@@ -1,7 +1,7 @@
 syntax = "proto3";
 
-import "protocol.proto";
-import "headers.proto";
+import "protocol/protocol.proto";
+import "headers/headers.proto";
 
 package atomix.counter;
 

@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package atomix.set;
 
-import "protocol.proto";
-import "headers.proto";
+import "protocol/protocol.proto";
+import "headers/headers.proto";
 import "google/protobuf/duration.proto";
 
 option java_package = "io.atomix.grpc.set";

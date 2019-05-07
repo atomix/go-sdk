@@ -9,4 +9,4 @@ RUN apt-get update && \
 
 WORKDIR "/go/src/github.com/atomix/atomix-go"
 
-ENTRYPOINT ["make"]
+ENTRYPOINT ["./build/compile_protos.sh"]
