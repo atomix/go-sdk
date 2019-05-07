@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package atomix.protocol;
+
+option java_package = "io.atomix.grpc.protocol";
+option java_multiple_files = true;
+
+// Multi-Raft protocol
+message MultiRaftProtocol {
+    string group = 1;
+}
+
+// Multi-primary protocol
+message MultiPrimaryProtocol {
+    string group = 1;
+}
+
+// Distributed log protocol
+message DistributedLogProtocol {
+    string group = 1;
+}
+
+// Gossip protocol
+message GossipProtocol {
+}
+
+// CRDT protocol
+message CrdtProtocol {
+}

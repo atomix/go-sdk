@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+import "google/protobuf/duration.proto";
+import "protocol.proto";
+import "headers.proto";
+
+package atomix.lock;
+
+option java_package = "io.atomix.grpc.lock";
+option java_multiple_files = true;
+
+// Lock ID
+message LockId {
+    string name = 1;
+    oneof proto {
+        protocol.MultiRaftProtocol raft = 2;
+        protocol.MultiPrimaryProtocol multi_primary = 3;
+        protocol.DistributedLogProtocol log = 4;
+    }
+}
+
+message CreateRequest {
+    LockId id = 1;
+    google.protobuf.Duration timeout = 2;
+}
+
+message CreateResponse {
+    atomix.headers.SessionHeaders headers = 1;
+}
+
+message KeepAliveRequest {
+    LockId id = 1;
+    atomix.headers.SessionHeaders headers = 2;
+}
+
+message KeepAliveResponse {
+    atomix.headers.SessionHeaders headers = 1;
+}
+
+message CloseRequest {
+    LockId id = 1;
+    atomix.headers.SessionHeaders headers = 2;
+}
+
+message CloseResponse {
+
+}
+
+message LockRequest {
+    LockId id = 1;
+    atomix.headers.SessionCommandHeaders headers = 2;
+    google.protobuf.Duration timeout = 3;
+}
+
+message LockResponse {
+    atomix.headers.SessionResponseHeaders headers = 1;
+    uint64 version = 2;
+}
+
+message UnlockRequest {
+    LockId id = 1;
+    atomix.headers.SessionCommandHeaders headers = 2;
+    uint64 version = 3;
+}
+
+message UnlockResponse {
+    atomix.headers.SessionResponseHeaders headers = 1;
+    bool unlocked = 2;
+}
+
+message IsLockedRequest {
+    LockId id = 1;
+    atomix.headers.SessionQueryHeaders headers = 2;
+    uint64 version = 3;
+}
+
+message IsLockedResponse {
+    atomix.headers.SessionResponseHeaders headers = 1;
+    bool isLocked = 2;
+}
+
+// Lock service
+service LockService {
+
+    rpc Create(CreateRequest) returns (CreateResponse) {}
+
+    rpc KeepAlive(KeepAliveRequest) returns (KeepAliveResponse) {}
+
+    rpc Close(CloseRequest) returns (CloseResponse) {}
+
+    rpc Lock(LockRequest) returns (LockResponse) {}
+
+    rpc Unlock(UnlockRequest) returns (UnlockResponse) {}
+
+    rpc IsLocked(IsLockedRequest) returns (IsLockedResponse) {}
+
+}

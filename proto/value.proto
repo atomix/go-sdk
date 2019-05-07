@@ -1,0 +1,122 @@
+syntax = "proto3";
+
+package atomix.value;
+
+import "protocol.proto";
+import "headers.proto";
+import "google/protobuf/duration.proto";
+
+option java_package = "io.atomix.grpc.value";
+option java_multiple_files = true;
+
+// Value ID
+message ValueId {
+    string name = 1;
+    oneof proto {
+        protocol.MultiRaftProtocol raft = 2;
+        protocol.MultiPrimaryProtocol multi_primary = 3;
+        protocol.DistributedLogProtocol log = 4;
+    }
+}
+
+message CreateRequest {
+    ValueId id = 1;
+    google.protobuf.Duration timeout = 2;
+}
+
+message CreateResponse {
+    atomix.headers.SessionHeaders headers = 1;
+}
+
+message KeepAliveRequest {
+    ValueId id = 1;
+    atomix.headers.SessionHeaders headers = 2;
+}
+
+message KeepAliveResponse {
+    atomix.headers.SessionHeaders headers = 1;
+}
+
+message CloseRequest {
+    ValueId id = 1;
+    atomix.headers.SessionHeaders headers = 2;
+}
+
+message CloseResponse {
+
+}
+
+message GetRequest {
+    ValueId id = 1;
+    atomix.headers.SessionQueryHeaders headers = 2;
+}
+
+message GetResponse {
+    atomix.headers.SessionResponseHeaders headers = 1;
+    bytes value = 2;
+    int64 version = 3;
+}
+
+message SetRequest {
+    ValueId id = 1;
+    atomix.headers.SessionCommandHeaders headers = 2;
+    bytes value = 3;
+}
+
+message SetResponse {
+    atomix.headers.SessionResponseHeaders headers = 1;
+    int64 version = 2;
+    bytes previous_value = 3;
+    int64 previous_version = 4;
+}
+
+message CheckAndSetRequest {
+    ValueId id = 1;
+    atomix.headers.SessionCommandHeaders headers = 2;
+    bytes check = 3;
+    bytes update = 4;
+    int64 version = 5;
+}
+
+message CheckAndSetResponse {
+    atomix.headers.SessionResponseHeaders headers = 1;
+    int64 version = 2;
+    bool succeeded = 3;
+}
+
+message EventRequest {
+    ValueId id = 1;
+    atomix.headers.SessionCommandHeaders headers = 2;
+}
+
+message EventResponse {
+    atomix.headers.SessionResponseHeaders headers = 1;
+    Type type = 2;
+    bytes previous_value = 3;
+    int64 previous_version = 4;
+    bytes new_value = 5;
+    int64 new_version = 6;
+
+    enum Type {
+        UPDATED = 0;
+    }
+}
+
+// Value service
+service ValueService {
+
+    rpc Create(CreateRequest) returns (CreateResponse) {}
+
+    rpc KeepAlive(KeepAliveRequest) returns (KeepAliveResponse) {}
+
+    rpc Close(CloseRequest) returns (CloseResponse) {}
+
+    rpc Set(SetRequest) returns (SetResponse) {}
+
+    rpc Get(GetRequest) returns (GetResponse) {}
+
+    rpc CheckAndSet(CheckAndSetRequest) returns (CheckAndSetResponse) {}
+
+    rpc Event(EventRequest) returns (stream EventResponse) {}
+
+}
