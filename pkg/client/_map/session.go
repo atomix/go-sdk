@@ -2,13 +2,22 @@ package _map
 
 import (
 	"context"
-	"github.com/atomix/atomix-go/pkg/client"
+	"github.com/atomix/atomix-go/pkg/client/protocol"
 	"github.com/atomix/atomix-go/pkg/client/session"
 	"github.com/atomix/atomix-go/proto/headers"
+	pb "github.com/atomix/atomix-go/proto/map"
 	"github.com/atomix/atomix-go/proto/protocol"
 	"github.com/golang/protobuf/ptypes/duration"
-	pb "github.com/atomix/atomix-go/proto/map"
 )
+
+func newSession(c pb.MapServiceClient, name string, protocol *protocol.Protocol, opts ...session.Option) *Session {
+	return &Session{
+		client: c,
+		name: name,
+		mapId: newMapId(name, protocol),
+		Session: session.NewSession(opts...),
+	}
+}
 
 type Session struct {
 	*session.Session
@@ -17,7 +26,7 @@ type Session struct {
 	mapId *pb.MapId
 }
 
-func newMapId(name string, protocol client.Protocol) *pb.MapId {
+func newMapId(name string, protocol *protocol.Protocol) *pb.MapId {
 	if protocol.MultiRaft != nil {
 		return &pb.MapId{
 			Name: name,

@@ -2,7 +2,7 @@ package lock
 
 import (
 	"context"
-	"github.com/atomix/atomix-go/pkg/client"
+	"github.com/atomix/atomix-go/pkg/client/protocol"
 	"github.com/atomix/atomix-go/pkg/client/session"
 	pb "github.com/atomix/atomix-go/proto/lock"
 	"github.com/golang/protobuf/ptypes/duration"
@@ -10,14 +10,9 @@ import (
 	"time"
 )
 
-func NewLock(conn *grpc.ClientConn, name string, protocol client.Protocol, opts ...session.Option) (*Lock, error) {
+func NewLock(conn *grpc.ClientConn, name string, protocol *protocol.Protocol, opts ...session.Option) (*Lock, error) {
 	c := pb.NewLockServiceClient(conn)
-	s := &Session{
-		client: c,
-		name: name,
-		lockId: newLockId(name, protocol),
-		Session: session.NewSession(opts...),
-	}
+	s := newSession(c, name, protocol, opts...)
 	if err := s.Connect(); err != nil {
 		return nil, err
 	}

@@ -1,7 +1,7 @@
 package session
 
 import (
-	"github.com/atomix/atomix-go/pkg/client"
+	"github.com/atomix/atomix-go/pkg/client/protocol"
 	"github.com/atomix/atomix-go/proto/headers"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sync"
@@ -31,9 +31,9 @@ func (o TimeoutOption) prepare(options *Options) {
 }
 
 type Options struct {
-	raft client.MultiRaftProtocol
-	primaryBackup client.MultiPrimaryProtocol
-	log client.MultiLogProtocol
+	raft protocol.MultiRaftProtocol
+	primaryBackup protocol.MultiPrimaryProtocol
+	log protocol.MultiLogProtocol
 	timeout time.Duration
 }
 
@@ -153,9 +153,9 @@ func (h *Headers) Validate(headers *headers.SessionResponseHeaders) bool {
 
 func (h *Headers) Session() *headers.SessionHeaders {
 	h.mu.RLock()
-	sh := make([]*headers.SessionHeader, len(h.partitions))
+	sh := []*headers.SessionHeader{}
 	for i := range h.partitions {
-		sh[i] = h.partitions[i].newSessionHeader()
+		sh = append(sh, h.partitions[i].newSessionHeader())
 	}
 	h.mu.RUnlock()
 
@@ -167,9 +167,9 @@ func (h *Headers) Session() *headers.SessionHeaders {
 
 func (h *Headers) Query() *headers.SessionQueryHeaders {
 	h.mu.RLock()
-	qh := make([]*headers.SessionQueryHeader, len(h.partitions))
+	qh := []*headers.SessionQueryHeader{}
 	for i := range h.partitions {
-		qh[i] = h.partitions[i].newQueryHeader()
+		qh = append(qh, h.partitions[i].newQueryHeader())
 	}
 	h.mu.RUnlock()
 
@@ -181,9 +181,9 @@ func (h *Headers) Query() *headers.SessionQueryHeaders {
 
 func (h *Headers) Command() *headers.SessionCommandHeaders {
 	h.mu.RLock()
-	ch := make([]*headers.SessionCommandHeader, len(h.partitions))
+	ch := []*headers.SessionCommandHeader{}
 	for i := range h.partitions {
-		ch[i] = h.partitions[i].newCommandHeader()
+		ch = append(ch, h.partitions[i].newCommandHeader())
 	}
 	h.mu.RUnlock()
 

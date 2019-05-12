@@ -2,13 +2,22 @@ package lock
 
 import (
 	"context"
-	"github.com/atomix/atomix-go/pkg/client"
+	"github.com/atomix/atomix-go/pkg/client/protocol"
 	"github.com/atomix/atomix-go/pkg/client/session"
 	"github.com/atomix/atomix-go/proto/headers"
+	pb "github.com/atomix/atomix-go/proto/lock"
 	"github.com/atomix/atomix-go/proto/protocol"
 	"github.com/golang/protobuf/ptypes/duration"
-	pb "github.com/atomix/atomix-go/proto/lock"
 )
+
+func newSession(c pb.LockServiceClient, name string, protocol *protocol.Protocol, opts ...session.Option) *Session {
+	return &Session{
+		client: c,
+		name: name,
+		lockId: newLockId(name, protocol),
+		Session: session.NewSession(opts...),
+	}
+}
 
 type Session struct {
 	*session.Session
@@ -17,7 +26,7 @@ type Session struct {
 	lockId *pb.LockId
 }
 
-func newLockId(name string, protocol client.Protocol) *pb.LockId {
+func newLockId(name string, protocol *protocol.Protocol) *pb.LockId {
 	if protocol.MultiRaft != nil {
 		return &pb.LockId{
 			Name: name,

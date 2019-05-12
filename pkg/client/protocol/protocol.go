@@ -1,4 +1,4 @@
-package client
+package protocol
 
 func MultiRaft(group string) *Protocol {
 	return &Protocol{

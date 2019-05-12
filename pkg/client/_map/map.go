@@ -2,7 +2,8 @@ package _map
 
 import (
 	"context"
-	"github.com/atomix/atomix-go/pkg/client"
+	"fmt"
+	"github.com/atomix/atomix-go/pkg/client/protocol"
 	"github.com/atomix/atomix-go/pkg/client/session"
 	pb "github.com/atomix/atomix-go/proto/map"
 	"google.golang.org/grpc"
@@ -10,14 +11,9 @@ import (
 	"k8s.io/klog/glog"
 )
 
-func NewMap(conn *grpc.ClientConn, name string, protocol client.Protocol, opts ...session.Option) (*Map, error) {
+func NewMap(conn *grpc.ClientConn, name string, protocol *protocol.Protocol, opts ...session.Option) (*Map, error) {
 	c := pb.NewMapServiceClient(conn)
-	s := &Session{
-		client: c,
-		name: name,
-		mapId: newMapId(name, protocol),
-		Session: session.NewSession(opts...),
-	}
+	s := newSession(c, name, protocol, opts...)
 	if err := s.Connect(); err != nil {
 		return nil, err
 	}
@@ -143,6 +139,7 @@ func (m *Map) Get(ctx context.Context, key string, opts ...GetOption) (*KeyValue
 		Headers: m.session.Headers.Query(),
 		Key: key,
 	}
+	fmt.Printf("%v", request)
 
 	for i := range opts {
 		opts[i].before(request)
