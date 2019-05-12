@@ -3,7 +3,6 @@ package _map
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/atomix/atomix-go/pkg/client/protocol"
 	"github.com/atomix/atomix-go/pkg/client/session"
 	pb "github.com/atomix/atomix-go/proto/map"
@@ -40,7 +39,6 @@ func (m *Map) Listen(ctx context.Context, c chan<- *MapEvent) error {
 		return err
 	}
 
-	ec := make(chan *MapEvent)
 	go func() {
 		for {
 			response, err := events.Recv()
@@ -63,7 +61,7 @@ func (m *Map) Listen(ctx context.Context, c chan<- *MapEvent) error {
 			}
 
 			if m.session.Headers.Validate(response.Headers) {
-				ec<-&MapEvent{
+				c<-&MapEvent{
 					Type: t,
 					Key: response.Key,
 					Value: response.NewValue,
@@ -72,15 +70,7 @@ func (m *Map) Listen(ctx context.Context, c chan<- *MapEvent) error {
 			}
 		}
 	}()
-
-	for {
-		select {
-		case e := <-ec:
-			c<-e
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
+	return nil
 }
 
 func (m *Map) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*KeyValue, error) {
@@ -152,7 +142,6 @@ func (m *Map) Get(ctx context.Context, key string, opts ...GetOption) (*KeyValue
 		Headers: m.session.Headers.Query(),
 		Key: key,
 	}
-	fmt.Printf("%v", request)
 
 	for i := range opts {
 		opts[i].before(request)

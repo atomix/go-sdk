@@ -9,34 +9,98 @@ import (
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
+	"io"
 	"log"
 	"net"
+	"sync"
 	"testing"
 )
 
+// NewTestServer creates a new server for managing sessions
 func NewTestServer() *TestServer {
 	return &TestServer{
-		sessions: make(map[uint64]uint64),
+		sessions: make(map[uint64]*TestSession),
 		index:    0,
 		entries:  make(map[string]*KeyValue),
-		streams:  make(map[uint64]*TestStream),
 	}
 }
 
+// TestServer manages the map state machine for testing
 type TestServer struct {
-	sessions map[uint64]uint64
+	sessions map[uint64]*TestSession
 	index    uint64
 	entries  map[string]*KeyValue
-	streams  map[uint64]*TestStream
+	mu       sync.Mutex
+	queue    chan uint64
 }
 
+// TestSession manages a session, orders session operations, and manages streams for the session
+type TestSession struct {
+	id        uint64
+	server    *TestServer
+	sequences map[uint64]chan struct{}
+	mu        sync.Mutex
+	sequence  uint64
+	streams   map[uint64]*TestStream
+}
+
+// Send sends an event response to all open streams
+func (s *TestSession) Send(event *pb.EventResponse) {
+	for _, stream := range s.streams {
+		stream.Send(event)
+	}
+}
+
+// getLatch returns a channel on which to wait for operations to be ordered for the given sequence number
+func (s *TestSession) getLatch(sequence uint64) chan struct{} {
+	s.mu.Lock()
+	if _, ok := s.sequences[sequence]; !ok {
+		s.sequences[sequence] = make(chan struct{}, 1)
+	}
+	latch := s.sequences[sequence]
+	s.mu.Unlock()
+	return latch
+}
+
+// Await waits for all commands prior to the given sequence number to be applied to the server
+func (s *TestSession) Await(sequence uint64) {
+	<-s.getLatch(sequence)
+	s.sequence = sequence
+}
+
+// Complete unblocks the command following the given sequence number to be applied to the server
+func (s *TestSession) Complete(sequence uint64) {
+	s.getLatch(sequence + 1)<-struct{}{}
+}
+
+// newResponseHeader creates a new response header with headers for all open streams
+func (s *TestSession) newResponseHeaders() (*headers.SessionResponseHeaders, error) {
+	streams := []*headers.SessionStreamHeader{}
+	for _, stream := range s.streams {
+		streams = append(streams, stream.header(uint64(s.server.index)))
+	}
+	return &headers.SessionResponseHeaders{
+		SessionId: s.id,
+		Headers: []*headers.SessionResponseHeader{
+			{
+				PartitionId:    1,
+				Index:          s.server.index,
+				SequenceNumber: s.sequence,
+				Streams:        streams,
+			},
+		},
+	}, nil
+}
+
+// TestStream manages ordering for a single stream
 type TestStream struct {
 	server   *TestServer
 	id       uint64
-	stream   pb.MapService_EventsServer
 	sequence uint64
+	c        chan<- *pb.EventResponse
 }
 
+// header creates a new stream header
 func (s *TestStream) header(index uint64) *headers.SessionStreamHeader {
 	return &headers.SessionStreamHeader{
 		StreamId:       s.id,
@@ -45,7 +109,8 @@ func (s *TestStream) header(index uint64) *headers.SessionStreamHeader {
 	}
 }
 
-func (s *TestStream) Send(response *pb.EventResponse) error {
+// Send sends an EventResponse on the stream
+func (s *TestStream) Send(response *pb.EventResponse) {
 	s.sequence += 1
 	response.Headers.Headers[0].Streams = []*headers.SessionStreamHeader{
 		{
@@ -54,9 +119,10 @@ func (s *TestStream) Send(response *pb.EventResponse) error {
 			LastItemNumber: s.sequence,
 		},
 	}
-	return s.stream.Send(response)
+	s.c <- response
 }
 
+// incrementIndex increments and returns the server's index
 func (s *TestServer) incrementIndex() uint64 {
 	s.index += 1
 	return s.index
@@ -64,7 +130,15 @@ func (s *TestServer) incrementIndex() uint64 {
 
 func (s *TestServer) Create(ctx context.Context, request *pb.CreateRequest) (*pb.CreateResponse, error) {
 	index := s.incrementIndex()
-	s.sessions[index] = 0
+	session := &TestSession{
+		id:        index,
+		server:    s,
+		sequences: make(map[uint64]chan struct{}),
+		streams:   make(map[uint64]*TestStream),
+		mu:        sync.Mutex{},
+	}
+	s.sessions[index] = session
+	session.Complete(0)
 	return &pb.CreateResponse{
 		Headers: &headers.SessionHeaders{
 			SessionId: index,
@@ -79,9 +153,9 @@ func (s *TestServer) Create(ctx context.Context, request *pb.CreateRequest) (*pb
 
 func (s *TestServer) KeepAlive(ctx context.Context, request *pb.KeepAliveRequest) (*pb.KeepAliveResponse, error) {
 	index := s.incrementIndex()
-	if sequence, exists := s.sessions[request.Headers.SessionId]; exists {
+	if session, exists := s.sessions[request.Headers.SessionId]; exists {
 		streams := []*headers.SessionStreamHeader{}
-		for _, stream := range s.streams {
+		for _, stream := range session.streams {
 			streams = append(streams, stream.header(uint64(index)))
 		}
 		return &pb.KeepAliveResponse{
@@ -90,14 +164,14 @@ func (s *TestServer) KeepAlive(ctx context.Context, request *pb.KeepAliveRequest
 				Headers: []*headers.SessionHeader{
 					{
 						PartitionId:        1,
-						LastSequenceNumber: sequence,
+						LastSequenceNumber: session.sequence,
 						Streams:            streams,
 					},
 				},
 			},
 		}, nil
 	} else {
-		return nil, errors.New("session does not exist")
+		return nil, errors.New("session not found")
 	}
 }
 
@@ -106,20 +180,26 @@ func (s *TestServer) Close(ctx context.Context, request *pb.CloseRequest) (*pb.C
 	if _, exists := s.sessions[request.Headers.SessionId]; exists {
 		return &pb.CloseResponse{}, nil
 	} else {
-		return nil, errors.New("session does not exist")
+		return nil, errors.New("session not found")
 	}
 }
 
 func (s *TestServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutResponse, error) {
 	index := s.incrementIndex()
 
-	headers, err := s.newResponseHeaders(request.Headers.SessionId)
+	session, ok := s.sessions[request.Headers.SessionId]
+	if !ok {
+		return nil, errors.New("session not found")
+	}
+
+	sequenceNumber := request.Headers.Headers[0].SequenceNumber
+	session.Await(sequenceNumber)
+	defer session.Complete(sequenceNumber)
+
+	headers, err := session.newResponseHeaders()
 	if err != nil {
 		return nil, err
 	}
-
-	sequence := request.Headers.Headers[0].SequenceNumber
-	s.sessions[request.Headers.SessionId] = sequence
 
 	v := s.entries[request.Key]
 
@@ -143,26 +223,24 @@ func (s *TestServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRe
 		Version: int64(index),
 	}
 
-	for _, stream := range s.streams {
-		if v.Version == 0 {
-			stream.Send(&pb.EventResponse{
-				Headers:    headers,
-				Type:       pb.EventResponse_INSERTED,
-				Key:        request.Key,
-				NewValue:   request.Value,
-				NewVersion: request.Version,
-			})
-		} else {
-			stream.Send(&pb.EventResponse{
-				Headers:    headers,
-				Type:       pb.EventResponse_UPDATED,
-				Key:        request.Key,
-				OldValue:   v.Value,
-				OldVersion: v.Version,
-				NewValue:   request.Value,
-				NewVersion: request.Version,
-			})
-		}
+	if v == nil {
+		session.Send(&pb.EventResponse{
+			Headers:    headers,
+			Type:       pb.EventResponse_INSERTED,
+			Key:        request.Key,
+			NewValue:   request.Value,
+			NewVersion: request.Version,
+		})
+	} else {
+		session.Send(&pb.EventResponse{
+			Headers:    headers,
+			Type:       pb.EventResponse_UPDATED,
+			Key:        request.Key,
+			OldValue:   v.Value,
+			OldVersion: v.Version,
+			NewValue:   request.Value,
+			NewVersion: request.Version,
+		})
 	}
 
 	if v != nil {
@@ -181,7 +259,12 @@ func (s *TestServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRe
 }
 
 func (s *TestServer) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetResponse, error) {
-	headers, err := s.newResponseHeaders(request.Headers.SessionId)
+	session, ok := s.sessions[request.Headers.SessionId]
+	if !ok {
+		return nil, errors.New("session not found")
+	}
+
+	headers, err := session.newResponseHeaders()
 	if err != nil {
 		return nil, err
 	}
@@ -204,13 +287,19 @@ func (s *TestServer) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetRe
 func (s *TestServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb.RemoveResponse, error) {
 	s.incrementIndex()
 
-	headers, err := s.newResponseHeaders(request.Headers.SessionId)
+	session, ok := s.sessions[request.Headers.SessionId]
+	if !ok {
+		return nil, errors.New("session not found")
+	}
+
+	sequenceNumber := request.Headers.Headers[0].SequenceNumber
+	session.Await(sequenceNumber)
+	defer session.Complete(sequenceNumber)
+
+	headers, err := session.newResponseHeaders()
 	if err != nil {
 		return nil, err
 	}
-
-	sequence := request.Headers.Headers[0].SequenceNumber
-	s.sessions[request.Headers.SessionId] = sequence
 
 	v := s.entries[request.Key]
 
@@ -230,15 +319,13 @@ func (s *TestServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb
 
 	delete(s.entries, request.Key)
 
-	for _, stream := range s.streams {
-		stream.Send(&pb.EventResponse{
-			Headers:    headers,
-			Type:       pb.EventResponse_REMOVED,
-			Key:        request.Key,
-			OldValue:   v.Value,
-			OldVersion: v.Version,
-		})
-	}
+	session.Send(&pb.EventResponse{
+		Headers:    headers,
+		Type:       pb.EventResponse_REMOVED,
+		Key:        request.Key,
+		OldValue:   v.Value,
+		OldVersion: v.Version,
+	})
 
 	if v.Version != 0 {
 		return &pb.RemoveResponse{
@@ -258,13 +345,19 @@ func (s *TestServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb
 func (s *TestServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*pb.ReplaceResponse, error) {
 	index := s.incrementIndex()
 
-	headers, err := s.newResponseHeaders(request.Headers.SessionId)
+	session, ok := s.sessions[request.Headers.SessionId]
+	if !ok {
+		return nil, errors.New("session not found")
+	}
+
+	sequenceNumber := request.Headers.Headers[0].SequenceNumber
+	session.Await(sequenceNumber)
+	defer session.Complete(sequenceNumber)
+
+	headers, err := session.newResponseHeaders()
 	if err != nil {
 		return nil, err
 	}
-
-	sequence := request.Headers.Headers[0].SequenceNumber
-	s.sessions[request.Headers.SessionId] = sequence
 
 	v := s.entries[request.Key]
 
@@ -288,26 +381,24 @@ func (s *TestServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*
 		Version: int64(index),
 	}
 
-	for _, stream := range s.streams {
-		if v.Version == 0 {
-			stream.Send(&pb.EventResponse{
-				Headers:    headers,
-				Type:       pb.EventResponse_INSERTED,
-				Key:        request.Key,
-				NewValue:   request.NewValue,
-				NewVersion: int64(index),
-			})
-		} else {
-			stream.Send(&pb.EventResponse{
-				Headers:    headers,
-				Type:       pb.EventResponse_UPDATED,
-				Key:        request.Key,
-				OldValue:   v.Value,
-				OldVersion: v.Version,
-				NewValue:   request.NewValue,
-				NewVersion: int64(index),
-			})
-		}
+	if v.Version == 0 {
+		session.Send(&pb.EventResponse{
+			Headers:    headers,
+			Type:       pb.EventResponse_INSERTED,
+			Key:        request.Key,
+			NewValue:   request.NewValue,
+			NewVersion: int64(index),
+		})
+	} else {
+		session.Send(&pb.EventResponse{
+			Headers:    headers,
+			Type:       pb.EventResponse_UPDATED,
+			Key:        request.Key,
+			OldValue:   v.Value,
+			OldVersion: v.Version,
+			NewValue:   request.NewValue,
+			NewVersion: int64(index),
+		})
 	}
 
 	if v != nil {
@@ -326,7 +417,12 @@ func (s *TestServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*
 }
 
 func (s *TestServer) Exists(ctx context.Context, request *pb.ExistsRequest) (*pb.ExistsResponse, error) {
-	headers, err := s.newResponseHeaders(request.Headers.SessionId)
+	session, ok := s.sessions[request.Headers.SessionId]
+	if !ok {
+		return nil, errors.New("session not found")
+	}
+
+	headers, err := session.newResponseHeaders()
 	if err != nil {
 		return nil, err
 	}
@@ -347,7 +443,12 @@ func (s *TestServer) Exists(ctx context.Context, request *pb.ExistsRequest) (*pb
 }
 
 func (s *TestServer) Size(ctx context.Context, request *pb.SizeRequest) (*pb.SizeResponse, error) {
-	headers, err := s.newResponseHeaders(request.Headers.SessionId)
+	session, ok := s.sessions[request.Headers.SessionId]
+	if !ok {
+		return nil, errors.New("session not found")
+	}
+
+	headers, err := session.newResponseHeaders()
 	if err != nil {
 		return nil, err
 	}
@@ -360,13 +461,19 @@ func (s *TestServer) Size(ctx context.Context, request *pb.SizeRequest) (*pb.Siz
 func (s *TestServer) Clear(ctx context.Context, request *pb.ClearRequest) (*pb.ClearResponse, error) {
 	s.incrementIndex()
 
-	headers, err := s.newResponseHeaders(request.Headers.SessionId)
+	session, ok := s.sessions[request.Headers.SessionId]
+	if !ok {
+		return nil, errors.New("session not found")
+	}
+
+	sequenceNumber := request.Headers.Headers[0].SequenceNumber
+	session.Await(sequenceNumber)
+	defer session.Complete(sequenceNumber)
+
+	headers, err := session.newResponseHeaders()
 	if err != nil {
 		return nil, err
 	}
-
-	sequence := request.Headers.Headers[0].SequenceNumber
-	s.sessions[request.Headers.SessionId] = sequence
 
 	s.entries = make(map[string]*KeyValue)
 
@@ -377,33 +484,30 @@ func (s *TestServer) Clear(ctx context.Context, request *pb.ClearRequest) (*pb.C
 
 func (s *TestServer) Events(request *pb.EventRequest, server pb.MapService_EventsServer) error {
 	index := s.incrementIndex()
-	s.streams[index] = &TestStream{
+
+	session, ok := s.sessions[request.Headers.SessionId]
+	if !ok {
+		return errors.New("session not found")
+	}
+
+	sequenceNumber := request.Headers.Headers[0].SequenceNumber
+	session.Await(sequenceNumber)
+	session.Complete(sequenceNumber)
+
+	c := make(chan *pb.EventResponse)
+	session.streams[index] = &TestStream{
 		server: s,
 		id:     index,
-		stream: server,
+		c:      c,
 	}
-	return nil
-}
 
-func (s *TestServer) newResponseHeaders(sessionId uint64) (*headers.SessionResponseHeaders, error) {
-	if sequence, exists := s.sessions[sessionId]; exists {
-		streams := []*headers.SessionStreamHeader{}
-		for _, stream := range s.streams {
-			streams = append(streams, stream.header(uint64(s.index)))
+	for {
+		if err := server.Send(<-c); err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
 		}
-		return &headers.SessionResponseHeaders{
-			SessionId: sessionId,
-			Headers: []*headers.SessionResponseHeader{
-				{
-					PartitionId:    1,
-					Index:          s.index,
-					SequenceNumber: sequence,
-					Streams:        streams,
-				},
-			},
-		}, nil
-	} else {
-		return nil, errors.New("session does not exist")
 	}
 }
 
@@ -439,7 +543,7 @@ func serve(l *bufconn.Listener, c <-chan struct{}) {
 	}()
 }
 
-func TestMapOperations(t *testing.T) {
+func startTest() (*grpc.ClientConn, chan struct{}) {
 	l := bufconn.Listen(1024 * 1024)
 	stop := make(chan struct{})
 	serve(l, stop)
@@ -453,7 +557,22 @@ func TestMapOperations(t *testing.T) {
 		panic(err)
 	}
 
-	m, err := NewMap(c, "test", protocol.MultiRaft("test"))
+	go func() {
+		<-stop
+		c.Close()
+	}()
+
+	return c, stop
+}
+
+func stopTest(c chan struct{}) {
+	c <- struct{}{}
+}
+
+func TestMapOperations(t *testing.T) {
+	conn, test := startTest()
+
+	m, err := NewMap(conn, "test", protocol.MultiRaft("test"))
 	assert.NoError(t, err)
 
 	size, err := m.Size(context.Background())
@@ -533,8 +652,67 @@ func TestMapOperations(t *testing.T) {
 	assert.NotNil(t, removed)
 	assert.Equal(t, kv2.Version, removed.Version)
 
-	defer c.Close()
-	stop <- struct{}{}
+	stopTest(test)
+}
+
+func TestMapStreams(t *testing.T) {
+	conn, test := startTest()
+
+	m, err := NewMap(conn, "test", protocol.MultiRaft("test"))
+	assert.NoError(t, err)
+
+	kv, err := m.Put(context.Background(), "foo", []byte{1})
+	assert.NoError(t, err)
+	assert.NotNil(t, kv)
+
+	c := make(chan *MapEvent)
+	latch := make(chan struct{})
+	go func() {
+		e := <-c
+		assert.Equal(t, "foo", e.Key)
+		assert.Equal(t, byte(2), e.Value[0])
+		e = <-c
+		assert.Equal(t, "bar", e.Key)
+		assert.Equal(t, byte(3), e.Value[0])
+		e = <-c
+		assert.Equal(t, "baz", e.Key)
+		assert.Equal(t, byte(4), e.Value[0])
+		e = <-c
+		assert.Equal(t, "foo", e.Key)
+		assert.Equal(t, byte(5), e.Value[0])
+		latch <- struct{}{}
+	}()
+
+	err = m.Listen(context.Background(), c)
+	assert.NoError(t, err)
+
+	kv, err = m.Put(context.Background(), "foo", []byte{2})
+	assert.NoError(t, err)
+	assert.NotNil(t, kv)
+	assert.Equal(t, "foo", kv.Key)
+	assert.Equal(t, byte(2), kv.Value[0])
+
+	kv, err = m.Put(context.Background(), "bar", []byte{3})
+	assert.NoError(t, err)
+	assert.NotNil(t, kv)
+	assert.Equal(t, "bar", kv.Key)
+	assert.Equal(t, byte(3), kv.Value[0])
+
+	kv, err = m.Put(context.Background(), "baz", []byte{4})
+	assert.NoError(t, err)
+	assert.NotNil(t, kv)
+	assert.Equal(t, "baz", kv.Key)
+	assert.Equal(t, byte(4), kv.Value[0])
+
+	kv, err = m.Put(context.Background(), "foo", []byte{5})
+	assert.NoError(t, err)
+	assert.NotNil(t, kv)
+	assert.Equal(t, "foo", kv.Key)
+	assert.Equal(t, byte(5), kv.Value[0])
+
+	<-latch
+
+	stopTest(test)
 }
 
 func example() {
