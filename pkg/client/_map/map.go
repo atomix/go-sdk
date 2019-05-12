@@ -2,6 +2,7 @@ package _map
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/atomix/atomix-go/pkg/client/protocol"
 	"github.com/atomix/atomix-go/pkg/client/session"
@@ -105,11 +106,23 @@ func (m *Map) Put(ctx context.Context, key string, value []byte, opts ...PutOpti
 
 	m.session.Headers.Update(response.Headers)
 
-	return &KeyValue{
-		Key: key,
-		Value: response.PreviousValue,
-		Version: response.PreviousVersion,
-	}, nil
+	if response.Status == pb.ResponseStatus_OK {
+		return &KeyValue{
+			Key:     key,
+			Value:   value,
+			Version: int64(response.Headers.Headers[0].Index),
+		}, nil
+	} else if response.Status == pb.ResponseStatus_PRECONDITION_FAILED {
+		return nil, errors.New("write condition failed")
+	} else if response.Status == pb.ResponseStatus_WRITE_LOCK {
+		return nil, errors.New("write lock failed")
+	} else {
+		return &KeyValue{
+			Key: key,
+			Value: value,
+			Version: int64(response.PreviousVersion),
+		}, nil
+	}
 }
 
 type PutOption interface {
@@ -156,11 +169,14 @@ func (m *Map) Get(ctx context.Context, key string, opts ...GetOption) (*KeyValue
 
 	m.session.Headers.Update(response.Headers)
 
-	return &KeyValue{
-		Key: key,
-		Value: response.Value,
-		Version: response.Version,
-	}, nil
+	if response.Version != 0 {
+		return &KeyValue{
+			Key:     key,
+			Value:   response.Value,
+			Version: response.Version,
+		}, nil
+	}
+	return nil, nil
 }
 
 type GetOption interface {
@@ -207,9 +223,19 @@ func (m *Map) Remove(ctx context.Context, key string, opts ...RemoveOption) (*Ke
 
 	m.session.Headers.Update(response.Headers)
 
-	return &KeyValue{
-		Key: key,
-	}, nil
+	if response.Status == pb.ResponseStatus_OK {
+		return &KeyValue{
+			Key: key,
+			Value: response.PreviousValue,
+			Version: response.PreviousVersion,
+		}, nil
+	} else if response.Status == pb.ResponseStatus_PRECONDITION_FAILED {
+		return nil, errors.New("write condition failed")
+	} else if response.Status == pb.ResponseStatus_WRITE_LOCK {
+		return nil, errors.New("write lock failed")
+	} else {
+		return nil, nil
+	}
 }
 
 type RemoveOption interface {
@@ -233,7 +259,7 @@ func (o RemoveIfVersionOption) after(response *pb.RemoveResponse) {
 
 }
 
-func (m *Map) Size(ctx context.Context) (*int32, error) {
+func (m *Map) Size(ctx context.Context) (int, error) {
 	request := &pb.SizeRequest{
 		Id: m.session.mapId,
 		Headers: m.session.Headers.Query(),
@@ -241,11 +267,11 @@ func (m *Map) Size(ctx context.Context) (*int32, error) {
 
 	response, err := m.client.Size(ctx, request)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
 	m.session.Headers.Update(response.Headers)
-	return &response.Size, nil
+	return int(response.Size), nil
 }
 
 func (m *Map) Clear(ctx context.Context) error {
