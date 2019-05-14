@@ -30,8 +30,6 @@ type TestServer struct {
 	sessions map[uint64]*TestSession
 	index    uint64
 	entries  map[string]*KeyValue
-	mu       sync.Mutex
-	queue    chan uint64
 }
 
 // TestSession manages a session, orders session operations, and manages streams for the session

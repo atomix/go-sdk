@@ -28,22 +28,51 @@ type Lock struct {
 	session *Session
 }
 
-func (l *Lock) Lock(ctx context.Context, timeout time.Duration) (uint64, error) {
+func (l *Lock) Lock(ctx context.Context, opts ...LockOption) (uint64, error) {
 	request := &pb.LockRequest{
 		Id: l.session.lockId,
 		Headers: l.session.Headers.Command(),
-		Timeout: &duration.Duration{
-			Seconds: int64(timeout.Seconds()),
-			Nanos: int32(timeout.Nanoseconds()),
-		},
+	}
+
+	for _, opt := range opts {
+		opt.before(request)
 	}
 
 	response, err := l.client.Lock(ctx, request)
 	if err != nil {
 		return 0, err
 	}
+
+	for _, opt := range opts {
+		opt.after(response)
+	}
+
 	l.session.Headers.Update(response.Headers)
 	return response.Version, nil
+}
+
+type LockOption interface {
+	before(request *pb.LockRequest)
+	after(response *pb.LockResponse)
+}
+
+func LockTimeout(timeout time.Duration) LockOption {
+	return lockTimeoutOption{timeout: timeout}
+}
+
+type lockTimeoutOption struct {
+	timeout time.Duration
+}
+
+func (o lockTimeoutOption) before(request *pb.LockRequest) {
+	request.Timeout = &duration.Duration{
+		Seconds: int64(o.timeout.Seconds()),
+		Nanos: int32(o.timeout.Nanoseconds()),
+	}
+}
+
+func (o lockTimeoutOption) after(response *pb.LockResponse) {
+
 }
 
 func (l *Lock) Unlock(ctx context.Context, opts ...UnlockOption) (bool, error) {
@@ -74,19 +103,19 @@ type UnlockOption interface {
 	after(response *pb.UnlockResponse)
 }
 
-func UnlockIfVersion(version uint64) UnlockOption {
-	return UnlockIfVersionOption{version: version}
+func UnlockVersion(version uint64) UnlockOption {
+	return unlockVersionOption{version: version}
 }
 
-type UnlockIfVersionOption struct {
+type unlockVersionOption struct {
 	version uint64
 }
 
-func (o UnlockIfVersionOption) before(request *pb.UnlockRequest) {
+func (o unlockVersionOption) before(request *pb.UnlockRequest) {
 	request.Version = o.version
 }
 
-func (o UnlockIfVersionOption) after(response *pb.UnlockResponse) {
+func (o unlockVersionOption) after(response *pb.UnlockResponse) {
 
 }
 
@@ -119,18 +148,18 @@ type IsLockedOption interface {
 }
 
 func IsLockedVersion(version uint64) IsLockedOption {
-	return IsLockedVersionOption{version: version}
+	return isLockedVersionOption{version: version}
 }
 
-type IsLockedVersionOption struct {
+type isLockedVersionOption struct {
 	version uint64
 }
 
-func (o IsLockedVersionOption) before(request *pb.IsLockedRequest) {
+func (o isLockedVersionOption) before(request *pb.IsLockedRequest) {
 	request.Version = o.version
 }
 
-func (o IsLockedVersionOption) after(response *pb.IsLockedResponse) {
+func (o isLockedVersionOption) after(response *pb.IsLockedResponse) {
 
 }
 
