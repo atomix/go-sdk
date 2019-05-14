@@ -2,199 +2,69 @@ package _map
 
 import (
 	"context"
-	"errors"
 	"github.com/atomix/atomix-go/pkg/client/protocol"
-	"github.com/atomix/atomix-go/proto/headers"
+	"github.com/atomix/atomix-go/pkg/client/test"
 	pb "github.com/atomix/atomix-go/proto/map"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/test/bufconn"
 	"io"
-	"log"
-	"net"
-	"sync"
 	"testing"
 )
 
 // NewTestServer creates a new server for managing sessions
 func NewTestServer() *TestServer {
 	return &TestServer{
-		sessions: make(map[uint64]*TestSession),
-		index:    0,
-		entries:  make(map[string]*KeyValue),
+		TestServer: test.NewTestServer(),
+		entries:    make(map[string]*KeyValue),
 	}
 }
 
-// TestServer manages the map state machine for testing
 type TestServer struct {
-	sessions map[uint64]*TestSession
-	index    uint64
-	entries  map[string]*KeyValue
-}
-
-// TestSession manages a session, orders session operations, and manages streams for the session
-type TestSession struct {
-	id        uint64
-	server    *TestServer
-	sequences map[uint64]chan struct{}
-	mu        sync.Mutex
-	sequence  uint64
-	streams   map[uint64]*TestStream
-}
-
-// Send sends an event response to all open streams
-func (s *TestSession) Send(event *pb.EventResponse) {
-	for _, stream := range s.streams {
-		stream.Send(event)
-	}
-}
-
-// getLatch returns a channel on which to wait for operations to be ordered for the given sequence number
-func (s *TestSession) getLatch(sequence uint64) chan struct{} {
-	s.mu.Lock()
-	if _, ok := s.sequences[sequence]; !ok {
-		s.sequences[sequence] = make(chan struct{}, 1)
-	}
-	latch := s.sequences[sequence]
-	s.mu.Unlock()
-	return latch
-}
-
-// Await waits for all commands prior to the given sequence number to be applied to the server
-func (s *TestSession) Await(sequence uint64) {
-	<-s.getLatch(sequence)
-	s.sequence = sequence
-}
-
-// Complete unblocks the command following the given sequence number to be applied to the server
-func (s *TestSession) Complete(sequence uint64) {
-	s.getLatch(sequence + 1)<-struct{}{}
-}
-
-// newResponseHeader creates a new response header with headers for all open streams
-func (s *TestSession) newResponseHeaders() (*headers.SessionResponseHeaders, error) {
-	streams := []*headers.SessionStreamHeader{}
-	for _, stream := range s.streams {
-		streams = append(streams, stream.header(uint64(s.server.index)))
-	}
-	return &headers.SessionResponseHeaders{
-		SessionId: s.id,
-		Headers: []*headers.SessionResponseHeader{
-			{
-				PartitionId:    1,
-				Index:          s.server.index,
-				SequenceNumber: s.sequence,
-				Streams:        streams,
-			},
-		},
-	}, nil
-}
-
-// TestStream manages ordering for a single stream
-type TestStream struct {
-	server   *TestServer
-	id       uint64
-	sequence uint64
-	c        chan<- *pb.EventResponse
-}
-
-// header creates a new stream header
-func (s *TestStream) header(index uint64) *headers.SessionStreamHeader {
-	return &headers.SessionStreamHeader{
-		StreamId:       s.id,
-		Index:          index,
-		LastItemNumber: s.sequence,
-	}
-}
-
-// Send sends an EventResponse on the stream
-func (s *TestStream) Send(response *pb.EventResponse) {
-	s.sequence += 1
-	response.Headers.Headers[0].Streams = []*headers.SessionStreamHeader{
-		{
-			StreamId:       s.id,
-			Index:          s.server.index,
-			LastItemNumber: s.sequence,
-		},
-	}
-	s.c <- response
-}
-
-// incrementIndex increments and returns the server's index
-func (s *TestServer) incrementIndex() uint64 {
-	s.index += 1
-	return s.index
+	*test.TestServer
+	entries map[string]*KeyValue
 }
 
 func (s *TestServer) Create(ctx context.Context, request *pb.CreateRequest) (*pb.CreateResponse, error) {
-	index := s.incrementIndex()
-	session := &TestSession{
-		id:        index,
-		server:    s,
-		sequences: make(map[uint64]chan struct{}),
-		streams:   make(map[uint64]*TestStream),
-		mu:        sync.Mutex{},
+	headers, err := s.CreateHeaders(ctx)
+	if err != nil {
+		return nil, err
 	}
-	s.sessions[index] = session
-	session.Complete(0)
 	return &pb.CreateResponse{
-		Headers: &headers.SessionHeaders{
-			SessionId: index,
-			Headers: []*headers.SessionHeader{
-				{
-					PartitionId: 1,
-				},
-			},
-		},
+		Headers: headers,
 	}, nil
 }
 
 func (s *TestServer) KeepAlive(ctx context.Context, request *pb.KeepAliveRequest) (*pb.KeepAliveResponse, error) {
-	index := s.incrementIndex()
-	if session, exists := s.sessions[request.Headers.SessionId]; exists {
-		streams := []*headers.SessionStreamHeader{}
-		for _, stream := range session.streams {
-			streams = append(streams, stream.header(uint64(index)))
-		}
-		return &pb.KeepAliveResponse{
-			Headers: &headers.SessionHeaders{
-				SessionId: request.Headers.SessionId,
-				Headers: []*headers.SessionHeader{
-					{
-						PartitionId:        1,
-						LastSequenceNumber: session.sequence,
-						Streams:            streams,
-					},
-				},
-			},
-		}, nil
-	} else {
-		return nil, errors.New("session not found")
+	headers, err := s.KeepAliveHeaders(ctx, request.Headers)
+	if err != nil {
+		return nil, err
 	}
+	return &pb.KeepAliveResponse{
+		Headers: headers,
+	}, nil
 }
 
 func (s *TestServer) Close(ctx context.Context, request *pb.CloseRequest) (*pb.CloseResponse, error) {
-	s.incrementIndex()
-	if _, exists := s.sessions[request.Headers.SessionId]; exists {
-		return &pb.CloseResponse{}, nil
-	} else {
-		return nil, errors.New("session not found")
+	err := s.CloseHeaders(ctx, request.Headers)
+	if err != nil {
+		return nil, err
 	}
+	return &pb.CloseResponse{}, nil
 }
 
 func (s *TestServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutResponse, error) {
-	index := s.incrementIndex()
+	index := s.IncrementIndex()
 
-	session, ok := s.sessions[request.Headers.SessionId]
-	if !ok {
-		return nil, errors.New("session not found")
+	session, err := s.GetSession(request.Headers.SessionId)
+	if err != nil {
+		return nil, err
 	}
 
 	sequenceNumber := request.Headers.Headers[0].SequenceNumber
 	session.Await(sequenceNumber)
 	defer session.Complete(sequenceNumber)
 
-	headers, err := session.newResponseHeaders()
+	headers, err := session.NewResponseHeaders()
 	if err != nil {
 		return nil, err
 	}
@@ -221,24 +91,27 @@ func (s *TestServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRe
 		Version: int64(index),
 	}
 
-	if v == nil {
-		session.Send(&pb.EventResponse{
-			Headers:    headers,
-			Type:       pb.EventResponse_INSERTED,
-			Key:        request.Key,
-			NewValue:   request.Value,
-			NewVersion: request.Version,
-		})
-	} else {
-		session.Send(&pb.EventResponse{
-			Headers:    headers,
-			Type:       pb.EventResponse_UPDATED,
-			Key:        request.Key,
-			OldValue:   v.Value,
-			OldVersion: v.Version,
-			NewValue:   request.Value,
-			NewVersion: request.Version,
-		})
+	streams := session.Streams()
+	for _, stream := range streams {
+		if v == nil {
+			stream.Send(&pb.EventResponse{
+				Headers:    stream.NewResponseHeaders(),
+				Type:       pb.EventResponse_INSERTED,
+				Key:        request.Key,
+				NewValue:   request.Value,
+				NewVersion: request.Version,
+			})
+		} else {
+			stream.Send(&pb.EventResponse{
+				Headers:    stream.NewResponseHeaders(),
+				Type:       pb.EventResponse_UPDATED,
+				Key:        request.Key,
+				OldValue:   v.Value,
+				OldVersion: v.Version,
+				NewValue:   request.Value,
+				NewVersion: request.Version,
+			})
+		}
 	}
 
 	if v != nil {
@@ -257,12 +130,12 @@ func (s *TestServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRe
 }
 
 func (s *TestServer) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetResponse, error) {
-	session, ok := s.sessions[request.Headers.SessionId]
-	if !ok {
-		return nil, errors.New("session not found")
+	session, err := s.GetSession(request.Headers.SessionId)
+	if err != nil {
+		return nil, err
 	}
 
-	headers, err := session.newResponseHeaders()
+	headers, err := session.NewResponseHeaders()
 	if err != nil {
 		return nil, err
 	}
@@ -283,18 +156,18 @@ func (s *TestServer) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetRe
 }
 
 func (s *TestServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb.RemoveResponse, error) {
-	s.incrementIndex()
+	s.IncrementIndex()
 
-	session, ok := s.sessions[request.Headers.SessionId]
-	if !ok {
-		return nil, errors.New("session not found")
+	session, err := s.GetSession(request.Headers.SessionId)
+	if err != nil {
+		return nil, err
 	}
 
 	sequenceNumber := request.Headers.Headers[0].SequenceNumber
 	session.Await(sequenceNumber)
 	defer session.Complete(sequenceNumber)
 
-	headers, err := session.newResponseHeaders()
+	headers, err := session.NewResponseHeaders()
 	if err != nil {
 		return nil, err
 	}
@@ -317,13 +190,15 @@ func (s *TestServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb
 
 	delete(s.entries, request.Key)
 
-	session.Send(&pb.EventResponse{
-		Headers:    headers,
-		Type:       pb.EventResponse_REMOVED,
-		Key:        request.Key,
-		OldValue:   v.Value,
-		OldVersion: v.Version,
-	})
+	for _, stream := range session.Streams() {
+		stream.Send(&pb.EventResponse{
+			Headers:    stream.NewResponseHeaders(),
+			Type:       pb.EventResponse_REMOVED,
+			Key:        request.Key,
+			OldValue:   v.Value,
+			OldVersion: v.Version,
+		})
+	}
 
 	if v.Version != 0 {
 		return &pb.RemoveResponse{
@@ -341,18 +216,18 @@ func (s *TestServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb
 }
 
 func (s *TestServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*pb.ReplaceResponse, error) {
-	index := s.incrementIndex()
+	index := s.IncrementIndex()
 
-	session, ok := s.sessions[request.Headers.SessionId]
-	if !ok {
-		return nil, errors.New("session not found")
+	session, err := s.GetSession(request.Headers.SessionId)
+	if err != nil {
+		return nil, err
 	}
 
 	sequenceNumber := request.Headers.Headers[0].SequenceNumber
 	session.Await(sequenceNumber)
 	defer session.Complete(sequenceNumber)
 
-	headers, err := session.newResponseHeaders()
+	headers, err := session.NewResponseHeaders()
 	if err != nil {
 		return nil, err
 	}
@@ -379,24 +254,26 @@ func (s *TestServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*
 		Version: int64(index),
 	}
 
-	if v.Version == 0 {
-		session.Send(&pb.EventResponse{
-			Headers:    headers,
-			Type:       pb.EventResponse_INSERTED,
-			Key:        request.Key,
-			NewValue:   request.NewValue,
-			NewVersion: int64(index),
-		})
-	} else {
-		session.Send(&pb.EventResponse{
-			Headers:    headers,
-			Type:       pb.EventResponse_UPDATED,
-			Key:        request.Key,
-			OldValue:   v.Value,
-			OldVersion: v.Version,
-			NewValue:   request.NewValue,
-			NewVersion: int64(index),
-		})
+	for _, stream := range session.Streams() {
+		if v.Version == 0 {
+			stream.Send(&pb.EventResponse{
+				Headers:    stream.NewResponseHeaders(),
+				Type:       pb.EventResponse_INSERTED,
+				Key:        request.Key,
+				NewValue:   request.NewValue,
+				NewVersion: int64(index),
+			})
+		} else {
+			stream.Send(&pb.EventResponse{
+				Headers:    stream.NewResponseHeaders(),
+				Type:       pb.EventResponse_UPDATED,
+				Key:        request.Key,
+				OldValue:   v.Value,
+				OldVersion: v.Version,
+				NewValue:   request.NewValue,
+				NewVersion: int64(index),
+			})
+		}
 	}
 
 	if v != nil {
@@ -415,12 +292,12 @@ func (s *TestServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*
 }
 
 func (s *TestServer) Exists(ctx context.Context, request *pb.ExistsRequest) (*pb.ExistsResponse, error) {
-	session, ok := s.sessions[request.Headers.SessionId]
-	if !ok {
-		return nil, errors.New("session not found")
+	session, err := s.GetSession(request.Headers.SessionId)
+	if err != nil {
+		return nil, err
 	}
 
-	headers, err := session.newResponseHeaders()
+	headers, err := session.NewResponseHeaders()
 	if err != nil {
 		return nil, err
 	}
@@ -441,12 +318,12 @@ func (s *TestServer) Exists(ctx context.Context, request *pb.ExistsRequest) (*pb
 }
 
 func (s *TestServer) Size(ctx context.Context, request *pb.SizeRequest) (*pb.SizeResponse, error) {
-	session, ok := s.sessions[request.Headers.SessionId]
-	if !ok {
-		return nil, errors.New("session not found")
+	session, err := s.GetSession(request.Headers.SessionId)
+	if err != nil {
+		return nil, err
 	}
 
-	headers, err := session.newResponseHeaders()
+	headers, err := session.NewResponseHeaders()
 	if err != nil {
 		return nil, err
 	}
@@ -457,18 +334,18 @@ func (s *TestServer) Size(ctx context.Context, request *pb.SizeRequest) (*pb.Siz
 }
 
 func (s *TestServer) Clear(ctx context.Context, request *pb.ClearRequest) (*pb.ClearResponse, error) {
-	s.incrementIndex()
+	s.IncrementIndex()
 
-	session, ok := s.sessions[request.Headers.SessionId]
-	if !ok {
-		return nil, errors.New("session not found")
+	session, err := s.GetSession(request.Headers.SessionId)
+	if err != nil {
+		return nil, err
 	}
 
 	sequenceNumber := request.Headers.Headers[0].SequenceNumber
 	session.Await(sequenceNumber)
 	defer session.Complete(sequenceNumber)
 
-	headers, err := session.newResponseHeaders()
+	headers, err := session.NewResponseHeaders()
 	if err != nil {
 		return nil, err
 	}
@@ -481,27 +358,25 @@ func (s *TestServer) Clear(ctx context.Context, request *pb.ClearRequest) (*pb.C
 }
 
 func (s *TestServer) Events(request *pb.EventRequest, server pb.MapService_EventsServer) error {
-	index := s.incrementIndex()
+	s.IncrementIndex()
 
-	session, ok := s.sessions[request.Headers.SessionId]
-	if !ok {
-		return errors.New("session not found")
+	session, err := s.GetSession(request.Headers.SessionId)
+	if err != nil {
+		return err
 	}
 
 	sequenceNumber := request.Headers.Headers[0].SequenceNumber
 	session.Await(sequenceNumber)
 	session.Complete(sequenceNumber)
 
-	c := make(chan *pb.EventResponse)
-	session.streams[index] = &TestStream{
-		server: s,
-		id:     index,
-		c:      c,
-	}
+	c := make(chan interface{})
+	stream := session.NewStream(c)
 
 	for {
-		if err := server.Send(<-c); err != nil {
+		e := <-c
+		if err := server.Send(e.(*pb.EventResponse)); err != nil {
 			if err == io.EOF {
+				stream.Delete()
 				return nil
 			}
 			return err
@@ -521,54 +396,10 @@ func valuesEqual(a []byte, b []byte) bool {
 	return true
 }
 
-func serve(l *bufconn.Listener, c <-chan struct{}) {
-	s := grpc.NewServer()
-	pb.RegisterMapServiceServer(s, NewTestServer())
-	go func() {
-		if err := s.Serve(l); err != nil {
-			log.Fatalf("Server exited with error: %v", err)
-		}
-	}()
-
-	go func() {
-		for {
-			select {
-			case <-c:
-				s.Stop()
-				return
-			}
-		}
-	}()
-}
-
-func startTest() (*grpc.ClientConn, chan struct{}) {
-	l := bufconn.Listen(1024 * 1024)
-	stop := make(chan struct{})
-	serve(l, stop)
-
-	f := func(c context.Context, s string) (net.Conn, error) {
-		return l.Dial()
-	}
-
-	c, err := grpc.Dial("test", grpc.WithContextDialer(f), grpc.WithInsecure())
-	if err != nil {
-		panic(err)
-	}
-
-	go func() {
-		<-stop
-		c.Close()
-	}()
-
-	return c, stop
-}
-
-func stopTest(c chan struct{}) {
-	c <- struct{}{}
-}
-
 func TestMapOperations(t *testing.T) {
-	conn, test := startTest()
+	conn, server := test.StartTestServer(func(server *grpc.Server) {
+		pb.RegisterMapServiceServer(server, NewTestServer())
+	})
 
 	m, err := NewMap(conn, "test", protocol.MultiRaft("test"))
 	assert.NoError(t, err)
@@ -650,11 +481,13 @@ func TestMapOperations(t *testing.T) {
 	assert.NotNil(t, removed)
 	assert.Equal(t, kv2.Version, removed.Version)
 
-	stopTest(test)
+	test.StopTestServer(server)
 }
 
 func TestMapStreams(t *testing.T) {
-	conn, test := startTest()
+	conn, server := test.StartTestServer(func(server *grpc.Server) {
+		pb.RegisterMapServiceServer(server, NewTestServer())
+	})
 
 	m, err := NewMap(conn, "test", protocol.MultiRaft("test"))
 	assert.NoError(t, err)
@@ -710,38 +543,5 @@ func TestMapStreams(t *testing.T) {
 
 	<-latch
 
-	stopTest(test)
-}
-
-func example() {
-	client, err := grpc.Dial("localhost", grpc.WithInsecure())
-	if err != nil {
-		panic(err)
-	}
-
-	m, err := NewMap(client, "foo", protocol.MultiRaft("test"))
-	if err != nil {
-		panic(err)
-	}
-
-	_, err = m.Put(context.TODO(), "foo", []byte("bar"))
-	if err != nil {
-		panic(err)
-	}
-
-	v, err := m.Get(context.TODO(), "foo")
-
-	println("Key is", v.Key)
-	println("Value is", string(v.Value))
-	println("Version is", v.Version)
-
-	c := make(chan *MapEvent)
-	go m.Listen(context.TODO(), c)
-
-	for {
-		select {
-		case e := <-c:
-			println(e.Key)
-		}
-	}
+	test.StopTestServer(server)
 }
