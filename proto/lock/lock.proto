@@ -25,21 +25,21 @@ message CreateRequest {
 }
 
 message CreateResponse {
-    atomix.headers.SessionHeaders headers = 1;
+    atomix.headers.SessionHeader header = 1;
 }
 
 message KeepAliveRequest {
     LockId id = 1;
-    atomix.headers.SessionHeaders headers = 2;
+    atomix.headers.SessionHeader header = 2;
 }
 
 message KeepAliveResponse {
-    atomix.headers.SessionHeaders headers = 1;
+    atomix.headers.SessionHeader header = 1;
 }
 
 message CloseRequest {
     LockId id = 1;
-    atomix.headers.SessionHeaders headers = 2;
+    atomix.headers.SessionHeader header = 2;
 }
 
 message CloseResponse {
@@ -48,34 +48,34 @@ message CloseResponse {
 
 message LockRequest {
     LockId id = 1;
-    atomix.headers.SessionCommandHeaders headers = 2;
+    atomix.headers.SessionCommandHeader header = 2;
     google.protobuf.Duration timeout = 3;
 }
 
 message LockResponse {
-    atomix.headers.SessionResponseHeaders headers = 1;
+    atomix.headers.SessionResponseHeader header = 1;
     uint64 version = 2;
 }
 
 message UnlockRequest {
     LockId id = 1;
-    atomix.headers.SessionCommandHeaders headers = 2;
+    atomix.headers.SessionCommandHeader header = 2;
     uint64 version = 3;
 }
 
 message UnlockResponse {
-    atomix.headers.SessionResponseHeaders headers = 1;
+    atomix.headers.SessionResponseHeader header = 1;
     bool unlocked = 2;
 }
 
 message IsLockedRequest {
     LockId id = 1;
-    atomix.headers.SessionQueryHeaders headers = 2;
+    atomix.headers.SessionQueryHeader header = 2;
     uint64 version = 3;
 }
 
 message IsLockedResponse {
-    atomix.headers.SessionResponseHeaders headers = 1;
+    atomix.headers.SessionResponseHeader header = 1;
     bool isLocked = 2;
 }
 

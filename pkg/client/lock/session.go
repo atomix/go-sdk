@@ -72,14 +72,14 @@ func (m *Session) Connect() error {
 		return err
 	}
 
-	m.Start(response.Headers)
+	m.Start([]*headers.SessionHeader{response.Header})
 	return nil
 }
 
 func (m *Session) keepAlive() error {
 	request := &pb.KeepAliveRequest{
 		Id: m.lockId,
-		Headers: m.Headers.Session(),
+		Header: m.Headers.GetPartition("").GetSessionHeader(),
 	}
 
 	if _, err := m.client.KeepAlive(context.Background(), request); err != nil {
@@ -93,9 +93,7 @@ func (m *Session) Close() error {
 
 	request := &pb.CloseRequest{
 		Id: m.lockId,
-		Headers: &headers.SessionHeaders{
-			SessionId: m.Id,
-		},
+		Header: m.Headers.GetPartition("").GetSessionHeader(),
 	}
 
 	if _, err := m.client.Close(context.Background(), request); err != nil {

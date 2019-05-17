@@ -130,20 +130,176 @@ func (*CounterId) XXX_OneofWrappers() []interface{} {
 	}
 }
 
-type IncrementRequest struct {
-	Id                   *CounterId              `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Headers              *headers.RequestHeaders `protobuf:"bytes,2,opt,name=headers,proto3" json:"headers,omitempty"`
-	Delta                int64                   `protobuf:"varint,3,opt,name=delta,proto3" json:"delta,omitempty"`
+type CreateRequest struct {
+	Id                   *CounterId `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}   `json:"-"`
+	XXX_unrecognized     []byte     `json:"-"`
+	XXX_sizecache        int32      `json:"-"`
+}
+
+func (m *CreateRequest) Reset()         { *m = CreateRequest{} }
+func (m *CreateRequest) String() string { return proto.CompactTextString(m) }
+func (*CreateRequest) ProtoMessage()    {}
+func (*CreateRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_189c0686f57a5de6, []int{1}
+}
+
+func (m *CreateRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_CreateRequest.Unmarshal(m, b)
+}
+func (m *CreateRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_CreateRequest.Marshal(b, m, deterministic)
+}
+func (m *CreateRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CreateRequest.Merge(m, src)
+}
+func (m *CreateRequest) XXX_Size() int {
+	return xxx_messageInfo_CreateRequest.Size(m)
+}
+func (m *CreateRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_CreateRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_CreateRequest proto.InternalMessageInfo
+
+func (m *CreateRequest) GetId() *CounterId {
+	if m != nil {
+		return m.Id
+	}
+	return nil
+}
+
+type CreateResponse struct {
+	Header               *headers.ResponseHeader `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                `json:"-"`
 	XXX_unrecognized     []byte                  `json:"-"`
 	XXX_sizecache        int32                   `json:"-"`
+}
+
+func (m *CreateResponse) Reset()         { *m = CreateResponse{} }
+func (m *CreateResponse) String() string { return proto.CompactTextString(m) }
+func (*CreateResponse) ProtoMessage()    {}
+func (*CreateResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_189c0686f57a5de6, []int{2}
+}
+
+func (m *CreateResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_CreateResponse.Unmarshal(m, b)
+}
+func (m *CreateResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_CreateResponse.Marshal(b, m, deterministic)
+}
+func (m *CreateResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CreateResponse.Merge(m, src)
+}
+func (m *CreateResponse) XXX_Size() int {
+	return xxx_messageInfo_CreateResponse.Size(m)
+}
+func (m *CreateResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_CreateResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_CreateResponse proto.InternalMessageInfo
+
+func (m *CreateResponse) GetHeader() *headers.ResponseHeader {
+	if m != nil {
+		return m.Header
+	}
+	return nil
+}
+
+type DeleteRequest struct {
+	Id                   *CounterId             `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Header               *headers.RequestHeader `protobuf:"bytes,2,opt,name=header,proto3" json:"header,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}               `json:"-"`
+	XXX_unrecognized     []byte                 `json:"-"`
+	XXX_sizecache        int32                  `json:"-"`
+}
+
+func (m *DeleteRequest) Reset()         { *m = DeleteRequest{} }
+func (m *DeleteRequest) String() string { return proto.CompactTextString(m) }
+func (*DeleteRequest) ProtoMessage()    {}
+func (*DeleteRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_189c0686f57a5de6, []int{3}
+}
+
+func (m *DeleteRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_DeleteRequest.Unmarshal(m, b)
+}
+func (m *DeleteRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_DeleteRequest.Marshal(b, m, deterministic)
+}
+func (m *DeleteRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_DeleteRequest.Merge(m, src)
+}
+func (m *DeleteRequest) XXX_Size() int {
+	return xxx_messageInfo_DeleteRequest.Size(m)
+}
+func (m *DeleteRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_DeleteRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_DeleteRequest proto.InternalMessageInfo
+
+func (m *DeleteRequest) GetId() *CounterId {
+	if m != nil {
+		return m.Id
+	}
+	return nil
+}
+
+func (m *DeleteRequest) GetHeader() *headers.RequestHeader {
+	if m != nil {
+		return m.Header
+	}
+	return nil
+}
+
+type DeleteResponse struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *DeleteResponse) Reset()         { *m = DeleteResponse{} }
+func (m *DeleteResponse) String() string { return proto.CompactTextString(m) }
+func (*DeleteResponse) ProtoMessage()    {}
+func (*DeleteResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_189c0686f57a5de6, []int{4}
+}
+
+func (m *DeleteResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_DeleteResponse.Unmarshal(m, b)
+}
+func (m *DeleteResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_DeleteResponse.Marshal(b, m, deterministic)
+}
+func (m *DeleteResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_DeleteResponse.Merge(m, src)
+}
+func (m *DeleteResponse) XXX_Size() int {
+	return xxx_messageInfo_DeleteResponse.Size(m)
+}
+func (m *DeleteResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_DeleteResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_DeleteResponse proto.InternalMessageInfo
+
+type IncrementRequest struct {
+	Id                   *CounterId             `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Header               *headers.RequestHeader `protobuf:"bytes,2,opt,name=header,proto3" json:"header,omitempty"`
+	Delta                int64                  `protobuf:"varint,3,opt,name=delta,proto3" json:"delta,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}               `json:"-"`
+	XXX_unrecognized     []byte                 `json:"-"`
+	XXX_sizecache        int32                  `json:"-"`
 }
 
 func (m *IncrementRequest) Reset()         { *m = IncrementRequest{} }
 func (m *IncrementRequest) String() string { return proto.CompactTextString(m) }
 func (*IncrementRequest) ProtoMessage()    {}
 func (*IncrementRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_189c0686f57a5de6, []int{1}
+	return fileDescriptor_189c0686f57a5de6, []int{5}
 }
 
 func (m *IncrementRequest) XXX_Unmarshal(b []byte) error {
@@ -171,9 +327,9 @@ func (m *IncrementRequest) GetId() *CounterId {
 	return nil
 }
 
-func (m *IncrementRequest) GetHeaders() *headers.RequestHeaders {
+func (m *IncrementRequest) GetHeader() *headers.RequestHeader {
 	if m != nil {
-		return m.Headers
+		return m.Header
 	}
 	return nil
 }
@@ -186,19 +342,19 @@ func (m *IncrementRequest) GetDelta() int64 {
 }
 
 type IncrementResponse struct {
-	Headers              *headers.ResponseHeaders `protobuf:"bytes,1,opt,name=headers,proto3" json:"headers,omitempty"`
-	PreviousValue        int64                    `protobuf:"varint,2,opt,name=previous_value,json=previousValue,proto3" json:"previous_value,omitempty"`
-	NextValue            int64                    `protobuf:"varint,3,opt,name=next_value,json=nextValue,proto3" json:"next_value,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}                 `json:"-"`
-	XXX_unrecognized     []byte                   `json:"-"`
-	XXX_sizecache        int32                    `json:"-"`
+	Header               *headers.ResponseHeader `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`
+	PreviousValue        int64                   `protobuf:"varint,2,opt,name=previous_value,json=previousValue,proto3" json:"previous_value,omitempty"`
+	NextValue            int64                   `protobuf:"varint,3,opt,name=next_value,json=nextValue,proto3" json:"next_value,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}                `json:"-"`
+	XXX_unrecognized     []byte                  `json:"-"`
+	XXX_sizecache        int32                   `json:"-"`
 }
 
 func (m *IncrementResponse) Reset()         { *m = IncrementResponse{} }
 func (m *IncrementResponse) String() string { return proto.CompactTextString(m) }
 func (*IncrementResponse) ProtoMessage()    {}
 func (*IncrementResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_189c0686f57a5de6, []int{2}
+	return fileDescriptor_189c0686f57a5de6, []int{6}
 }
 
 func (m *IncrementResponse) XXX_Unmarshal(b []byte) error {
@@ -219,9 +375,9 @@ func (m *IncrementResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_IncrementResponse proto.InternalMessageInfo
 
-func (m *IncrementResponse) GetHeaders() *headers.ResponseHeaders {
+func (m *IncrementResponse) GetHeader() *headers.ResponseHeader {
 	if m != nil {
-		return m.Headers
+		return m.Header
 	}
 	return nil
 }
@@ -241,19 +397,19 @@ func (m *IncrementResponse) GetNextValue() int64 {
 }
 
 type DecrementRequest struct {
-	Id                   *CounterId              `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Headers              *headers.RequestHeaders `protobuf:"bytes,2,opt,name=headers,proto3" json:"headers,omitempty"`
-	Delta                int64                   `protobuf:"varint,3,opt,name=delta,proto3" json:"delta,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}                `json:"-"`
-	XXX_unrecognized     []byte                  `json:"-"`
-	XXX_sizecache        int32                   `json:"-"`
+	Id                   *CounterId             `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Header               *headers.RequestHeader `protobuf:"bytes,2,opt,name=header,proto3" json:"header,omitempty"`
+	Delta                int64                  `protobuf:"varint,3,opt,name=delta,proto3" json:"delta,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}               `json:"-"`
+	XXX_unrecognized     []byte                 `json:"-"`
+	XXX_sizecache        int32                  `json:"-"`
 }
 
 func (m *DecrementRequest) Reset()         { *m = DecrementRequest{} }
 func (m *DecrementRequest) String() string { return proto.CompactTextString(m) }
 func (*DecrementRequest) ProtoMessage()    {}
 func (*DecrementRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_189c0686f57a5de6, []int{3}
+	return fileDescriptor_189c0686f57a5de6, []int{7}
 }
 
 func (m *DecrementRequest) XXX_Unmarshal(b []byte) error {
@@ -281,9 +437,9 @@ func (m *DecrementRequest) GetId() *CounterId {
 	return nil
 }
 
-func (m *DecrementRequest) GetHeaders() *headers.RequestHeaders {
+func (m *DecrementRequest) GetHeader() *headers.RequestHeader {
 	if m != nil {
-		return m.Headers
+		return m.Header
 	}
 	return nil
 }
@@ -296,19 +452,19 @@ func (m *DecrementRequest) GetDelta() int64 {
 }
 
 type DecrementResponse struct {
-	Headers              *headers.ResponseHeaders `protobuf:"bytes,1,opt,name=headers,proto3" json:"headers,omitempty"`
-	PreviousValue        int64                    `protobuf:"varint,2,opt,name=previous_value,json=previousValue,proto3" json:"previous_value,omitempty"`
-	NextValue            int64                    `protobuf:"varint,3,opt,name=next_value,json=nextValue,proto3" json:"next_value,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}                 `json:"-"`
-	XXX_unrecognized     []byte                   `json:"-"`
-	XXX_sizecache        int32                    `json:"-"`
+	Header               *headers.ResponseHeader `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`
+	PreviousValue        int64                   `protobuf:"varint,2,opt,name=previous_value,json=previousValue,proto3" json:"previous_value,omitempty"`
+	NextValue            int64                   `protobuf:"varint,3,opt,name=next_value,json=nextValue,proto3" json:"next_value,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}                `json:"-"`
+	XXX_unrecognized     []byte                  `json:"-"`
+	XXX_sizecache        int32                   `json:"-"`
 }
 
 func (m *DecrementResponse) Reset()         { *m = DecrementResponse{} }
 func (m *DecrementResponse) String() string { return proto.CompactTextString(m) }
 func (*DecrementResponse) ProtoMessage()    {}
 func (*DecrementResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_189c0686f57a5de6, []int{4}
+	return fileDescriptor_189c0686f57a5de6, []int{8}
 }
 
 func (m *DecrementResponse) XXX_Unmarshal(b []byte) error {
@@ -329,9 +485,9 @@ func (m *DecrementResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_DecrementResponse proto.InternalMessageInfo
 
-func (m *DecrementResponse) GetHeaders() *headers.ResponseHeaders {
+func (m *DecrementResponse) GetHeader() *headers.ResponseHeader {
 	if m != nil {
-		return m.Headers
+		return m.Header
 	}
 	return nil
 }
@@ -351,18 +507,18 @@ func (m *DecrementResponse) GetNextValue() int64 {
 }
 
 type GetRequest struct {
-	Id                   *CounterId              `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Headers              *headers.RequestHeaders `protobuf:"bytes,2,opt,name=headers,proto3" json:"headers,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}                `json:"-"`
-	XXX_unrecognized     []byte                  `json:"-"`
-	XXX_sizecache        int32                   `json:"-"`
+	Id                   *CounterId             `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Header               *headers.RequestHeader `protobuf:"bytes,2,opt,name=header,proto3" json:"header,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}               `json:"-"`
+	XXX_unrecognized     []byte                 `json:"-"`
+	XXX_sizecache        int32                  `json:"-"`
 }
 
 func (m *GetRequest) Reset()         { *m = GetRequest{} }
 func (m *GetRequest) String() string { return proto.CompactTextString(m) }
 func (*GetRequest) ProtoMessage()    {}
 func (*GetRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_189c0686f57a5de6, []int{5}
+	return fileDescriptor_189c0686f57a5de6, []int{9}
 }
 
 func (m *GetRequest) XXX_Unmarshal(b []byte) error {
@@ -390,26 +546,26 @@ func (m *GetRequest) GetId() *CounterId {
 	return nil
 }
 
-func (m *GetRequest) GetHeaders() *headers.RequestHeaders {
+func (m *GetRequest) GetHeader() *headers.RequestHeader {
 	if m != nil {
-		return m.Headers
+		return m.Header
 	}
 	return nil
 }
 
 type GetResponse struct {
-	Headers              *headers.ResponseHeaders `protobuf:"bytes,1,opt,name=headers,proto3" json:"headers,omitempty"`
-	Value                int64                    `protobuf:"varint,2,opt,name=value,proto3" json:"value,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}                 `json:"-"`
-	XXX_unrecognized     []byte                   `json:"-"`
-	XXX_sizecache        int32                    `json:"-"`
+	Header               *headers.ResponseHeader `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`
+	Value                int64                   `protobuf:"varint,2,opt,name=value,proto3" json:"value,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}                `json:"-"`
+	XXX_unrecognized     []byte                  `json:"-"`
+	XXX_sizecache        int32                   `json:"-"`
 }
 
 func (m *GetResponse) Reset()         { *m = GetResponse{} }
 func (m *GetResponse) String() string { return proto.CompactTextString(m) }
 func (*GetResponse) ProtoMessage()    {}
 func (*GetResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_189c0686f57a5de6, []int{6}
+	return fileDescriptor_189c0686f57a5de6, []int{10}
 }
 
 func (m *GetResponse) XXX_Unmarshal(b []byte) error {
@@ -430,9 +586,9 @@ func (m *GetResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_GetResponse proto.InternalMessageInfo
 
-func (m *GetResponse) GetHeaders() *headers.ResponseHeaders {
+func (m *GetResponse) GetHeader() *headers.ResponseHeader {
 	if m != nil {
-		return m.Headers
+		return m.Header
 	}
 	return nil
 }
@@ -445,19 +601,19 @@ func (m *GetResponse) GetValue() int64 {
 }
 
 type SetRequest struct {
-	Id                   *CounterId              `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Headers              *headers.RequestHeaders `protobuf:"bytes,2,opt,name=headers,proto3" json:"headers,omitempty"`
-	Value                int64                   `protobuf:"varint,3,opt,name=value,proto3" json:"value,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}                `json:"-"`
-	XXX_unrecognized     []byte                  `json:"-"`
-	XXX_sizecache        int32                   `json:"-"`
+	Id                   *CounterId             `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Header               *headers.RequestHeader `protobuf:"bytes,2,opt,name=header,proto3" json:"header,omitempty"`
+	Value                int64                  `protobuf:"varint,3,opt,name=value,proto3" json:"value,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}               `json:"-"`
+	XXX_unrecognized     []byte                 `json:"-"`
+	XXX_sizecache        int32                  `json:"-"`
 }
 
 func (m *SetRequest) Reset()         { *m = SetRequest{} }
 func (m *SetRequest) String() string { return proto.CompactTextString(m) }
 func (*SetRequest) ProtoMessage()    {}
 func (*SetRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_189c0686f57a5de6, []int{7}
+	return fileDescriptor_189c0686f57a5de6, []int{11}
 }
 
 func (m *SetRequest) XXX_Unmarshal(b []byte) error {
@@ -485,9 +641,9 @@ func (m *SetRequest) GetId() *CounterId {
 	return nil
 }
 
-func (m *SetRequest) GetHeaders() *headers.RequestHeaders {
+func (m *SetRequest) GetHeader() *headers.RequestHeader {
 	if m != nil {
-		return m.Headers
+		return m.Header
 	}
 	return nil
 }
@@ -500,18 +656,18 @@ func (m *SetRequest) GetValue() int64 {
 }
 
 type SetResponse struct {
-	Headers              *headers.ResponseHeaders `protobuf:"bytes,1,opt,name=headers,proto3" json:"headers,omitempty"`
-	PreviousValue        int64                    `protobuf:"varint,2,opt,name=previous_value,json=previousValue,proto3" json:"previous_value,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}                 `json:"-"`
-	XXX_unrecognized     []byte                   `json:"-"`
-	XXX_sizecache        int32                    `json:"-"`
+	Header               *headers.ResponseHeader `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`
+	PreviousValue        int64                   `protobuf:"varint,2,opt,name=previous_value,json=previousValue,proto3" json:"previous_value,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}                `json:"-"`
+	XXX_unrecognized     []byte                  `json:"-"`
+	XXX_sizecache        int32                   `json:"-"`
 }
 
 func (m *SetResponse) Reset()         { *m = SetResponse{} }
 func (m *SetResponse) String() string { return proto.CompactTextString(m) }
 func (*SetResponse) ProtoMessage()    {}
 func (*SetResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_189c0686f57a5de6, []int{8}
+	return fileDescriptor_189c0686f57a5de6, []int{12}
 }
 
 func (m *SetResponse) XXX_Unmarshal(b []byte) error {
@@ -532,9 +688,9 @@ func (m *SetResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_SetResponse proto.InternalMessageInfo
 
-func (m *SetResponse) GetHeaders() *headers.ResponseHeaders {
+func (m *SetResponse) GetHeader() *headers.ResponseHeader {
 	if m != nil {
-		return m.Headers
+		return m.Header
 	}
 	return nil
 }
@@ -547,20 +703,20 @@ func (m *SetResponse) GetPreviousValue() int64 {
 }
 
 type CheckAndSetRequest struct {
-	Id                   *CounterId              `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Headers              *headers.RequestHeaders `protobuf:"bytes,2,opt,name=headers,proto3" json:"headers,omitempty"`
-	Expect               int64                   `protobuf:"varint,3,opt,name=expect,proto3" json:"expect,omitempty"`
-	Update               int64                   `protobuf:"varint,4,opt,name=update,proto3" json:"update,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}                `json:"-"`
-	XXX_unrecognized     []byte                  `json:"-"`
-	XXX_sizecache        int32                   `json:"-"`
+	Id                   *CounterId             `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Header               *headers.RequestHeader `protobuf:"bytes,2,opt,name=header,proto3" json:"header,omitempty"`
+	Expect               int64                  `protobuf:"varint,3,opt,name=expect,proto3" json:"expect,omitempty"`
+	Update               int64                  `protobuf:"varint,4,opt,name=update,proto3" json:"update,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}               `json:"-"`
+	XXX_unrecognized     []byte                 `json:"-"`
+	XXX_sizecache        int32                  `json:"-"`
 }
 
 func (m *CheckAndSetRequest) Reset()         { *m = CheckAndSetRequest{} }
 func (m *CheckAndSetRequest) String() string { return proto.CompactTextString(m) }
 func (*CheckAndSetRequest) ProtoMessage()    {}
 func (*CheckAndSetRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_189c0686f57a5de6, []int{9}
+	return fileDescriptor_189c0686f57a5de6, []int{13}
 }
 
 func (m *CheckAndSetRequest) XXX_Unmarshal(b []byte) error {
@@ -588,9 +744,9 @@ func (m *CheckAndSetRequest) GetId() *CounterId {
 	return nil
 }
 
-func (m *CheckAndSetRequest) GetHeaders() *headers.RequestHeaders {
+func (m *CheckAndSetRequest) GetHeader() *headers.RequestHeader {
 	if m != nil {
-		return m.Headers
+		return m.Header
 	}
 	return nil
 }
@@ -610,18 +766,18 @@ func (m *CheckAndSetRequest) GetUpdate() int64 {
 }
 
 type CheckAndSetResponse struct {
-	Headers              *headers.ResponseHeaders `protobuf:"bytes,1,opt,name=headers,proto3" json:"headers,omitempty"`
-	Succeeded            bool                     `protobuf:"varint,2,opt,name=succeeded,proto3" json:"succeeded,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}                 `json:"-"`
-	XXX_unrecognized     []byte                   `json:"-"`
-	XXX_sizecache        int32                    `json:"-"`
+	Header               *headers.ResponseHeader `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`
+	Succeeded            bool                    `protobuf:"varint,2,opt,name=succeeded,proto3" json:"succeeded,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}                `json:"-"`
+	XXX_unrecognized     []byte                  `json:"-"`
+	XXX_sizecache        int32                   `json:"-"`
 }
 
 func (m *CheckAndSetResponse) Reset()         { *m = CheckAndSetResponse{} }
 func (m *CheckAndSetResponse) String() string { return proto.CompactTextString(m) }
 func (*CheckAndSetResponse) ProtoMessage()    {}
 func (*CheckAndSetResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_189c0686f57a5de6, []int{10}
+	return fileDescriptor_189c0686f57a5de6, []int{14}
 }
 
 func (m *CheckAndSetResponse) XXX_Unmarshal(b []byte) error {
@@ -642,9 +798,9 @@ func (m *CheckAndSetResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_CheckAndSetResponse proto.InternalMessageInfo
 
-func (m *CheckAndSetResponse) GetHeaders() *headers.ResponseHeaders {
+func (m *CheckAndSetResponse) GetHeader() *headers.ResponseHeader {
 	if m != nil {
-		return m.Headers
+		return m.Header
 	}
 	return nil
 }
@@ -658,6 +814,10 @@ func (m *CheckAndSetResponse) GetSucceeded() bool {
 
 func init() {
 	proto.RegisterType((*CounterId)(nil), "atomix.counter.CounterId")
+	proto.RegisterType((*CreateRequest)(nil), "atomix.counter.CreateRequest")
+	proto.RegisterType((*CreateResponse)(nil), "atomix.counter.CreateResponse")
+	proto.RegisterType((*DeleteRequest)(nil), "atomix.counter.DeleteRequest")
+	proto.RegisterType((*DeleteResponse)(nil), "atomix.counter.DeleteResponse")
 	proto.RegisterType((*IncrementRequest)(nil), "atomix.counter.IncrementRequest")
 	proto.RegisterType((*IncrementResponse)(nil), "atomix.counter.IncrementResponse")
 	proto.RegisterType((*DecrementRequest)(nil), "atomix.counter.DecrementRequest")
@@ -673,44 +833,48 @@ func init() {
 func init() { proto.RegisterFile("counter/counter.proto", fileDescriptor_189c0686f57a5de6) }
 
 var fileDescriptor_189c0686f57a5de6 = []byte{
-	// 578 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xcc, 0x55, 0x4d, 0x6f, 0xd3, 0x40,
-	0x10, 0xad, 0xe3, 0xa4, 0x25, 0x13, 0x1a, 0xc1, 0xd2, 0x96, 0x60, 0xbe, 0x82, 0x51, 0x45, 0xb9,
-	0x24, 0x52, 0xb8, 0x14, 0x71, 0x81, 0xb6, 0x52, 0x5a, 0xa9, 0x48, 0xd1, 0x46, 0x42, 0x9c, 0xa8,
-	0x5c, 0x7b, 0x9a, 0x5a, 0xd8, 0x5e, 0x77, 0xbd, 0x8e, 0xc2, 0x2f, 0xe0, 0xc4, 0x0d, 0xf1, 0x1f,
-	0xf8, 0x71, 0xfc, 0x07, 0xe4, 0xdd, 0x75, 0xe2, 0xc4, 0x51, 0x2e, 0x95, 0xa2, 0x9e, 0xec, 0x79,
-	0xfb, 0xf6, 0xcd, 0xdb, 0xb7, 0xd6, 0x18, 0x76, 0x5d, 0x96, 0x46, 0x02, 0x79, 0x57, 0x3f, 0x3b,
-	0x31, 0x67, 0x82, 0x91, 0xa6, 0x23, 0x58, 0xe8, 0x4f, 0x3a, 0x1a, 0xb5, 0x1e, 0x4b, 0xd8, 0x65,
-	0x41, 0x37, 0x7f, 0x51, 0x44, 0x6b, 0xf7, 0x1a, 0x1d, 0x0f, 0x79, 0xd2, 0xd5, 0x4f, 0x05, 0xdb,
-	0xff, 0x0c, 0xa8, 0x1f, 0xab, 0xbd, 0x67, 0x1e, 0x21, 0x50, 0x8d, 0x9c, 0x10, 0x5b, 0x46, 0xdb,
-	0x38, 0xa8, 0x53, 0xf9, 0x4e, 0x0e, 0xa1, 0xca, 0x9d, 0x2b, 0xd1, 0xaa, 0xb4, 0x8d, 0x83, 0x46,
-	0xcf, 0xee, 0xe8, 0x86, 0x53, 0xf9, 0xcf, 0x69, 0x20, 0x7c, 0xea, 0x5c, 0x89, 0x81, 0x46, 0x4e,
-	0x37, 0xa8, 0xdc, 0x41, 0xce, 0x61, 0x3b, 0xcc, 0x16, 0x2f, 0x62, 0xee, 0x87, 0x0e, 0xff, 0xd1,
-	0x32, 0xa5, 0xc4, 0xfe, 0x72, 0x89, 0x81, 0x22, 0x15, 0x54, 0xee, 0x87, 0x05, 0x9c, 0x7c, 0x00,
-	0x33, 0x60, 0xa3, 0x56, 0x55, 0x6a, 0xbc, 0x29, 0x69, 0x9c, 0xf8, 0x89, 0xe0, 0xfe, 0x65, 0x2a,
-	0xd0, 0x3b, 0x67, 0xa3, 0x82, 0x4a, 0xb6, 0xeb, 0x68, 0x0b, 0x6a, 0xea, 0xbc, 0xbf, 0x0c, 0x78,
-	0x70, 0x16, 0xb9, 0x1c, 0x43, 0x8c, 0x04, 0xc5, 0x9b, 0x14, 0x13, 0x41, 0xde, 0x42, 0xc5, 0xf7,
-	0xe4, 0xa1, 0x1b, 0xbd, 0x27, 0x9d, 0xf9, 0x44, 0x3b, 0xd3, 0x74, 0x68, 0xc5, 0xf7, 0xc8, 0x21,
-	0x6c, 0xe9, 0x00, 0x75, 0x20, 0x2f, 0x72, 0x7e, 0x9e, 0xab, 0x16, 0x3d, 0x55, 0x25, 0xcd, 0xe9,
-	0x64, 0x07, 0x6a, 0x1e, 0x06, 0xc2, 0x91, 0x29, 0x98, 0x54, 0x15, 0xf6, 0x6f, 0x03, 0x1e, 0x16,
-	0xfc, 0x24, 0x31, 0x8b, 0x12, 0x24, 0xef, 0x67, 0x5d, 0x94, 0xab, 0x97, 0xe5, 0x2e, 0x8a, 0x5a,
-	0x6a, 0xb3, 0x0f, 0xcd, 0x98, 0xe3, 0xd8, 0x67, 0x69, 0x72, 0x31, 0x76, 0x82, 0x14, 0xa5, 0x4f,
-	0x93, 0x6e, 0xe7, 0xe8, 0x97, 0x0c, 0x24, 0xcf, 0x01, 0x22, 0x9c, 0x08, 0x4d, 0x51, 0x96, 0xea,
-	0x19, 0x22, 0x97, 0x65, 0x4c, 0x27, 0x78, 0xb7, 0x62, 0x2a, 0xf8, 0xb9, 0x2b, 0x31, 0xdd, 0x00,
-	0xf4, 0x71, 0xad, 0xf9, 0xd8, 0xdf, 0xa0, 0x21, 0x5b, 0xde, 0x3e, 0x82, 0x1d, 0xa8, 0x15, 0x4f,
-	0xae, 0x0a, 0xfb, 0xa7, 0x01, 0x30, 0xc4, 0xb5, 0xdf, 0x79, 0x31, 0x60, 0xed, 0x84, 0x41, 0x63,
-	0x88, 0x6b, 0xbc, 0x6c, 0xfb, 0xaf, 0x01, 0xe4, 0xf8, 0x1a, 0xdd, 0xef, 0x9f, 0x22, 0x6f, 0xdd,
-	0x11, 0xec, 0xc1, 0x26, 0x4e, 0x62, 0x74, 0x85, 0xce, 0x40, 0x57, 0x19, 0x9e, 0xc6, 0x9e, 0x23,
-	0x50, 0x0e, 0x3e, 0x93, 0xea, 0xca, 0x8e, 0xe0, 0xd1, 0x9c, 0xd5, 0xdb, 0x87, 0xf4, 0x0c, 0xea,
-	0x49, 0xea, 0xba, 0x88, 0x1e, 0x7a, 0xd2, 0xfd, 0x3d, 0x3a, 0x03, 0x7a, 0x7f, 0x4c, 0x68, 0xea,
-	0xb3, 0x0e, 0x91, 0x8f, 0x7d, 0x17, 0xc9, 0x47, 0x30, 0x87, 0x28, 0x88, 0xb5, 0x18, 0xc9, 0x2c,
-	0x3a, 0xeb, 0xe9, 0xd2, 0x35, 0x65, 0xc0, 0xde, 0xc8, 0x14, 0xfa, 0xcb, 0x14, 0xfa, 0x2b, 0x14,
-	0xfa, 0x73, 0x0a, 0x14, 0xea, 0xd3, 0xe9, 0x49, 0xda, 0x8b, 0xdc, 0xc5, 0x41, 0x6f, 0xbd, 0x5a,
-	0xc1, 0x28, 0x6a, 0x4e, 0x47, 0x4d, 0x59, 0x73, 0x71, 0x2a, 0x96, 0x35, 0x4b, 0x73, 0xca, 0xde,
-	0x20, 0x5f, 0xa1, 0x51, 0xb8, 0x2e, 0x62, 0x97, 0x3e, 0xa3, 0xd2, 0x67, 0x67, 0xbd, 0x5e, 0xc9,
-	0xc9, 0x95, 0x8f, 0x2c, 0xd8, 0xf3, 0x59, 0x4e, 0x1d, 0xf1, 0xd8, 0xcd, 0xf9, 0x03, 0xe3, 0x72,
-	0x53, 0xfe, 0xf3, 0xde, 0xfd, 0x0f, 0x00, 0x00, 0xff, 0xff, 0x2f, 0x3f, 0xde, 0x72, 0x3c, 0x08,
-	0x00, 0x00,
+	// 646 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xcc, 0x96, 0x4f, 0x6f, 0xd3, 0x4c,
+	0x10, 0xc6, 0xe3, 0x3a, 0xcd, 0xfb, 0x66, 0x42, 0xa2, 0xb2, 0xb4, 0x25, 0x18, 0x5a, 0x95, 0x45,
+	0x15, 0xe5, 0x92, 0x4a, 0x45, 0x20, 0x04, 0x17, 0x68, 0x2b, 0x25, 0x91, 0x8a, 0x14, 0x39, 0x12,
+	0x42, 0xe2, 0x50, 0xb9, 0xf6, 0x34, 0xb5, 0xea, 0x7f, 0x5d, 0xaf, 0xa3, 0x70, 0xe7, 0xc4, 0x8d,
+	0x2f, 0xc1, 0x89, 0xaf, 0xc6, 0x77, 0x40, 0xde, 0x5d, 0xa7, 0x8e, 0x1d, 0x72, 0x20, 0x52, 0xd4,
+	0x93, 0xbd, 0xb3, 0xcf, 0xfe, 0x76, 0xe6, 0x59, 0x67, 0x36, 0xb0, 0x65, 0x87, 0x49, 0xc0, 0x91,
+	0x1d, 0xaa, 0x67, 0x27, 0x62, 0x21, 0x0f, 0x49, 0xcb, 0xe2, 0xa1, 0xef, 0x4e, 0x3a, 0x2a, 0x6a,
+	0x3c, 0x14, 0x61, 0x3b, 0xf4, 0x0e, 0xb3, 0x17, 0x29, 0x34, 0xb6, 0xae, 0xd0, 0x72, 0x90, 0xc5,
+	0x87, 0xea, 0x29, 0xc3, 0xf4, 0xb7, 0x06, 0xf5, 0x13, 0xb9, 0xb6, 0xef, 0x10, 0x02, 0xd5, 0xc0,
+	0xf2, 0xb1, 0xad, 0xed, 0x69, 0x07, 0x75, 0x53, 0xbc, 0x93, 0x37, 0x50, 0x65, 0xd6, 0x25, 0x6f,
+	0xaf, 0xed, 0x69, 0x07, 0x8d, 0x23, 0xda, 0x51, 0x1b, 0x4e, 0xf1, 0x1f, 0x13, 0x8f, 0xbb, 0xa6,
+	0x75, 0xc9, 0x07, 0x2a, 0xd2, 0xab, 0x98, 0x62, 0x05, 0x39, 0x83, 0xa6, 0x9f, 0x4e, 0x9e, 0x47,
+	0xcc, 0xf5, 0x2d, 0xf6, 0xb5, 0xad, 0x0b, 0xc4, 0xfe, 0x7c, 0xc4, 0x40, 0x8a, 0x72, 0x94, 0x7b,
+	0x7e, 0x2e, 0x4e, 0xde, 0x81, 0xee, 0x85, 0xa3, 0x76, 0x55, 0x30, 0x9e, 0x97, 0x18, 0xa7, 0x6e,
+	0xcc, 0x99, 0x7b, 0x91, 0x70, 0x74, 0xce, 0xc2, 0x51, 0x8e, 0x92, 0xae, 0x3a, 0xfe, 0x0f, 0xd6,
+	0x65, 0xbd, 0x6f, 0xa1, 0x79, 0xc2, 0xd0, 0xe2, 0x68, 0xe2, 0x4d, 0x82, 0x31, 0x27, 0x2f, 0x60,
+	0xcd, 0x75, 0x44, 0xc1, 0x8d, 0xa3, 0x47, 0x9d, 0x59, 0x37, 0x3b, 0x53, 0x67, 0xcc, 0x35, 0xd7,
+	0xa1, 0x3d, 0x68, 0x65, 0x6b, 0xe3, 0x28, 0x0c, 0x62, 0x24, 0xaf, 0xa1, 0x26, 0xed, 0x54, 0x80,
+	0xdd, 0x0c, 0x90, 0x99, 0x9c, 0x29, 0x7b, 0x62, 0x6c, 0x2a, 0x35, 0xbd, 0x81, 0xe6, 0x29, 0x7a,
+	0xf8, 0x2f, 0x59, 0x90, 0x57, 0xd3, 0x3d, 0xe5, 0x89, 0xec, 0x94, 0xf7, 0x14, 0xcc, 0xc2, 0x96,
+	0x1b, 0xd0, 0xca, 0xb6, 0x94, 0x29, 0xd1, 0xef, 0x1a, 0x6c, 0xf4, 0x03, 0x9b, 0xa1, 0x8f, 0x01,
+	0x5f, 0x59, 0x22, 0x64, 0x13, 0xd6, 0x1d, 0xf4, 0xb8, 0x25, 0xbe, 0x06, 0xdd, 0x94, 0x03, 0xfa,
+	0x43, 0x83, 0xfb, 0xb9, 0x64, 0x96, 0xf3, 0x97, 0xec, 0x43, 0x2b, 0x62, 0x38, 0x76, 0xc3, 0x24,
+	0x3e, 0x1f, 0x5b, 0x5e, 0x82, 0x22, 0x45, 0xdd, 0x6c, 0x66, 0xd1, 0x4f, 0x69, 0x90, 0xec, 0x00,
+	0x04, 0x38, 0xe1, 0x4a, 0x22, 0xf3, 0xa9, 0xa7, 0x11, 0x31, 0x2d, 0x0c, 0x3a, 0xc5, 0x3b, 0x64,
+	0x50, 0x2e, 0x99, 0x3b, 0x61, 0x50, 0x00, 0xd0, 0xc5, 0xd5, 0x39, 0x43, 0xbf, 0x40, 0x43, 0xec,
+	0xb7, 0x64, 0xf1, 0x9b, 0xb0, 0x9e, 0xaf, 0x59, 0x0e, 0xe8, 0x37, 0x0d, 0x60, 0x88, 0xab, 0x3d,
+	0xe7, 0xbc, 0xaf, 0x2a, 0x0d, 0x0f, 0x1a, 0x43, 0x5c, 0xd5, 0x01, 0xd3, 0x9f, 0x1a, 0x90, 0x93,
+	0x2b, 0xb4, 0xaf, 0x3f, 0x04, 0xce, 0x4a, 0x8b, 0xdf, 0x86, 0x1a, 0x4e, 0x22, 0xb4, 0xb9, 0xaa,
+	0x5e, 0x8d, 0xd2, 0x78, 0x12, 0x39, 0x16, 0x47, 0xd1, 0xe8, 0x75, 0x53, 0x8d, 0xe8, 0x35, 0x3c,
+	0x98, 0xc9, 0x73, 0x49, 0x7b, 0x9e, 0x40, 0x3d, 0x4e, 0x6c, 0x1b, 0xd1, 0x41, 0x47, 0x24, 0xfe,
+	0xbf, 0x79, 0x1b, 0x38, 0xfa, 0x55, 0x85, 0x96, 0xaa, 0x72, 0x88, 0x6c, 0xec, 0xda, 0x48, 0xfa,
+	0x50, 0x93, 0xbd, 0x9f, 0xec, 0x94, 0xfc, 0xc8, 0xdf, 0x27, 0xc6, 0xee, 0xdf, 0xa6, 0x55, 0xd7,
+	0xad, 0xa4, 0x28, 0xd9, 0x89, 0xcb, 0xa8, 0x99, 0x4b, 0xa1, 0x8c, 0x2a, 0x34, 0xf0, 0x0a, 0x79,
+	0x0f, 0xfa, 0x10, 0x39, 0x31, 0x8a, 0xc2, 0xdb, 0xa3, 0x34, 0x1e, 0xcf, 0x9d, 0xcb, 0x13, 0xba,
+	0xf3, 0x08, 0xdd, 0x05, 0x84, 0xee, 0x0c, 0xc1, 0x84, 0xfa, 0xb4, 0x71, 0x93, 0xbd, 0xa2, 0xb6,
+	0x78, 0xc1, 0x18, 0x4f, 0x17, 0x28, 0xf2, 0xcc, 0x69, 0xaf, 0x2b, 0x33, 0x8b, 0x3d, 0xb9, 0xcc,
+	0x2c, 0x35, 0x4a, 0x5a, 0x21, 0x9f, 0xa1, 0x91, 0xfb, 0x82, 0x08, 0x2d, 0x9d, 0x53, 0xe9, 0x67,
+	0x60, 0x3c, 0x5b, 0xa8, 0xc9, 0xc8, 0xc7, 0x06, 0x6c, 0xbb, 0x61, 0x26, 0x1d, 0xb1, 0xc8, 0xce,
+	0xf4, 0x03, 0xed, 0xa2, 0x26, 0xfe, 0x76, 0xbc, 0xfc, 0x13, 0x00, 0x00, 0xff, 0xff, 0x13, 0x1a,
+	0x10, 0xa4, 0xbf, 0x09, 0x00, 0x00,
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -725,6 +889,8 @@ const _ = grpc.SupportPackageIsVersion4
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type CounterServiceClient interface {
+	Create(ctx context.Context, in *CreateRequest, opts ...grpc.CallOption) (*CreateResponse, error)
+	Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*DeleteResponse, error)
 	Set(ctx context.Context, in *SetRequest, opts ...grpc.CallOption) (*SetResponse, error)
 	Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error)
 	Increment(ctx context.Context, in *IncrementRequest, opts ...grpc.CallOption) (*IncrementResponse, error)
@@ -738,6 +904,24 @@ type counterServiceClient struct {
 
 func NewCounterServiceClient(cc *grpc.ClientConn) CounterServiceClient {
 	return &counterServiceClient{cc}
+}
+
+func (c *counterServiceClient) Create(ctx context.Context, in *CreateRequest, opts ...grpc.CallOption) (*CreateResponse, error) {
+	out := new(CreateResponse)
+	err := c.cc.Invoke(ctx, "/atomix.counter.CounterService/Create", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *counterServiceClient) Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*DeleteResponse, error) {
+	out := new(DeleteResponse)
+	err := c.cc.Invoke(ctx, "/atomix.counter.CounterService/Delete", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *counterServiceClient) Set(ctx context.Context, in *SetRequest, opts ...grpc.CallOption) (*SetResponse, error) {
@@ -787,6 +971,8 @@ func (c *counterServiceClient) CheckAndSet(ctx context.Context, in *CheckAndSetR
 
 // CounterServiceServer is the server API for CounterService service.
 type CounterServiceServer interface {
+	Create(context.Context, *CreateRequest) (*CreateResponse, error)
+	Delete(context.Context, *DeleteRequest) (*DeleteResponse, error)
 	Set(context.Context, *SetRequest) (*SetResponse, error)
 	Get(context.Context, *GetRequest) (*GetResponse, error)
 	Increment(context.Context, *IncrementRequest) (*IncrementResponse, error)
@@ -798,6 +984,12 @@ type CounterServiceServer interface {
 type UnimplementedCounterServiceServer struct {
 }
 
+func (*UnimplementedCounterServiceServer) Create(ctx context.Context, req *CreateRequest) (*CreateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Create not implemented")
+}
+func (*UnimplementedCounterServiceServer) Delete(ctx context.Context, req *DeleteRequest) (*DeleteResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Delete not implemented")
+}
 func (*UnimplementedCounterServiceServer) Set(ctx context.Context, req *SetRequest) (*SetResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Set not implemented")
 }
@@ -816,6 +1008,42 @@ func (*UnimplementedCounterServiceServer) CheckAndSet(ctx context.Context, req *
 
 func RegisterCounterServiceServer(s *grpc.Server, srv CounterServiceServer) {
 	s.RegisterService(&_CounterService_serviceDesc, srv)
+}
+
+func _CounterService_Create_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CounterServiceServer).Create(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/atomix.counter.CounterService/Create",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CounterServiceServer).Create(ctx, req.(*CreateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CounterService_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CounterServiceServer).Delete(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/atomix.counter.CounterService/Delete",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CounterServiceServer).Delete(ctx, req.(*DeleteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _CounterService_Set_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -912,6 +1140,14 @@ var _CounterService_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "atomix.counter.CounterService",
 	HandlerType: (*CounterServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Create",
+			Handler:    _CounterService_Create_Handler,
+		},
+		{
+			MethodName: "Delete",
+			Handler:    _CounterService_Delete_Handler,
+		},
 		{
 			MethodName: "Set",
 			Handler:    _CounterService_Set_Handler,

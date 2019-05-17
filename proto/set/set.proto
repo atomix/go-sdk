@@ -25,21 +25,21 @@ message CreateRequest {
 }
 
 message CreateResponse {
-    atomix.headers.SessionHeaders headers = 1;
+    repeated atomix.headers.SessionHeader headers = 1;
 }
 
 message KeepAliveRequest {
     SetId id = 1;
-    atomix.headers.SessionHeaders headers = 2;
+    repeated atomix.headers.SessionHeader headers = 2;
 }
 
 message KeepAliveResponse {
-    atomix.headers.SessionHeaders headers = 1;
+    repeated atomix.headers.SessionHeader headers = 1;
 }
 
 message CloseRequest {
     SetId id = 1;
-    atomix.headers.SessionHeaders headers = 2;
+    repeated atomix.headers.SessionHeader headers = 2;
 }
 
 message CloseResponse {
@@ -48,65 +48,65 @@ message CloseResponse {
 
 message SizeRequest {
     SetId id = 1;
-    atomix.headers.SessionQueryHeaders headers = 2;
+    repeated atomix.headers.SessionQueryHeader headers = 2;
 }
 
 message SizeResponse {
-    atomix.headers.SessionResponseHeaders headers = 1;
+    repeated atomix.headers.SessionResponseHeader headers = 1;
     int32 size = 2;
 }
 
 message ContainsRequest {
     SetId id = 1;
-    atomix.headers.SessionQueryHeaders headers = 2;
+    repeated atomix.headers.SessionQueryHeader headers = 2;
     repeated string values = 3;
 }
 
 message ContainsResponse {
-    atomix.headers.SessionResponseHeaders headers = 1;
+    repeated atomix.headers.SessionResponseHeader headers = 1;
     bool contains = 2;
 }
 
 message AddRequest {
     SetId id = 1;
-    atomix.headers.SessionCommandHeaders headers = 2;
+    repeated atomix.headers.SessionCommandHeader headers = 2;
     repeated string values = 3;
 }
 
 message AddResponse {
-    atomix.headers.SessionResponseHeaders headers = 1;
+    repeated atomix.headers.SessionResponseHeader headers = 1;
     ResponseStatus status = 2;
     bool added = 3;
 }
 
 message RemoveRequest {
     SetId id = 1;
-    atomix.headers.SessionCommandHeaders headers = 2;
+    repeated atomix.headers.SessionCommandHeader headers = 2;
     repeated string values = 3;
 }
 
 message RemoveResponse {
-    atomix.headers.SessionResponseHeaders headers = 1;
+    repeated atomix.headers.SessionResponseHeader headers = 1;
     ResponseStatus status = 2;
     bool removed = 3;
 }
 
 message ClearRequest {
     SetId id = 1;
-    atomix.headers.SessionCommandHeaders headers = 2;
+    repeated atomix.headers.SessionCommandHeader headers = 2;
 }
 
 message ClearResponse {
-    atomix.headers.SessionResponseHeaders headers = 1;
+    repeated atomix.headers.SessionResponseHeader headers = 1;
 }
 
 message EventRequest {
     SetId id = 1;
-    atomix.headers.SessionCommandHeaders headers = 2;
+    repeated atomix.headers.SessionCommandHeader headers = 2;
 }
 
 message EventResponse {
-    atomix.headers.SessionResponseHeaders headers = 1;
+    atomix.headers.SessionResponseHeader header = 1;
     Type type = 2;
     string value = 3;
 
@@ -118,11 +118,11 @@ message EventResponse {
 
 message IterateRequest {
     SetId id = 1;
-    atomix.headers.SessionQueryHeaders headers = 2;
+    repeated atomix.headers.SessionQueryHeader headers = 2;
 }
 
 message IterateResponse {
-    atomix.headers.SessionResponseHeaders headers = 1;
+    atomix.headers.SessionResponseHeader header = 1;
     string value = 2;
 }
 

@@ -18,6 +18,8 @@ message MultiPrimaryProtocol {
 // Distributed log protocol
 message DistributedLogProtocol {
     string group = 1;
+    int32 partitions = 2;
+    int32 replication_factor = 3;
 }
 
 // Gossip protocol

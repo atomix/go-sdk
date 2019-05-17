@@ -25,21 +25,21 @@ message CreateRequest {
 }
 
 message CreateResponse {
-    atomix.headers.SessionHeaders headers = 1;
+    atomix.headers.SessionHeader header = 1;
 }
 
 message KeepAliveRequest {
     ValueId id = 1;
-    atomix.headers.SessionHeaders headers = 2;
+    atomix.headers.SessionHeader header = 2;
 }
 
 message KeepAliveResponse {
-    atomix.headers.SessionHeaders headers = 1;
+    atomix.headers.SessionHeader header = 1;
 }
 
 message CloseRequest {
     ValueId id = 1;
-    atomix.headers.SessionHeaders headers = 2;
+    atomix.headers.SessionHeader header = 2;
 }
 
 message CloseResponse {
@@ -48,23 +48,23 @@ message CloseResponse {
 
 message GetRequest {
     ValueId id = 1;
-    atomix.headers.SessionQueryHeaders headers = 2;
+    atomix.headers.SessionQueryHeader header = 2;
 }
 
 message GetResponse {
-    atomix.headers.SessionResponseHeaders headers = 1;
+    atomix.headers.SessionResponseHeader header = 1;
     bytes value = 2;
     int64 version = 3;
 }
 
 message SetRequest {
     ValueId id = 1;
-    atomix.headers.SessionCommandHeaders headers = 2;
+    atomix.headers.SessionCommandHeader header = 2;
     bytes value = 3;
 }
 
 message SetResponse {
-    atomix.headers.SessionResponseHeaders headers = 1;
+    atomix.headers.SessionResponseHeader header = 1;
     int64 version = 2;
     bytes previous_value = 3;
     int64 previous_version = 4;
@@ -72,25 +72,25 @@ message SetResponse {
 
 message CheckAndSetRequest {
     ValueId id = 1;
-    atomix.headers.SessionCommandHeaders headers = 2;
+    atomix.headers.SessionCommandHeader header = 2;
     bytes check = 3;
     bytes update = 4;
     int64 version = 5;
 }
 
 message CheckAndSetResponse {
-    atomix.headers.SessionResponseHeaders headers = 1;
+    atomix.headers.SessionResponseHeader header = 1;
     int64 version = 2;
     bool succeeded = 3;
 }
 
 message EventRequest {
     ValueId id = 1;
-    atomix.headers.SessionCommandHeaders headers = 2;
+    atomix.headers.SessionCommandHeader header = 2;
 }
 
 message EventResponse {
-    atomix.headers.SessionResponseHeaders headers = 1;
+    atomix.headers.SessionResponseHeader header = 1;
     Type type = 2;
     bytes previous_value = 3;
     int64 previous_version = 4;

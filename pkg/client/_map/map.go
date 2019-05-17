@@ -19,7 +19,7 @@ func NewMap(conn *grpc.ClientConn, name string, protocol *protocol.Protocol, opt
 	}
 
 	return &Map{
-		client: c,
+		client:  c,
 		session: s,
 	}, nil
 }
@@ -31,8 +31,8 @@ type Map struct {
 
 func (m *Map) Listen(ctx context.Context, c chan<- *MapEvent) error {
 	request := &pb.EventRequest{
-		Id: m.session.mapId,
-		Headers: m.session.Headers.Command(),
+		Id:      m.session.mapId,
+		Headers: m.session.Headers.GetCommandHeaders(),
 	}
 	events, err := m.client.Events(ctx, request)
 	if err != nil {
@@ -60,11 +60,11 @@ func (m *Map) Listen(ctx context.Context, c chan<- *MapEvent) error {
 				t = EVENT_REMOVED
 			}
 
-			if m.session.Headers.Validate(response.Headers) {
-				c<-&MapEvent{
-					Type: t,
-					Key: response.Key,
-					Value: response.NewValue,
+			if m.session.Headers.Validate(response.Header) {
+				c <- &MapEvent{
+					Type:    t,
+					Key:     response.Key,
+					Value:   response.NewValue,
 					Version: response.NewVersion,
 				}
 			}
@@ -74,11 +74,13 @@ func (m *Map) Listen(ctx context.Context, c chan<- *MapEvent) error {
 }
 
 func (m *Map) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*KeyValue, error) {
+	partition := m.session.Headers.GetPartition(key)
+
 	request := &pb.PutRequest{
-		Id: m.session.mapId,
-		Headers: m.session.Headers.Command(),
-		Key: key,
-		Value: value,
+		Id:     m.session.mapId,
+		Header: partition.GetCommandHeader(),
+		Key:    key,
+		Value:  value,
 	}
 
 	for i := range opts {
@@ -94,13 +96,13 @@ func (m *Map) Put(ctx context.Context, key string, value []byte, opts ...PutOpti
 		opts[i].after(response)
 	}
 
-	m.session.Headers.Update(response.Headers)
+	partition.Update(response.Header)
 
 	if response.Status == pb.ResponseStatus_OK {
 		return &KeyValue{
 			Key:     key,
 			Value:   value,
-			Version: int64(response.Headers.Headers[0].Index),
+			Version: int64(response.Header.Index),
 		}, nil
 	} else if response.Status == pb.ResponseStatus_PRECONDITION_FAILED {
 		return nil, errors.New("write condition failed")
@@ -108,8 +110,8 @@ func (m *Map) Put(ctx context.Context, key string, value []byte, opts ...PutOpti
 		return nil, errors.New("write lock failed")
 	} else {
 		return &KeyValue{
-			Key: key,
-			Value: value,
+			Key:     key,
+			Value:   value,
 			Version: int64(response.PreviousVersion),
 		}, nil
 	}
@@ -137,10 +139,12 @@ func (o PutIfVersionOption) after(response *pb.PutResponse) {
 }
 
 func (m *Map) Get(ctx context.Context, key string, opts ...GetOption) (*KeyValue, error) {
+	partition := m.session.Headers.GetPartition(key)
+
 	request := &pb.GetRequest{
-		Id: m.session.mapId,
-		Headers: m.session.Headers.Query(),
-		Key: key,
+		Id:     m.session.mapId,
+		Header: partition.GetQueryHeader(),
+		Key:    key,
 	}
 
 	for i := range opts {
@@ -156,7 +160,7 @@ func (m *Map) Get(ctx context.Context, key string, opts ...GetOption) (*KeyValue
 		opts[i].after(response)
 	}
 
-	m.session.Headers.Update(response.Headers)
+	partition.Update(response.Header)
 
 	if response.Version != 0 {
 		return &KeyValue{
@@ -191,10 +195,12 @@ func (o GetOrDefaultOption) after(response *pb.GetResponse) {
 }
 
 func (m *Map) Remove(ctx context.Context, key string, opts ...RemoveOption) (*KeyValue, error) {
+	partition := m.session.Headers.GetPartition(key)
+
 	request := &pb.RemoveRequest{
-		Id: m.session.mapId,
-		Headers: m.session.Headers.Command(),
-		Key: key,
+		Id:     m.session.mapId,
+		Header: partition.GetCommandHeader(),
+		Key:    key,
 	}
 
 	for i := range opts {
@@ -210,12 +216,12 @@ func (m *Map) Remove(ctx context.Context, key string, opts ...RemoveOption) (*Ke
 		opts[i].after(response)
 	}
 
-	m.session.Headers.Update(response.Headers)
+	partition.Update(response.Header)
 
 	if response.Status == pb.ResponseStatus_OK {
 		return &KeyValue{
-			Key: key,
-			Value: response.PreviousValue,
+			Key:     key,
+			Value:   response.PreviousValue,
 			Version: response.PreviousVersion,
 		}, nil
 	} else if response.Status == pb.ResponseStatus_PRECONDITION_FAILED {
@@ -250,8 +256,8 @@ func (o RemoveIfVersionOption) after(response *pb.RemoveResponse) {
 
 func (m *Map) Size(ctx context.Context) (int, error) {
 	request := &pb.SizeRequest{
-		Id: m.session.mapId,
-		Headers: m.session.Headers.Query(),
+		Id:      m.session.mapId,
+		Headers: m.session.Headers.GetQueryHeaders(),
 	}
 
 	response, err := m.client.Size(ctx, request)
@@ -265,7 +271,7 @@ func (m *Map) Size(ctx context.Context) (int, error) {
 
 func (m *Map) Clear(ctx context.Context) error {
 	request := &pb.ClearRequest{
-		Headers: m.session.Headers.Command(),
+		Headers: m.session.Headers.GetCommandHeaders(),
 	}
 
 	response, err := m.client.Clear(ctx, request)
@@ -283,21 +289,21 @@ func (m *Map) Close() error {
 
 type KeyValue struct {
 	Version int64
-	Key string
-	Value []byte
+	Key     string
+	Value   []byte
 }
 
 type MapEventType string
 
 const (
 	EVENT_INSERTED MapEventType = "inserted"
-	EVENT_UPDATED MapEventType = "updated"
-	EVENT_REMOVED MapEventType = "removed"
+	EVENT_UPDATED  MapEventType = "updated"
+	EVENT_REMOVED  MapEventType = "removed"
 )
 
 type MapEvent struct {
-	Type MapEventType
-	Key string
-	Value []byte
+	Type    MapEventType
+	Key     string
+	Value   []byte
 	Version int64
 }

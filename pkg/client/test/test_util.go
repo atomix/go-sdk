@@ -30,35 +30,70 @@ func (s *TestServer) IncrementIndex() uint64 {
 	return s.Index
 }
 
-func (s *TestServer) CreateHeaders(ctx context.Context) (*headers.SessionHeaders, error) {
+func (s *TestServer) CreateHeader(ctx context.Context) (*headers.SessionHeader, error) {
 	index := s.IncrementIndex()
 	session := s.NewSession()
 	session.Complete(0)
-	return &headers.SessionHeaders{
-		SessionId: index,
-		Headers: []*headers.SessionHeader{
-			{
-				PartitionId: 1,
-			},
-		},
+	return &headers.SessionHeader{
+		PartitionId: 1,
+		SessionId:   index,
 	}, nil
 }
 
-func (s *TestServer) KeepAliveHeaders(ctx context.Context, h *headers.SessionHeaders) (*headers.SessionHeaders, error) {
+func (s *TestServer) KeepAliveHeader(ctx context.Context, h *headers.SessionHeader) (*headers.SessionHeader, error) {
 	index := s.IncrementIndex()
 	if session, exists := s.sessions[h.SessionId]; exists {
 		streams := []*headers.SessionStreamHeader{}
 		for _, stream := range session.streams {
 			streams = append(streams, stream.Header(uint64(index)))
 		}
-		return &headers.SessionHeaders{
-			SessionId: h.SessionId,
-			Headers: []*headers.SessionHeader{
-				{
-					PartitionId:        1,
-					LastSequenceNumber: session.SequenceNumber,
-					Streams:            streams,
-				},
+		return &headers.SessionHeader{
+			PartitionId:        1,
+			SessionId:          h.SessionId,
+			LastSequenceNumber: session.SequenceNumber,
+			Streams:            streams,
+		}, nil
+	} else {
+		return nil, errors.New("session not found")
+	}
+}
+
+func (s *TestServer) CloseHeader(ctx context.Context, h *headers.SessionHeader) error {
+	s.IncrementIndex()
+	if _, exists := s.sessions[h.SessionId]; exists {
+		delete(s.sessions, h.SessionId)
+		return nil
+	} else {
+		return errors.New("session not found")
+	}
+}
+
+func (s *TestServer) CreateHeaders(ctx context.Context) ([]*headers.SessionHeader, error) {
+	index := s.IncrementIndex()
+	session := s.NewSession()
+	session.Complete(0)
+	return []*headers.SessionHeader{
+		{
+			PartitionId: 1,
+			SessionId:   index,
+		},
+	}, nil
+}
+
+func (s *TestServer) KeepAliveHeaders(ctx context.Context, h []*headers.SessionHeader) ([]*headers.SessionHeader, error) {
+	index := s.IncrementIndex()
+	header := h[0]
+	if session, exists := s.sessions[header.SessionId]; exists {
+		streams := []*headers.SessionStreamHeader{}
+		for _, stream := range session.streams {
+			streams = append(streams, stream.Header(uint64(index)))
+		}
+		return []*headers.SessionHeader{
+			{
+				PartitionId:        1,
+				SessionId:          header.SessionId,
+				LastSequenceNumber: session.SequenceNumber,
+				Streams:            streams,
 			},
 		}, nil
 	} else {
@@ -66,10 +101,11 @@ func (s *TestServer) KeepAliveHeaders(ctx context.Context, h *headers.SessionHea
 	}
 }
 
-func (s *TestServer) CloseHeaders(ctx context.Context, h *headers.SessionHeaders) error {
+func (s *TestServer) CloseHeaders(ctx context.Context, h []*headers.SessionHeader) error {
 	s.IncrementIndex()
-	if _, exists := s.sessions[h.SessionId]; exists {
-		delete(s.sessions, h.SessionId)
+	header := h[0]
+	if _, exists := s.sessions[header.SessionId]; exists {
+		delete(s.sessions, header.SessionId)
 		return nil
 	} else {
 		return errors.New("session not found")
@@ -154,20 +190,33 @@ func (s *TestSession) Complete(sequence uint64) {
 }
 
 // NewResponseHeaders creates a new response header with headers for all open streams
-func (s *TestSession) NewResponseHeaders() (*headers.SessionResponseHeaders, error) {
+func (s *TestSession) NewResponseHeader() (*headers.SessionResponseHeader, error) {
 	streams := []*headers.SessionStreamHeader{}
 	for _, stream := range s.streams {
 		streams = append(streams, stream.Header(uint64(s.server.Index)))
 	}
-	return &headers.SessionResponseHeaders{
-		SessionId: s.Id,
-		Headers: []*headers.SessionResponseHeader{
-			{
-				PartitionId:    1,
-				Index:          s.server.Index,
-				SequenceNumber: s.SequenceNumber,
-				Streams:        streams,
-			},
+	return &headers.SessionResponseHeader{
+		PartitionId:    1,
+		SessionId:      s.Id,
+		Index:          s.server.Index,
+		SequenceNumber: s.SequenceNumber,
+		Streams:        streams,
+	}, nil
+}
+
+// NewResponseHeaders creates a new response header with headers for all open streams
+func (s *TestSession) NewResponseHeaders() ([]*headers.SessionResponseHeader, error) {
+	streams := []*headers.SessionStreamHeader{}
+	for _, stream := range s.streams {
+		streams = append(streams, stream.Header(uint64(s.server.Index)))
+	}
+	return []*headers.SessionResponseHeader{
+		{
+			PartitionId:    1,
+			SessionId:      s.Id,
+			Index:          s.server.Index,
+			SequenceNumber: s.SequenceNumber,
+			Streams:        streams,
 		},
 	}, nil
 }
@@ -195,21 +244,17 @@ func (s *TestStream) Header(index uint64) *headers.SessionStreamHeader {
 }
 
 // NewResponseHeaders returns headers for the stream
-func (s *TestStream) NewResponseHeaders() *headers.SessionResponseHeaders {
-	return &headers.SessionResponseHeaders{
-		SessionId: s.Id,
-		Headers: []*headers.SessionResponseHeader{
+func (s *TestStream) NewResponseHeader() *headers.SessionResponseHeader {
+	return &headers.SessionResponseHeader{
+		PartitionId:    1,
+		SessionId:      s.Id,
+		Index:          s.session.server.Index,
+		SequenceNumber: s.session.SequenceNumber,
+		Streams: []*headers.SessionStreamHeader{
 			{
-				PartitionId:    1,
+				StreamId:       s.Id,
 				Index:          s.session.server.Index,
-				SequenceNumber: s.session.SequenceNumber,
-				Streams: []*headers.SessionStreamHeader{
-					{
-						StreamId:       s.Id,
-						Index:          s.session.server.Index,
-						LastItemNumber: s.ItemNumber + 1,
-					},
-				},
+				LastItemNumber: s.ItemNumber + 1,
 			},
 		},
 	}

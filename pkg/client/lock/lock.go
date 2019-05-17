@@ -18,7 +18,7 @@ func NewLock(conn *grpc.ClientConn, name string, protocol *protocol.Protocol, op
 	}
 
 	return &Lock{
-		client: c,
+		client:  c,
 		session: s,
 	}, nil
 }
@@ -29,9 +29,11 @@ type Lock struct {
 }
 
 func (l *Lock) Lock(ctx context.Context, opts ...LockOption) (uint64, error) {
+	partition := l.session.Headers.GetPartition("")
+
 	request := &pb.LockRequest{
-		Id: l.session.lockId,
-		Headers: l.session.Headers.Command(),
+		Id:     l.session.lockId,
+		Header: partition.GetCommandHeader(),
 	}
 
 	for _, opt := range opts {
@@ -47,7 +49,7 @@ func (l *Lock) Lock(ctx context.Context, opts ...LockOption) (uint64, error) {
 		opt.after(response)
 	}
 
-	l.session.Headers.Update(response.Headers)
+	partition.Update(response.Header)
 	return response.Version, nil
 }
 
@@ -67,7 +69,7 @@ type lockTimeoutOption struct {
 func (o lockTimeoutOption) before(request *pb.LockRequest) {
 	request.Timeout = &duration.Duration{
 		Seconds: int64(o.timeout.Seconds()),
-		Nanos: int32(o.timeout.Nanoseconds()),
+		Nanos:   int32(o.timeout.Nanoseconds()),
 	}
 }
 
@@ -76,9 +78,11 @@ func (o lockTimeoutOption) after(response *pb.LockResponse) {
 }
 
 func (l *Lock) Unlock(ctx context.Context, opts ...UnlockOption) (bool, error) {
+	partition := l.session.Headers.GetPartition("")
+
 	request := &pb.UnlockRequest{
-		Id: l.session.lockId,
-		Headers: l.session.Headers.Command(),
+		Id:     l.session.lockId,
+		Header: partition.GetCommandHeader(),
 	}
 
 	for i := range opts {
@@ -94,7 +98,7 @@ func (l *Lock) Unlock(ctx context.Context, opts ...UnlockOption) (bool, error) {
 		opts[i].after(response)
 	}
 
-	l.session.Headers.Update(response.Headers)
+	partition.Update(response.Header)
 	return response.Unlocked, nil
 }
 
@@ -120,9 +124,11 @@ func (o unlockVersionOption) after(response *pb.UnlockResponse) {
 }
 
 func (l *Lock) IsLocked(ctx context.Context, opts ...IsLockedOption) (bool, error) {
+	partition := l.session.Headers.GetPartition("")
+
 	request := &pb.IsLockedRequest{
-		Id: l.session.lockId,
-		Headers: l.session.Headers.Query(),
+		Id:     l.session.lockId,
+		Header: partition.GetQueryHeader(),
 	}
 
 	for i := range opts {
@@ -138,7 +144,7 @@ func (l *Lock) IsLocked(ctx context.Context, opts ...IsLockedOption) (bool, erro
 		opts[i].after(response)
 	}
 
-	l.session.Headers.Update(response.Headers)
+	partition.Update(response.Header)
 	return response.IsLocked, nil
 }
 

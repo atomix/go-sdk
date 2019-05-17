@@ -9,8 +9,9 @@ option java_multiple_files = true;
 
 // Distributed log ID
 message LogId {
+    string name = 1;
     oneof proto {
-        protocol.DistributedLogProtocol log = 1;
+        protocol.DistributedLogProtocol log = 2;
     }
 }
 

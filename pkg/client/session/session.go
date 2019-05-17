@@ -3,6 +3,7 @@ package session
 import (
 	"github.com/atomix/atomix-go/pkg/client/protocol"
 	"github.com/atomix/atomix-go/proto/headers"
+	"hash/fnv"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sync"
 	"time"
@@ -31,10 +32,10 @@ func (o TimeoutOption) prepare(options *Options) {
 }
 
 type Options struct {
-	raft protocol.MultiRaftProtocol
+	raft          protocol.MultiRaftProtocol
 	primaryBackup protocol.MultiPrimaryProtocol
-	log protocol.MultiLogProtocol
-	timeout time.Duration
+	log           protocol.MultiLogProtocol
+	timeout       time.Duration
 }
 
 func NewSession(opts ...Option) *Session {
@@ -52,14 +53,12 @@ func NewSession(opts ...Option) *Session {
 }
 
 type Session struct {
-	Id      uint64
 	Timeout time.Duration
 	Headers *Headers
 	stopped chan struct{}
 }
 
-func (s *Session) Start(headers *headers.SessionHeaders) {
-	s.Id = headers.SessionId
+func (s *Session) Start(headers []*headers.SessionHeader) {
 	s.Headers.Create(headers)
 
 	go wait.Until(func() {
@@ -82,50 +81,39 @@ func NewHeaders() *Headers {
 }
 
 type Headers struct {
-	session    *Session
-	partitions map[uint32]*Partition
-	mu         sync.RWMutex
+	session      *Session
+	partitions   map[uint32]*Partition
+	partitionIds []uint32
+	mu           sync.RWMutex
 }
 
-func (h *Headers) Create(headers *headers.SessionHeaders) {
+func (h *Headers) Create(headers []*headers.SessionHeader) {
 	h.mu.Lock()
-	h.partitions = make(map[uint32]*Partition, len(headers.Headers))
-	for i := range headers.Headers {
-		id := headers.Headers[i].PartitionId
+	h.partitions = make(map[uint32]*Partition, len(headers))
+	h.partitionIds = []uint32{}
+	for _, header := range headers {
+		id := header.PartitionId
 		h.partitions[id] = &Partition{
-			id:      headers.Headers[i].PartitionId,
-			streams: map[uint64]*Stream{},
+			Id:        header.PartitionId,
+			SessionId: header.SessionId,
+			streams:   map[uint64]*Stream{},
 		}
+		h.partitionIds = append(h.partitionIds, header.PartitionId)
 	}
 	h.mu.Unlock()
 }
 
-func (h *Headers) Update(headers *headers.SessionResponseHeaders) {
+func (h *Headers) Update(headers []*headers.SessionResponseHeader) {
 	h.mu.Lock()
-	for i := range headers.Headers {
-		header := headers.Headers[i]
+	for _, header := range headers {
 		partition := h.partitions[header.PartitionId]
-		if header.Index > partition.lastIndex {
-			partition.lastIndex = header.Index
-		}
-
-		streams := partition.streams
-		for j := range header.Streams {
-			id := header.Streams[j].StreamId
-			if _, ok := streams[id]; !ok {
-				streams[id] = &Stream{
-					id:    id,
-					index: id,
-				}
-			}
-		}
+		partition.Update(header)
 	}
 	h.mu.Unlock()
 }
 
-func (h *Headers) Validate(headers *headers.SessionResponseHeaders) bool {
+func (h *Headers) Validate(header *headers.SessionResponseHeader) bool {
 	h.mu.Lock()
-	header := headers.Headers[0]
 	partition := h.partitions[header.PartitionId]
 	if header.Index > partition.lastIndex {
 		partition.lastIndex = header.Index
@@ -151,81 +139,101 @@ func (h *Headers) Validate(headers *headers.SessionResponseHeaders) bool {
 	return false
 }
 
-func (h *Headers) Session() *headers.SessionHeaders {
+func (h *Headers) GetSessionHeaders() []*headers.SessionHeader {
 	h.mu.RLock()
 	sh := []*headers.SessionHeader{}
-	for i := range h.partitions {
-		sh = append(sh, h.partitions[i].newSessionHeader())
+	for _, partition := range h.partitions {
+		sh = append(sh, partition.GetSessionHeader())
 	}
 	h.mu.RUnlock()
-
-	return &headers.SessionHeaders{
-		SessionId: h.session.Id,
-		Headers:   sh,
-	}
+	return sh
 }
 
-func (h *Headers) Query() *headers.SessionQueryHeaders {
+func (h *Headers) GetQueryHeaders() []*headers.SessionQueryHeader {
 	h.mu.RLock()
 	qh := []*headers.SessionQueryHeader{}
-	for i := range h.partitions {
-		qh = append(qh, h.partitions[i].newQueryHeader())
+	for _, partition := range h.partitions {
+		qh = append(qh, partition.GetQueryHeader())
 	}
 	h.mu.RUnlock()
-
-	return &headers.SessionQueryHeaders{
-		SessionId: h.session.Id,
-		Headers:   qh,
-	}
+	return qh
 }
 
-func (h *Headers) Command() *headers.SessionCommandHeaders {
+func (h *Headers) GetCommandHeaders() []*headers.SessionCommandHeader {
 	h.mu.RLock()
 	ch := []*headers.SessionCommandHeader{}
-	for i := range h.partitions {
-		ch = append(ch, h.partitions[i].newCommandHeader())
+	for _, partition := range h.partitions {
+		ch = append(ch, partition.GetCommandHeader())
 	}
 	h.mu.RUnlock()
+	return ch
+}
 
-	return &headers.SessionCommandHeaders{
-		SessionId: h.session.Id,
-		Headers:   ch,
+func (h *Headers) GetPartition(key string) *Partition {
+	if len(h.partitionIds) == 1 {
+		return h.partitions[h.partitionIds[0]]
 	}
+
+	hash := fnv.New32()
+	hash.Write([]byte(key))
+	i := hash.Sum32()
+	return h.partitions[h.partitionIds[i%uint32(len(h.partitionIds))]]
 }
 
 type Partition struct {
-	id                 uint32
+	Id                 uint32
+	SessionId          uint64
 	lastIndex          uint64
 	sequenceNumber     uint64
 	lastSequenceNumber uint64
 	streams            map[uint64]*Stream
 }
 
-func (p *Partition) newSessionHeader() *headers.SessionHeader {
-	return &headers.SessionHeader{
-		PartitionId:        p.id,
-		LastSequenceNumber: p.lastSequenceNumber,
-		Streams:            p.newStreamHeaders(),
+func (p *Partition) Update(header *headers.SessionResponseHeader) {
+	if header.Index > p.lastIndex {
+		p.lastIndex = header.Index
+	}
+
+	streams := p.streams
+	for j := range header.Streams {
+		id := header.Streams[j].StreamId
+		if _, ok := streams[id]; !ok {
+			streams[id] = &Stream{
+				id:    id,
+				index: id,
+			}
+		}
 	}
 }
 
-func (p *Partition) newCommandHeader() *headers.SessionCommandHeader {
+func (p *Partition) GetSessionHeader() *headers.SessionHeader {
+	return &headers.SessionHeader{
+		PartitionId:        p.Id,
+		SessionId:          p.SessionId,
+		LastSequenceNumber: p.lastSequenceNumber,
+		Streams:            p.GetStreamHeaders(),
+	}
+}
+
+func (p *Partition) GetCommandHeader() *headers.SessionCommandHeader {
 	p.sequenceNumber += 1
 	return &headers.SessionCommandHeader{
-		PartitionId:    p.id,
+		PartitionId:    p.Id,
+		SessionId:      p.SessionId,
 		SequenceNumber: p.sequenceNumber,
 	}
 }
 
-func (p *Partition) newQueryHeader() *headers.SessionQueryHeader {
+func (p *Partition) GetQueryHeader() *headers.SessionQueryHeader {
 	return &headers.SessionQueryHeader{
-		PartitionId:        p.id,
+		PartitionId:        p.Id,
+		SessionId:          p.SessionId,
 		LastIndex:          p.lastIndex,
 		LastSequenceNumber: p.lastSequenceNumber,
 	}
 }
 
-func (p *Partition) newStreamHeaders() []*headers.SessionStreamHeader {
+func (p *Partition) GetStreamHeaders() []*headers.SessionStreamHeader {
 	result := make([]*headers.SessionStreamHeader, len(p.streams))
 	for _, stream := range p.streams {
 		result = append(result, stream.newStreamHeader())

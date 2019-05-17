@@ -55,16 +55,16 @@ func (s *TestServer) Close(ctx context.Context, request *pb.CloseRequest) (*pb.C
 func (s *TestServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutResponse, error) {
 	index := s.IncrementIndex()
 
-	session, err := s.GetSession(request.Headers.SessionId)
+	session, err := s.GetSession(request.Header.SessionId)
 	if err != nil {
 		return nil, err
 	}
 
-	sequenceNumber := request.Headers.Headers[0].SequenceNumber
+	sequenceNumber := request.Header.SequenceNumber
 	session.Await(sequenceNumber)
 	defer session.Complete(sequenceNumber)
 
-	headers, err := session.NewResponseHeaders()
+	header, err := session.NewResponseHeader()
 	if err != nil {
 		return nil, err
 	}
@@ -73,14 +73,14 @@ func (s *TestServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRe
 
 	if request.Version != 0 && (v == nil || v.Version != request.Version) {
 		return &pb.PutResponse{
-			Headers: headers,
+			Header: header,
 			Status:  pb.ResponseStatus_PRECONDITION_FAILED,
 		}, nil
 	}
 
 	if v != nil && valuesEqual(v.Value, request.Value) {
 		return &pb.PutResponse{
-			Headers: headers,
+			Header: header,
 			Status:  pb.ResponseStatus_NOOP,
 		}, nil
 	}
@@ -95,7 +95,7 @@ func (s *TestServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRe
 	for _, stream := range streams {
 		if v == nil {
 			stream.Send(&pb.EventResponse{
-				Headers:    stream.NewResponseHeaders(),
+				Header:    stream.NewResponseHeader(),
 				Type:       pb.EventResponse_INSERTED,
 				Key:        request.Key,
 				NewValue:   request.Value,
@@ -103,7 +103,7 @@ func (s *TestServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRe
 			})
 		} else {
 			stream.Send(&pb.EventResponse{
-				Headers:    stream.NewResponseHeaders(),
+				Header:    stream.NewResponseHeader(),
 				Type:       pb.EventResponse_UPDATED,
 				Key:        request.Key,
 				OldValue:   v.Value,
@@ -116,26 +116,26 @@ func (s *TestServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRe
 
 	if v != nil {
 		return &pb.PutResponse{
-			Headers:         headers,
+			Header:         header,
 			Status:          pb.ResponseStatus_OK,
 			PreviousValue:   v.Value,
 			PreviousVersion: v.Version,
 		}, nil
 	} else {
 		return &pb.PutResponse{
-			Headers: headers,
+			Header: header,
 			Status:  pb.ResponseStatus_OK,
 		}, nil
 	}
 }
 
 func (s *TestServer) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetResponse, error) {
-	session, err := s.GetSession(request.Headers.SessionId)
+	session, err := s.GetSession(request.Header.SessionId)
 	if err != nil {
 		return nil, err
 	}
 
-	headers, err := session.NewResponseHeaders()
+	header, err := session.NewResponseHeader()
 	if err != nil {
 		return nil, err
 	}
@@ -144,13 +144,13 @@ func (s *TestServer) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetRe
 
 	if v.Version != 0 {
 		return &pb.GetResponse{
-			Headers: headers,
+			Header: header,
 			Value:   v.Value,
 			Version: v.Version,
 		}, nil
 	} else {
 		return &pb.GetResponse{
-			Headers: headers,
+			Header: header,
 		}, nil
 	}
 }
@@ -158,16 +158,16 @@ func (s *TestServer) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetRe
 func (s *TestServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb.RemoveResponse, error) {
 	s.IncrementIndex()
 
-	session, err := s.GetSession(request.Headers.SessionId)
+	session, err := s.GetSession(request.Header.SessionId)
 	if err != nil {
 		return nil, err
 	}
 
-	sequenceNumber := request.Headers.Headers[0].SequenceNumber
+	sequenceNumber := request.Header.SequenceNumber
 	session.Await(sequenceNumber)
 	defer session.Complete(sequenceNumber)
 
-	headers, err := session.NewResponseHeaders()
+	header, err := session.NewResponseHeader()
 	if err != nil {
 		return nil, err
 	}
@@ -176,14 +176,14 @@ func (s *TestServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb
 
 	if v == nil {
 		return &pb.RemoveResponse{
-			Headers: headers,
+			Header: header,
 			Status:  pb.ResponseStatus_NOOP,
 		}, nil
 	}
 
 	if request.Version != 0 && v.Version != request.Version {
 		return &pb.RemoveResponse{
-			Headers: headers,
+			Header: header,
 			Status:  pb.ResponseStatus_PRECONDITION_FAILED,
 		}, nil
 	}
@@ -192,7 +192,7 @@ func (s *TestServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb
 
 	for _, stream := range session.Streams() {
 		stream.Send(&pb.EventResponse{
-			Headers:    stream.NewResponseHeaders(),
+			Header:    stream.NewResponseHeader(),
 			Type:       pb.EventResponse_REMOVED,
 			Key:        request.Key,
 			OldValue:   v.Value,
@@ -202,14 +202,14 @@ func (s *TestServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb
 
 	if v.Version != 0 {
 		return &pb.RemoveResponse{
-			Headers:         headers,
+			Header:         header,
 			Status:          pb.ResponseStatus_OK,
 			PreviousValue:   v.Value,
 			PreviousVersion: v.Version,
 		}, nil
 	} else {
 		return &pb.RemoveResponse{
-			Headers: headers,
+			Header: header,
 			Status:  pb.ResponseStatus_OK,
 		}, nil
 	}
@@ -218,16 +218,16 @@ func (s *TestServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb
 func (s *TestServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*pb.ReplaceResponse, error) {
 	index := s.IncrementIndex()
 
-	session, err := s.GetSession(request.Headers.SessionId)
+	session, err := s.GetSession(request.Header.SessionId)
 	if err != nil {
 		return nil, err
 	}
 
-	sequenceNumber := request.Headers.Headers[0].SequenceNumber
+	sequenceNumber := request.Header.SequenceNumber
 	session.Await(sequenceNumber)
 	defer session.Complete(sequenceNumber)
 
-	headers, err := session.NewResponseHeaders()
+	header, err := session.NewResponseHeader()
 	if err != nil {
 		return nil, err
 	}
@@ -236,14 +236,14 @@ func (s *TestServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*
 
 	if (v == nil && request.PreviousVersion != 0) || (v != nil && v.Version != request.PreviousVersion) || (v != nil && !valuesEqual(v.Value, request.PreviousValue)) {
 		return &pb.ReplaceResponse{
-			Headers: headers,
+			Header: header,
 			Status:  pb.ResponseStatus_PRECONDITION_FAILED,
 		}, nil
 	}
 
 	if v != nil && valuesEqual(v.Value, request.NewValue) {
 		return &pb.ReplaceResponse{
-			Headers: headers,
+			Header: header,
 			Status:  pb.ResponseStatus_NOOP,
 		}, nil
 	}
@@ -257,7 +257,7 @@ func (s *TestServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*
 	for _, stream := range session.Streams() {
 		if v.Version == 0 {
 			stream.Send(&pb.EventResponse{
-				Headers:    stream.NewResponseHeaders(),
+				Header:    stream.NewResponseHeader(),
 				Type:       pb.EventResponse_INSERTED,
 				Key:        request.Key,
 				NewValue:   request.NewValue,
@@ -265,7 +265,7 @@ func (s *TestServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*
 			})
 		} else {
 			stream.Send(&pb.EventResponse{
-				Headers:    stream.NewResponseHeaders(),
+				Header:    stream.NewResponseHeader(),
 				Type:       pb.EventResponse_UPDATED,
 				Key:        request.Key,
 				OldValue:   v.Value,
@@ -278,47 +278,46 @@ func (s *TestServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*
 
 	if v != nil {
 		return &pb.ReplaceResponse{
-			Headers:         headers,
+			Header:         header,
 			Status:          pb.ResponseStatus_OK,
 			PreviousValue:   v.Value,
 			PreviousVersion: v.Version,
 		}, nil
 	} else {
 		return &pb.ReplaceResponse{
-			Headers: headers,
+			Header: header,
 			Status:  pb.ResponseStatus_OK,
 		}, nil
 	}
 }
 
 func (s *TestServer) Exists(ctx context.Context, request *pb.ExistsRequest) (*pb.ExistsResponse, error) {
-	session, err := s.GetSession(request.Headers.SessionId)
+	session, err := s.GetSession(request.Header.SessionId)
 	if err != nil {
 		return nil, err
 	}
 
-	headers, err := session.NewResponseHeaders()
+	header, err := session.NewResponseHeader()
 	if err != nil {
 		return nil, err
 	}
 
-	for _, key := range request.Keys {
-		_, ok := s.entries[key]
-		if !ok {
-			return &pb.ExistsResponse{
-				Headers:     headers,
-				ContainsKey: false,
-			}, nil
-		}
+	_, ok := s.entries[request.Key]
+	if !ok {
+		return &pb.ExistsResponse{
+			Header:     header,
+			ContainsKey: false,
+		}, nil
+	} else {
+		return &pb.ExistsResponse{
+			Header:      header,
+			ContainsKey: true,
+		}, nil
 	}
-	return &pb.ExistsResponse{
-		Headers:     headers,
-		ContainsKey: true,
-	}, nil
 }
 
 func (s *TestServer) Size(ctx context.Context, request *pb.SizeRequest) (*pb.SizeResponse, error) {
-	session, err := s.GetSession(request.Headers.SessionId)
+	session, err := s.GetSession(request.Headers[0].SessionId)
 	if err != nil {
 		return nil, err
 	}
@@ -336,12 +335,12 @@ func (s *TestServer) Size(ctx context.Context, request *pb.SizeRequest) (*pb.Siz
 func (s *TestServer) Clear(ctx context.Context, request *pb.ClearRequest) (*pb.ClearResponse, error) {
 	s.IncrementIndex()
 
-	session, err := s.GetSession(request.Headers.SessionId)
+	session, err := s.GetSession(request.Headers[0].SessionId)
 	if err != nil {
 		return nil, err
 	}
 
-	sequenceNumber := request.Headers.Headers[0].SequenceNumber
+	sequenceNumber := request.Headers[0].SequenceNumber
 	session.Await(sequenceNumber)
 	defer session.Complete(sequenceNumber)
 
@@ -360,12 +359,12 @@ func (s *TestServer) Clear(ctx context.Context, request *pb.ClearRequest) (*pb.C
 func (s *TestServer) Events(request *pb.EventRequest, server pb.MapService_EventsServer) error {
 	s.IncrementIndex()
 
-	session, err := s.GetSession(request.Headers.SessionId)
+	session, err := s.GetSession(request.Headers[0].SessionId)
 	if err != nil {
 		return err
 	}
 
-	sequenceNumber := request.Headers.Headers[0].SequenceNumber
+	sequenceNumber := request.Headers[0].SequenceNumber
 	session.Await(sequenceNumber)
 	session.Complete(sequenceNumber)
 

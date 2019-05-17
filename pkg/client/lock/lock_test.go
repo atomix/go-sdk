@@ -33,27 +33,27 @@ type LockAttempt struct {
 }
 
 func (s *TestServer) Create(ctx context.Context, request *pb.CreateRequest) (*pb.CreateResponse, error) {
-	headers, err := s.CreateHeaders(ctx)
+	header, err := s.CreateHeader(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return &pb.CreateResponse{
-		Headers: headers,
+		Header: header,
 	}, nil
 }
 
 func (s *TestServer) KeepAlive(ctx context.Context, request *pb.KeepAliveRequest) (*pb.KeepAliveResponse, error) {
-	headers, err := s.KeepAliveHeaders(ctx, request.Headers)
+	header, err := s.KeepAliveHeader(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
 	return &pb.KeepAliveResponse{
-		Headers: headers,
+		Header: header,
 	}, nil
 }
 
 func (s *TestServer) Close(ctx context.Context, request *pb.CloseRequest) (*pb.CloseResponse, error) {
-	err := s.CloseHeaders(ctx, request.Headers)
+	err := s.CloseHeader(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -63,12 +63,12 @@ func (s *TestServer) Close(ctx context.Context, request *pb.CloseRequest) (*pb.C
 func (s *TestServer) Lock(ctx context.Context, request *pb.LockRequest) (*pb.LockResponse, error) {
 	index := s.IncrementIndex()
 
-	session, err := s.GetSession(request.Headers.SessionId)
+	session, err := s.GetSession(request.Header.SessionId)
 	if err != nil {
 		return nil, err
 	}
 
-	sequenceNumber := request.Headers.Headers[0].SequenceNumber
+	sequenceNumber := request.Header.SequenceNumber
 	session.Await(sequenceNumber)
 	defer session.Complete(sequenceNumber)
 
@@ -82,7 +82,7 @@ func (s *TestServer) Lock(ctx context.Context, request *pb.LockRequest) (*pb.Loc
 		s.queue = append(s.queue, attempt)
 		succeeded := <-c
 
-		headers, err := session.NewResponseHeaders()
+		header, err := session.NewResponseHeader()
 		if err != nil {
 			return nil, err
 		}
@@ -91,17 +91,17 @@ func (s *TestServer) Lock(ctx context.Context, request *pb.LockRequest) (*pb.Loc
 			attempt.version = s.Index
 			s.lock = attempt
 			return &pb.LockResponse{
-				Headers: headers,
+				Header: header,
 				Version: s.Index,
 			}, nil
 		} else {
 			return &pb.LockResponse{
-				Headers: headers,
+				Header: header,
 				Version: 0,
 			}, nil
 		}
 	} else {
-		headers, err := session.NewResponseHeaders()
+		header, err := session.NewResponseHeader()
 		if err != nil {
 			return nil, err
 		}
@@ -111,7 +111,7 @@ func (s *TestServer) Lock(ctx context.Context, request *pb.LockRequest) (*pb.Loc
 			request: request,
 		}
 		return &pb.LockResponse{
-			Headers: headers,
+			Header: header,
 			Version: index,
 		}, nil
 	}
@@ -120,23 +120,23 @@ func (s *TestServer) Lock(ctx context.Context, request *pb.LockRequest) (*pb.Loc
 func (s *TestServer) Unlock(ctx context.Context, request *pb.UnlockRequest) (*pb.UnlockResponse, error) {
 	s.IncrementIndex()
 
-	session, err := s.GetSession(request.Headers.SessionId)
+	session, err := s.GetSession(request.Header.SessionId)
 	if err != nil {
 		return nil, err
 	}
 
-	sequenceNumber := request.Headers.Headers[0].SequenceNumber
+	sequenceNumber := request.Header.SequenceNumber
 	session.Await(sequenceNumber)
 	defer session.Complete(sequenceNumber)
 
-	headers, err := session.NewResponseHeaders()
+	header, err := session.NewResponseHeader()
 	if err != nil {
 		return nil, err
 	}
 
 	if s.lock == nil || (request.Version != 0 && s.lock.version != request.Version) {
 		return &pb.UnlockResponse{
-			Headers:  headers,
+			Header:  header,
 			Unlocked: false,
 		}, nil
 	}
@@ -161,35 +161,35 @@ func (s *TestServer) Unlock(ctx context.Context, request *pb.UnlockRequest) (*pb
 	}
 
 	return &pb.UnlockResponse{
-		Headers:  headers,
+		Header:  header,
 		Unlocked: true,
 	}, nil
 }
 
 func (s *TestServer) IsLocked(ctx context.Context, request *pb.IsLockedRequest) (*pb.IsLockedResponse, error) {
-	session, err := s.GetSession(request.Headers.SessionId)
+	session, err := s.GetSession(request.Header.SessionId)
 	if err != nil {
 		return nil, err
 	}
 
-	headers, err := session.NewResponseHeaders()
+	header, err := session.NewResponseHeader()
 	if err != nil {
 		return nil, err
 	}
 
 	if s.lock == nil {
 		return &pb.IsLockedResponse{
-			Headers:  headers,
+			Header:  header,
 			IsLocked: false,
 		}, nil
 	} else if request.Version > 0 && s.lock.version != request.Version {
 		return &pb.IsLockedResponse{
-			Headers:  headers,
+			Header:  header,
 			IsLocked: false,
 		}, nil
 	} else {
 		return &pb.IsLockedResponse{
-			Headers:  headers,
+			Header:  header,
 			IsLocked: true,
 		}, nil
 	}

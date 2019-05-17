@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/atomix/atomix-go/pkg/client/protocol"
 	"github.com/atomix/atomix-go/pkg/client/session"
-	"github.com/atomix/atomix-go/proto/headers"
 	pb "github.com/atomix/atomix-go/proto/map"
 	"github.com/atomix/atomix-go/proto/protocol"
 	"github.com/golang/protobuf/ptypes/duration"
@@ -12,9 +11,9 @@ import (
 
 func newSession(c pb.MapServiceClient, name string, protocol *protocol.Protocol, opts ...session.Option) *Session {
 	return &Session{
-		client: c,
-		name: name,
-		mapId: newMapId(name, protocol),
+		client:  c,
+		name:    name,
+		mapId:   newMapId(name, protocol),
 		Session: session.NewSession(opts...),
 	}
 }
@@ -22,8 +21,8 @@ func newSession(c pb.MapServiceClient, name string, protocol *protocol.Protocol,
 type Session struct {
 	*session.Session
 	client pb.MapServiceClient
-	name string
-	mapId *pb.MapId
+	name   string
+	mapId  *pb.MapId
 }
 
 func newMapId(name string, protocol *protocol.Protocol) *pb.MapId {
@@ -63,7 +62,7 @@ func (m *Session) Connect() error {
 		Id: m.mapId,
 		Timeout: &duration.Duration{
 			Seconds: int64(m.Timeout.Seconds()),
-			Nanos: int32(m.Timeout.Nanoseconds()),
+			Nanos:   int32(m.Timeout.Nanoseconds()),
 		},
 	}
 
@@ -78,8 +77,8 @@ func (m *Session) Connect() error {
 
 func (m *Session) keepAlive() error {
 	request := &pb.KeepAliveRequest{
-		Id: m.mapId,
-		Headers: m.Headers.Session(),
+		Id:      m.mapId,
+		Headers: m.Headers.GetSessionHeaders(),
 	}
 
 	if _, err := m.client.KeepAlive(context.Background(), request); err != nil {
@@ -92,10 +91,8 @@ func (m *Session) Close() error {
 	m.Stop()
 
 	request := &pb.CloseRequest{
-		Id: m.mapId,
-		Headers: &headers.SessionHeaders{
-			SessionId: m.Id,
-		},
+		Id:      m.mapId,
+		Headers: m.Headers.GetSessionHeaders(),
 	}
 
 	if _, err := m.client.Close(context.Background(), request); err != nil {

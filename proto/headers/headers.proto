@@ -23,48 +23,32 @@ message ResponseHeader {
     uint64 index = 2;
 }
 
-message SessionHeaders {
-    uint64 session_id = 1;
-    repeated SessionHeader headers = 2;
-}
-
 message SessionHeader {
     uint32 partition_id = 1;
-    uint64 last_sequence_number = 2;
-    repeated SessionStreamHeader streams = 3;
-}
-
-message SessionCommandHeaders {
-    uint64 session_id = 1;
-    repeated SessionCommandHeader headers = 2;
+    uint64 session_id = 2;
+    uint64 last_sequence_number = 3;
+    repeated SessionStreamHeader streams = 4;
 }
 
 message SessionCommandHeader {
     uint32 partition_id = 1;
-    uint64 sequence_number = 2;
-}
-
-message SessionQueryHeaders {
-    uint64 session_id = 1;
-    repeated SessionQueryHeader headers = 2;
+    uint64 session_id = 2;
+    uint64 sequence_number = 3;
 }
 
 message SessionQueryHeader {
     uint32 partition_id = 1;
-    uint64 last_index = 2;
-    uint64 last_sequence_number = 3;
-}
-
-message SessionResponseHeaders {
-    uint64 session_id = 1;
-    repeated SessionResponseHeader headers = 2;
+    uint64 session_id = 2;
+    uint64 last_index = 3;
+    uint64 last_sequence_number = 4;
 }
 
 message SessionResponseHeader {
     uint32 partition_id = 1;
-    uint64 index = 2;
-    uint64 sequence_number = 3;
-    repeated SessionStreamHeader streams = 4;
+    uint64 session_id = 2;
+    uint64 index = 3;
+    uint64 sequence_number = 4;
+    repeated SessionStreamHeader streams = 5;
 }
 
 message SessionStreamHeader {
