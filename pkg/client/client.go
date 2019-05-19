@@ -2,6 +2,7 @@ package client
 
 import (
 	"github.com/atomix/atomix-go/pkg/client/_map"
+	"github.com/atomix/atomix-go/pkg/client/election"
 	"github.com/atomix/atomix-go/pkg/client/lock"
 	"github.com/atomix/atomix-go/pkg/client/protocol"
 	"github.com/atomix/atomix-go/pkg/client/session"
@@ -30,6 +31,10 @@ func (c *Client) NewMap(name string, protocol *protocol.Protocol, opts ...sessio
 
 func (c *Client) NewLock(name string, protocol *protocol.Protocol, opts ...session.Option) (*lock.Lock, error) {
 	return lock.NewLock(c.conn, name, protocol, opts...)
+}
+
+func (c *Client) NewLeaderElection(name string, protocol *protocol.Protocol, opts ...session.Option) (*election.Election, error) {
+	return election.NewElection(c.conn, name, protocol, opts...)
 }
 
 func (c *Client) Close() error {
