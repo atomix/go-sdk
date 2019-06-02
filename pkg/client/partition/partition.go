@@ -4,7 +4,6 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/client/_map"
 	"github.com/atomix/atomix-go-client/pkg/client/election"
 	"github.com/atomix/atomix-go-client/pkg/client/lock"
-	"github.com/atomix/atomix-go-client/pkg/client/protocol"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"google.golang.org/grpc"
 	"sort"
@@ -39,16 +38,16 @@ func (g *PartitionGroup) getConnections() []*grpc.ClientConn {
 	return connections
 }
 
-func (g *PartitionGroup) NewMap(name string, protocol *protocol.Protocol, opts ...session.Option) (*_map.Map, error) {
+func (g *PartitionGroup) NewMap(name string, opts ...session.Option) (*_map.Map, error) {
 	return _map.NewMap(g.Application, name, g.getConnections(), opts...)
 }
 
-func (g *PartitionGroup) NewLock(name string, protocol *protocol.Protocol, opts ...session.Option) (*lock.Lock, error) {
+func (g *PartitionGroup) NewLock(name string, opts ...session.Option) (*lock.Lock, error) {
 	return lock.NewLock(g.Application, name, g.getConnections(), opts...)
 }
 
-func (g *PartitionGroup) NewLeaderElection(name string, protocol *protocol.Protocol, opts ...session.Option) (*election.Election, error) {
-	return election.NewElection(g.Application, name, g.getConnections(), opts...)
+func (g *PartitionGroup) NewLeaderElection(name string, candidate string, opts ...session.Option) (*election.Election, error) {
+	return election.NewElection(g.Application, name, candidate, g.getConnections(), opts...)
 }
 
 // Close closes the partition group clients

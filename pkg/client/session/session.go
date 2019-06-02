@@ -1,7 +1,7 @@
 package session
 
 import (
-	"github.com/atomix/atomix-go-client/proto/atomix/headers"
+	headers "github.com/atomix/atomix-go-client/proto/atomix/headers"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sync"
 	"time"
@@ -39,7 +39,7 @@ func NewSession(namespace string, name string, handler Handler, opts ...Option) 
 		opts[i].prepare(options)
 	}
 	session := &Session{
-		Name: &atomix_headers.Name{
+		Name: &headers.Name{
 			Namespace: namespace,
 			Name:      name,
 		},
@@ -53,7 +53,7 @@ func NewSession(namespace string, name string, handler Handler, opts ...Option) 
 }
 
 type Session struct {
-	Name               *atomix_headers.Name
+	Name               *headers.Name
 	Timeout            time.Duration
 	SessionId          uint64
 	handler            Handler
@@ -83,10 +83,10 @@ func (s *Session) Stop() error {
 	return err
 }
 
-func (s *Session) GetHeader() *atomix_headers.RequestHeader {
+func (s *Session) GetHeader() *headers.RequestHeader {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return &atomix_headers.RequestHeader{
+	return &headers.RequestHeader{
 		Name:           s.Name,
 		SessionId:      s.SessionId,
 		Index:          s.lastIndex,
@@ -95,11 +95,11 @@ func (s *Session) GetHeader() *atomix_headers.RequestHeader {
 	}
 }
 
-func (s *Session) NextHeader() *atomix_headers.RequestHeader {
+func (s *Session) NextHeader() *headers.RequestHeader {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.sequenceNumber = s.sequenceNumber + 1
-	return &atomix_headers.RequestHeader{
+	return &headers.RequestHeader{
 		Name:           s.Name,
 		SessionId:      s.SessionId,
 		Index:          s.lastIndex,
@@ -108,7 +108,7 @@ func (s *Session) NextHeader() *atomix_headers.RequestHeader {
 	}
 }
 
-func (s *Session) UpdateHeader(header *atomix_headers.ResponseHeader) {
+func (s *Session) UpdateHeader(header *headers.ResponseHeader) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -131,7 +131,7 @@ func (s *Session) UpdateHeader(header *atomix_headers.ResponseHeader) {
 	}
 }
 
-func (s *Session) ValidStream(header *atomix_headers.ResponseHeader) bool {
+func (s *Session) ValidStream(header *headers.ResponseHeader) bool {
 	s.mu.Lock()
 	if header.Index > s.lastIndex {
 		s.lastIndex = header.Index
@@ -157,8 +157,8 @@ func (s *Session) ValidStream(header *atomix_headers.ResponseHeader) bool {
 	return false
 }
 
-func (s *Session) getStreamHeaders() []*atomix_headers.StreamHeader {
-	result := make([]*atomix_headers.StreamHeader, len(s.streams))
+func (s *Session) getStreamHeaders() []*headers.StreamHeader {
+	result := make([]*headers.StreamHeader, len(s.streams))
 	for _, stream := range s.streams {
 		result = append(result, stream.newStreamHeader())
 	}
@@ -171,8 +171,8 @@ type Stream struct {
 	lastItemNumber uint64
 }
 
-func (s *Stream) newStreamHeader() *atomix_headers.StreamHeader {
-	return &atomix_headers.StreamHeader{
+func (s *Stream) newStreamHeader() *headers.StreamHeader {
+	return &headers.StreamHeader{
 		StreamId:       s.id,
 		Index:          s.index,
 		LastItemNumber: s.lastItemNumber,

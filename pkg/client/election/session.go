@@ -2,102 +2,50 @@ package election
 
 import (
 	"context"
-	"github.com/atomix/atomix-go-client/pkg/client/protocol"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
-	pb "github.com/atomix/atomix-go-client/proto/election"
-	"github.com/atomix/atomix-go-client/proto/headers"
-	"github.com/atomix/atomix-go-client/proto/protocol"
+	pb "github.com/atomix/atomix-go-client/proto/atomix/election"
 	"github.com/golang/protobuf/ptypes/duration"
 )
 
-func newSession(c pb.LeaderElectionServiceClient, name string, protocol *protocol.Protocol, opts ...session.Option) *Session {
-	return &Session{
-		client:     c,
-		name:       name,
-		electionId: newElectionId(name, protocol),
-		Session:    session.NewSession(opts...),
-	}
+type SessionHandler struct {
+	session.Handler
+	client pb.LeaderElectionServiceClient
 }
 
-type Session struct {
-	*session.Session
-	client     pb.LeaderElectionServiceClient
-	name       string
-	electionId *pb.ElectionId
-}
-
-func newElectionId(name string, protocol *protocol.Protocol) *pb.ElectionId {
-	if protocol.MultiRaft != nil {
-		return &pb.ElectionId{
-			Name: name,
-			Proto: &pb.ElectionId_Raft{
-				Raft: &atomix_protocol.MultiRaftProtocol{
-					Group: protocol.MultiRaft.Group,
-				},
-			},
-		}
-	} else if protocol.MultiPrimary != nil {
-		return &pb.ElectionId{
-			Name: name,
-			Proto: &pb.ElectionId_MultiPrimary{
-				MultiPrimary: &atomix_protocol.MultiPrimaryProtocol{
-					Group: protocol.MultiPrimary.Group,
-				},
-			},
-		}
-	} else if protocol.MultiLog != nil {
-		return &pb.ElectionId{
-			Name: name,
-			Proto: &pb.ElectionId_Log{
-				Log: &atomix_protocol.DistributedLogProtocol{
-					Group: protocol.MultiLog.Group,
-				},
-			},
-		}
-	}
-	return nil
-}
-
-func (m *Session) Connect() error {
+func (m *SessionHandler) Create(s *session.Session) error {
 	request := &pb.CreateRequest{
-		Id: m.electionId,
+		Header: s.GetHeader(),
 		Timeout: &duration.Duration{
-			Seconds: int64(m.Timeout.Seconds()),
-			Nanos:   int32(m.Timeout.Nanoseconds()),
+			Seconds: int64(s.Timeout.Seconds()),
+			Nanos:   int32(s.Timeout.Nanoseconds()),
 		},
 	}
-
 	response, err := m.client.Create(context.Background(), request)
 	if err != nil {
 		return err
 	}
-
-	m.Start([]*headers.SessionHeader{response.Header})
+	s.UpdateHeader(response.Header)
 	return nil
 }
 
-func (m *Session) keepAlive() error {
+func (m *SessionHandler) KeepAlive(s *session.Session) error {
 	request := &pb.KeepAliveRequest{
-		Id:     m.electionId,
-		Header: m.Headers.GetPartition("").GetSessionHeader(),
+		Header: s.GetHeader(),
 	}
 
-	if _, err := m.client.KeepAlive(context.Background(), request); err != nil {
+	response, err := m.client.KeepAlive(context.Background(), request)
+	if err != nil {
 		return err
 	}
+	s.UpdateHeader(response.Header)
 	return nil
 }
 
-func (m *Session) Close() error {
-	m.Stop()
-
+func (m *SessionHandler) close(s *session.Session) error {
 	request := &pb.CloseRequest{
-		Id:     m.electionId,
-		Header: m.Headers.GetPartition("").GetSessionHeader(),
+		Header: s.GetHeader(),
 	}
 
-	if _, err := m.client.Close(context.Background(), request); err != nil {
-		return err
-	}
-	return nil
+	_, err := m.client.Close(context.Background(), request)
+	return err
 }
