@@ -96,6 +96,21 @@ func (c *Client) GetPartitionGroup(namespace string, name string) (*PartitionGro
 	return newPartitionGroup(c.Application, namespace, name, partitions)
 }
 
+// DeletePartitionGroup deletes a partition group via the controller
+func (c *Client) DeletePartitionGroup(namespace string, name string) error {
+	client := controller.NewControllerServiceClient(c.conn)
+	request := &controller.DeletePartitionGroupRequest{
+		Id: &partitionpb.PartitionGroupId{
+			Namespace: namespace,
+			Name:      name,
+		},
+	}
+
+	_, err := client.DeletePartitionGroup(context.Background(), request)
+	return err
+}
+
+// Close closes the client
 func (c *Client) Close() error {
 	return c.conn.Close()
 }
@@ -127,4 +142,14 @@ func (g *PartitionGroup) NewLock(name string, protocol *protocol.Protocol, opts 
 
 func (g *PartitionGroup) NewLeaderElection(name string, protocol *protocol.Protocol, opts ...session.Option) (*election.Election, error) {
 	return election.NewElection(g.Application, name, g.partitions, opts...)
+}
+
+// Close closes the partition group clients
+func (g *PartitionGroup) Close() error {
+	for _, p := range g.partitions {
+		if err := p.Close(); err != nil {
+			return err
+		}
+	}
+	return nil
 }

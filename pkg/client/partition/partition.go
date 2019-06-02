@@ -22,3 +22,8 @@ type Partition struct {
 	Id   int
 	Conn *grpc.ClientConn
 }
+
+// Close closes the partition
+func (c *Partition) Close() error {
+	return c.Conn.Close()
+}

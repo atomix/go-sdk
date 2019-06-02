@@ -33,12 +33,6 @@ type Options struct {
 	timeout time.Duration
 }
 
-type SessionClient interface {
-	Create(header atomix_headers.RequestHeader) (*atomix_headers.ResponseHeader, error)
-	KeepAlive(header atomix_headers.RequestHeader) (*atomix_headers.ResponseHeader, error)
-	Close(header atomix_headers.RequestHeader) (*atomix_headers.ResponseHeader, error)
-}
-
 func NewSession(namespace string, name string, opts ...Option) *Session {
 	options := &Options{}
 	for i := range opts {
