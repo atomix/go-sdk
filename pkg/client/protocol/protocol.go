@@ -25,9 +25,9 @@ func MultiLog(group string) *Protocol {
 }
 
 type Protocol struct {
-	MultiRaft *MultiRaftProtocol
+	MultiRaft    *MultiRaftProtocol
 	MultiPrimary *MultiPrimaryProtocol
-	MultiLog *MultiLogProtocol
+	MultiLog     *MultiLogProtocol
 }
 
 type MultiRaftProtocol struct {
@@ -35,9 +35,11 @@ type MultiRaftProtocol struct {
 }
 
 type MultiPrimaryProtocol struct {
-    Group string
+	Group string
 }
 
 type MultiLogProtocol struct {
-    Group string
+	Group             string
+	Partitions        int
+	ReplicationFactor int
 }
