@@ -2,6 +2,7 @@ package partition
 
 import (
 	"github.com/atomix/atomix-go-client/pkg/client/_map"
+	"github.com/atomix/atomix-go-client/pkg/client/counter"
 	"github.com/atomix/atomix-go-client/pkg/client/election"
 	"github.com/atomix/atomix-go-client/pkg/client/lock"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
@@ -53,6 +54,10 @@ func (g *PartitionGroup) NewLock(name string, opts ...session.Option) (*lock.Loc
 
 func (g *PartitionGroup) NewLeaderElection(name string, candidate string, opts ...session.Option) (*election.Election, error) {
 	return election.NewElection(g.Application, name, candidate, g.getConnections(), opts...)
+}
+
+func (g *PartitionGroup) NewCounter(name string) (*counter.Counter, error) {
+	return counter.NewCounter(g.Application, name, g.getConnections())
 }
 
 // Close closes the partition group clients

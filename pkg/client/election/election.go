@@ -169,5 +169,5 @@ func (e *Election) Listen(ctx context.Context, c chan<- *ElectionEvent) error {
 }
 
 func (e *Election) Close() error {
-	return e.session.Close()
+	return e.session.Stop()
 }
