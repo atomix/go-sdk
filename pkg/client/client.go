@@ -4,12 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/atomix/atomix-go-client/pkg/client/_map"
-	"github.com/atomix/atomix-go-client/pkg/client/election"
-	"github.com/atomix/atomix-go-client/pkg/client/lock"
 	"github.com/atomix/atomix-go-client/pkg/client/partition"
 	"github.com/atomix/atomix-go-client/pkg/client/protocol"
-	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/proto/atomix/controller"
 	partitionpb "github.com/atomix/atomix-go-client/proto/atomix/partition"
 	"google.golang.org/grpc"
@@ -40,7 +36,7 @@ type Client struct {
 }
 
 // CreatePartitionGroup creates a new partition group
-func (c *Client) CreatePartitionGroup(name string, partitions int, partitionSize int, protocol protocol.Protocol) (*PartitionGroup, error) {
+func (c *Client) CreatePartitionGroup(name string, partitions int, partitionSize int, protocol protocol.Protocol) (*partition.PartitionGroup, error) {
 	client := controller.NewControllerServiceClient(c.conn)
 	request := &controller.CreatePartitionGroupRequest{
 		Id: &partitionpb.PartitionGroupId{
@@ -62,7 +58,7 @@ func (c *Client) CreatePartitionGroup(name string, partitions int, partitionSize
 }
 
 // GetPartitionGroup gets a partition group in the client's namespace
-func (c *Client) GetPartitionGroup(name string) (*PartitionGroup, error) {
+func (c *Client) GetPartitionGroup(name string) (*partition.PartitionGroup, error) {
 	client := controller.NewControllerServiceClient(c.conn)
 	request := &controller.GetPartitionGroupsRequest{
 		Id: &partitionpb.PartitionGroupId{
@@ -93,7 +89,7 @@ func (c *Client) GetPartitionGroup(name string) (*PartitionGroup, error) {
 		}
 		partitions = append(partitions, partition)
 	}
-	return newPartitionGroup(c.Application, c.Namespace, name, partitions)
+	return partition.NewPartitionGroup(c.Application, c.Namespace, name, partitions)
 }
 
 // DeletePartitionGroup deletes a partition group via the controller
@@ -113,43 +109,4 @@ func (c *Client) DeletePartitionGroup(name string) error {
 // Close closes the client
 func (c *Client) Close() error {
 	return c.conn.Close()
-}
-
-func newPartitionGroup(application string, namespace string, name string, partitions []*partition.Partition) (*PartitionGroup, error) {
-	return &PartitionGroup{
-		Application: application,
-		Namespace:   namespace,
-		Name:        name,
-		partitions:  partitions,
-	}, nil
-}
-
-// PartitionGroup is the interface to an Atomix partition group
-type PartitionGroup struct {
-	Application string
-	Name        string
-	Namespace   string
-	partitions  []*partition.Partition
-}
-
-func (g *PartitionGroup) NewMap(name string, protocol *protocol.Protocol, opts ...session.Option) (*_map.Map, error) {
-	return _map.NewMap(g.Application, name, g.partitions, opts...)
-}
-
-func (g *PartitionGroup) NewLock(name string, protocol *protocol.Protocol, opts ...session.Option) (*lock.Lock, error) {
-	return lock.NewLock(g.Application, name, g.partitions, opts...)
-}
-
-func (g *PartitionGroup) NewLeaderElection(name string, protocol *protocol.Protocol, opts ...session.Option) (*election.Election, error) {
-	return election.NewElection(g.Application, name, g.partitions, opts...)
-}
-
-// Close closes the partition group clients
-func (g *PartitionGroup) Close() error {
-	for _, p := range g.partitions {
-		if err := p.Close(); err != nil {
-			return err
-		}
-	}
-	return nil
 }

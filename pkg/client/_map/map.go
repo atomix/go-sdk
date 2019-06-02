@@ -2,20 +2,16 @@ package _map
 
 import (
 	"context"
-	"github.com/atomix/atomix-go-client/pkg/client/partition"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
+	"google.golang.org/grpc"
 	"hash/fnv"
-	"sort"
 	"sync"
 )
 
-func NewMap(namespace string, name string, partitions []*partition.Partition, opts ...session.Option) (*Map, error) {
-	sort.Slice(partitions, func(i, j int) bool {
-		return partitions[i].Id < partitions[i].Id
-	})
+func NewMap(namespace string, name string, partitions []*grpc.ClientConn, opts ...session.Option) (*Map, error) {
 	mapPartitions := make([]*Session, len(partitions))
-	for i, partition := range partitions {
-		mapPartition, err := newSession(partition.Conn, namespace, name, opts...)
+	for i, conn := range partitions {
+		mapPartition, err := newSession(conn, namespace, name, opts...)
 		if err != nil {
 			return nil, err
 		}
@@ -79,9 +75,9 @@ func (m *Map) Size(ctx context.Context) (int, error) {
 			defer wg.Done()
 			result, err := partition.Size(ctx)
 			if err != nil {
-				errors<-err
+				errors <- err
 			} else {
-				results<-result
+				results <- result
 			}
 		}()
 	}
@@ -111,7 +107,7 @@ func (m *Map) Clear(ctx context.Context) error {
 		wg.Add(1)
 		go func() {
 			if err := partition.Clear(ctx); err != nil {
-				errors<-err
+				errors <- err
 			}
 		}()
 	}
@@ -136,7 +132,7 @@ func (m *Map) Listen(ctx context.Context, ch chan<- *MapEvent) error {
 		wg.Add(1)
 		go func() {
 			if err := partition.Listen(ctx, ch); err != nil {
-				errors<-err
+				errors <- err
 			}
 		}()
 	}
