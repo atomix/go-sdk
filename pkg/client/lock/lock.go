@@ -49,7 +49,7 @@ func (l *Lock) Lock(ctx context.Context, opts ...LockOption) (uint64, error) {
 		opt.after(response)
 	}
 
-	partition.Update(response.Header)
+	partition.UpdateHeader(response.Header)
 	return response.Version, nil
 }
 
@@ -98,7 +98,7 @@ func (l *Lock) Unlock(ctx context.Context, opts ...UnlockOption) (bool, error) {
 		opts[i].after(response)
 	}
 
-	partition.Update(response.Header)
+	partition.UpdateHeader(response.Header)
 	return response.Unlocked, nil
 }
 
@@ -144,7 +144,7 @@ func (l *Lock) IsLocked(ctx context.Context, opts ...IsLockedOption) (bool, erro
 		opts[i].after(response)
 	}
 
-	partition.Update(response.Header)
+	partition.UpdateHeader(response.Header)
 	return response.IsLocked, nil
 }
 

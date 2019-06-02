@@ -2,308 +2,97 @@ package _map
 
 import (
 	"context"
-	"errors"
-	"github.com/atomix/atomix-go-client/pkg/client/protocol"
+	"github.com/atomix/atomix-go-client/pkg/client/partition"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
-	pb "github.com/atomix/atomix-go-client/proto/map"
-	"google.golang.org/grpc"
-	"io"
-	"k8s.io/klog/glog"
+	"hash/fnv"
+	"sort"
 )
 
-func NewMap(conn *grpc.ClientConn, name string, protocol *protocol.Protocol, opts ...session.Option) (*Map, error) {
-	c := pb.NewMapServiceClient(conn)
-	s := newSession(c, name, protocol, opts...)
-	if err := s.Connect(); err != nil {
-		return nil, err
+func NewMap(namespace string, name string, partitions []*partition.Partition, opts ...session.Option) (*Map, error) {
+	sort.Slice(partitions, func(i, j int) bool {
+		return partitions[i].Id < partitions[i].Id
+	})
+	mapPartitions := make([]*Session, len(partitions))
+	for i, partition := range partitions {
+		mapPartition, err := newSession(partition.Conn, namespace, name, opts...)
+		if err != nil {
+			return nil, err
+		}
+		mapPartitions[i] = mapPartition
 	}
-
 	return &Map{
-		client:  c,
-		session: s,
+		Namespace:  namespace,
+		Name:       name,
+		partitions: mapPartitions,
 	}, nil
 }
 
 type Map struct {
-	client  pb.MapServiceClient
-	session *Session
+	mapInterface
+	Namespace  string
+	Name       string
+	partitions []*Session
 }
 
-func (m *Map) Listen(ctx context.Context, c chan<- *MapEvent) error {
-	request := &pb.EventRequest{
-		Id:      m.session.mapId,
-		Headers: m.session.Headers.GetCommandHeaders(),
+func (m *Map) getPartition(key string) (*Session, error) {
+	h := fnv.New32a()
+	if _, err := h.Write([]byte(key)); err != nil {
+		return nil, err
 	}
-	events, err := m.client.Events(ctx, request)
-	if err != nil {
-		return err
-	}
-
-	go func() {
-		for {
-			response, err := events.Recv()
-			if err == io.EOF {
-				break
-			}
-
-			if err != nil {
-				glog.Error("Failed to receive event stream", err)
-			}
-
-			var t MapEventType
-			switch response.Type {
-			case pb.EventResponse_INSERTED:
-				t = EVENT_INSERTED
-			case pb.EventResponse_UPDATED:
-				t = EVENT_UPDATED
-			case pb.EventResponse_REMOVED:
-				t = EVENT_REMOVED
-			}
-
-			if m.session.Headers.Validate(response.Header) {
-				c <- &MapEvent{
-					Type:    t,
-					Key:     response.Key,
-					Value:   response.NewValue,
-					Version: response.NewVersion,
-				}
-			}
-		}
-	}()
-	return nil
+	i := h.Sum32() % uint32(len(m.partitions))
+	return m.partitions[i], nil
 }
 
 func (m *Map) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*KeyValue, error) {
-	partition := m.session.Headers.GetPartition(key)
-
-	request := &pb.PutRequest{
-		Id:     m.session.mapId,
-		Header: partition.GetCommandHeader(),
-		Key:    key,
-		Value:  value,
-	}
-
-	for i := range opts {
-		opts[i].before(request)
-	}
-
-	response, err := m.client.Put(ctx, request)
+	session, err := m.getPartition(key)
 	if err != nil {
 		return nil, err
 	}
-
-	for i := range opts {
-		opts[i].after(response)
-	}
-
-	partition.Update(response.Header)
-
-	if response.Status == pb.ResponseStatus_OK {
-		return &KeyValue{
-			Key:     key,
-			Value:   value,
-			Version: int64(response.Header.Index),
-		}, nil
-	} else if response.Status == pb.ResponseStatus_PRECONDITION_FAILED {
-		return nil, errors.New("write condition failed")
-	} else if response.Status == pb.ResponseStatus_WRITE_LOCK {
-		return nil, errors.New("write lock failed")
-	} else {
-		return &KeyValue{
-			Key:     key,
-			Value:   value,
-			Version: int64(response.PreviousVersion),
-		}, nil
-	}
-}
-
-type PutOption interface {
-	before(request *pb.PutRequest)
-	after(response *pb.PutResponse)
-}
-
-func PutIfVersion(version int64) PutOption {
-	return PutIfVersionOption{version: version}
-}
-
-type PutIfVersionOption struct {
-	version int64
-}
-
-func (o PutIfVersionOption) before(request *pb.PutRequest) {
-	request.Version = o.version
-}
-
-func (o PutIfVersionOption) after(response *pb.PutResponse) {
-
+	return session.Put(ctx, key, value, opts...)
 }
 
 func (m *Map) Get(ctx context.Context, key string, opts ...GetOption) (*KeyValue, error) {
-	partition := m.session.Headers.GetPartition(key)
-
-	request := &pb.GetRequest{
-		Id:     m.session.mapId,
-		Header: partition.GetQueryHeader(),
-		Key:    key,
-	}
-
-	for i := range opts {
-		opts[i].before(request)
-	}
-
-	response, err := m.client.Get(ctx, request)
+	session, err := m.getPartition(key)
 	if err != nil {
 		return nil, err
 	}
-
-	for i := range opts {
-		opts[i].after(response)
-	}
-
-	partition.Update(response.Header)
-
-	if response.Version != 0 {
-		return &KeyValue{
-			Key:     key,
-			Value:   response.Value,
-			Version: response.Version,
-		}, nil
-	}
-	return nil, nil
-}
-
-type GetOption interface {
-	before(request *pb.GetRequest)
-	after(response *pb.GetResponse)
-}
-
-func GetOrDefault(def []byte) GetOption {
-	return GetOrDefaultOption{def: def}
-}
-
-type GetOrDefaultOption struct {
-	def []byte
-}
-
-func (o GetOrDefaultOption) before(request *pb.GetRequest) {
-}
-
-func (o GetOrDefaultOption) after(response *pb.GetResponse) {
-	if response.Version == 0 {
-		response.Value = o.def
-	}
+	return session.Get(ctx, key, opts...)
 }
 
 func (m *Map) Remove(ctx context.Context, key string, opts ...RemoveOption) (*KeyValue, error) {
-	partition := m.session.Headers.GetPartition(key)
-
-	request := &pb.RemoveRequest{
-		Id:     m.session.mapId,
-		Header: partition.GetCommandHeader(),
-		Key:    key,
-	}
-
-	for i := range opts {
-		opts[i].before(request)
-	}
-
-	response, err := m.client.Remove(ctx, request)
+	session, err := m.getPartition(key)
 	if err != nil {
 		return nil, err
 	}
-
-	for i := range opts {
-		opts[i].after(response)
-	}
-
-	partition.Update(response.Header)
-
-	if response.Status == pb.ResponseStatus_OK {
-		return &KeyValue{
-			Key:     key,
-			Value:   response.PreviousValue,
-			Version: response.PreviousVersion,
-		}, nil
-	} else if response.Status == pb.ResponseStatus_PRECONDITION_FAILED {
-		return nil, errors.New("write condition failed")
-	} else if response.Status == pb.ResponseStatus_WRITE_LOCK {
-		return nil, errors.New("write lock failed")
-	} else {
-		return nil, nil
-	}
-}
-
-type RemoveOption interface {
-	before(request *pb.RemoveRequest)
-	after(response *pb.RemoveResponse)
-}
-
-func RemoveIfVersion(version int64) RemoveOption {
-	return RemoveIfVersionOption{version: version}
-}
-
-type RemoveIfVersionOption struct {
-	version int64
-}
-
-func (o RemoveIfVersionOption) before(request *pb.RemoveRequest) {
-	request.Version = o.version
-}
-
-func (o RemoveIfVersionOption) after(response *pb.RemoveResponse) {
-
+	return session.Remove(ctx, key, opts...)
 }
 
 func (m *Map) Size(ctx context.Context) (int, error) {
-	request := &pb.SizeRequest{
-		Id:      m.session.mapId,
-		Headers: m.session.Headers.GetQueryHeaders(),
+	size := 0
+	for _, partition := range m.partitions {
+		s, err := partition.Size(ctx)
+		if err != nil {
+			return 0, err
+		}
+		size += s
 	}
-
-	response, err := m.client.Size(ctx, request)
-	if err != nil {
-		return 0, err
-	}
-
-	m.session.Headers.Update(response.Headers)
-	return int(response.Size), nil
+	return size, nil
 }
 
 func (m *Map) Clear(ctx context.Context) error {
-	request := &pb.ClearRequest{
-		Headers: m.session.Headers.GetCommandHeaders(),
+	for _, partition := range m.partitions {
+		if err := partition.Clear(ctx); err != nil {
+			return err
+		}
 	}
-
-	response, err := m.client.Clear(ctx, request)
-	if err != nil {
-		return err
-	}
-
-	m.session.Headers.Update(response.Headers)
 	return nil
 }
 
-func (m *Map) Close() error {
-	return m.session.Close()
-}
-
-type KeyValue struct {
-	Version int64
-	Key     string
-	Value   []byte
-}
-
-type MapEventType string
-
-const (
-	EVENT_INSERTED MapEventType = "inserted"
-	EVENT_UPDATED  MapEventType = "updated"
-	EVENT_REMOVED  MapEventType = "removed"
-)
-
-type MapEvent struct {
-	Type    MapEventType
-	Key     string
-	Value   []byte
-	Version int64
+func (m *Map) Listen(ctx context.Context, ch chan<- *MapEvent) error {
+	for _, partition := range m.partitions {
+		if err := partition.Listen(ctx, ch); err != nil {
+			return err
+		}
+	}
+	return nil
 }

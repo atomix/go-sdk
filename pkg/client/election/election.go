@@ -41,7 +41,7 @@ func (e *Election) GetTerm(ctx context.Context) (*Term, error) {
 		return nil, err
 	}
 
-	partition.Update(response.Header)
+	partition.UpdateHeader(response.Header)
 	return &Term{
 		Term:       response.Term,
 		Leader:     response.Leader,
@@ -63,7 +63,7 @@ func (e *Election) Enter(ctx context.Context, id string) (*Term, error) {
 		return nil, err
 	}
 
-	partition.Update(response.Header)
+	partition.UpdateHeader(response.Header)
 	return &Term{
 		Term:       response.Term,
 		Leader:     response.Leader,
@@ -85,7 +85,7 @@ func (e *Election) Withdraw(ctx context.Context, id string) error {
 		return err
 	}
 
-	partition.Update(response.Header)
+	partition.UpdateHeader(response.Header)
 	return nil
 }
 
@@ -103,7 +103,7 @@ func (e *Election) Anoint(ctx context.Context, id string) (bool, error) {
 		return false, err
 	}
 
-	partition.Update(response.Header)
+	partition.UpdateHeader(response.Header)
 	return response.Succeeded, nil
 }
 
@@ -121,7 +121,7 @@ func (e *Election) Promote(ctx context.Context, id string) (bool, error) {
 		return false, err
 	}
 
-	partition.Update(response.Header)
+	partition.UpdateHeader(response.Header)
 	return response.Succeeded, nil
 }
 
@@ -139,7 +139,7 @@ func (e *Election) Evict(ctx context.Context, id string) (bool, error) {
 		return false, err
 	}
 
-	partition.Update(response.Header)
+	partition.UpdateHeader(response.Header)
 	return response.Succeeded, nil
 }
 

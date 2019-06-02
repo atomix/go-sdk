@@ -3,7 +3,7 @@ package test
 import (
 	"context"
 	"errors"
-	"github.com/atomix/atomix-go-client/proto/headers"
+	"github.com/atomix/atomix-go-client/proto/atomix/headers"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
 	"log"
@@ -30,82 +30,38 @@ func (s *TestServer) IncrementIndex() uint64 {
 	return s.Index
 }
 
-func (s *TestServer) CreateHeader(ctx context.Context) (*headers.SessionHeader, error) {
+func (s *TestServer) CreateHeader(ctx context.Context) (*atomix_headers.ResponseHeader, error) {
 	index := s.IncrementIndex()
 	session := s.NewSession()
 	session.Complete(0)
-	return &headers.SessionHeader{
-		PartitionId: 1,
-		SessionId:   index,
+	return &atomix_headers.ResponseHeader{
+		SessionId: index,
+		Index:     index,
 	}, nil
 }
 
-func (s *TestServer) KeepAliveHeader(ctx context.Context, h *headers.SessionHeader) (*headers.SessionHeader, error) {
+func (s *TestServer) KeepAliveHeader(ctx context.Context, h *atomix_headers.RequestHeader) (*atomix_headers.ResponseHeader, error) {
 	index := s.IncrementIndex()
 	if session, exists := s.sessions[h.SessionId]; exists {
-		streams := []*headers.SessionStreamHeader{}
+		streams := []*atomix_headers.StreamHeader{}
 		for _, stream := range session.streams {
 			streams = append(streams, stream.Header(uint64(index)))
 		}
-		return &headers.SessionHeader{
-			PartitionId:        1,
-			SessionId:          h.SessionId,
-			LastSequenceNumber: session.SequenceNumber,
-			Streams:            streams,
+		return &atomix_headers.ResponseHeader{
+			SessionId:      h.SessionId,
+			Index:          index,
+			SequenceNumber: session.SequenceNumber,
+			Streams:        streams,
 		}, nil
 	} else {
 		return nil, errors.New("session not found")
 	}
 }
 
-func (s *TestServer) CloseHeader(ctx context.Context, h *headers.SessionHeader) error {
+func (s *TestServer) CloseHeader(ctx context.Context, h *atomix_headers.RequestHeader) error {
 	s.IncrementIndex()
 	if _, exists := s.sessions[h.SessionId]; exists {
 		delete(s.sessions, h.SessionId)
-		return nil
-	} else {
-		return errors.New("session not found")
-	}
-}
-
-func (s *TestServer) CreateHeaders(ctx context.Context) ([]*headers.SessionHeader, error) {
-	index := s.IncrementIndex()
-	session := s.NewSession()
-	session.Complete(0)
-	return []*headers.SessionHeader{
-		{
-			PartitionId: 1,
-			SessionId:   index,
-		},
-	}, nil
-}
-
-func (s *TestServer) KeepAliveHeaders(ctx context.Context, h []*headers.SessionHeader) ([]*headers.SessionHeader, error) {
-	index := s.IncrementIndex()
-	header := h[0]
-	if session, exists := s.sessions[header.SessionId]; exists {
-		streams := []*headers.SessionStreamHeader{}
-		for _, stream := range session.streams {
-			streams = append(streams, stream.Header(uint64(index)))
-		}
-		return []*headers.SessionHeader{
-			{
-				PartitionId:        1,
-				SessionId:          header.SessionId,
-				LastSequenceNumber: session.SequenceNumber,
-				Streams:            streams,
-			},
-		}, nil
-	} else {
-		return nil, errors.New("session not found")
-	}
-}
-
-func (s *TestServer) CloseHeaders(ctx context.Context, h []*headers.SessionHeader) error {
-	s.IncrementIndex()
-	header := h[0]
-	if _, exists := s.sessions[header.SessionId]; exists {
-		delete(s.sessions, header.SessionId)
 		return nil
 	} else {
 		return errors.New("session not found")
@@ -190,34 +146,16 @@ func (s *TestSession) Complete(sequence uint64) {
 }
 
 // NewResponseHeaders creates a new response header with headers for all open streams
-func (s *TestSession) NewResponseHeader() (*headers.SessionResponseHeader, error) {
-	streams := []*headers.SessionStreamHeader{}
+func (s *TestSession) NewResponseHeader() (*atomix_headers.ResponseHeader, error) {
+	streams := []*atomix_headers.StreamHeader{}
 	for _, stream := range s.streams {
 		streams = append(streams, stream.Header(uint64(s.server.Index)))
 	}
-	return &headers.SessionResponseHeader{
-		PartitionId:    1,
+	return &atomix_headers.ResponseHeader{
 		SessionId:      s.Id,
 		Index:          s.server.Index,
 		SequenceNumber: s.SequenceNumber,
 		Streams:        streams,
-	}, nil
-}
-
-// NewResponseHeaders creates a new response header with headers for all open streams
-func (s *TestSession) NewResponseHeaders() ([]*headers.SessionResponseHeader, error) {
-	streams := []*headers.SessionStreamHeader{}
-	for _, stream := range s.streams {
-		streams = append(streams, stream.Header(uint64(s.server.Index)))
-	}
-	return []*headers.SessionResponseHeader{
-		{
-			PartitionId:    1,
-			SessionId:      s.Id,
-			Index:          s.server.Index,
-			SequenceNumber: s.SequenceNumber,
-			Streams:        streams,
-		},
 	}, nil
 }
 
@@ -235,8 +173,8 @@ type TestStream struct {
 }
 
 // header creates a new stream header
-func (s *TestStream) Header(index uint64) *headers.SessionStreamHeader {
-	return &headers.SessionStreamHeader{
+func (s *TestStream) Header(index uint64) *atomix_headers.StreamHeader {
+	return &atomix_headers.StreamHeader{
 		StreamId:       s.Id,
 		Index:          index,
 		LastItemNumber: s.ItemNumber,
@@ -244,13 +182,12 @@ func (s *TestStream) Header(index uint64) *headers.SessionStreamHeader {
 }
 
 // NewResponseHeaders returns headers for the stream
-func (s *TestStream) NewResponseHeader() *headers.SessionResponseHeader {
-	return &headers.SessionResponseHeader{
-		PartitionId:    1,
+func (s *TestStream) NewResponseHeader() *atomix_headers.ResponseHeader {
+	return &atomix_headers.ResponseHeader{
 		SessionId:      s.Id,
 		Index:          s.session.server.Index,
 		SequenceNumber: s.session.SequenceNumber,
-		Streams: []*headers.SessionStreamHeader{
+		Streams: []*atomix_headers.StreamHeader{
 			{
 				StreamId:       s.Id,
 				Index:          s.session.server.Index,

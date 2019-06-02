@@ -2,9 +2,9 @@ package _map
 
 import (
 	"context"
-	"github.com/atomix/atomix-go-client/pkg/client/protocol"
+	"errors"
 	"github.com/atomix/atomix-go-client/pkg/client/test"
-	pb "github.com/atomix/atomix-go-client/proto/map"
+	pb "github.com/atomix/atomix-go-client/proto/atomix/map"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"io"
@@ -25,27 +25,27 @@ type TestServer struct {
 }
 
 func (s *TestServer) Create(ctx context.Context, request *pb.CreateRequest) (*pb.CreateResponse, error) {
-	headers, err := s.CreateHeaders(ctx)
+	headers, err := s.CreateHeader(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return &pb.CreateResponse{
-		Headers: headers,
+		Header: headers,
 	}, nil
 }
 
 func (s *TestServer) KeepAlive(ctx context.Context, request *pb.KeepAliveRequest) (*pb.KeepAliveResponse, error) {
-	headers, err := s.KeepAliveHeaders(ctx, request.Headers)
+	headers, err := s.KeepAliveHeader(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
 	return &pb.KeepAliveResponse{
-		Headers: headers,
+		Header: headers,
 	}, nil
 }
 
 func (s *TestServer) Close(ctx context.Context, request *pb.CloseRequest) (*pb.CloseResponse, error) {
-	err := s.CloseHeaders(ctx, request.Headers)
+	err := s.CloseHeader(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
@@ -74,14 +74,14 @@ func (s *TestServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRe
 	if request.Version != 0 && (v == nil || v.Version != request.Version) {
 		return &pb.PutResponse{
 			Header: header,
-			Status:  pb.ResponseStatus_PRECONDITION_FAILED,
+			Status: pb.ResponseStatus_PRECONDITION_FAILED,
 		}, nil
 	}
 
 	if v != nil && valuesEqual(v.Value, request.Value) {
 		return &pb.PutResponse{
 			Header: header,
-			Status:  pb.ResponseStatus_NOOP,
+			Status: pb.ResponseStatus_NOOP,
 		}, nil
 	}
 
@@ -95,7 +95,7 @@ func (s *TestServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRe
 	for _, stream := range streams {
 		if v == nil {
 			stream.Send(&pb.EventResponse{
-				Header:    stream.NewResponseHeader(),
+				Header:     stream.NewResponseHeader(),
 				Type:       pb.EventResponse_INSERTED,
 				Key:        request.Key,
 				NewValue:   request.Value,
@@ -103,7 +103,7 @@ func (s *TestServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRe
 			})
 		} else {
 			stream.Send(&pb.EventResponse{
-				Header:    stream.NewResponseHeader(),
+				Header:     stream.NewResponseHeader(),
 				Type:       pb.EventResponse_UPDATED,
 				Key:        request.Key,
 				OldValue:   v.Value,
@@ -116,7 +116,7 @@ func (s *TestServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRe
 
 	if v != nil {
 		return &pb.PutResponse{
-			Header:         header,
+			Header:          header,
 			Status:          pb.ResponseStatus_OK,
 			PreviousValue:   v.Value,
 			PreviousVersion: v.Version,
@@ -124,7 +124,7 @@ func (s *TestServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRe
 	} else {
 		return &pb.PutResponse{
 			Header: header,
-			Status:  pb.ResponseStatus_OK,
+			Status: pb.ResponseStatus_OK,
 		}, nil
 	}
 }
@@ -144,7 +144,7 @@ func (s *TestServer) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetRe
 
 	if v.Version != 0 {
 		return &pb.GetResponse{
-			Header: header,
+			Header:  header,
 			Value:   v.Value,
 			Version: v.Version,
 		}, nil
@@ -177,14 +177,14 @@ func (s *TestServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb
 	if v == nil {
 		return &pb.RemoveResponse{
 			Header: header,
-			Status:  pb.ResponseStatus_NOOP,
+			Status: pb.ResponseStatus_NOOP,
 		}, nil
 	}
 
 	if request.Version != 0 && v.Version != request.Version {
 		return &pb.RemoveResponse{
 			Header: header,
-			Status:  pb.ResponseStatus_PRECONDITION_FAILED,
+			Status: pb.ResponseStatus_PRECONDITION_FAILED,
 		}, nil
 	}
 
@@ -192,7 +192,7 @@ func (s *TestServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb
 
 	for _, stream := range session.Streams() {
 		stream.Send(&pb.EventResponse{
-			Header:    stream.NewResponseHeader(),
+			Header:     stream.NewResponseHeader(),
 			Type:       pb.EventResponse_REMOVED,
 			Key:        request.Key,
 			OldValue:   v.Value,
@@ -202,7 +202,7 @@ func (s *TestServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb
 
 	if v.Version != 0 {
 		return &pb.RemoveResponse{
-			Header:         header,
+			Header:          header,
 			Status:          pb.ResponseStatus_OK,
 			PreviousValue:   v.Value,
 			PreviousVersion: v.Version,
@@ -210,7 +210,7 @@ func (s *TestServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb
 	} else {
 		return &pb.RemoveResponse{
 			Header: header,
-			Status:  pb.ResponseStatus_OK,
+			Status: pb.ResponseStatus_OK,
 		}, nil
 	}
 }
@@ -237,14 +237,14 @@ func (s *TestServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*
 	if (v == nil && request.PreviousVersion != 0) || (v != nil && v.Version != request.PreviousVersion) || (v != nil && !valuesEqual(v.Value, request.PreviousValue)) {
 		return &pb.ReplaceResponse{
 			Header: header,
-			Status:  pb.ResponseStatus_PRECONDITION_FAILED,
+			Status: pb.ResponseStatus_PRECONDITION_FAILED,
 		}, nil
 	}
 
 	if v != nil && valuesEqual(v.Value, request.NewValue) {
 		return &pb.ReplaceResponse{
 			Header: header,
-			Status:  pb.ResponseStatus_NOOP,
+			Status: pb.ResponseStatus_NOOP,
 		}, nil
 	}
 
@@ -257,7 +257,7 @@ func (s *TestServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*
 	for _, stream := range session.Streams() {
 		if v.Version == 0 {
 			stream.Send(&pb.EventResponse{
-				Header:    stream.NewResponseHeader(),
+				Header:     stream.NewResponseHeader(),
 				Type:       pb.EventResponse_INSERTED,
 				Key:        request.Key,
 				NewValue:   request.NewValue,
@@ -265,7 +265,7 @@ func (s *TestServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*
 			})
 		} else {
 			stream.Send(&pb.EventResponse{
-				Header:    stream.NewResponseHeader(),
+				Header:     stream.NewResponseHeader(),
 				Type:       pb.EventResponse_UPDATED,
 				Key:        request.Key,
 				OldValue:   v.Value,
@@ -278,7 +278,7 @@ func (s *TestServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*
 
 	if v != nil {
 		return &pb.ReplaceResponse{
-			Header:         header,
+			Header:          header,
 			Status:          pb.ResponseStatus_OK,
 			PreviousValue:   v.Value,
 			PreviousVersion: v.Version,
@@ -286,7 +286,7 @@ func (s *TestServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*
 	} else {
 		return &pb.ReplaceResponse{
 			Header: header,
-			Status:  pb.ResponseStatus_OK,
+			Status: pb.ResponseStatus_OK,
 		}, nil
 	}
 }
@@ -305,7 +305,7 @@ func (s *TestServer) Exists(ctx context.Context, request *pb.ExistsRequest) (*pb
 	_, ok := s.entries[request.Key]
 	if !ok {
 		return &pb.ExistsResponse{
-			Header:     header,
+			Header:      header,
 			ContainsKey: false,
 		}, nil
 	} else {
@@ -317,34 +317,34 @@ func (s *TestServer) Exists(ctx context.Context, request *pb.ExistsRequest) (*pb
 }
 
 func (s *TestServer) Size(ctx context.Context, request *pb.SizeRequest) (*pb.SizeResponse, error) {
-	session, err := s.GetSession(request.Headers[0].SessionId)
+	session, err := s.GetSession(request.Header.SessionId)
 	if err != nil {
 		return nil, err
 	}
 
-	headers, err := session.NewResponseHeaders()
+	headers, err := session.NewResponseHeader()
 	if err != nil {
 		return nil, err
 	}
 	return &pb.SizeResponse{
-		Headers: headers,
-		Size:    int32(len(s.entries)),
+		Header: headers,
+		Size:   int32(len(s.entries)),
 	}, nil
 }
 
 func (s *TestServer) Clear(ctx context.Context, request *pb.ClearRequest) (*pb.ClearResponse, error) {
 	s.IncrementIndex()
 
-	session, err := s.GetSession(request.Headers[0].SessionId)
+	session, err := s.GetSession(request.Header.SessionId)
 	if err != nil {
 		return nil, err
 	}
 
-	sequenceNumber := request.Headers[0].SequenceNumber
+	sequenceNumber := request.Header.SequenceNumber
 	session.Await(sequenceNumber)
 	defer session.Complete(sequenceNumber)
 
-	headers, err := session.NewResponseHeaders()
+	headers, err := session.NewResponseHeader()
 	if err != nil {
 		return nil, err
 	}
@@ -352,19 +352,19 @@ func (s *TestServer) Clear(ctx context.Context, request *pb.ClearRequest) (*pb.C
 	s.entries = make(map[string]*KeyValue)
 
 	return &pb.ClearResponse{
-		Headers: headers,
+		Header: headers,
 	}, nil
 }
 
 func (s *TestServer) Events(request *pb.EventRequest, server pb.MapService_EventsServer) error {
 	s.IncrementIndex()
 
-	session, err := s.GetSession(request.Headers[0].SessionId)
+	session, err := s.GetSession(request.Header.SessionId)
 	if err != nil {
 		return err
 	}
 
-	sequenceNumber := request.Headers[0].SequenceNumber
+	sequenceNumber := request.Header.SequenceNumber
 	session.Await(sequenceNumber)
 	session.Complete(sequenceNumber)
 
@@ -381,6 +381,10 @@ func (s *TestServer) Events(request *pb.EventRequest, server pb.MapService_Event
 			return err
 		}
 	}
+}
+
+func (s *TestServer) Entries(request *pb.EntriesRequest, server pb.MapService_EntriesServer) error {
+	return errors.New("not implemented")
 }
 
 func valuesEqual(a []byte, b []byte) bool {
@@ -400,7 +404,7 @@ func TestMapOperations(t *testing.T) {
 		pb.RegisterMapServiceServer(server, NewTestServer())
 	})
 
-	m, err := NewMap(conn, "test", protocol.MultiRaft("test"))
+	m, err := newSession(conn, "test", "test")
 	assert.NoError(t, err)
 
 	size, err := m.Size(context.Background())
@@ -488,7 +492,7 @@ func TestMapStreams(t *testing.T) {
 		pb.RegisterMapServiceServer(server, NewTestServer())
 	})
 
-	m, err := NewMap(conn, "test", protocol.MultiRaft("test"))
+	m, err := newSession(conn, "test", "test")
 	assert.NoError(t, err)
 
 	kv, err := m.Put(context.Background(), "foo", []byte{1})
