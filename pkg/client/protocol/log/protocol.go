@@ -1,4 +1,4 @@
-package raft
+package log
 
 import (
 	"github.com/atomix/atomix-go-client/proto/atomix/partition"
