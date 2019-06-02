@@ -2,9 +2,8 @@ package lock
 
 import (
 	"context"
-	"github.com/atomix/atomix-go-client/pkg/client/protocol"
 	"github.com/atomix/atomix-go-client/pkg/client/test"
-	pb "github.com/atomix/atomix-go-client/proto/lock"
+	pb "github.com/atomix/atomix-go-client/proto/atomix/lock"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"testing"
@@ -91,12 +90,12 @@ func (s *TestServer) Lock(ctx context.Context, request *pb.LockRequest) (*pb.Loc
 			attempt.version = s.Index
 			s.lock = attempt
 			return &pb.LockResponse{
-				Header: header,
+				Header:  header,
 				Version: s.Index,
 			}, nil
 		} else {
 			return &pb.LockResponse{
-				Header: header,
+				Header:  header,
 				Version: 0,
 			}, nil
 		}
@@ -111,7 +110,7 @@ func (s *TestServer) Lock(ctx context.Context, request *pb.LockRequest) (*pb.Loc
 			request: request,
 		}
 		return &pb.LockResponse{
-			Header: header,
+			Header:  header,
 			Version: index,
 		}, nil
 	}
@@ -136,7 +135,7 @@ func (s *TestServer) Unlock(ctx context.Context, request *pb.UnlockRequest) (*pb
 
 	if s.lock == nil || (request.Version != 0 && s.lock.version != request.Version) {
 		return &pb.UnlockResponse{
-			Header:  header,
+			Header:   header,
 			Unlocked: false,
 		}, nil
 	}
@@ -161,7 +160,7 @@ func (s *TestServer) Unlock(ctx context.Context, request *pb.UnlockRequest) (*pb
 	}
 
 	return &pb.UnlockResponse{
-		Header:  header,
+		Header:   header,
 		Unlocked: true,
 	}, nil
 }
@@ -179,17 +178,17 @@ func (s *TestServer) IsLocked(ctx context.Context, request *pb.IsLockedRequest) 
 
 	if s.lock == nil {
 		return &pb.IsLockedResponse{
-			Header:  header,
+			Header:   header,
 			IsLocked: false,
 		}, nil
 	} else if request.Version > 0 && s.lock.version != request.Version {
 		return &pb.IsLockedResponse{
-			Header:  header,
+			Header:   header,
 			IsLocked: false,
 		}, nil
 	} else {
 		return &pb.IsLockedResponse{
-			Header:  header,
+			Header:   header,
 			IsLocked: true,
 		}, nil
 	}
@@ -200,10 +199,10 @@ func TestLock(t *testing.T) {
 		pb.RegisterLockServiceServer(server, NewTestServer())
 	})
 
-	l1, err := NewLock(conn, "test", protocol.MultiRaft("test"))
+	l1, err := newLock("test", "test", conn)
 	assert.NoError(t, err)
 
-	l2, err := NewLock(conn, "test", protocol.MultiRaft("test"))
+	l2, err := newLock("test", "test", conn)
 	assert.NoError(t, err)
 
 	v1, err := l1.Lock(context.Background())

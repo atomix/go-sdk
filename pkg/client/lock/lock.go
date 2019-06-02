@@ -13,8 +13,11 @@ func NewLock(namespace string, name string, partitions []*grpc.ClientConn, opts 
 	if err != nil {
 		return nil, err
 	}
+	return newLock(namespace, name, partitions[i], opts...)
+}
 
-	client := pb.NewLockServiceClient(partitions[i])
+func newLock(namespace string, name string, conn *grpc.ClientConn, opts ...session.Option) (*Lock, error) {
+	client := pb.NewLockServiceClient(conn)
 	session := session.NewSession(namespace, name, &SessionHandler{client: client}, opts...)
 	if err := session.Start(); err != nil {
 		return nil, err
