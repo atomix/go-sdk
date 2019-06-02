@@ -1,8 +1,8 @@
 package session
 
 import (
-	"github.com/atomix/atomix-go/pkg/client/protocol"
-	"github.com/atomix/atomix-go/proto/headers"
+	"github.com/atomix/atomix-go-client/pkg/client/protocol"
+	"github.com/atomix/atomix-go-client/proto/headers"
 	"hash/fnv"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sync"

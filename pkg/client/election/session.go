@@ -2,11 +2,11 @@ package election
 
 import (
 	"context"
-	"github.com/atomix/atomix-go/pkg/client/protocol"
-	"github.com/atomix/atomix-go/pkg/client/session"
-	pb "github.com/atomix/atomix-go/proto/election"
-	"github.com/atomix/atomix-go/proto/headers"
-	"github.com/atomix/atomix-go/proto/protocol"
+	"github.com/atomix/atomix-go-client/pkg/client/protocol"
+	"github.com/atomix/atomix-go-client/pkg/client/session"
+	pb "github.com/atomix/atomix-go-client/proto/election"
+	"github.com/atomix/atomix-go-client/proto/headers"
+	"github.com/atomix/atomix-go-client/proto/protocol"
 	"github.com/golang/protobuf/ptypes/duration"
 )
 

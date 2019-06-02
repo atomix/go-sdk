@@ -1,11 +1,11 @@
 package client
 
 import (
-	"github.com/atomix/atomix-go/pkg/client/_map"
-	"github.com/atomix/atomix-go/pkg/client/election"
-	"github.com/atomix/atomix-go/pkg/client/lock"
-	"github.com/atomix/atomix-go/pkg/client/protocol"
-	"github.com/atomix/atomix-go/pkg/client/session"
+	"github.com/atomix/atomix-go-client/pkg/client/_map"
+	"github.com/atomix/atomix-go-client/pkg/client/election"
+	"github.com/atomix/atomix-go-client/pkg/client/lock"
+	"github.com/atomix/atomix-go-client/pkg/client/protocol"
+	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"google.golang.org/grpc"
 )
 

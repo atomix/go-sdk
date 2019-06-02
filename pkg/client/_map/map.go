@@ -3,9 +3,9 @@ package _map
 import (
 	"context"
 	"errors"
-	"github.com/atomix/atomix-go/pkg/client/protocol"
-	"github.com/atomix/atomix-go/pkg/client/session"
-	pb "github.com/atomix/atomix-go/proto/map"
+	"github.com/atomix/atomix-go-client/pkg/client/protocol"
+	"github.com/atomix/atomix-go-client/pkg/client/session"
+	pb "github.com/atomix/atomix-go-client/proto/map"
 	"google.golang.org/grpc"
 	"io"
 	"k8s.io/klog/glog"

@@ -2,10 +2,10 @@ package _map
 
 import (
 	"context"
-	"github.com/atomix/atomix-go/pkg/client/protocol"
-	"github.com/atomix/atomix-go/pkg/client/session"
-	pb "github.com/atomix/atomix-go/proto/map"
-	"github.com/atomix/atomix-go/proto/protocol"
+	"github.com/atomix/atomix-go-client/pkg/client/protocol"
+	"github.com/atomix/atomix-go-client/pkg/client/session"
+	pb "github.com/atomix/atomix-go-client/proto/map"
+	"github.com/atomix/atomix-go-client/proto/protocol"
 	"github.com/golang/protobuf/ptypes/duration"
 )
 

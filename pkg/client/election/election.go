@@ -2,9 +2,9 @@ package election
 
 import (
 	"context"
-	"github.com/atomix/atomix-go/pkg/client/protocol"
-	"github.com/atomix/atomix-go/pkg/client/session"
-	pb "github.com/atomix/atomix-go/proto/election"
+	"github.com/atomix/atomix-go-client/pkg/client/protocol"
+	"github.com/atomix/atomix-go-client/pkg/client/session"
+	pb "github.com/atomix/atomix-go-client/proto/election"
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
 	"io"

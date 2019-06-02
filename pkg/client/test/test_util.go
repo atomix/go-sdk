@@ -3,7 +3,7 @@ package test
 import (
 	"context"
 	"errors"
-	"github.com/atomix/atomix-go/proto/headers"
+	"github.com/atomix/atomix-go-client/proto/headers"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
 	"log"

@@ -2,11 +2,11 @@ package lock
 
 import (
 	"context"
-	"github.com/atomix/atomix-go/pkg/client/protocol"
-	"github.com/atomix/atomix-go/pkg/client/session"
-	"github.com/atomix/atomix-go/proto/headers"
-	pb "github.com/atomix/atomix-go/proto/lock"
-	"github.com/atomix/atomix-go/proto/protocol"
+	"github.com/atomix/atomix-go-client/pkg/client/protocol"
+	"github.com/atomix/atomix-go-client/pkg/client/session"
+	"github.com/atomix/atomix-go-client/proto/headers"
+	pb "github.com/atomix/atomix-go-client/proto/lock"
+	"github.com/atomix/atomix-go-client/proto/protocol"
 	"github.com/golang/protobuf/ptypes/duration"
 )
 
