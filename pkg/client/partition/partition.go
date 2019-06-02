@@ -5,6 +5,7 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/client/election"
 	"github.com/atomix/atomix-go-client/pkg/client/lock"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
+	"github.com/atomix/atomix-go-client/pkg/client/set"
 	"google.golang.org/grpc"
 	"sort"
 )
@@ -40,6 +41,10 @@ func (g *PartitionGroup) getConnections() []*grpc.ClientConn {
 
 func (g *PartitionGroup) NewMap(name string, opts ...session.Option) (*_map.Map, error) {
 	return _map.NewMap(g.Application, name, g.getConnections(), opts...)
+}
+
+func (g *PartitionGroup) NewSet(name string, opts ...session.Option) (*set.Set, error) {
+	return set.NewSet(g.Application, name, g.getConnections(), opts...)
 }
 
 func (g *PartitionGroup) NewLock(name string, opts ...session.Option) (*lock.Lock, error) {

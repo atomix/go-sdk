@@ -17,7 +17,7 @@ func newPartition(conn *grpc.ClientConn, namespace string, name string, opts ...
 		return nil, err
 	}
 	return &mapPartition{
-		client:  pb.NewMapServiceClient(conn),
+		client:  client,
 		session: session,
 	}, nil
 }
