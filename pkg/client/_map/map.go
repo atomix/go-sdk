@@ -6,6 +6,7 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"hash/fnv"
 	"sort"
+	"sync"
 )
 
 func NewMap(namespace string, name string, partitions []*partition.Partition, opts ...session.Option) (*Map, error) {
@@ -68,31 +69,86 @@ func (m *Map) Remove(ctx context.Context, key string, opts ...RemoveOption) (*Ke
 }
 
 func (m *Map) Size(ctx context.Context) (int, error) {
-	size := 0
+	wg := sync.WaitGroup{}
+	results := make(chan int, len(m.partitions))
+	errors := make(chan error, len(m.partitions))
+
 	for _, partition := range m.partitions {
-		s, err := partition.Size(ctx)
-		if err != nil {
-			return 0, err
-		}
-		size += s
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			result, err := partition.Size(ctx)
+			if err != nil {
+				errors<-err
+			} else {
+				results<-result
+			}
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+		close(errors)
+	}()
+
+	for err := range errors {
+		return 0, err
+	}
+
+	size := 0
+	for result := range results {
+		size += result
 	}
 	return size, nil
 }
 
 func (m *Map) Clear(ctx context.Context) error {
+	wg := sync.WaitGroup{}
+	errors := make(chan error, len(m.partitions))
+
 	for _, partition := range m.partitions {
-		if err := partition.Clear(ctx); err != nil {
-			return err
-		}
+		wg.Add(1)
+		go func() {
+			if err := partition.Clear(ctx); err != nil {
+				errors<-err
+			}
+		}()
 	}
+
+	go func() {
+		wg.Wait()
+		close(errors)
+	}()
+
+	for err := range errors {
+		return err
+	}
+
 	return nil
 }
 
 func (m *Map) Listen(ctx context.Context, ch chan<- *MapEvent) error {
+	wg := sync.WaitGroup{}
+	errors := make(chan error, len(m.partitions))
+
 	for _, partition := range m.partitions {
-		if err := partition.Listen(ctx, ch); err != nil {
-			return err
-		}
+		wg.Add(1)
+		go func() {
+			if err := partition.Listen(ctx, ch); err != nil {
+				errors<-err
+			}
+		}()
 	}
+
+	go func() {
+		wg.Wait()
+		close(errors)
+	}()
+
+	for err := range errors {
+		return err
+	}
+
 	return nil
 }
