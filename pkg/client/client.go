@@ -40,12 +40,12 @@ type Client struct {
 }
 
 // CreatePartitionGroup creates a new partition group
-func (c *Client) CreatePartitionGroup(namespace string, name string, partitions int, partitionSize int, protocol protocol.Protocol) (*PartitionGroup, error) {
+func (c *Client) CreatePartitionGroup(name string, partitions int, partitionSize int, protocol protocol.Protocol) (*PartitionGroup, error) {
 	client := controller.NewControllerServiceClient(c.conn)
 	request := &controller.CreatePartitionGroupRequest{
 		Id: &partitionpb.PartitionGroupId{
 			Name:      name,
-			Namespace: namespace,
+			Namespace: c.Namespace,
 		},
 		Spec: &partitionpb.PartitionGroupSpec{
 			Partitions:    uint32(partitions),
@@ -58,11 +58,11 @@ func (c *Client) CreatePartitionGroup(namespace string, name string, partitions 
 	if err != nil {
 		return nil, err
 	}
-	return c.GetPartitionGroup(namespace, name)
+	return c.GetPartitionGroup(name)
 }
 
 // GetPartitionGroup gets a partition group in the client's namespace
-func (c *Client) GetPartitionGroup(namespace string, name string) (*PartitionGroup, error) {
+func (c *Client) GetPartitionGroup(name string) (*PartitionGroup, error) {
 	client := controller.NewControllerServiceClient(c.conn)
 	request := &controller.GetPartitionGroupsRequest{
 		Id: &partitionpb.PartitionGroupId{
@@ -93,15 +93,15 @@ func (c *Client) GetPartitionGroup(namespace string, name string) (*PartitionGro
 		}
 		partitions = append(partitions, partition)
 	}
-	return newPartitionGroup(c.Application, namespace, name, partitions)
+	return newPartitionGroup(c.Application, c.Namespace, name, partitions)
 }
 
 // DeletePartitionGroup deletes a partition group via the controller
-func (c *Client) DeletePartitionGroup(namespace string, name string) error {
+func (c *Client) DeletePartitionGroup(name string) error {
 	client := controller.NewControllerServiceClient(c.conn)
 	request := &controller.DeletePartitionGroupRequest{
 		Id: &partitionpb.PartitionGroupId{
-			Namespace: namespace,
+			Namespace: c.Namespace,
 			Name:      name,
 		},
 	}
