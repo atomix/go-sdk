@@ -1,8 +1,12 @@
 package _map
 
-import "context"
+import (
+	"context"
+	"github.com/atomix/atomix-go-client/pkg/client/primitive"
+)
 
-type mapInterface interface {
+type Interface interface {
+	primitive.Interface
 	Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*KeyValue, error)
 	Get(ctx context.Context, key string, opts ...GetOption) (*KeyValue, error)
 	Remove(ctx context.Context, key string, opts ...RemoveOption) (*KeyValue, error)

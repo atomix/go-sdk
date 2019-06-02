@@ -7,12 +7,6 @@ import (
 	"time"
 )
 
-type Interface interface {
-	Connect() error
-	keepAlive() error
-	Close() error
-}
-
 type Option interface {
 	prepare(options *Options)
 }
@@ -33,7 +27,13 @@ type Options struct {
 	timeout time.Duration
 }
 
-func NewSession(namespace string, name string, opts ...Option) *Session {
+type Handler interface {
+	Create(session *Session) error
+	KeepAlive(session *Session) error
+	Close(session *Session) error
+}
+
+func NewSession(namespace string, name string, handler Handler, opts ...Option) *Session {
 	options := &Options{}
 	for i := range opts {
 		opts[i].prepare(options)
@@ -43,6 +43,7 @@ func NewSession(namespace string, name string, opts ...Option) *Session {
 			Namespace: namespace,
 			Name:      name,
 		},
+		handler: handler,
 		Timeout: options.timeout,
 		streams: make(map[uint64]*Stream),
 		mu:      sync.RWMutex{},
@@ -55,6 +56,7 @@ type Session struct {
 	Name               *atomix_headers.Name
 	Timeout            time.Duration
 	SessionId          uint64
+	handler            Handler
 	lastIndex          uint64
 	sequenceNumber     uint64
 	lastSequenceNumber uint64
@@ -64,38 +66,21 @@ type Session struct {
 }
 
 func (s *Session) Start() error {
-	header, err := s.connect(&atomix_headers.RequestHeader{
-		Name: s.Name,
-	}, s.Timeout)
+	err := s.handler.Create(s)
 	if err != nil {
 		return err
 	}
 
-	if header != nil {
-		s.UpdateHeader(header)
-		go wait.Until(func() {
-			s.keepAlive(s.GetHeader())
-		}, s.Timeout/2, s.stopped)
-	}
+	go wait.Until(func() {
+		s.handler.KeepAlive(s)
+	}, s.Timeout/2, s.stopped)
 	return nil
-}
-
-func (s *Session) connect(header *atomix_headers.RequestHeader, timeout time.Duration) (*atomix_headers.ResponseHeader, error) {
-	return nil, nil
-}
-
-func (s *Session) keepAlive(header *atomix_headers.RequestHeader) (*atomix_headers.ResponseHeader, error) {
-	return nil, nil
 }
 
 func (s *Session) Stop() error {
-	err := s.close(s.GetHeader())
+	err := s.handler.Close(s)
 	close(s.stopped)
 	return err
-}
-
-func (s *Session) close(header *atomix_headers.RequestHeader) error {
-	return nil
 }
 
 func (s *Session) GetHeader() *atomix_headers.RequestHeader {

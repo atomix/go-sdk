@@ -404,7 +404,7 @@ func TestMapOperations(t *testing.T) {
 		pb.RegisterMapServiceServer(server, NewTestServer())
 	})
 
-	m, err := newSession(conn, "test", "test")
+	m, err := newPartition(conn, "test", "test")
 	assert.NoError(t, err)
 
 	size, err := m.Size(context.Background())
@@ -492,7 +492,7 @@ func TestMapStreams(t *testing.T) {
 		pb.RegisterMapServiceServer(server, NewTestServer())
 	})
 
-	m, err := newSession(conn, "test", "test")
+	m, err := newPartition(conn, "test", "test")
 	assert.NoError(t, err)
 
 	kv, err := m.Put(context.Background(), "foo", []byte{1})

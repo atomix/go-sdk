@@ -2,101 +2,50 @@ package lock
 
 import (
 	"context"
-	"github.com/atomix/atomix-go-client/pkg/client/protocol"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
-	"github.com/atomix/atomix-go-client/proto/headers"
-	pb "github.com/atomix/atomix-go-client/proto/lock"
-	"github.com/atomix/atomix-go-client/proto/protocol"
+	pb "github.com/atomix/atomix-go-client/proto/atomix/lock"
 	"github.com/golang/protobuf/ptypes/duration"
 )
 
-func newSession(c pb.LockServiceClient, name string, protocol *protocol.Protocol, opts ...session.Option) *Session {
-	return &Session{
-		client: c,
-		name: name,
-		lockId: newLockId(name, protocol),
-		Session: session.NewSession(opts...),
-	}
-}
-
-type Session struct {
-	*session.Session
+type SessionHandler struct {
+	session.Handler
 	client pb.LockServiceClient
-	name   string
-	lockId *pb.LockId
 }
 
-func newLockId(name string, protocol *protocol.Protocol) *pb.LockId {
-	if protocol.MultiRaft != nil {
-		return &pb.LockId{
-			Name: name,
-			Proto: &pb.LockId_Raft{
-				Raft: &atomix_protocol.MultiRaftProtocol{
-					Group: protocol.MultiRaft.Group,
-				},
-			},
-		}
-	} else if protocol.MultiPrimary != nil {
-		return &pb.LockId{
-			Name: name,
-			Proto: &pb.LockId_MultiPrimary{
-				MultiPrimary: &atomix_protocol.MultiPrimaryProtocol{
-					Group: protocol.MultiPrimary.Group,
-				},
-			},
-		}
-	} else if protocol.MultiLog != nil {
-		return &pb.LockId{
-			Name: name,
-			Proto: &pb.LockId_Log{
-				Log: &atomix_protocol.DistributedLogProtocol{
-					Group: protocol.MultiLog.Group,
-				},
-			},
-		}
-	}
-	return nil
-}
-
-func (m *Session) Connect() error {
+func (h *SessionHandler) Create(s *session.Session) error {
 	request := &pb.CreateRequest{
-		Id: m.lockId,
+		Header: s.GetHeader(),
 		Timeout: &duration.Duration{
-			Seconds: int64(m.Timeout.Seconds()),
-			Nanos: int32(m.Timeout.Nanoseconds()),
+			Seconds: int64(s.Timeout.Seconds()),
+			Nanos:   int32(s.Timeout.Nanoseconds()),
 		},
 	}
 
-	response, err := m.client.Create(context.Background(), request)
+	response, err := h.client.Create(context.Background(), request)
 	if err != nil {
 		return err
 	}
-
-	m.Start([]*headers.SessionHeader{response.Header})
+	s.UpdateHeader(response.Header)
 	return nil
 }
 
-func (m *Session) keepAlive() error {
+func (h *SessionHandler) KeepAlive(s *session.Session) error {
 	request := &pb.KeepAliveRequest{
-		Id: m.lockId,
-		Header: m.Headers.GetPartition("").GetSessionHeader(),
+		Header: s.GetHeader(),
 	}
 
-	if _, err := m.client.KeepAlive(context.Background(), request); err != nil {
+	if _, err := h.client.KeepAlive(context.Background(), request); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (m *Session) Close() error {
-	m.Stop()
-
+func (h *SessionHandler) Close(s *session.Session) error {
 	request := &pb.CloseRequest{
-		Id: m.lockId,
-		Header: m.Headers.GetPartition("").GetSessionHeader(),
+		Header: s.GetHeader(),
 	}
 
-	if _, err := m.client.Close(context.Background(), request); err != nil {
+	if _, err := h.client.Close(context.Background(), request); err != nil {
 		return err
 	}
 	return nil

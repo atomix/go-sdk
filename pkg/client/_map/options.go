@@ -10,18 +10,18 @@ type PutOption interface {
 }
 
 func PutIfVersion(version int64) PutOption {
-	return PutIfVersionOption{version: version}
+	return putIfVersionOption{version: version}
 }
 
-type PutIfVersionOption struct {
+type putIfVersionOption struct {
 	version int64
 }
 
-func (o PutIfVersionOption) before(request *pb.PutRequest) {
+func (o putIfVersionOption) before(request *pb.PutRequest) {
 	request.Version = o.version
 }
 
-func (o PutIfVersionOption) after(response *pb.PutResponse) {
+func (o putIfVersionOption) after(response *pb.PutResponse) {
 
 }
 
@@ -31,17 +31,17 @@ type GetOption interface {
 }
 
 func GetOrDefault(def []byte) GetOption {
-	return GetOrDefaultOption{def: def}
+	return getOrDefaultOption{def: def}
 }
 
-type GetOrDefaultOption struct {
+type getOrDefaultOption struct {
 	def []byte
 }
 
-func (o GetOrDefaultOption) before(request *pb.GetRequest) {
+func (o getOrDefaultOption) before(request *pb.GetRequest) {
 }
 
-func (o GetOrDefaultOption) after(response *pb.GetResponse) {
+func (o getOrDefaultOption) after(response *pb.GetResponse) {
 	if response.Version == 0 {
 		response.Value = o.def
 	}
@@ -53,17 +53,17 @@ type RemoveOption interface {
 }
 
 func RemoveIfVersion(version int64) RemoveOption {
-	return RemoveIfVersionOption{version: version}
+	return removeIfVersionOption{version: version}
 }
 
-type RemoveIfVersionOption struct {
+type removeIfVersionOption struct {
 	version int64
 }
 
-func (o RemoveIfVersionOption) before(request *pb.RemoveRequest) {
+func (o removeIfVersionOption) before(request *pb.RemoveRequest) {
 	request.Version = o.version
 }
 
-func (o RemoveIfVersionOption) after(response *pb.RemoveResponse) {
+func (o removeIfVersionOption) after(response *pb.RemoveResponse) {
 
 }
