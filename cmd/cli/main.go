@@ -27,7 +27,7 @@ func main() {
 
 	flag.Parse()
 
-	c, err := client.New(fmt.Sprintf("%s:%d", *host, *port), client.WithApplication(*application), client.WithNamespace(*namespace))
+	c, err := client.NewClient(fmt.Sprintf("%s:%d", *host, *port), client.WithApplication(*application), client.WithNamespace(*namespace))
 	if err != nil {
 		log.Fatal("failed to establish client connection", err)
 	}

@@ -14,10 +14,11 @@ import (
 	"github.com/atomix/atomix-go-client/proto/atomix/controller"
 	"github.com/atomix/atomix-go-client/proto/atomix/partition"
 	"google.golang.org/grpc"
+	"net"
 )
 
-// New returns a new Atomix primitive
-func New(address string, opts ...ClientOption) (*Client, error) {
+// NewClient returns a new Atomix client
+func NewClient(address string, opts ...ClientOption) (*Client, error) {
 	options := applyOptions(opts...)
 
 	// Set up a connection to the server.
@@ -89,7 +90,7 @@ func (c *Client) GetGroup(ctx context.Context, name string) (*PartitionGroup, er
 	partitions := make([]*grpc.ClientConn, len(group.Partitions))
 	for i, partition := range group.Partitions {
 		ep := partition.Endpoints[0]
-		conn, err := grpc.Dial(fmt.Sprintf("%s:%d", ep.Host, ep.Port))
+		conn, err := grpc.Dial(fmt.Sprintf("%s:%d", ep.Host, ep.Port), grpc.WithInsecure())
 		if err != nil {
 			return nil, err
 		}
@@ -97,12 +98,10 @@ func (c *Client) GetGroup(ctx context.Context, name string) (*PartitionGroup, er
 		c.conns = append(c.conns, conn)
 	}
 	return &PartitionGroup{
-		Namespace:     c.namespace,
-		Name:          name,
-		Partitions:    int(group.Spec.Partitions),
-		PartitionSize: int(group.Spec.PartitionSize),
-		client:        c,
-		partitions:    partitions,
+		Namespace:   c.namespace,
+		Name:        name,
+		application: c.application,
+		partitions:  partitions,
 	}, nil
 }
 
@@ -135,6 +134,30 @@ func (c *Client) Close() error {
 	return result
 }
 
+// NewGroup returns a partition group client
+func NewGroup(address string, opts ...ClientOption) (*PartitionGroup, error) {
+	_, records, err := net.LookupSRV("", "", address)
+	if err != nil {
+		return nil, err
+	}
+
+	options := applyOptions(opts...)
+	partitions := make([]*grpc.ClientConn, len(records))
+	for i, record := range records {
+		conn, err := grpc.Dial(fmt.Sprintf("%s:%d", record.Target, record.Port), grpc.WithInsecure())
+		if err != nil {
+			return nil, err
+		}
+		partitions[i] = conn
+	}
+	return &PartitionGroup{
+		Namespace:   options.namespace,
+		Name:        address,
+		application: options.application,
+		partitions:  partitions,
+	}, nil
+}
+
 // Primitive partition group.
 type PartitionGroup struct {
 	counter.CounterClient
@@ -143,31 +166,29 @@ type PartitionGroup struct {
 	lock.LockClient
 	set.SetClient
 
-	Namespace     string
-	Name          string
-	Partitions    int
-	PartitionSize int
+	Namespace string
+	Name      string
 
-	client     *Client
-	partitions []*grpc.ClientConn
+	application string
+	partitions  []*grpc.ClientConn
 }
 
 func (g *PartitionGroup) GetCounter(ctx context.Context, name string, opts ...session.SessionOption) (counter.Counter, error) {
-	return counter.New(ctx, g.client.application, name, g.partitions, opts...)
+	return counter.New(ctx, g.application, name, g.partitions, opts...)
 }
 
 func (g *PartitionGroup) GetElection(ctx context.Context, name string, opts ...session.SessionOption) (election.Election, error) {
-	return election.New(ctx, g.client.application, name, g.partitions, opts...)
+	return election.New(ctx, g.application, name, g.partitions, opts...)
 }
 
 func (g *PartitionGroup) GetLock(ctx context.Context, name string, opts ...session.SessionOption) (lock.Lock, error) {
-	return lock.New(ctx, g.client.application, name, g.partitions, opts...)
+	return lock.New(ctx, g.application, name, g.partitions, opts...)
 }
 
 func (g *PartitionGroup) GetMap(ctx context.Context, name string, opts ...session.SessionOption) (_map.Map, error) {
-	return _map.New(ctx, g.client.application, name, g.partitions, opts...)
+	return _map.New(ctx, g.application, name, g.partitions, opts...)
 }
 
 func (g *PartitionGroup) GetSet(ctx context.Context, name string, opts ...session.SessionOption) (set.Set, error) {
-	return set.New(ctx, g.client.application, name, g.partitions, opts...)
+	return set.New(ctx, g.application, name, g.partitions, opts...)
 }

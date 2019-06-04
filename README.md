@@ -291,7 +291,7 @@ if err != nil {
 	...
 }
 
-if term.Leader == election.Id {
+if term.Leader == election.Id() {
 	...
 }
 
@@ -324,7 +324,7 @@ for event := range ch {
 }
 ```
 
-## Partition Groups
+## Managing Partition Groups
 
 The client API can also be used to manage partition groups controlled by the Atomix controller.
 To create a new group, simply call `CreateGroup` on the client:
