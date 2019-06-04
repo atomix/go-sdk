@@ -20,6 +20,7 @@ type ElectionClient interface {
 // Election is the interface for the leader election primitive
 type Election interface {
 	primitive.Primitive
+	Id() string
 	GetTerm(ctx context.Context) (*Term, error)
 	Enter(ctx context.Context) (*Term, error)
 	Leave(ctx context.Context) error
@@ -61,16 +62,20 @@ func New(ctx context.Context, namespace string, name string, partitions []*grpc.
 	nodeId := uuid.NodeID()
 	candidate := base64.StdEncoding.EncodeToString(nodeId)
 	return &election{
-		client:      client,
-		session:     sess,
-		candidateId: candidate,
+		client:  client,
+		session: sess,
+		id:      candidate,
 	}, nil
 }
 
 type election struct {
-	client      pb.LeaderElectionServiceClient
-	session     *session.Session
-	candidateId string
+	client  pb.LeaderElectionServiceClient
+	session *session.Session
+	id      string
+}
+
+func (e *election) Id() string {
+	return e.id
 }
 
 func (e *election) GetTerm(ctx context.Context) (*Term, error) {
@@ -94,7 +99,7 @@ func (e *election) GetTerm(ctx context.Context) (*Term, error) {
 func (e *election) Enter(ctx context.Context) (*Term, error) {
 	request := &pb.EnterRequest{
 		Header:      e.session.NextHeader(),
-		CandidateId: e.candidateId,
+		CandidateId: e.id,
 	}
 
 	response, err := e.client.Enter(ctx, request)
@@ -113,7 +118,7 @@ func (e *election) Enter(ctx context.Context) (*Term, error) {
 func (e *election) Leave(ctx context.Context) error {
 	request := &pb.WithdrawRequest{
 		Header:      e.session.NextHeader(),
-		CandidateId: e.candidateId,
+		CandidateId: e.id,
 	}
 
 	response, err := e.client.Withdraw(ctx, request)
@@ -206,5 +211,5 @@ func (e *election) Listen(ctx context.Context, c chan<- *ElectionEvent) error {
 }
 
 func (e *election) Close() error {
-	return e.session.Stop()
+	return e.session.Close()
 }

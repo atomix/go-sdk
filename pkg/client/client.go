@@ -97,8 +97,12 @@ func (c *Client) GetGroup(ctx context.Context, name string) (*PartitionGroup, er
 		c.conns = append(c.conns, conn)
 	}
 	return &PartitionGroup{
-		client:     c,
-		partitions: partitions,
+		Namespace:     c.namespace,
+		Name:          name,
+		Partitions:    int(group.Spec.Partitions),
+		PartitionSize: int(group.Spec.PartitionSize),
+		client:        c,
+		partitions:    partitions,
 	}, nil
 }
 
@@ -138,6 +142,11 @@ type PartitionGroup struct {
 	election.ElectionClient
 	lock.LockClient
 	set.SetClient
+
+	Namespace     string
+	Name          string
+	Partitions    int
+	PartitionSize int
 
 	client     *Client
 	partitions []*grpc.ClientConn
