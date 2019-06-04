@@ -199,10 +199,10 @@ func TestLock(t *testing.T) {
 		pb.RegisterLockServiceServer(server, NewTestServer())
 	})
 
-	l1, err := newLock("test", "test", conn)
+	l1, err := newLock(context.TODO(), "test", "test", conn)
 	assert.NoError(t, err)
 
-	l2, err := newLock("test", "test", conn)
+	l2, err := newLock(context.TODO(), "test", "test", conn)
 	assert.NoError(t, err)
 
 	v1, err := l1.Lock(context.Background())

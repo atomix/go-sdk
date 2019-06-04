@@ -125,60 +125,106 @@ func (s *Session) UpdateHeader(header *headers.ResponseHeader) {
 
 	streams := s.streams
 	for j := range header.Streams {
-		id := header.Streams[j].StreamId
-		if _, ok := streams[id]; !ok {
-			streams[id] = &Stream{
-				id:    id,
-				index: id,
-			}
+		streamHeader := header.Streams[j]
+		id := streamHeader.StreamId
+		stream, ok := streams[id]
+		if ok {
+			stream.complete(streamHeader)
+		} else {
+			streams[id] = newStream(id)
 		}
 	}
 }
 
-func (s *Session) ValidStream(header *headers.ResponseHeader) bool {
+func (s *Session) WaitStream(header *headers.StreamHeader) chan struct{} {
+	ch := make(chan struct{}, 1)
+
 	s.mu.Lock()
-	if header.Index > s.lastIndex {
-		s.lastIndex = header.Index
-	}
-
-	streamHeader := header.Streams[0]
-	stream, ok := s.streams[streamHeader.StreamId]
-	if !ok {
-		stream = &Stream{
-			id:    streamHeader.StreamId,
-			index: streamHeader.StreamId,
-		}
-		s.streams[streamHeader.StreamId] = stream
-	}
-
 	defer s.mu.Unlock()
 
-	if streamHeader.Index >= s.lastIndex && streamHeader.LastItemNumber == stream.lastItemNumber+1 {
-		s.lastIndex = streamHeader.Index
-		stream.lastItemNumber = streamHeader.LastItemNumber
-		return true
+	stream, ok := s.streams[header.StreamId]
+
+	// If the stream does not exist, close and return the channel.
+	if !ok {
+		close(ch)
+		return ch
 	}
-	return false
+
+	// If the response was not received in stream order, skip the response.
+	if header.LastItemNumber != stream.lastItemNumber+1 {
+		close(ch)
+		return ch
+	}
+
+	// Update the stream received index and last item number to ensure the next response can be handled.
+	stream.receivedIndex = header.Index
+	stream.lastItemNumber = header.LastItemNumber
+
+	// If the response index for the session has advanced to the stream index, complete the stream.
+	if s.lastIndex >= header.Index {
+		stream.completeIndex = header.Index
+		stream.lastItemNumber = header.LastItemNumber
+		ch <- struct{}{}
+		close(ch)
+		return ch
+	}
+
+	// If the response index has not advanced to the stream index, enqueue the channel to be completed
+	// once the session has advanced to the response index.
+	queue, ok := stream.queue[header.Index]
+	if !ok {
+		queue := []chan struct{}{
+			ch,
+		}
+		stream.queue[header.Index] = queue
+	} else {
+		stream.queue[header.Index] = append(queue, ch)
+	}
+	return ch
 }
 
 func (s *Session) getStreamHeaders() []*headers.StreamHeader {
-	result := make([]*headers.StreamHeader, len(s.streams))
+	result := make([]*headers.StreamHeader, 0, len(s.streams))
 	for _, stream := range s.streams {
 		result = append(result, stream.newStreamHeader())
 	}
 	return result
 }
 
+func newStream(id uint64) *Stream {
+	return &Stream{
+		id:            id,
+		receivedIndex: id,
+		completeIndex: id,
+		queue: make(map[uint64][]chan struct{}),
+	}
+}
+
 type Stream struct {
 	id             uint64
-	index          uint64
+	receivedIndex  uint64
+	completeIndex  uint64
 	lastItemNumber uint64
+	queue          map[uint64][]chan struct{}
 }
 
 func (s *Stream) newStreamHeader() *headers.StreamHeader {
 	return &headers.StreamHeader{
 		StreamId:       s.id,
-		Index:          s.index,
+		Index:          s.receivedIndex,
 		LastItemNumber: s.lastItemNumber,
+	}
+}
+
+func (s *Stream) complete(header *headers.StreamHeader) {
+	for s.completeIndex < header.Index {
+		s.completeIndex += 1
+		queue, ok := s.queue[s.completeIndex]
+		if ok {
+			for _, ch := range queue {
+				ch <- struct{}{}
+			}
+			delete(s.queue, s.completeIndex)
+		}
 	}
 }

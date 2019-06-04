@@ -193,12 +193,25 @@ func (m *mapPartition) Listen(ctx context.Context, c chan<- *MapEvent) error {
 				t = EVENT_REMOVED
 			}
 
-			if m.session.ValidStream(response.Header) {
+			// If no stream headers are provided by the server, immediately complete the event.
+			if len(response.Header.Streams) == 0 {
 				c <- &MapEvent{
 					Type:    t,
 					Key:     response.Key,
 					Value:   response.NewValue,
 					Version: response.NewVersion,
+				}
+			} else {
+				// Wait for the stream to advanced at least to the responses.
+				stream := response.Header.Streams[0]
+				_, ok := <-m.session.WaitStream(stream)
+				if ok {
+					c <- &MapEvent{
+						Type:    t,
+						Key:     response.Key,
+						Value:   response.NewValue,
+						Version: response.NewVersion,
+					}
 				}
 			}
 		}

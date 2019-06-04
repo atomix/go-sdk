@@ -371,8 +371,7 @@ func (s *TestServer) Events(request *pb.EventRequest, server pb.MapService_Event
 	c := make(chan interface{})
 	stream := session.NewStream(c)
 
-	for {
-		e := <-c
+	for e := range c {
 		if err := server.Send(e.(*pb.EventResponse)); err != nil {
 			if err == io.EOF {
 				stream.Delete()
@@ -381,6 +380,7 @@ func (s *TestServer) Events(request *pb.EventRequest, server pb.MapService_Event
 			return err
 		}
 	}
+	return nil
 }
 
 func (s *TestServer) Entries(request *pb.EntriesRequest, server pb.MapService_EntriesServer) error {
@@ -404,7 +404,7 @@ func TestMapOperations(t *testing.T) {
 		pb.RegisterMapServiceServer(server, NewTestServer())
 	})
 
-	m, err := newPartition(conn, "test", "test")
+	m, err := newPartition(context.TODO(), conn, "test", "test")
 	assert.NoError(t, err)
 
 	size, err := m.Size(context.Background())
@@ -468,10 +468,10 @@ func TestMapOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 
-	kv, err = m.Put(context.Background(), "foo", []byte("baz"), WithPutIfVersion(1))
+	kv, err = m.Put(context.Background(), "foo", []byte("baz"), WithVersion(1))
 	assert.Error(t, err)
 
-	kv2, err := m.Put(context.Background(), "foo", []byte("baz"), WithPutIfVersion(kv1.Version))
+	kv2, err := m.Put(context.Background(), "foo", []byte("baz"), WithVersion(kv1.Version))
 	assert.NoError(t, err)
 	assert.NotEqual(t, kv1.Version, kv2.Version)
 	assert.Equal(t, "baz", string(kv2.Value))
@@ -492,7 +492,7 @@ func TestMapStreams(t *testing.T) {
 		pb.RegisterMapServiceServer(server, NewTestServer())
 	})
 
-	m, err := newPartition(conn, "test", "test")
+	m, err := newPartition(context.TODO(), conn, "test", "test")
 	assert.NoError(t, err)
 
 	kv, err := m.Put(context.Background(), "foo", []byte{1})
