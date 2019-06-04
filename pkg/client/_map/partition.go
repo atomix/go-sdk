@@ -10,20 +10,19 @@ import (
 	"io"
 )
 
-func newPartition(conn *grpc.ClientConn, namespace string, name string, opts ...session.Option) (*mapPartition, error) {
+func newPartition(ctx context.Context, conn *grpc.ClientConn, namespace string, name string, opts ...session.SessionOption) (Map, error) {
 	client := pb.NewMapServiceClient(conn)
-	session := session.NewSession(namespace, name, &SessionHandler{client: client}, opts...)
-	if err := session.Start(); err != nil {
+	sess, err := session.New(ctx, namespace, name, &SessionHandler{client: client}, opts...)
+	if err != nil {
 		return nil, err
 	}
 	return &mapPartition{
 		client:  client,
-		session: session,
+		session: sess,
 	}, nil
 }
 
 type mapPartition struct {
-	Interface
 	client  pb.MapServiceClient
 	session *session.Session
 }
@@ -36,7 +35,7 @@ func (m *mapPartition) Put(ctx context.Context, key string, value []byte, opts .
 	}
 
 	for i := range opts {
-		opts[i].before(request)
+		opts[i].beforePut(request)
 	}
 
 	response, err := m.client.Put(ctx, request)
@@ -45,7 +44,7 @@ func (m *mapPartition) Put(ctx context.Context, key string, value []byte, opts .
 	}
 
 	for i := range opts {
-		opts[i].after(response)
+		opts[i].afterPut(response)
 	}
 
 	m.session.UpdateHeader(response.Header)
@@ -76,7 +75,7 @@ func (m *mapPartition) Get(ctx context.Context, key string, opts ...GetOption) (
 	}
 
 	for i := range opts {
-		opts[i].before(request)
+		opts[i].beforeGet(request)
 	}
 
 	response, err := m.client.Get(ctx, request)
@@ -85,7 +84,7 @@ func (m *mapPartition) Get(ctx context.Context, key string, opts ...GetOption) (
 	}
 
 	for i := range opts {
-		opts[i].after(response)
+		opts[i].afterGet(response)
 	}
 
 	m.session.UpdateHeader(response.Header)
@@ -107,7 +106,7 @@ func (m *mapPartition) Remove(ctx context.Context, key string, opts ...RemoveOpt
 	}
 
 	for i := range opts {
-		opts[i].before(request)
+		opts[i].beforeRemove(request)
 	}
 
 	response, err := m.client.Remove(ctx, request)
@@ -116,7 +115,7 @@ func (m *mapPartition) Remove(ctx context.Context, key string, opts ...RemoveOpt
 	}
 
 	for i := range opts {
-		opts[i].after(response)
+		opts[i].afterRemove(response)
 	}
 
 	m.session.UpdateHeader(response.Header)
@@ -205,4 +204,8 @@ func (m *mapPartition) Listen(ctx context.Context, c chan<- *MapEvent) error {
 		}
 	}()
 	return nil
+}
+
+func (m *mapPartition) Close() error {
+	return m.session.Close()
 }

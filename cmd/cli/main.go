@@ -8,7 +8,6 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/client/protocol"
 	logprotocol "github.com/atomix/atomix-go-client/pkg/client/protocol/log"
 	"github.com/atomix/atomix-go-client/pkg/client/protocol/raft"
-	"google.golang.org/grpc"
 	"log"
 	"os"
 )
@@ -28,7 +27,7 @@ func main() {
 
 	flag.Parse()
 
-	c, err := client.NewClient(*application, *namespace, fmt.Sprintf("%s:%d", *host, *port), grpc.WithInsecure())
+	c, err := client.New(fmt.Sprintf("%s:%d", *host, *port), client.WithApplication(*application), client.WithNamespace(*namespace))
 	if err != nil {
 		log.Fatal("failed to establish client connection", err)
 	}
@@ -115,7 +114,7 @@ func (c *createCommand) execute(cl *client.Client) error {
 	case "log":
 		p = &logprotocol.Protocol{}
 	}
-	_, err := cl.CreatePartitionGroup(*c.group, *c.partitions, *c.partitionSize, p)
+	_, err := cl.CreateGroup(context.Background(), *c.group, *c.partitions, *c.partitionSize, p)
 	return err
 }
 
@@ -145,7 +144,7 @@ func (c *getCommand) parse(args []string) error {
 }
 
 func (c *getCommand) execute(cl *client.Client) error {
-	group, err := cl.GetPartitionGroup(*c.group)
+	group, err := cl.GetGroup(context.Background(), *c.group)
 	println(fmt.Sprintf("%v", group))
 	return err
 }
@@ -176,7 +175,7 @@ func (c *deleteCommand) parse(args []string) error {
 }
 
 func (c *deleteCommand) execute(cl *client.Client) error {
-	return cl.DeletePartitionGroup(*c.group)
+	return cl.DeleteGroup(context.Background(), *c.group)
 }
 
 func newMapCommand() command {
@@ -256,12 +255,12 @@ func (c *mapGetCommand) parse(args []string) error {
 }
 
 func (c *mapGetCommand) execute(cl *client.Client) error {
-	group, err := cl.GetPartitionGroup(*c.group)
+	group, err := cl.GetGroup(context.Background(), *c.group)
 	if err != nil {
 		return err
 	}
 
-	_map, err := group.NewMap(*c._name)
+	_map, err := group.GetMap(*c._name)
 	if err != nil {
 		return err
 	}
@@ -309,12 +308,12 @@ func (c *mapPutCommand) parse(args []string) error {
 }
 
 func (c *mapPutCommand) execute(cl *client.Client) error {
-	group, err := cl.GetPartitionGroup(*c.group)
+	group, err := cl.GetGroup(context.Background(), *c.group)
 	if err != nil {
 		return err
 	}
 
-	_map, err := group.NewMap(*c._name)
+	_map, err := group.GetMap(*c._name)
 	if err != nil {
 		return err
 	}

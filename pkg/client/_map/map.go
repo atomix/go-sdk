@@ -2,47 +2,74 @@ package _map
 
 import (
 	"context"
+	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/util"
 	"google.golang.org/grpc"
 )
 
-func NewMap(namespace string, name string, partitions []*grpc.ClientConn, opts ...session.Option) (*Map, error) {
+type MapClient interface {
+	GetMap(ctx context.Context, name string, opts ...session.SessionOption) (Map, error)
+}
+
+type Map interface {
+	primitive.Primitive
+	Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*KeyValue, error)
+	Get(ctx context.Context, key string, opts ...GetOption) (*KeyValue, error)
+	Remove(ctx context.Context, key string, opts ...RemoveOption) (*KeyValue, error)
+	Size(ctx context.Context) (int, error)
+	Clear(ctx context.Context) error
+	Listen(ctx context.Context, ch chan<- *MapEvent) error
+}
+
+type KeyValue struct {
+	Version int64
+	Key     string
+	Value   []byte
+}
+
+type MapEventType string
+
+const (
+	EVENT_INSERTED MapEventType = "inserted"
+	EVENT_UPDATED  MapEventType = "updated"
+	EVENT_REMOVED  MapEventType = "removed"
+)
+
+type MapEvent struct {
+	Type    MapEventType
+	Key     string
+	Value   []byte
+	Version int64
+}
+
+func New(ctx context.Context, namespace string, name string, partitions []*grpc.ClientConn, opts ...session.SessionOption) (Map, error) {
 	iter := make([]interface{}, len(partitions))
 	for i, partition := range partitions {
 		iter[i] = partition
 	}
 
-	results, err := util.ExecuteAllAsync(iter, func(arg interface{}) (interface{}, error) {
-		return newPartition(arg.(*grpc.ClientConn), namespace, name, opts...)
+	maps, err := util.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
+		return newPartition(ctx, partitions[i], namespace, name, opts...)
 	})
-
 	if err != nil {
 		return nil, err
 	}
 
-	mapPartitions := make([]*mapPartition, len(results))
-	for i, result := range results {
-		mapPartitions[i] = result.(*mapPartition)
-	}
-
-	return &Map{
-		Namespace:      namespace,
-		Name:           name,
-		partitions:     mapPartitions,
-		partitionsIter: results,
+	return &_map{
+		Namespace:  namespace,
+		Name:       name,
+		partitions: maps.([]Map),
 	}, nil
 }
 
-type Map struct {
-	Interface
-	Namespace      string
-	Name           string
-	partitions     []*mapPartition
-	partitionsIter []interface{}
+type _map struct {
+	Namespace  string
+	Name       string
+	partitions []Map
 }
 
-func (m *Map) getPartition(key string) (*mapPartition, error) {
+func (m *_map) getPartition(key string) (Map, error) {
 	i, err := util.GetPartitionIndex(key, len(m.partitions))
 	if err != nil {
 		return nil, err
@@ -50,7 +77,7 @@ func (m *Map) getPartition(key string) (*mapPartition, error) {
 	return m.partitions[i], nil
 }
 
-func (m *Map) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*KeyValue, error) {
+func (m *_map) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*KeyValue, error) {
 	session, err := m.getPartition(key)
 	if err != nil {
 		return nil, err
@@ -58,7 +85,7 @@ func (m *Map) Put(ctx context.Context, key string, value []byte, opts ...PutOpti
 	return session.Put(ctx, key, value, opts...)
 }
 
-func (m *Map) Get(ctx context.Context, key string, opts ...GetOption) (*KeyValue, error) {
+func (m *_map) Get(ctx context.Context, key string, opts ...GetOption) (*KeyValue, error) {
 	session, err := m.getPartition(key)
 	if err != nil {
 		return nil, err
@@ -66,7 +93,7 @@ func (m *Map) Get(ctx context.Context, key string, opts ...GetOption) (*KeyValue
 	return session.Get(ctx, key, opts...)
 }
 
-func (m *Map) Remove(ctx context.Context, key string, opts ...RemoveOption) (*KeyValue, error) {
+func (m *_map) Remove(ctx context.Context, key string, opts ...RemoveOption) (*KeyValue, error) {
 	session, err := m.getPartition(key)
 	if err != nil {
 		return nil, err
@@ -74,37 +101,35 @@ func (m *Map) Remove(ctx context.Context, key string, opts ...RemoveOption) (*Ke
 	return session.Remove(ctx, key, opts...)
 }
 
-func (m *Map) Size(ctx context.Context) (int, error) {
-	results, err := util.ExecuteAllAsync(m.partitionsIter, func(arg interface{}) (interface{}, error) {
-		return arg.(*mapPartition).Size(ctx)
+func (m *_map) Size(ctx context.Context) (int, error) {
+	results, err := util.ExecuteAsync(len(m.partitions), func(i int) (interface{}, error) {
+		return m.partitions[i].Size(ctx)
 	})
 	if err != nil {
 		return 0, err
 	}
 
 	size := 0
-	for _, result := range results {
-		size += result.(int)
+	for _, result := range results.([]int) {
+		size += result
 	}
 	return size, nil
 }
 
-func (m *Map) Clear(ctx context.Context) error {
-	_, err := util.ExecuteAllAsync(m.partitionsIter, func(arg interface{}) (interface{}, error) {
-		return nil, arg.(*mapPartition).Clear(ctx)
+func (m *_map) Clear(ctx context.Context) error {
+	return util.IterAsync(len(m.partitions), func(i int) error {
+		return m.partitions[i].Clear(ctx)
 	})
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
-func (m *Map) Listen(ctx context.Context, ch chan<- *MapEvent) error {
-	_, err := util.ExecuteAllAsync(m.partitionsIter, func(arg interface{}) (interface{}, error) {
-		return nil, arg.(*mapPartition).Listen(ctx, ch)
+func (m *_map) Listen(ctx context.Context, ch chan<- *MapEvent) error {
+	return util.IterAsync(len(m.partitions), func(i int) error {
+		return m.partitions[i].Listen(ctx, ch)
 	})
-	if err != nil {
-		return err
-	}
-	return nil
+}
+
+func (s *_map) Close() error {
+	return util.IterAsync(len(s.partitions), func(i int) error {
+		return s.partitions[i].Close()
+	})
 }

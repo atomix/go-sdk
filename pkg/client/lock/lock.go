@@ -2,40 +2,50 @@ package lock
 
 import (
 	"context"
+	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/util"
 	pb "github.com/atomix/atomix-go-client/proto/atomix/lock"
 	"google.golang.org/grpc"
 )
 
-func NewLock(namespace string, name string, partitions []*grpc.ClientConn, opts ...session.Option) (*Lock, error) {
+type LockClient interface {
+	GetLock(ctx context.Context, name string, opts ...session.SessionOption) (Lock, error)
+}
+
+type Lock interface {
+	primitive.Primitive
+	Lock(ctx context.Context, opts ...LockOption) (uint64, error)
+	Unlock(ctx context.Context, opts ...UnlockOption) (bool, error)
+	IsLocked(ctx context.Context, opts ...IsLockedOption) (bool, error)
+}
+
+func New(ctx context.Context, namespace string, name string, partitions []*grpc.ClientConn, opts ...session.SessionOption) (Lock, error) {
 	i, err := util.GetPartitionIndex(name, len(partitions))
 	if err != nil {
 		return nil, err
 	}
-	return newLock(namespace, name, partitions[i], opts...)
+	return newLock(ctx, namespace, name, partitions[i], opts...)
 }
 
-func newLock(namespace string, name string, conn *grpc.ClientConn, opts ...session.Option) (*Lock, error) {
+func newLock(ctx context.Context, namespace string, name string, conn *grpc.ClientConn, opts ...session.SessionOption) (*lock, error) {
 	client := pb.NewLockServiceClient(conn)
-	session := session.NewSession(namespace, name, &SessionHandler{client: client}, opts...)
-	if err := session.Start(); err != nil {
+	sess, err := session.New(ctx, namespace, name, &SessionHandler{client: client}, opts...)
+	if err != nil {
 		return nil, err
 	}
-
-	return &Lock{
+	return &lock{
 		client:  client,
-		session: session,
+		session: sess,
 	}, nil
 }
 
-type Lock struct {
-	Interface
+type lock struct {
 	client  pb.LockServiceClient
 	session *session.Session
 }
 
-func (l *Lock) Lock(ctx context.Context, opts ...LockOption) (uint64, error) {
+func (l *lock) Lock(ctx context.Context, opts ...LockOption) (uint64, error) {
 	request := &pb.LockRequest{
 		Header: l.session.NextHeader(),
 	}
@@ -57,7 +67,7 @@ func (l *Lock) Lock(ctx context.Context, opts ...LockOption) (uint64, error) {
 	return response.Version, nil
 }
 
-func (l *Lock) Unlock(ctx context.Context, opts ...UnlockOption) (bool, error) {
+func (l *lock) Unlock(ctx context.Context, opts ...UnlockOption) (bool, error) {
 	request := &pb.UnlockRequest{
 		Header: l.session.NextHeader(),
 	}
@@ -79,7 +89,7 @@ func (l *Lock) Unlock(ctx context.Context, opts ...UnlockOption) (bool, error) {
 	return response.Unlocked, nil
 }
 
-func (l *Lock) IsLocked(ctx context.Context, opts ...IsLockedOption) (bool, error) {
+func (l *lock) IsLocked(ctx context.Context, opts ...IsLockedOption) (bool, error) {
 	request := &pb.IsLockedRequest{
 		Header: l.session.GetHeader(),
 	}
@@ -101,6 +111,6 @@ func (l *Lock) IsLocked(ctx context.Context, opts ...IsLockedOption) (bool, erro
 	return response.IsLocked, nil
 }
 
-func (l *Lock) Close() error {
-	return l.session.Stop()
+func (l *lock) Close() error {
+	return l.session.Close()
 }

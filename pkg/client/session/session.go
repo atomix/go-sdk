@@ -1,29 +1,30 @@
 package session
 
 import (
+	"context"
 	headers "github.com/atomix/atomix-go-client/proto/atomix/headers"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sync"
 	"time"
 )
 
-type Option interface {
-	prepare(options *Options)
+type SessionOption interface {
+	prepare(options *sessionOptions)
 }
 
-func Timeout(timeout time.Duration) Option {
-	return TimeoutOption{timeout: timeout}
+func WithTimeout(timeout time.Duration) SessionOption {
+	return timeoutOption{timeout: timeout}
 }
 
-type TimeoutOption struct {
+type timeoutOption struct {
 	timeout time.Duration
 }
 
-func (o TimeoutOption) prepare(options *Options) {
+func (o timeoutOption) prepare(options *sessionOptions) {
 	options.timeout = o.timeout
 }
 
-type Options struct {
+type sessionOptions struct {
 	timeout time.Duration
 }
 
@@ -33,8 +34,8 @@ type Handler interface {
 	Close(session *Session) error
 }
 
-func NewSession(namespace string, name string, handler Handler, opts ...Option) *Session {
-	options := &Options{}
+func New(ctx context.Context, namespace string, name string, handler Handler, opts ...SessionOption) (*Session, error) {
+	options := &sessionOptions{}
 	for i := range opts {
 		opts[i].prepare(options)
 	}
@@ -49,7 +50,10 @@ func NewSession(namespace string, name string, handler Handler, opts ...Option) 
 		mu:      sync.RWMutex{},
 		stopped: make(chan struct{}),
 	}
-	return session
+	if err := session.start(); err != nil {
+		return nil, err
+	}
+	return session, nil
 }
 
 type Session struct {
@@ -65,7 +69,7 @@ type Session struct {
 	stopped            chan struct{}
 }
 
-func (s *Session) Start() error {
+func (s *Session) start() error {
 	err := s.handler.Create(s)
 	if err != nil {
 		return err
@@ -77,7 +81,7 @@ func (s *Session) Start() error {
 	return nil
 }
 
-func (s *Session) Stop() error {
+func (s *Session) Close() error {
 	err := s.handler.Close(s)
 	close(s.stopped)
 	return err

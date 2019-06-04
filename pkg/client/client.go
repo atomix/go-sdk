@@ -4,70 +4,77 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/atomix/atomix-go-client/pkg/client/partition"
+	"github.com/atomix/atomix-go-client/pkg/client/_map"
+	"github.com/atomix/atomix-go-client/pkg/client/counter"
+	"github.com/atomix/atomix-go-client/pkg/client/election"
+	"github.com/atomix/atomix-go-client/pkg/client/lock"
 	"github.com/atomix/atomix-go-client/pkg/client/protocol"
+	"github.com/atomix/atomix-go-client/pkg/client/session"
+	"github.com/atomix/atomix-go-client/pkg/client/set"
 	"github.com/atomix/atomix-go-client/proto/atomix/controller"
-	partitionpb "github.com/atomix/atomix-go-client/proto/atomix/partition"
+	"github.com/atomix/atomix-go-client/proto/atomix/partition"
 	"google.golang.org/grpc"
 )
 
-// NewClient returns a new client for the controller indicated by 'address'
-func NewClient(application string, namespace string, address string, opts ...grpc.DialOption) (*Client, error) {
+// New returns a new Atomix primitive
+func New(address string, opts ...ClientOption) (*Client, error) {
+	options := applyOptions(opts...)
+
 	// Set up a connection to the server.
-	conn, err := grpc.Dial(address, opts...)
+	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
 		return nil, err
 	}
 
 	return &Client{
 		conn:        conn,
-		opts:        opts,
-		Application: application,
-		Namespace:   namespace,
+		application: options.application,
+		namespace:   options.namespace,
+		conns:       []*grpc.ClientConn{},
 	}, nil
 }
 
-// Client is the interface to an Atomix cluster
+// Atomix primitive client
 type Client struct {
+	application string
+	namespace   string
 	conn        *grpc.ClientConn
-	opts        []grpc.DialOption
-	Application string
-	Namespace   string
+	conns       []*grpc.ClientConn
 }
 
-// CreatePartitionGroup creates a new partition group
-func (c *Client) CreatePartitionGroup(name string, partitions int, partitionSize int, protocol protocol.Protocol) (*partition.PartitionGroup, error) {
+// CreateGroup creates a new partition group
+func (c *Client) CreateGroup(ctx context.Context, name string, partitions int, partitionSize int, protocol protocol.Protocol) (*PartitionGroup, error) {
 	client := controller.NewControllerServiceClient(c.conn)
 	request := &controller.CreatePartitionGroupRequest{
-		Id: &partitionpb.PartitionGroupId{
+		Id: &partition.PartitionGroupId{
 			Name:      name,
-			Namespace: c.Namespace,
+			Namespace: c.namespace,
 		},
-		Spec: &partitionpb.PartitionGroupSpec{
+		Spec: &partition.PartitionGroupSpec{
 			Partitions:    uint32(partitions),
 			PartitionSize: uint32(partitionSize),
 			Group:         protocol.Spec().GetGroup(),
 		},
 	}
 
-	_, err := client.CreatePartitionGroup(context.Background(), request)
+	_, err := client.CreatePartitionGroup(ctx, request)
 	if err != nil {
 		return nil, err
 	}
-	return c.GetPartitionGroup(name)
+	return c.GetGroup(ctx, name)
 }
 
-// GetPartitionGroup gets a partition group in the client's namespace
-func (c *Client) GetPartitionGroup(name string) (*partition.PartitionGroup, error) {
+// GetGroup returns a partition group primitive client
+func (c *Client) GetGroup(ctx context.Context, name string) (*PartitionGroup, error) {
 	client := controller.NewControllerServiceClient(c.conn)
 	request := &controller.GetPartitionGroupsRequest{
-		Id: &partitionpb.PartitionGroupId{
-			Namespace: c.Namespace,
+		Id: &partition.PartitionGroupId{
 			Name:      name,
+			Namespace: c.namespace,
 		},
 	}
 
-	response, err := client.GetPartitionGroups(context.Background(), request)
+	response, err := client.GetPartitionGroups(ctx, request)
 	if err != nil {
 		return nil, err
 	}
@@ -79,34 +86,79 @@ func (c *Client) GetPartitionGroup(name string) (*partition.PartitionGroup, erro
 	}
 
 	group := response.Groups[0]
-	partitions := []*partition.Partition{}
-	for _, partitionpb := range group.Partitions {
-		ep := partitionpb.Endpoints[0]
-		address := fmt.Sprintf("%s:%d", ep.Host, ep.Port)
-		partition, err := partition.NewPartition(int(partitionpb.PartitionId), address)
+	partitions := make([]*grpc.ClientConn, len(group.Partitions))
+	for i, partition := range group.Partitions {
+		ep := partition.Endpoints[0]
+		conn, err := grpc.Dial(fmt.Sprintf("%s:%d", ep.Host, ep.Port))
 		if err != nil {
 			return nil, err
 		}
-		partitions = append(partitions, partition)
+		partitions[i] = conn
+		c.conns = append(c.conns, conn)
 	}
-	return partition.NewPartitionGroup(c.Application, c.Namespace, name, partitions)
+	return &PartitionGroup{
+		client:     c,
+		partitions: partitions,
+	}, nil
 }
 
-// DeletePartitionGroup deletes a partition group via the controller
-func (c *Client) DeletePartitionGroup(name string) error {
+// DeleteGroup deletes a partition group via the controller
+func (c *Client) DeleteGroup(ctx context.Context, name string) error {
 	client := controller.NewControllerServiceClient(c.conn)
 	request := &controller.DeletePartitionGroupRequest{
-		Id: &partitionpb.PartitionGroupId{
-			Namespace: c.Namespace,
+		Id: &partition.PartitionGroupId{
 			Name:      name,
+			Namespace: c.namespace,
 		},
 	}
-
-	_, err := client.DeletePartitionGroup(context.Background(), request)
+	_, err := client.DeletePartitionGroup(ctx, request)
 	return err
 }
 
 // Close closes the client
 func (c *Client) Close() error {
-	return c.conn.Close()
+	var result error
+	for _, conn := range c.conns {
+		err := conn.Close()
+		if err != nil {
+			result = err
+		}
+	}
+
+	if err := c.conn.Close(); err != nil {
+		return err
+	}
+	return result
+}
+
+// Primitive partition group.
+type PartitionGroup struct {
+	counter.CounterClient
+	_map.MapClient
+	election.ElectionClient
+	lock.LockClient
+	set.SetClient
+
+	client     *Client
+	partitions []*grpc.ClientConn
+}
+
+func (g *PartitionGroup) GetCounter(ctx context.Context, name string, opts ...session.SessionOption) (counter.Counter, error) {
+	return counter.New(ctx, g.client.application, name, g.partitions, opts...)
+}
+
+func (g *PartitionGroup) GetElection(ctx context.Context, name string, opts ...session.SessionOption) (election.Election, error) {
+	return election.New(ctx, g.client.application, name, g.partitions, opts...)
+}
+
+func (g *PartitionGroup) GetLock(ctx context.Context, name string, opts ...session.SessionOption) (lock.Lock, error) {
+	return lock.New(ctx, g.client.application, name, g.partitions, opts...)
+}
+
+func (g *PartitionGroup) GetMap(ctx context.Context, name string, opts ...session.SessionOption) (_map.Map, error) {
+	return _map.New(ctx, g.client.application, name, g.partitions, opts...)
+}
+
+func (g *PartitionGroup) GetSet(ctx context.Context, name string, opts ...session.SessionOption) (set.Set, error) {
+	return set.New(ctx, g.client.application, name, g.partitions, opts...)
 }

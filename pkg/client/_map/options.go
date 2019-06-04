@@ -5,65 +5,59 @@ import (
 )
 
 type PutOption interface {
-	before(request *pb.PutRequest)
-	after(response *pb.PutResponse)
+	beforePut(request *pb.PutRequest)
+	afterPut(response *pb.PutResponse)
 }
 
-func PutIfVersion(version int64) PutOption {
-	return putIfVersionOption{version: version}
+type RemoveOption interface {
+	beforeRemove(request *pb.RemoveRequest)
+	afterRemove(response *pb.RemoveResponse)
 }
 
-type putIfVersionOption struct {
+func WithVersion(version int64) VersionOption {
+	return VersionOption{version: version}
+}
+
+type VersionOption struct {
+	PutOption
+	RemoveOption
 	version int64
 }
 
-func (o putIfVersionOption) before(request *pb.PutRequest) {
+func (o VersionOption) beforePut(request *pb.PutRequest) {
 	request.Version = o.version
 }
 
-func (o putIfVersionOption) after(response *pb.PutResponse) {
+func (o VersionOption) afterPut(response *pb.PutResponse) {
+
+}
+
+func (o VersionOption) beforeRemove(request *pb.RemoveRequest) {
+	request.Version = o.version
+}
+
+func (o VersionOption) afterRemove(response *pb.RemoveResponse) {
 
 }
 
 type GetOption interface {
-	before(request *pb.GetRequest)
-	after(response *pb.GetResponse)
+	beforeGet(request *pb.GetRequest)
+	afterGet(response *pb.GetResponse)
 }
 
-func GetOrDefault(def []byte) GetOption {
-	return getOrDefaultOption{def: def}
+func WithDefault(def []byte) GetOption {
+	return defaultOption{def: def}
 }
 
-type getOrDefaultOption struct {
+type defaultOption struct {
 	def []byte
 }
 
-func (o getOrDefaultOption) before(request *pb.GetRequest) {
+func (o defaultOption) beforeGet(request *pb.GetRequest) {
 }
 
-func (o getOrDefaultOption) after(response *pb.GetResponse) {
+func (o defaultOption) afterGet(response *pb.GetResponse) {
 	if response.Version == 0 {
 		response.Value = o.def
 	}
-}
-
-type RemoveOption interface {
-	before(request *pb.RemoveRequest)
-	after(response *pb.RemoveResponse)
-}
-
-func RemoveIfVersion(version int64) RemoveOption {
-	return removeIfVersionOption{version: version}
-}
-
-type removeIfVersionOption struct {
-	version int64
-}
-
-func (o removeIfVersionOption) before(request *pb.RemoveRequest) {
-	request.Version = o.version
-}
-
-func (o removeIfVersionOption) after(response *pb.RemoveResponse) {
-
 }

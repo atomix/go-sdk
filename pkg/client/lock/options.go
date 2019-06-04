@@ -11,22 +11,22 @@ type LockOption interface {
 	after(response *pb.LockResponse)
 }
 
-func LockTimeout(timeout time.Duration) LockOption {
-	return lockTimeoutOption{timeout: timeout}
+func WithTimeout(timeout time.Duration) LockOption {
+	return timeoutOption{timeout: timeout}
 }
 
-type lockTimeoutOption struct {
+type timeoutOption struct {
 	timeout time.Duration
 }
 
-func (o lockTimeoutOption) before(request *pb.LockRequest) {
+func (o timeoutOption) before(request *pb.LockRequest) {
 	request.Timeout = &duration.Duration{
 		Seconds: int64(o.timeout.Seconds()),
 		Nanos:   int32(o.timeout.Nanoseconds()),
 	}
 }
 
-func (o lockTimeoutOption) after(response *pb.LockResponse) {
+func (o timeoutOption) after(response *pb.LockResponse) {
 
 }
 
@@ -35,19 +35,19 @@ type UnlockOption interface {
 	after(response *pb.UnlockResponse)
 }
 
-func UnlockVersion(version uint64) UnlockOption {
-	return unlockVersionOption{version: version}
+func WithVersion(version uint64) UnlockOption {
+	return versionOption{version: version}
 }
 
-type unlockVersionOption struct {
+type versionOption struct {
 	version uint64
 }
 
-func (o unlockVersionOption) before(request *pb.UnlockRequest) {
+func (o versionOption) before(request *pb.UnlockRequest) {
 	request.Version = o.version
 }
 
-func (o unlockVersionOption) after(response *pb.UnlockResponse) {
+func (o versionOption) after(response *pb.UnlockResponse) {
 
 }
 
@@ -56,18 +56,18 @@ type IsLockedOption interface {
 	after(response *pb.IsLockedResponse)
 }
 
-func IsLockedVersion(version uint64) IsLockedOption {
-	return isLockedVersionOption{version: version}
+func WithIsVersion(version uint64) IsLockedOption {
+	return isVersionOption{version: version}
 }
 
-type isLockedVersionOption struct {
+type isVersionOption struct {
 	version uint64
 }
 
-func (o isLockedVersionOption) before(request *pb.IsLockedRequest) {
+func (o isVersionOption) before(request *pb.IsLockedRequest) {
 	request.Version = o.version
 }
 
-func (o isLockedVersionOption) after(response *pb.IsLockedResponse) {
+func (o isVersionOption) after(response *pb.IsLockedResponse) {
 
 }

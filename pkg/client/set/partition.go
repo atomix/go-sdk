@@ -10,20 +10,19 @@ import (
 	"io"
 )
 
-func newPartition(conn *grpc.ClientConn, namespace string, name string, opts ...session.Option) (*setPartition, error) {
+func newPartition(ctx context.Context, conn *grpc.ClientConn, namespace string, name string, opts ...session.SessionOption) (Set, error) {
 	client := pb.NewSetServiceClient(conn)
-	session := session.NewSession(namespace, name, &SessionHandler{client: client}, opts...)
-	if err := session.Start(); err != nil {
+	sess, err := session.New(ctx, namespace, name, &SessionHandler{client: client}, opts...)
+	if err != nil {
 		return nil, err
 	}
 	return &setPartition{
 		client:  client,
-		session: session,
+		session: sess,
 	}, nil
 }
 
 type setPartition struct {
-	Interface
 	client  pb.SetServiceClient
 	session *session.Session
 }
@@ -146,4 +145,8 @@ func (s *setPartition) Listen(ctx context.Context, c chan<- *SetEvent) error {
 		}
 	}()
 	return nil
+}
+
+func (s *setPartition) Close() error {
+	return s.session.Close()
 }

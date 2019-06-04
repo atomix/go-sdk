@@ -2,37 +2,50 @@ package counter
 
 import (
 	"context"
+	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/util"
 	pb "github.com/atomix/atomix-go-client/proto/atomix/counter"
 	"google.golang.org/grpc"
 )
 
-func NewCounter(namespace string, name string, partitions []*grpc.ClientConn, opts ...session.Option) (*Counter, error) {
+type CounterClient interface {
+	GetCounter(ctx context.Context, name string, opts ...session.SessionOption) (Counter, error)
+}
+
+// Counter is the interface for the counter primitive
+type Counter interface {
+	primitive.Primitive
+	Get(ctx context.Context) (int64, error)
+	Set(ctx context.Context, value int64) error
+	Increment(ctx context.Context, delta int64) (int64, error)
+	Decrement(ctx context.Context, delta int64) (int64, error)
+}
+
+func New(ctx context.Context, namespace string, name string, partitions []*grpc.ClientConn, opts ...session.SessionOption) (Counter, error) {
 	i, err := util.GetPartitionIndex(name, len(partitions))
 	if err != nil {
 		return nil, err
 	}
 
 	client := pb.NewCounterServiceClient(partitions[i])
-	session := session.NewSession(namespace, name, &SessionHandler{client: client}, opts...)
-	if err := session.Start(); err != nil {
+	sess, err := session.New(ctx, namespace, name, &SessionHandler{client: client}, opts...)
+	if err != nil {
 		return nil, err
 	}
 
-	return &Counter{
+	return &counter{
 		client:  client,
-		session: session,
+		session: sess,
 	}, nil
 }
 
-type Counter struct {
-	Interface
+type counter struct {
 	client  pb.CounterServiceClient
 	session *session.Session
 }
 
-func (c *Counter) Get(ctx context.Context) (int64, error) {
+func (c *counter) Get(ctx context.Context) (int64, error) {
 	request := &pb.GetRequest{
 		Header: c.session.GetHeader(),
 	}
@@ -46,7 +59,7 @@ func (c *Counter) Get(ctx context.Context) (int64, error) {
 	return response.Value, nil
 }
 
-func (c *Counter) Set(ctx context.Context, value int64) (int64, error) {
+func (c *counter) Set(ctx context.Context, value int64) error {
 	request := &pb.SetRequest{
 		Header: c.session.NextHeader(),
 		Value:  value,
@@ -54,14 +67,14 @@ func (c *Counter) Set(ctx context.Context, value int64) (int64, error) {
 
 	response, err := c.client.Set(ctx, request)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	c.session.UpdateHeader(response.Header)
-	return response.PreviousValue + value, nil
+	return nil
 }
 
-func (c *Counter) Increment(ctx context.Context, delta int64) (int64, error) {
+func (c *counter) Increment(ctx context.Context, delta int64) (int64, error) {
 	request := &pb.IncrementRequest{
 		Header: c.session.NextHeader(),
 		Delta:  delta,
@@ -76,7 +89,7 @@ func (c *Counter) Increment(ctx context.Context, delta int64) (int64, error) {
 	return response.NextValue, nil
 }
 
-func (c *Counter) Decrement(ctx context.Context, delta int64) (int64, error) {
+func (c *counter) Decrement(ctx context.Context, delta int64) (int64, error) {
 	request := &pb.DecrementRequest{
 		Header: c.session.NextHeader(),
 		Delta:  delta,
@@ -91,6 +104,6 @@ func (c *Counter) Decrement(ctx context.Context, delta int64) (int64, error) {
 	return response.NextValue, nil
 }
 
-func (c *Counter) Close() error {
-	return c.session.Stop()
+func (c *counter) Close() error {
+	return c.session.Close()
 }

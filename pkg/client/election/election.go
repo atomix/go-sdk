@@ -2,41 +2,78 @@ package election
 
 import (
 	"context"
+	"encoding/base64"
+	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/util"
 	pb "github.com/atomix/atomix-go-client/proto/atomix/election"
 	"github.com/golang/glog"
+	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"io"
 )
 
-func NewElection(namespace string, name string, candidate string, partitions []*grpc.ClientConn, opts ...session.Option) (*Election, error) {
+type ElectionClient interface {
+	GetElection(ctx context.Context, name string, opts ...session.SessionOption) (Election, error)
+}
+
+// Election is the interface for the leader election primitive
+type Election interface {
+	primitive.Primitive
+	GetTerm(ctx context.Context) (*Term, error)
+	Enter(ctx context.Context) (*Term, error)
+	Leave(ctx context.Context) error
+	Anoint(ctx context.Context, id string) (bool, error)
+	Promote(ctx context.Context, id string) (bool, error)
+	Evict(ctx context.Context, id string) (bool, error)
+	Listen(ctx context.Context, c chan<- *ElectionEvent) error
+}
+
+type Term struct {
+	Term       uint64
+	Leader     string
+	Candidates []string
+}
+
+type ElectionEventType string
+
+const (
+	EVENT_CHANGED ElectionEventType = "changed"
+)
+
+type ElectionEvent struct {
+	Type ElectionEventType
+	Term Term
+}
+
+func New(ctx context.Context, namespace string, name string, partitions []*grpc.ClientConn, opts ...session.SessionOption) (Election, error) {
 	i, err := util.GetPartitionIndex(name, len(partitions))
 	if err != nil {
 		return nil, err
 	}
 
 	client := pb.NewLeaderElectionServiceClient(partitions[i])
-	session := session.NewSession(namespace, name, &SessionHandler{client: client}, opts...)
-	if err := session.Start(); err != nil {
+	sess, err := session.New(ctx, namespace, name, &SessionHandler{client: client}, opts...)
+	if err != nil {
 		return nil, err
 	}
 
-	return &Election{
+	nodeId := uuid.NodeID()
+	candidate := base64.StdEncoding.EncodeToString(nodeId)
+	return &election{
 		client:      client,
-		session:     session,
+		session:     sess,
 		candidateId: candidate,
 	}, nil
 }
 
-type Election struct {
-	Interface
+type election struct {
 	client      pb.LeaderElectionServiceClient
 	session     *session.Session
 	candidateId string
 }
 
-func (e *Election) GetTerm(ctx context.Context) (*Term, error) {
+func (e *election) GetTerm(ctx context.Context) (*Term, error) {
 	request := &pb.GetLeadershipRequest{
 		Header: e.session.GetHeader(),
 	}
@@ -54,7 +91,7 @@ func (e *Election) GetTerm(ctx context.Context) (*Term, error) {
 	}, nil
 }
 
-func (e *Election) Enter(ctx context.Context) (*Term, error) {
+func (e *election) Enter(ctx context.Context) (*Term, error) {
 	request := &pb.EnterRequest{
 		Header:      e.session.NextHeader(),
 		CandidateId: e.candidateId,
@@ -73,7 +110,7 @@ func (e *Election) Enter(ctx context.Context) (*Term, error) {
 	}, nil
 }
 
-func (e *Election) Leave(ctx context.Context) error {
+func (e *election) Leave(ctx context.Context) error {
 	request := &pb.WithdrawRequest{
 		Header:      e.session.NextHeader(),
 		CandidateId: e.candidateId,
@@ -88,7 +125,7 @@ func (e *Election) Leave(ctx context.Context) error {
 	return nil
 }
 
-func (e *Election) Anoint(ctx context.Context, id string) (bool, error) {
+func (e *election) Anoint(ctx context.Context, id string) (bool, error) {
 	request := &pb.AnointRequest{
 		Header:      e.session.NextHeader(),
 		CandidateId: id,
@@ -103,7 +140,7 @@ func (e *Election) Anoint(ctx context.Context, id string) (bool, error) {
 	return response.Succeeded, nil
 }
 
-func (e *Election) Promote(ctx context.Context, id string) (bool, error) {
+func (e *election) Promote(ctx context.Context, id string) (bool, error) {
 	request := &pb.PromoteRequest{
 		Header:      e.session.NextHeader(),
 		CandidateId: id,
@@ -118,7 +155,7 @@ func (e *Election) Promote(ctx context.Context, id string) (bool, error) {
 	return response.Succeeded, nil
 }
 
-func (e *Election) Evict(ctx context.Context, id string) (bool, error) {
+func (e *election) Evict(ctx context.Context, id string) (bool, error) {
 	request := &pb.EvictRequest{
 		Header:      e.session.NextHeader(),
 		CandidateId: id,
@@ -133,7 +170,7 @@ func (e *Election) Evict(ctx context.Context, id string) (bool, error) {
 	return response.Succeeded, nil
 }
 
-func (e *Election) Listen(ctx context.Context, c chan<- *ElectionEvent) error {
+func (e *election) Listen(ctx context.Context, c chan<- *ElectionEvent) error {
 	request := &pb.EventRequest{
 		Header: e.session.NextHeader(),
 	}
@@ -168,6 +205,6 @@ func (e *Election) Listen(ctx context.Context, c chan<- *ElectionEvent) error {
 	return nil
 }
 
-func (e *Election) Close() error {
+func (e *election) Close() error {
 	return e.session.Stop()
 }

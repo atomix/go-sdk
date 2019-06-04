@@ -2,47 +2,66 @@ package set
 
 import (
 	"context"
+	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/util"
 	"google.golang.org/grpc"
 )
 
-func NewSet(namespace string, name string, partitions []*grpc.ClientConn, opts ...session.Option) (*Set, error) {
-	iter := make([]interface{}, len(partitions))
-	for i, partition := range partitions {
-		iter[i] = partition
-	}
+type SetClient interface {
+	GetSet(ctx context.Context, name string, opts ...session.SessionOption) (Set, error)
+}
 
-	results, err := util.ExecuteAllAsync(iter, func(arg interface{}) (interface{}, error) {
-		return newPartition(arg.(*grpc.ClientConn), namespace, name, opts...)
+type Set interface {
+	primitive.Primitive
+	Add(ctx context.Context, value string) (bool, error)
+	Remove(ctx context.Context, value string) (bool, error)
+	Contains(ctx context.Context, value string) (bool, error)
+	Size(ctx context.Context) (int, error)
+	Clear(ctx context.Context) error
+	Listen(ctx context.Context, ch chan<- *SetEvent) error
+}
+
+type KeyValue struct {
+	Version int64
+	Key     string
+	Value   []byte
+}
+
+type SetEventType string
+
+const (
+	EVENT_ADDED   SetEventType = "added"
+	EVENT_REMOVED SetEventType = "removed"
+)
+
+type SetEvent struct {
+	Type  SetEventType
+	Value string
+}
+
+func New(ctx context.Context, namespace string, name string, partitions []*grpc.ClientConn, opts ...session.SessionOption) (Set, error) {
+	sets, err := util.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
+		return newPartition(ctx, partitions[i], namespace, name, opts...)
 	})
-
 	if err != nil {
 		return nil, err
 	}
 
-	setPartitions := make([]*setPartition, len(results))
-	for i, result := range results {
-		setPartitions[i] = result.(*setPartition)
-	}
-
-	return &Set{
-		Namespace:      namespace,
-		Name:           name,
-		partitions:     setPartitions,
-		partitionsIter: results,
+	return &set{
+		Namespace:  namespace,
+		Name:       name,
+		partitions: sets.([]Set),
 	}, nil
 }
 
-type Set struct {
-	Interface
-	Namespace      string
-	Name           string
-	partitions     []*setPartition
-	partitionsIter []interface{}
+type set struct {
+	Namespace  string
+	Name       string
+	partitions []Set
 }
 
-func (s *Set) getPartition(key string) (*setPartition, error) {
+func (s *set) getPartition(key string) (Set, error) {
 	i, err := util.GetPartitionIndex(key, len(s.partitions))
 	if err != nil {
 		return nil, err
@@ -50,7 +69,7 @@ func (s *Set) getPartition(key string) (*setPartition, error) {
 	return s.partitions[i], nil
 }
 
-func (s *Set) Add(ctx context.Context, value string) (bool, error) {
+func (s *set) Add(ctx context.Context, value string) (bool, error) {
 	partition, err := s.getPartition(value)
 	if err != nil {
 		return false, err
@@ -58,7 +77,7 @@ func (s *Set) Add(ctx context.Context, value string) (bool, error) {
 	return partition.Add(ctx, value)
 }
 
-func (s *Set) Remove(ctx context.Context, value string) (bool, error) {
+func (s *set) Remove(ctx context.Context, value string) (bool, error) {
 	partition, err := s.getPartition(value)
 	if err != nil {
 		return false, err
@@ -66,7 +85,7 @@ func (s *Set) Remove(ctx context.Context, value string) (bool, error) {
 	return partition.Remove(ctx, value)
 }
 
-func (s *Set) Contains(ctx context.Context, value string) (bool, error) {
+func (s *set) Contains(ctx context.Context, value string) (bool, error) {
 	partition, err := s.getPartition(value)
 	if err != nil {
 		return false, err
@@ -74,37 +93,35 @@ func (s *Set) Contains(ctx context.Context, value string) (bool, error) {
 	return partition.Contains(ctx, value)
 }
 
-func (s *Set) Size(ctx context.Context) (int, error) {
-	results, err := util.ExecuteAllAsync(s.partitionsIter, func(arg interface{}) (interface{}, error) {
-		return arg.(*setPartition).Size(ctx)
+func (s *set) Size(ctx context.Context) (int, error) {
+	results, err := util.ExecuteAsync(len(s.partitions), func(i int) (interface{}, error) {
+		return s.partitions[i].Size(ctx)
 	})
 	if err != nil {
 		return 0, err
 	}
 
 	size := 0
-	for _, result := range results {
-		size += result.(int)
+	for _, result := range results.([]int) {
+		size += result
 	}
 	return size, nil
 }
 
-func (s *Set) Clear(ctx context.Context) error {
-	_, err := util.ExecuteAllAsync(s.partitionsIter, func(arg interface{}) (interface{}, error) {
-		return nil, arg.(*setPartition).Clear(ctx)
+func (s *set) Clear(ctx context.Context) error {
+	return util.IterAsync(len(s.partitions), func(i int) error {
+		return s.partitions[i].Clear(ctx)
 	})
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
-func (s *Set) Listen(ctx context.Context, ch chan<- *SetEvent) error {
-	_, err := util.ExecuteAllAsync(s.partitionsIter, func(arg interface{}) (interface{}, error) {
-		return nil, arg.(*setPartition).Listen(ctx, ch)
+func (s *set) Listen(ctx context.Context, ch chan<- *SetEvent) error {
+	return util.IterAsync(len(s.partitions), func(i int) error {
+		return s.partitions[i].Listen(ctx, ch)
 	})
-	if err != nil {
-		return err
-	}
-	return nil
+}
+
+func (s *set) Close() error {
+	return util.IterAsync(len(s.partitions), func(i int) error {
+		return s.partitions[i].Close()
+	})
 }
