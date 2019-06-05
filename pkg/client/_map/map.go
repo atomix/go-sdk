@@ -44,22 +44,22 @@ type MapEvent struct {
 }
 
 func New(ctx context.Context, namespace string, name string, partitions []*grpc.ClientConn, opts ...session.SessionOption) (Map, error) {
-	iter := make([]interface{}, len(partitions))
-	for i, partition := range partitions {
-		iter[i] = partition
-	}
-
-	maps, err := util.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
+	results, err := util.ExecuteOrderedAsync(len(partitions), func(i int) (interface{}, error) {
 		return newPartition(ctx, partitions[i], namespace, name, opts...)
 	})
 	if err != nil {
 		return nil, err
 	}
 
+	maps := make([]Map, len(results))
+	for i, result := range results {
+		maps[i] = result.(Map)
+	}
+
 	return &_map{
 		Namespace:  namespace,
 		Name:       name,
-		partitions: maps.([]Map),
+		partitions: maps,
 	}, nil
 }
 
@@ -110,8 +110,8 @@ func (m *_map) Size(ctx context.Context) (int, error) {
 	}
 
 	size := 0
-	for _, result := range results.([]int) {
-		size += result
+	for _, result := range results {
+		size += result.(int)
 	}
 	return size, nil
 }

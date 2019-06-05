@@ -33,8 +33,11 @@ func main() {
 			if err := cmd.execute(); err != nil {
 				log.Fatal("Failed to execute command", err)
 			}
+			return
 		}
 	}
+
+	println("Unknown command " + name)
 }
 
 func getCommands() []command {
@@ -162,7 +165,7 @@ type groupCreateCommand struct {
 }
 
 func (c *groupCreateCommand) name() string {
-	return "put"
+	return "create"
 }
 
 func (c *groupCreateCommand) init() error {

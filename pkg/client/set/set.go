@@ -41,17 +41,22 @@ type SetEvent struct {
 }
 
 func New(ctx context.Context, namespace string, name string, partitions []*grpc.ClientConn, opts ...session.SessionOption) (Set, error) {
-	sets, err := util.ExecuteAsync(len(partitions), func(i int) (interface{}, error) {
+	results, err := util.ExecuteOrderedAsync(len(partitions), func(i int) (interface{}, error) {
 		return newPartition(ctx, partitions[i], namespace, name, opts...)
 	})
 	if err != nil {
 		return nil, err
 	}
 
+	sets := make([]Set, len(results))
+	for i, result := range results {
+		sets[i] = result.(Set)
+	}
+
 	return &set{
 		Namespace:  namespace,
 		Name:       name,
-		partitions: sets.([]Set),
+		partitions: sets,
 	}, nil
 }
 
@@ -102,8 +107,8 @@ func (s *set) Size(ctx context.Context) (int, error) {
 	}
 
 	size := 0
-	for _, result := range results.([]int) {
-		size += result
+	for _, result := range results {
+		size += result.(int)
 	}
 	return size, nil
 }
