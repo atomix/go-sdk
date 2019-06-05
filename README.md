@@ -33,7 +33,7 @@ The client can optionally be configured with a _namespace_ within which to opera
 partition groups. If no namespace is specified, the `default` namespace will be used:
 
 ```go
-client, err := atomixclient.NewClient("atomix-controller:5679", client.WithNamespace("prod"))
+client, err := atomixclient.NewClient("atomix-controller:5679", atomixclient.WithNamespace("prod"))
 if err != nil {
 	...
 }
@@ -51,7 +51,7 @@ to be isolated from one another even when they exist within the same partition g
 namespace:
 
 ```go
-client, err := atomixclient.NewClient("atomix-controller:5679", client.WithApplication("my-service"))
+client, err := atomixclient.NewClient("atomix-controller:5679", atomixclient.WithApplication("my-service"))
 if err != nil {
 	...
 }
