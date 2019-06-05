@@ -20,29 +20,35 @@ type Lock interface {
 	IsLocked(ctx context.Context, opts ...IsLockedOption) (bool, error)
 }
 
-func New(ctx context.Context, namespace string, name string, partitions []*grpc.ClientConn, opts ...session.SessionOption) (Lock, error) {
-	i, err := util.GetPartitionIndex(name, len(partitions))
+func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.SessionOption) (Lock, error) {
+	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
 		return nil, err
 	}
-	return newLock(ctx, namespace, name, partitions[i], opts...)
+	return newLock(ctx, name, partitions[i], opts...)
 }
 
-func newLock(ctx context.Context, namespace string, name string, conn *grpc.ClientConn, opts ...session.SessionOption) (*lock, error) {
+func newLock(ctx context.Context, name primitive.Name, conn *grpc.ClientConn, opts ...session.SessionOption) (*lock, error) {
 	client := pb.NewLockServiceClient(conn)
-	sess, err := session.New(ctx, namespace, name, &SessionHandler{client: client}, opts...)
+	sess, err := session.New(ctx, name, &SessionHandler{client: client}, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return &lock{
+		name:    name,
 		client:  client,
 		session: sess,
 	}, nil
 }
 
 type lock struct {
+	name    primitive.Name
 	client  pb.LockServiceClient
 	session *session.Session
+}
+
+func (l *lock) Name() primitive.Name {
+	return l.name
 }
 
 func (l *lock) Lock(ctx context.Context, opts ...LockOption) (uint64, error) {

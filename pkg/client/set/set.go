@@ -40,9 +40,9 @@ type SetEvent struct {
 	Value string
 }
 
-func New(ctx context.Context, namespace string, name string, partitions []*grpc.ClientConn, opts ...session.SessionOption) (Set, error) {
+func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.SessionOption) (Set, error) {
 	results, err := util.ExecuteOrderedAsync(len(partitions), func(i int) (interface{}, error) {
-		return newPartition(ctx, partitions[i], namespace, name, opts...)
+		return newPartition(ctx, partitions[i], name, opts...)
 	})
 	if err != nil {
 		return nil, err
@@ -54,16 +54,18 @@ func New(ctx context.Context, namespace string, name string, partitions []*grpc.
 	}
 
 	return &set{
-		Namespace:  namespace,
-		Name:       name,
+		name:       name,
 		partitions: sets,
 	}, nil
 }
 
 type set struct {
-	Namespace  string
-	Name       string
+	name       primitive.Name
 	partitions []Set
+}
+
+func (s *set) Name() primitive.Name {
+	return s.name
 }
 
 func (s *set) getPartition(key string) (Set, error) {

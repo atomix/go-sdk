@@ -2,6 +2,7 @@ package lock
 
 import (
 	"context"
+	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/test"
 	pb "github.com/atomix/atomix-go-client/proto/atomix/lock"
 	"github.com/stretchr/testify/assert"
@@ -199,10 +200,10 @@ func TestLock(t *testing.T) {
 		pb.RegisterLockServiceServer(server, NewTestServer())
 	})
 
-	l1, err := newLock(context.TODO(), "test", "test", conn)
+	l1, err := newLock(context.TODO(), primitive.NewName("default", "test", "default", "test"), conn)
 	assert.NoError(t, err)
 
-	l2, err := newLock(context.TODO(), "test", "test", conn)
+	l2, err := newLock(context.TODO(), primitive.NewName("default", "test", "default", "test"), conn)
 	assert.NoError(t, err)
 
 	v1, err := l1.Lock(context.Background())

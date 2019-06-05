@@ -22,27 +22,33 @@ type Counter interface {
 	Decrement(ctx context.Context, delta int64) (int64, error)
 }
 
-func New(ctx context.Context, namespace string, name string, partitions []*grpc.ClientConn, opts ...session.SessionOption) (Counter, error) {
-	i, err := util.GetPartitionIndex(name, len(partitions))
+func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.SessionOption) (Counter, error) {
+	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
 		return nil, err
 	}
 
 	client := pb.NewCounterServiceClient(partitions[i])
-	sess, err := session.New(ctx, namespace, name, &SessionHandler{client: client}, opts...)
+	sess, err := session.New(ctx, name, &SessionHandler{client: client}, opts...)
 	if err != nil {
 		return nil, err
 	}
 
 	return &counter{
+		name:    name,
 		client:  client,
 		session: sess,
 	}, nil
 }
 
 type counter struct {
+	name    primitive.Name
 	client  pb.CounterServiceClient
 	session *session.Session
+}
+
+func (c *counter) Name() primitive.Name {
+	return c.name
 }
 
 func (c *counter) Get(ctx context.Context) (int64, error) {

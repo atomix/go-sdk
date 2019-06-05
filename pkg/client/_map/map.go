@@ -43,9 +43,9 @@ type MapEvent struct {
 	Version int64
 }
 
-func New(ctx context.Context, namespace string, name string, partitions []*grpc.ClientConn, opts ...session.SessionOption) (Map, error) {
+func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.SessionOption) (Map, error) {
 	results, err := util.ExecuteOrderedAsync(len(partitions), func(i int) (interface{}, error) {
-		return newPartition(ctx, partitions[i], namespace, name, opts...)
+		return newPartition(ctx, partitions[i], name, opts...)
 	})
 	if err != nil {
 		return nil, err
@@ -57,16 +57,18 @@ func New(ctx context.Context, namespace string, name string, partitions []*grpc.
 	}
 
 	return &_map{
-		Namespace:  namespace,
-		Name:       name,
+		name:       name,
 		partitions: maps,
 	}, nil
 }
 
 type _map struct {
-	Namespace  string
-	Name       string
+	name       primitive.Name
 	partitions []Map
+}
+
+func (m *_map) Name() primitive.Name {
+	return m.name
 }
 
 func (m *_map) getPartition(key string) (Map, error) {

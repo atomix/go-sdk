@@ -10,7 +10,8 @@ This project provides a [Go] client for [Atomix].
    * [Counter](#counter)
    * [Lock](#lock)
    * [Leader Election](#leader-election)
-3. [Partition Group Management](#partition-group-management)
+3. [Partition Group Management](#managing-partition-groups)
+4. [Command Line Interface](#cli)
 
 ## Client Usage
 To pull the project run `go get -u github.com/atomix/atomix-go`
@@ -233,10 +234,9 @@ for event := range ch {
 }
 ```
 
-Events read from the channel are guaranteed to be read in the order in which they occurred in
-the order in which they occurred within the partition from which they were produced. For example,
-if key `foo` is set to `bar` and then to `baz`, _every client_ is guaranteed to see the event
-indicating the update to `bar` before `baz`.
+Events read from the channel are guaranteed to be read in the order in which they occurred within 
+the partition from which they were produced. For example, if key `foo` is set to `bar` and then 
+to `baz`, _every client_ is guaranteed to see the event indicating the update to `bar` before `baz`.
 
 ### Set
 
@@ -556,6 +556,52 @@ err = client.DeleteGroup(context.TODO(), "raft")
 if err != nil {
 	...
 }
+```
+
+## Command Line Interface
+
+The Atomix Go client provides a CLI that can be used to operate on Atomix clusters.
+Eventually the CLI will be moved into a separate project, but for now, CLI commands
+are documented below:
+
+```bash
+> atomix config set controller "atomix-controller.kube-system.svc.cluster.local:5679"
+atomix-controller.kube-system.svc.cluster.local:5679
+```
+
+```bash
+> atomix config get controller
+atomix-controller.kube-system.svc.cluster.local:5679
+```
+
+```bash
+> atomix group get raft
+name: raft
+namespace: default
+partitions: 3
+partitionSize: 3
+protocol: raft
+```
+
+```bash
+> atomix group create raft -n default --protocol raft --partitions 3 --partitionSize 3
+name: raft
+namespace: default
+partitions: 3
+partitionSize: 3
+protocol: raft
+```
+
+```bash
+> atomix map put foo bar baz
+version: 1
+key: bar
+value: baz
+```
+
+```bash
+> atomix map get foo bar
+baz
 ```
 
 [go]: https://golang.org

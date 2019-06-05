@@ -47,14 +47,14 @@ type ElectionEvent struct {
 	Term Term
 }
 
-func New(ctx context.Context, namespace string, name string, partitions []*grpc.ClientConn, opts ...session.SessionOption) (Election, error) {
+func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.SessionOption) (Election, error) {
 	i, err := util.GetPartitionIndex(name, len(partitions))
 	if err != nil {
 		return nil, err
 	}
 
 	client := pb.NewLeaderElectionServiceClient(partitions[i])
-	sess, err := session.New(ctx, namespace, name, &SessionHandler{client: client}, opts...)
+	sess, err := session.New(ctx, name, &SessionHandler{client: client}, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -62,6 +62,7 @@ func New(ctx context.Context, namespace string, name string, partitions []*grpc.
 	nodeId := uuid.NodeID()
 	candidate := base64.StdEncoding.EncodeToString(nodeId)
 	return &election{
+		name:    name,
 		client:  client,
 		session: sess,
 		id:      candidate,
@@ -69,9 +70,14 @@ func New(ctx context.Context, namespace string, name string, partitions []*grpc.
 }
 
 type election struct {
+	name    primitive.Name
 	client  pb.LeaderElectionServiceClient
 	session *session.Session
 	id      string
+}
+
+func (e *election) Name() primitive.Name {
+	return e.name
 }
 
 func (e *election) Id() string {

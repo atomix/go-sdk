@@ -3,6 +3,7 @@ package _map
 import (
 	"context"
 	"errors"
+	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	pb "github.com/atomix/atomix-go-client/proto/atomix/map"
 	"github.com/golang/glog"
@@ -10,21 +11,27 @@ import (
 	"io"
 )
 
-func newPartition(ctx context.Context, conn *grpc.ClientConn, namespace string, name string, opts ...session.SessionOption) (Map, error) {
+func newPartition(ctx context.Context, conn *grpc.ClientConn, name primitive.Name, opts ...session.SessionOption) (Map, error) {
 	client := pb.NewMapServiceClient(conn)
-	sess, err := session.New(ctx, namespace, name, &SessionHandler{client: client}, opts...)
+	sess, err := session.New(ctx, name, &SessionHandler{client: client}, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return &mapPartition{
+		name:    name,
 		client:  client,
 		session: sess,
 	}, nil
 }
 
 type mapPartition struct {
+	name    primitive.Name
 	client  pb.MapServiceClient
 	session *session.Session
+}
+
+func (m *mapPartition) Name() primitive.Name {
+	return m.name
 }
 
 func (m *mapPartition) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*KeyValue, error) {

@@ -3,6 +3,7 @@ package set
 import (
 	"context"
 	"errors"
+	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	pb "github.com/atomix/atomix-go-client/proto/atomix/set"
 	"github.com/golang/glog"
@@ -10,21 +11,27 @@ import (
 	"io"
 )
 
-func newPartition(ctx context.Context, conn *grpc.ClientConn, namespace string, name string, opts ...session.SessionOption) (Set, error) {
+func newPartition(ctx context.Context, conn *grpc.ClientConn, name primitive.Name, opts ...session.SessionOption) (Set, error) {
 	client := pb.NewSetServiceClient(conn)
-	sess, err := session.New(ctx, namespace, name, &SessionHandler{client: client}, opts...)
+	sess, err := session.New(ctx, name, &SessionHandler{client: client}, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return &setPartition{
+		name:    name,
 		client:  client,
 		session: sess,
 	}, nil
 }
 
 type setPartition struct {
+	name    primitive.Name
 	client  pb.SetServiceClient
 	session *session.Session
+}
+
+func (s *setPartition) Name() primitive.Name {
+	return s.name
 }
 
 func (s *setPartition) Add(ctx context.Context, value string) (bool, error) {

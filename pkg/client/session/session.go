@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	headers "github.com/atomix/atomix-go-client/proto/atomix/headers"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sync"
@@ -35,15 +36,15 @@ type Handler interface {
 	Delete(ctx context.Context, session *Session) error
 }
 
-func New(ctx context.Context, namespace string, name string, handler Handler, opts ...SessionOption) (*Session, error) {
+func New(ctx context.Context, name primitive.Name, handler Handler, opts ...SessionOption) (*Session, error) {
 	options := &sessionOptions{}
 	for i := range opts {
 		opts[i].prepare(options)
 	}
 	session := &Session{
 		Name: &headers.Name{
-			Namespace: namespace,
-			Name:      name,
+			Namespace: name.Application,
+			Name:      name.Name,
 		},
 		handler: handler,
 		Timeout: options.timeout,

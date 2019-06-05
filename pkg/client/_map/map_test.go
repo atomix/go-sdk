@@ -3,6 +3,7 @@ package _map
 import (
 	"context"
 	"errors"
+	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/test"
 	pb "github.com/atomix/atomix-go-client/proto/atomix/map"
 	"github.com/stretchr/testify/assert"
@@ -404,7 +405,7 @@ func TestMapOperations(t *testing.T) {
 		pb.RegisterMapServiceServer(server, NewTestServer())
 	})
 
-	m, err := newPartition(context.TODO(), conn, "test", "test")
+	m, err := newPartition(context.TODO(), conn, primitive.NewName("default", "test", "default", "test"))
 	assert.NoError(t, err)
 
 	size, err := m.Size(context.Background())
@@ -492,7 +493,7 @@ func TestMapStreams(t *testing.T) {
 		pb.RegisterMapServiceServer(server, NewTestServer())
 	})
 
-	m, err := newPartition(context.TODO(), conn, "test", "test")
+	m, err := newPartition(context.TODO(), conn, primitive.NewName("default", "test", "default", "test"))
 	assert.NoError(t, err)
 
 	kv, err := m.Put(context.Background(), "foo", []byte{1})
