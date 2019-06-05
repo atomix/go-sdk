@@ -2,10 +2,10 @@
 
 go install ./vendor/github.com/golang/protobuf/protoc-gen-go
 
-rm -rf build/_output/atomix
+rm -rf build/proto/_output/atomix
 rm -rf proto
-git clone --branch single-server https://github.com/atomix/atomix.git build/_output/atomix
-mv build/_output/atomix/api/src/main/proto proto
+git clone --branch single-server https://github.com/atomix/atomix.git build/proto/_output/atomix
+mv build/proto/_output/atomix/api/src/main/proto proto
 
 proto_imports="./proto:${GOPATH}/src/github.com/google/protobuf/src:${GOPATH}/src"
 

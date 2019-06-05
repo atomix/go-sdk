@@ -9,4 +9,4 @@ RUN mkdir -p /go/src/github.com/atomix/atomix-go-client
 
 WORKDIR "/go/src/github.com/atomix/atomix-go-client"
 
-ENTRYPOINT ["./build/compile_protos.sh"]
+ENTRYPOINT ["./build/proto/compile_protos.sh"]
