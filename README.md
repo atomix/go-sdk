@@ -18,7 +18,7 @@ import (
 	atomixclient "github.com/atomix/atomix-go-client/pkg/client"
 )
 
-client, err := atomixclient.New("atomix-controller.kube-system.svc.cluster.local:5679")
+client, err := atomixclient.NewClient("atomix-controller.kube-system.svc.cluster.local:5679")
 if err != nil {
 	...
 }
@@ -28,7 +28,7 @@ The client can optionally be configured with a _namespace_ within which to opera
 partition groups. If no namespace is specified, the `default` namespace will be used:
 
 ```go
-client, err := atomixclient.New("atomix-controller:5679", client.WithNamespace("prod"))
+client, err := atomixclient.NewClient("atomix-controller:5679", client.WithNamespace("prod"))
 if err != nil {
 	...
 }
@@ -46,7 +46,7 @@ to be isolated from one another even when they exist within the same partition g
 namespace:
 
 ```go
-client, err := atomixclient.New("atomix-controller:5679", client.WithApplication("my-service"))
+client, err := atomixclient.NewClient("atomix-controller:5679", client.WithApplication("my-service"))
 if err != nil {
 	...
 }
