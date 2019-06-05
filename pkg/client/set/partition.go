@@ -136,10 +136,21 @@ func (s *setPartition) Listen(ctx context.Context, c chan<- *SetEvent) error {
 				t = EVENT_REMOVED
 			}
 
-			if s.session.ValidStream(response.Header) {
+			// If no stream headers are provided by the server, immediately complete the event.
+			if len(response.Header.Streams) == 0 {
 				c <- &SetEvent{
 					Type:  t,
 					Value: response.Value,
+				}
+			} else {
+				// Wait for the stream to advanced at least to the responses.
+				stream := response.Header.Streams[0]
+				_, ok := <-s.session.WaitStream(stream)
+				if ok {
+					c <- &SetEvent{
+						Type:  t,
+						Value: response.Value,
+					}
 				}
 			}
 		}
@@ -149,4 +160,8 @@ func (s *setPartition) Listen(ctx context.Context, c chan<- *SetEvent) error {
 
 func (s *setPartition) Close() error {
 	return s.session.Close()
+}
+
+func (s *setPartition) Delete() error {
+	return s.session.Delete()
 }

@@ -29,9 +29,10 @@ type sessionOptions struct {
 }
 
 type Handler interface {
-	Create(session *Session) error
-	KeepAlive(session *Session) error
-	Close(session *Session) error
+	Create(ctx context.Context, session *Session) error
+	KeepAlive(ctx context.Context, session *Session) error
+	Close(ctx context.Context, session *Session) error
+	Delete(ctx context.Context, session *Session) error
 }
 
 func New(ctx context.Context, namespace string, name string, handler Handler, opts ...SessionOption) (*Session, error) {
@@ -50,7 +51,7 @@ func New(ctx context.Context, namespace string, name string, handler Handler, op
 		mu:      sync.RWMutex{},
 		stopped: make(chan struct{}),
 	}
-	if err := session.start(); err != nil {
+	if err := session.start(ctx); err != nil {
 		return nil, err
 	}
 	return session, nil
@@ -69,20 +70,26 @@ type Session struct {
 	stopped            chan struct{}
 }
 
-func (s *Session) start() error {
-	err := s.handler.Create(s)
+func (s *Session) start(ctx context.Context) error {
+	err := s.handler.Create(ctx, s)
 	if err != nil {
 		return err
 	}
 
 	go wait.Until(func() {
-		s.handler.KeepAlive(s)
+		s.handler.KeepAlive(context.TODO(), s)
 	}, s.Timeout/2, s.stopped)
 	return nil
 }
 
 func (s *Session) Close() error {
-	err := s.handler.Close(s)
+	err := s.handler.Close(context.TODO(), s)
+	close(s.stopped)
+	return err
+}
+
+func (s *Session) Delete() error {
+	err := s.handler.Delete(context.TODO(), s)
 	close(s.stopped)
 	return err
 }

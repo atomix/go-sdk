@@ -8,11 +8,10 @@ import (
 )
 
 type SessionHandler struct {
-	session.Handler
 	client pb.LockServiceClient
 }
 
-func (h *SessionHandler) Create(s *session.Session) error {
+func (h *SessionHandler) Create(ctx context.Context, s *session.Session) error {
 	request := &pb.CreateRequest{
 		Header: s.GetHeader(),
 		Timeout: &duration.Duration{
@@ -21,7 +20,7 @@ func (h *SessionHandler) Create(s *session.Session) error {
 		},
 	}
 
-	response, err := h.client.Create(context.Background(), request)
+	response, err := h.client.Create(ctx, request)
 	if err != nil {
 		return err
 	}
@@ -29,24 +28,30 @@ func (h *SessionHandler) Create(s *session.Session) error {
 	return nil
 }
 
-func (h *SessionHandler) KeepAlive(s *session.Session) error {
+func (h *SessionHandler) KeepAlive(ctx context.Context, s *session.Session) error {
 	request := &pb.KeepAliveRequest{
 		Header: s.GetHeader(),
 	}
 
-	if _, err := h.client.KeepAlive(context.Background(), request); err != nil {
+	if _, err := h.client.KeepAlive(ctx, request); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (h *SessionHandler) Close(s *session.Session) error {
+func (h *SessionHandler) Close(ctx context.Context, s *session.Session) error {
 	request := &pb.CloseRequest{
 		Header: s.GetHeader(),
 	}
+	_, err := h.client.Close(ctx, request);
+	return err
+}
 
-	if _, err := h.client.Close(context.Background(), request); err != nil {
-		return err
+func (h *SessionHandler) Delete(ctx context.Context, s *session.Session) error {
+	request := &pb.CloseRequest{
+		Header: s.GetHeader(),
+		Delete: true,
 	}
-	return nil
+	_, err := h.client.Close(ctx, request);
+	return err
 }

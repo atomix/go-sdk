@@ -133,3 +133,9 @@ func (s *_map) Close() error {
 		return s.partitions[i].Close()
 	})
 }
+
+func (s *_map) Delete() error {
+	return util.IterAsync(len(s.partitions), func(i int) error {
+		return s.partitions[i].Delete()
+	})
+}

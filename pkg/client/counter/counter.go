@@ -107,3 +107,7 @@ func (c *counter) Decrement(ctx context.Context, delta int64) (int64, error) {
 func (c *counter) Close() error {
 	return c.session.Close()
 }
+
+func (c *counter) Delete() error {
+	return c.session.Delete()
+}

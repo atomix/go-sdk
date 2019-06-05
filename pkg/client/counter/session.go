@@ -7,15 +7,14 @@ import (
 )
 
 type SessionHandler struct {
-	session.Handler
 	client pb.CounterServiceClient
 }
 
-func (m *SessionHandler) Create(s *session.Session) error {
+func (m *SessionHandler) Create(ctx context.Context, s *session.Session) error {
 	request := &pb.CreateRequest{
 		Header: s.GetHeader(),
 	}
-	response, err := m.client.Create(context.Background(), request)
+	response, err := m.client.Create(ctx, request)
 	if err != nil {
 		return err
 	}
@@ -23,14 +22,23 @@ func (m *SessionHandler) Create(s *session.Session) error {
 	return nil
 }
 
-func (m *SessionHandler) KeepAlive(s *session.Session) error {
+func (m *SessionHandler) KeepAlive(ctx context.Context, s *session.Session) error {
 	return nil
 }
 
-func (m *SessionHandler) close(s *session.Session) error {
+func (m *SessionHandler) Close(ctx context.Context, s *session.Session) error {
 	request := &pb.CloseRequest{
 		Header: s.GetHeader(),
 	}
-	_, err := m.client.Close(context.Background(), request)
+	_, err := m.client.Close(ctx, request)
+	return err
+}
+
+func (m *SessionHandler) Delete(ctx context.Context, s *session.Session) error {
+	request := &pb.CloseRequest{
+		Header: s.GetHeader(),
+		Delete: true,
+	}
+	_, err := m.client.Close(ctx, request)
 	return err
 }

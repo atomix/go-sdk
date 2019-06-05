@@ -114,3 +114,7 @@ func (l *lock) IsLocked(ctx context.Context, opts ...IsLockedOption) (bool, erro
 func (l *lock) Close() error {
 	return l.session.Close()
 }
+
+func (l *lock) Delete() error {
+	return l.session.Delete()
+}

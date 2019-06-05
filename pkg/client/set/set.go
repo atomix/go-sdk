@@ -125,3 +125,9 @@ func (s *set) Close() error {
 		return s.partitions[i].Close()
 	})
 }
+
+func (s *set) Delete() error {
+	return util.IterAsync(len(s.partitions), func(i int) error {
+		return s.partitions[i].Delete()
+	})
+}

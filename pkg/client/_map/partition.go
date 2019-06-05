@@ -222,3 +222,7 @@ func (m *mapPartition) Listen(ctx context.Context, c chan<- *MapEvent) error {
 func (m *mapPartition) Close() error {
 	return m.session.Close()
 }
+
+func (m *mapPartition) Delete() error {
+	return m.session.Delete()
+}

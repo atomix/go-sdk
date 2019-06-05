@@ -195,7 +195,8 @@ func (e *election) Listen(ctx context.Context, c chan<- *ElectionEvent) error {
 				glog.Error("Failed to receive event stream", err)
 			}
 
-			if e.session.ValidStream(response.Header) {
+			// If no stream headers are provided by the server, immediately complete the event.
+			if len(response.Header.Streams) == 0 {
 				c <- &ElectionEvent{
 					Type: EVENT_CHANGED,
 					Term: Term{
@@ -203,6 +204,20 @@ func (e *election) Listen(ctx context.Context, c chan<- *ElectionEvent) error {
 						Leader:     response.Leader,
 						Candidates: response.Candidates,
 					},
+				}
+			} else {
+				// Wait for the stream to advanced at least to the responses.
+				stream := response.Header.Streams[0]
+				_, ok := <-e.session.WaitStream(stream)
+				if ok {
+					c <- &ElectionEvent{
+						Type: EVENT_CHANGED,
+						Term: Term{
+							Term:       response.Term,
+							Leader:     response.Leader,
+							Candidates: response.Candidates,
+						},
+					}
 				}
 			}
 		}
@@ -212,4 +227,8 @@ func (e *election) Listen(ctx context.Context, c chan<- *ElectionEvent) error {
 
 func (e *election) Close() error {
 	return e.session.Close()
+}
+
+func (e *election) Delete() error {
+	return e.session.Delete()
 }
