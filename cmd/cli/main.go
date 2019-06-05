@@ -279,6 +279,7 @@ func (c *mapGetCommand) init() error {
 	c.controller = c.flag.String("controller", "", "the controller for the group")
 	c.namespace = c.flag.String("namespace", "default", "the partition group namespace")
 	c.group = c.flag.String("group", "", "the partition group name")
+	c.app = c.flag.String("app", "default", "the application name")
 	c._name = c.flag.String("name", "", "the map name")
 	c.key = c.flag.String("key", "", "the key to get")
 	return nil
@@ -316,7 +317,7 @@ func (c *mapGetCommand) execute() error {
 	}
 
 	if value != nil {
-		println(fmt.Sprintf("%v", value.Value))
+		println(fmt.Sprintf("%+v", value))
 	}
 	return nil
 }
@@ -386,7 +387,7 @@ func (c *mapPutCommand) execute() error {
 	}
 
 	if value != nil {
-		println(fmt.Sprintf("%v", value.Value))
+		println(fmt.Sprintf("%+v", value))
 	}
 	return nil
 }
