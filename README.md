@@ -5,6 +5,11 @@ This project provides a [Go] client for [Atomix].
 ## Table of Contents
 1. [Client Usage](#client-usage)
 2. [Distributed Primitives](#distributed-primitives)
+  * [Map](#map)
+  * [Set](#set)
+  * [Counter](#counter)
+  * [Lock](#lock)
+  * [Leader Election](#leader-election)
 3. [Partition Group Management](#partition-group-management)
 
 ## Client Usage
