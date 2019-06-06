@@ -27,9 +27,16 @@ func newConfigCommand() *cobra.Command {
 }
 
 func newConfigGetCommand() *cobra.Command {
+	validArgs := []string{
+		"controller",
+		"namespace",
+		"group",
+		"app",
+	}
 	return &cobra.Command{
 		Use:  "get <key>",
 		Args: cobra.ExactArgs(1),
+		ValidArgs: validArgs,
 		Run:  runConfigGetCommand,
 	}
 }
@@ -40,9 +47,16 @@ func runConfigGetCommand(cmd *cobra.Command, args []string) {
 }
 
 func newConfigSetCommand() *cobra.Command {
+	validArgs := []string{
+		"controller",
+		"namespace",
+		"group",
+		"app",
+	}
 	return &cobra.Command{
 		Use:  "set <key> <value>",
 		Args: cobra.ExactArgs(2),
+		ValidArgs: validArgs,
 		Run:  runConfigSetCommand,
 	}
 }
@@ -58,9 +72,16 @@ func runConfigSetCommand(cmd *cobra.Command, args []string) {
 }
 
 func newConfigDeleteCommand() *cobra.Command {
+	validArgs := []string{
+		"controller",
+		"namespace",
+		"group",
+		"app",
+	}
 	return &cobra.Command{
 		Use:  "delete <key>",
 		Args: cobra.ExactArgs(1),
+		ValidArgs: validArgs,
 		Run:  runConfigDeleteCommand,
 	}
 }

@@ -572,17 +572,17 @@ Created ~/.atomix/config.yaml
 The `config` subcommand can be used to get or set global configuration values:
 
 ```bash
-> atomix config set controller "atomix-controller.kube-system.svc.cluster.local:5679"
+> atomixctl config set controller "atomix-controller.kube-system.svc.cluster.local:5679"
 atomix-controller.kube-system.svc.cluster.local:5679
 ```
 
 ```bash
-> atomix config get controller
+> atomixctl config get controller
 atomix-controller.kube-system.svc.cluster.local:5679
 ```
 
 ```bash
-> atomix group get raft
+> atomixctl group get raft
 name: raft
 namespace: default
 partitions: 3
@@ -591,7 +591,7 @@ protocol: raft
 ```
 
 ```bash
-> atomix group create raft -n default --protocol raft --partitions 3 --partitionSize 3
+> atomixctl group create raft -n default --protocol raft --partitions 3 --partitionSize 3
 name: raft
 namespace: default
 partitions: 3
@@ -600,15 +600,42 @@ protocol: raft
 ```
 
 ```bash
-> atomix map put foo bar baz
+> atomixctl map put foo bar baz
 version: 1
 key: bar
 value: baz
 ```
 
 ```bash
-> atomix map get foo bar
+> atomixctl map get foo bar
 baz
+```
+
+### Completion
+
+`atomixctl` provides support for completion both in `bash` and in `zsh`. To enable
+completion in either shell, source the `atomixctl completion` output:
+
+```bash
+> source <(atomixctl completion bash)
+```
+
+### Docker Image
+
+A Docker image is provided to facilitate the usage of `atomixctl` in containerized environments
+like Kubernetes. The Docker image is built with `atomixctl` installed and support for bash
+completion enabled. To use `atomixctl`, simply run the `atomix/atomixctl` image.
+To use `atomixctl` in Kubernetes, run the `atomix/atomixctl` image via `kubectl`:
+
+```bash
+> kubectl run atomixctl --rm -it --image atomix/atomixctl:latest --image-pull-policy "IfNotPresent" --restart "Never"
+```
+
+This command will create a single-pod `Deployment` and log in to the `atomixctl` pod. To connect
+to a controller, override the default `controller` setting:
+
+```bash
+> atomixctl config set controller atomix-controller.kube-system.svc.cluster.local:5679
 ```
 
 [go]: https://golang.org

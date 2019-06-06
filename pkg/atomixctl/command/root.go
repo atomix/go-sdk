@@ -7,7 +7,7 @@ import (
 
 func GetRootCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "atomix",
+		Use:   "atomixctl",
 		Short: "Atomix command line client",
 	}
 
@@ -25,6 +25,7 @@ func GetRootCommand() *cobra.Command {
 	viper.BindPFlag("app", cmd.PersistentFlags().Lookup("app"))
 
 	cmd.AddCommand(newInitCommand())
+	cmd.AddCommand(newCompletionCommand())
 	cmd.AddCommand(newConfigCommand())
 	cmd.AddCommand(newGroupCommand())
 	cmd.AddCommand(newCounterCommand())
