@@ -33,7 +33,6 @@ func printGroups(groups []*client.PartitionGroup) {
 	for _, group := range groups {
 		fmt.Fprintln(writer, fmt.Sprintf("%s\t%s\t%d\t%d", group.Protocol, group.Name, group.Partitions, group.PartitionSize))
 	}
-	fmt.Fprintln(writer)
 	writer.Flush()
 }
 

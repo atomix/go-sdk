@@ -6,4 +6,4 @@ RUN addgroup -S atomix && adduser -S -G atomix atomix
 USER atomix
 WORKDIR /home/atomix
 
-ADD build/cli/_output/bin/atomix-cli /usr/local/bin/atomix-cli
+ADD build/atomixctl/_output/bin/atomixctl /usr/local/bin/atomixctl

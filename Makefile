@@ -11,5 +11,5 @@ proto:
 	docker run -it -v `pwd`:/go/src/github.com/atomix/atomix-go-client atomix/atomix-go-build:0.1 build/proto
 
 build:
-	go build -o build/cli/_output/bin/atomix-cli ./cmd/cli
-	docker build . -f build/cli/Dockerfile -t atomix/atomix-cli:latest
+	go build -o build/atomixctl/_output/bin/atomixctl ./cmd/atomixctl
+	docker build . -f build/atomixctl/Dockerfile -t atomix/atomixctl:latest

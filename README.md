@@ -561,8 +561,15 @@ if err != nil {
 ## Command Line Interface
 
 The Atomix Go client provides a CLI that can be used to operate on Atomix clusters.
-Eventually the CLI will be moved into a separate project, but for now, CLI commands
-are documented below:
+The CLI can be configured using a `config.yaml`, `config.json`, or `config.toml`
+file in `~/.atomix`. To initialize the CLI configuration, run `atomixctl init`:
+
+```bash
+> atomixctl init
+Created ~/.atomix/config.yaml
+```
+
+The `config` subcommand can be used to get or set global configuration values:
 
 ```bash
 > atomix config set controller "atomix-controller.kube-system.svc.cluster.local:5679"

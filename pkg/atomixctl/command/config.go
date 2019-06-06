@@ -105,7 +105,7 @@ func newInitCommand() *cobra.Command {
 			if err != nil {
 				ExitWithError(ExitError, err)
 			} else {
-				ExitWithSuccess()
+				ExitWithOutput("Created ~/.atomix/config.yaml")
 			}
 		},
 	}
