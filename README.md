@@ -560,6 +560,8 @@ if err != nil {
 
 ## Command Line Interface
 
+![atomixctl](https://media.giphy.com/media/cnufJZziPUaGKlzlHy/giphy.gif)
+
 The Atomix Go client provides a CLI that can be used to operate on Atomix clusters.
 The CLI can be configured using a `config.yaml`, `config.json`, or `config.toml`
 file in `~/.atomix`. To initialize the CLI configuration, run `atomixctl init`:
