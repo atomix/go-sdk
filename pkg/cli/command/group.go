@@ -2,6 +2,7 @@ package command
 
 import (
 	"fmt"
+	"github.com/atomix/atomix-go-client/pkg/client"
 	"github.com/atomix/atomix-go-client/pkg/client/protocol"
 	"github.com/atomix/atomix-go-client/pkg/client/protocol/log"
 	"github.com/atomix/atomix-go-client/pkg/client/protocol/raft"
@@ -25,20 +26,31 @@ func newGroupCommand() *cobra.Command {
 	return cmd
 }
 
+func printGroups(groups []*client.PartitionGroup) {
+	writer := new(tabwriter.Writer)
+	writer.Init(os.Stdout, 0, 0, 3, ' ', tabwriter.FilterHTML)
+	fmt.Fprintln(writer, "NAME\tPROTOCOL\tPARTITIONS\tSIZE")
+	for _, group := range groups {
+		fmt.Fprintln(writer, fmt.Sprintf("%s\t%s\t%d\t%d", group.Protocol, group.Name, group.Partitions, group.PartitionSize))
+	}
+	fmt.Fprintln(writer)
+	writer.Flush()
+}
+
+func printGroup(group *client.PartitionGroup) {
+	fmt.Println(fmt.Sprintf("Name:            %s", group.Name))
+	fmt.Println(fmt.Sprintf("Namespace:       %s", group.Namespace))
+	fmt.Println(fmt.Sprintf("Partitions:      %d", group.Partitions))
+	fmt.Println(fmt.Sprintf("Partitions Size: %d", group.PartitionSize))
+}
+
 func runGroupsCommand(cmd *cobra.Command, args []string) {
 	client := newClientFromEnv()
 	groups, err := client.GetGroups(newTimeoutContext())
 	if err != nil {
 		ExitWithError(ExitError, err)
 	} else {
-		writer := new(tabwriter.Writer)
-		writer.Init(os.Stdout, 0, 0, 3, ' ', tabwriter.FilterHTML)
-		fmt.Fprintln(writer, "NAME\tPROTOCOL\tPARTITIONS\tPARTITION SIZE")
-		for _, group := range groups {
-			fmt.Fprintln(writer, fmt.Sprintf("%s\t%s\t%d\t%d", group.Protocol, group.Name, group.Partitions, group.PartitionSize))
-		}
-		fmt.Fprintln(writer)
-		writer.Flush()
+		printGroups(groups)
 		ExitWithSuccess()
 	}
 }
@@ -58,7 +70,8 @@ func runGroupGetCommand(cmd *cobra.Command, args []string) {
 	if err != nil {
 		ExitWithError(ExitError, err)
 	} else {
-		ExitWithOutput(group)
+		printGroup(group)
+		ExitWithSuccess()
 	}
 }
 
@@ -94,7 +107,8 @@ func runGroupCreateCommand(cmd *cobra.Command, args []string) {
 	if err != nil {
 		ExitWithError(ExitError, err)
 	} else {
-		ExitWithOutput(group)
+		printGroup(group)
+		ExitWithSuccess()
 	}
 }
 
