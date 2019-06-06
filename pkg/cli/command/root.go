@@ -1,7 +1,6 @@
 package command
 
 import (
-	"fmt"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -16,9 +15,9 @@ func GetRootCommand() *cobra.Command {
 	viper.SetDefault("namespace", "default")
 	viper.SetDefault("app", "default")
 
-	cmd.PersistentFlags().StringP("controller", "c", viper.GetString("controller"), fmt.Sprintf("the controller address (default: %s)", viper.GetString("controller")))
-	cmd.PersistentFlags().StringP("namespace", "n", viper.GetString("namespace"), fmt.Sprintf("the partition group namespace (default: %s)", viper.GetString("namespace")))
-	cmd.PersistentFlags().StringP("app", "a", viper.GetString("app"), fmt.Sprintf("the application name (default: %s)", viper.GetString("app")))
+	cmd.PersistentFlags().StringP("controller", "c", viper.GetString("controller"), "the controller address")
+	cmd.PersistentFlags().StringP("namespace", "n", viper.GetString("namespace"), "the partition group namespace")
+	cmd.PersistentFlags().StringP("app", "a", viper.GetString("app"), "the application name")
 	cmd.PersistentFlags().String("config", "", "config file (default: $HOME/.atomix/config.yaml)")
 
 	viper.BindPFlag("controller", cmd.PersistentFlags().Lookup("controller"))
