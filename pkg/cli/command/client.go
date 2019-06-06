@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/atomix/atomix-go-client/pkg/client"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"strings"
 	"time"
 )
@@ -24,6 +25,8 @@ type ClientFlags struct {
 func addClientFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().StringVarP(&clientFlags.Group, "group", "g", "default", "the partition group name")
 	cmd.PersistentFlags().StringVarP(&clientFlags.Timeout, "timeout", "t", "15s", "the operation timeout")
+	viper.BindPFlag("group", cmd.PersistentFlags().Lookup("group"))
+	viper.SetDefault("group", "")
 }
 
 func newTimeoutContext() context.Context {

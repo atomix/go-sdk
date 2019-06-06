@@ -7,7 +7,8 @@ import (
 
 func newConfigCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "config <subcommand>",
+		Use:   "config <subcommand>",
+		Short: "Read and update CLI configuration options",
 	}
 	cmd.AddCommand(newConfigGetCommand())
 	cmd.AddCommand(newConfigSetCommand())
@@ -17,9 +18,9 @@ func newConfigCommand() *cobra.Command {
 
 func newConfigGetCommand() *cobra.Command {
 	return &cobra.Command{
-		Use: "get <key>",
+		Use:  "get <key>",
 		Args: cobra.ExactArgs(1),
-		Run: runConfigGetCommand,
+		Run:  runConfigGetCommand,
 	}
 }
 
@@ -30,9 +31,9 @@ func runConfigGetCommand(cmd *cobra.Command, args []string) {
 
 func newConfigSetCommand() *cobra.Command {
 	return &cobra.Command{
-		Use: "set <key> <value>",
+		Use:  "set <key> <value>",
 		Args: cobra.ExactArgs(2),
-		Run: runConfigSetCommand,
+		Run:  runConfigSetCommand,
 	}
 }
 
@@ -43,9 +44,9 @@ func runConfigSetCommand(cmd *cobra.Command, args []string) {
 
 func newConfigDeleteCommand() *cobra.Command {
 	return &cobra.Command{
-		Use: "delete <key>",
+		Use:  "delete <key>",
 		Args: cobra.ExactArgs(1),
-		Run: runConfigDeleteCommand,
+		Run:  runConfigDeleteCommand,
 	}
 }
 

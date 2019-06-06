@@ -7,7 +7,8 @@ import (
 
 func newLockCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "lock {create,lock,get,unlock,delete}",
+		Use:   "lock {create,lock,get,unlock,delete}",
+		Short: "Manage the state of a distributed lock",
 	}
 	addClientFlags(cmd)
 	cmd.AddCommand(newLockCreateCommand())

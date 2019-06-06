@@ -8,7 +8,8 @@ import (
 
 func newCounterCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "counter {create,get,set,increment,decrement,delete}",
+		Use:   "counter {create,get,set,increment,decrement,delete}",
+		Short: "Manage the state of a distributed counter",
 	}
 	addClientFlags(cmd)
 	cmd.AddCommand(newCounterCreateCommand())

@@ -9,7 +9,8 @@ import (
 
 func newGroupCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "group {get,create,delete}",
+		Use:   "group {get,create,delete}",
+		Short: "Manage partition groups and partitions",
 	}
 	cmd.AddCommand(newGroupGetCommand())
 	cmd.AddCommand(newGroupCreateCommand())

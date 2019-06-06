@@ -7,7 +7,8 @@ import (
 
 func newElectionCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "election {create,enter,get,leave,delete}",
+		Use:   "election {create,enter,get,leave,delete}",
+		Short: "Managed the state of a distributed leader election",
 	}
 	addClientFlags(cmd)
 	cmd.AddCommand(newElectionCreateCommand())
