@@ -71,7 +71,12 @@ func newCounterGetCommand() *cobra.Command {
 
 func runCounterGetCommand(cmd *cobra.Command, args []string) {
 	counter := newCounterFromName(args[0])
-	ExitWithOutput(counter.Get(newTimeoutContext()))
+	value, err := counter.Get(newTimeoutContext())
+	if err != nil {
+		ExitWithError(ExitError, err)
+	} else {
+		ExitWithOutput(value)
+	}
 }
 
 func newCounterSetCommand() *cobra.Command {
@@ -88,7 +93,12 @@ func runCounterSetCommand(cmd *cobra.Command, args []string) {
 	if err != nil {
 		ExitWithError(ExitError, err)
 	}
-	ExitWithOutput(counter.Set(newTimeoutContext(), value))
+	err = counter.Set(newTimeoutContext(), value)
+	if err != nil {
+		ExitWithError(ExitError, err)
+	} else {
+		ExitWithOutput(value)
+	}
 }
 
 func newCounterIncrementCommand() *cobra.Command {
@@ -111,7 +121,13 @@ func runCounterIncrementCommand(cmd *cobra.Command, args []string) {
 			ExitWithError(ExitError, err)
 		}
 	}
-	ExitWithOutput(counter.Increment(newTimeoutContext(), delta))
+
+	value, err := counter.Increment(newTimeoutContext(), delta)
+	if err != nil {
+		ExitWithError(ExitError, err)
+	} else {
+		ExitWithOutput(value)
+	}
 }
 
 func newCounterDecrementCommand() *cobra.Command {
@@ -134,5 +150,11 @@ func runCounterDecrementCommand(cmd *cobra.Command, args []string) {
 			ExitWithError(ExitError, err)
 		}
 	}
-	ExitWithOutput(counter.Decrement(newTimeoutContext(), delta))
+
+	value, err := counter.Decrement(newTimeoutContext(), delta)
+	if err != nil {
+		ExitWithError(ExitError, err)
+	} else {
+		ExitWithOutput(value)
+	}
 }

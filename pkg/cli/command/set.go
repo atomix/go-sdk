@@ -71,7 +71,12 @@ func newSetAddCommand() *cobra.Command {
 
 func runSetAddCommand(cmd *cobra.Command, args []string) {
 	set := newSetFromName(args[0])
-	ExitWithOutput(set.Add(newTimeoutContext(), args[1]))
+	added, err := set.Add(newTimeoutContext(), args[1])
+	if err != nil {
+		ExitWithError(ExitError, err)
+	} else {
+		ExitWithOutput(added)
+	}
 }
 
 func newSetContainsCommand() *cobra.Command {
@@ -84,7 +89,12 @@ func newSetContainsCommand() *cobra.Command {
 
 func runSetContainsCommand(cmd *cobra.Command, args []string) {
 	set := newSetFromName(args[0])
-	ExitWithOutput(set.Contains(newTimeoutContext(), args[1]))
+	contains, err := set.Contains(newTimeoutContext(), args[1])
+	if err != nil {
+		ExitWithError(ExitError, err)
+	} else {
+		ExitWithOutput(contains)
+	}
 }
 
 func newSetRemoveCommand() *cobra.Command {
@@ -97,7 +107,12 @@ func newSetRemoveCommand() *cobra.Command {
 
 func runSetRemoveCommand(cmd *cobra.Command, args []string) {
 	set := newSetFromName(args[0])
-	ExitWithOutput(set.Remove(newTimeoutContext(), args[1]))
+	removed, err := set.Remove(newTimeoutContext(), args[1])
+	if err != nil {
+		ExitWithError(ExitError, err)
+	} else {
+		ExitWithOutput(removed)
+	}
 }
 
 func newSetSizeCommand() *cobra.Command {
@@ -110,7 +125,12 @@ func newSetSizeCommand() *cobra.Command {
 
 func runSetSizeCommand(cmd *cobra.Command, args []string) {
 	set := newSetFromName(args[0])
-	ExitWithOutput(set.Size(newTimeoutContext()))
+	size, err := set.Size(newTimeoutContext())
+	if err != nil {
+		ExitWithError(ExitError, err)
+	} else {
+		ExitWithOutput(size)
+	}
 }
 
 func newSetClearCommand() *cobra.Command {
@@ -123,5 +143,10 @@ func newSetClearCommand() *cobra.Command {
 
 func runSetClearCommand(cmd *cobra.Command, args []string) {
 	set := newSetFromName(args[0])
-	ExitWithOutput(set.Clear(newTimeoutContext()))
+	err := set.Clear(newTimeoutContext())
+	if err != nil {
+		ExitWithError(ExitError, err)
+	} else {
+		ExitWithSuccess()
+	}
 }

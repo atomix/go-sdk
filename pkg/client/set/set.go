@@ -22,12 +22,6 @@ type Set interface {
 	Listen(ctx context.Context, ch chan<- *SetEvent) error
 }
 
-type KeyValue struct {
-	Version int64
-	Key     string
-	Value   []byte
-}
-
 type SetEventType string
 
 const (

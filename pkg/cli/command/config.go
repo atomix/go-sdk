@@ -17,7 +17,7 @@ func newConfigCommand() *cobra.Command {
 
 func newConfigGetCommand() *cobra.Command {
 	return &cobra.Command{
-		Use: "get",
+		Use: "get <key>",
 		Args: cobra.ExactArgs(1),
 		Run: runConfigGetCommand,
 	}
@@ -30,7 +30,7 @@ func runConfigGetCommand(cmd *cobra.Command, args []string) {
 
 func newConfigSetCommand() *cobra.Command {
 	return &cobra.Command{
-		Use: "set",
+		Use: "set <key> <value>",
 		Args: cobra.ExactArgs(2),
 		Run: runConfigSetCommand,
 	}
@@ -43,7 +43,8 @@ func runConfigSetCommand(cmd *cobra.Command, args []string) {
 
 func newConfigDeleteCommand() *cobra.Command {
 	return &cobra.Command{
-		Use: "delete",
+		Use: "delete <key>",
+		Args: cobra.ExactArgs(1),
 		Run: runConfigDeleteCommand,
 	}
 }

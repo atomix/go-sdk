@@ -31,14 +31,6 @@ func newTimeoutContext() context.Context {
 	return ctx
 }
 
-func newClientFromGlobals() *client.Client {
-	c, err := client.NewClient(globalFlags.Controller, client.WithNamespace(globalFlags.Namespace), client.WithApplication(globalFlags.Application))
-	if err != nil {
-		ExitWithError(ExitError, err)
-	}
-	return c
-}
-
 func newClientFromGroup(name string) *client.Client {
 	ns := getGroupNamespace(name)
 	c, err := client.NewClient(globalFlags.Controller, client.WithNamespace(ns), client.WithApplication(globalFlags.Application))

@@ -2,6 +2,7 @@ package _map
 
 import (
 	"context"
+	"fmt"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/util"
@@ -26,6 +27,10 @@ type KeyValue struct {
 	Version int64
 	Key     string
 	Value   []byte
+}
+
+func (kv KeyValue) String() string {
+	return fmt.Sprintf("key: %s\nvalue: %s\nversion: %d", kv.Key, string(kv.Value), kv.Version)
 }
 
 type MapEventType string

@@ -36,22 +36,15 @@ func runGroupGetCommand(cmd *cobra.Command, args []string) {
 	}
 }
 
-type groupCreateOptions struct {
-	partitions    int
-	partitionSize int
-	protocol      string
-}
-
 func newGroupCreateCommand() *cobra.Command {
-	options := &groupCreateOptions{}
 	cmd := &cobra.Command{
 		Use:  "create <group>",
 		Args: cobra.ExactArgs(1),
 		Run:  runGroupCreateCommand,
 	}
-	cmd.Flags().StringVar(&options.protocol, "protocol", "raft", "the protocol to run in the partition group")
-	cmd.Flags().IntVarP(&options.partitions, "partitions", "p", 1, "the number of partitions to create")
-	cmd.Flags().IntVarP(&options.partitionSize, "partitionSize", "s", 1, "the size of partitions in the group")
+	cmd.Flags().String("protocol", "raft", "the protocol to run in the partition group")
+	cmd.Flags().IntP("partitions", "p", 1, "the number of partitions to create")
+	cmd.Flags().IntP("partitionSize", "s", 1, "the size of partitions in the group")
 	return cmd
 }
 
