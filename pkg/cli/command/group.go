@@ -32,10 +32,10 @@ func runGroupsCommand(cmd *cobra.Command, args []string) {
 		ExitWithError(ExitError, err)
 	} else {
 		writer := new(tabwriter.Writer)
-		writer.Init(os.Stdout, 0, 0, 2, ' ', tabwriter.Debug)
-		fmt.Fprintln(writer, "Namespace\tName\tPartitions\tPartition Size\tProtocol")
+		writer.Init(os.Stdout, 0, 0, 3, ' ', tabwriter.FilterHTML)
+		fmt.Fprintln(writer, "NAME\tPROTOCOL\tPARTITIONS\tPARTITION SIZE")
 		for _, group := range groups {
-			fmt.Fprintln(writer, "%s\t%s\t%d\t%d\t%s", group.Namespace, group.Name, group.Partitions, group.PartitionSize, group.Protocol)
+			fmt.Fprintln(writer, fmt.Sprintf("%s\t%s\t%d\t%d", group.Protocol, group.Name, group.Partitions, group.PartitionSize))
 		}
 		fmt.Fprintln(writer)
 		writer.Flush()
