@@ -48,7 +48,7 @@ type ElectionEvent struct {
 }
 
 func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.SessionOption) (Election, error) {
-	i, err := util.GetPartitionIndex(name, len(partitions))
+	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
 		return nil, err
 	}
