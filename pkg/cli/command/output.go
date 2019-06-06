@@ -2,7 +2,6 @@ package command
 
 import (
 	"fmt"
-	"github.com/etcd-io/etcd/client"
 	"os"
 )
 
@@ -29,8 +28,5 @@ func ExitWithSuccess() {
 
 func ExitWithError(code int, err error) {
 	fmt.Fprintln(os.Stderr, "Error:", err)
-	if cerr, ok := err.(*client.ClusterError); ok {
-		fmt.Fprintln(os.Stderr, cerr.Detail())
-	}
 	os.Exit(code)
 }
