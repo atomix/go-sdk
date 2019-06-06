@@ -1,21 +1,46 @@
 package command
 
 import (
+	"fmt"
 	"github.com/atomix/atomix-go-client/pkg/client/protocol"
 	"github.com/atomix/atomix-go-client/pkg/client/protocol/log"
 	"github.com/atomix/atomix-go-client/pkg/client/protocol/raft"
 	"github.com/spf13/cobra"
+	"os"
+	"text/tabwriter"
 )
 
 func newGroupCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "group {get,create,delete}",
+		Use: "group [get,create,delete]",
+		Aliases: []string{
+			"groups",
+		},
 		Short: "Manage partition groups and partitions",
+		Run:   runGroupsCommand,
 	}
 	cmd.AddCommand(newGroupGetCommand())
 	cmd.AddCommand(newGroupCreateCommand())
 	cmd.AddCommand(newGroupDeleteCommand())
 	return cmd
+}
+
+func runGroupsCommand(cmd *cobra.Command, args []string) {
+	client := newClientFromEnv()
+	groups, err := client.GetGroups(newTimeoutContext())
+	if err != nil {
+		ExitWithError(ExitError, err)
+	} else {
+		writer := new(tabwriter.Writer)
+		writer.Init(os.Stdout, 0, 0, 2, ' ', tabwriter.Debug)
+		fmt.Fprintln(writer, "Namespace\tName\tPartitions\tPartition Size\tProtocol")
+		for _, group := range groups {
+			fmt.Fprintln(writer, "%s\t%s\t%d\t%d\t%s", group.Namespace, group.Name, group.Partitions, group.PartitionSize, group.Protocol)
+		}
+		fmt.Fprintln(writer)
+		writer.Flush()
+		ExitWithSuccess()
+	}
 }
 
 func newGroupGetCommand() *cobra.Command {

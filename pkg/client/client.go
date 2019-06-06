@@ -66,6 +66,31 @@ func (c *Client) CreateGroup(ctx context.Context, name string, partitions int, p
 	return c.GetGroup(ctx, name)
 }
 
+// GetGroups returns a list of all partition group in the client's namespace
+func (c *Client) GetGroups(ctx context.Context) ([]*PartitionGroup, error) {
+	client := controller.NewControllerServiceClient(c.conn)
+	request := &controller.GetPartitionGroupsRequest{
+		Id: &partition.PartitionGroupId{
+			Namespace: c.namespace,
+		},
+	}
+
+	response, err := client.GetPartitionGroups(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+
+	groups := make([]*PartitionGroup, len(response.Groups))
+	for i, groupProto := range response.Groups {
+		group, err := c.newGroup(groupProto)
+		if err != nil {
+			return nil, err
+		}
+		groups[i] = group
+	}
+	return groups, nil
+}
+
 // GetGroup returns a partition group primitive client
 func (c *Client) GetGroup(ctx context.Context, name string) (*PartitionGroup, error) {
 	client := controller.NewControllerServiceClient(c.conn)
@@ -86,11 +111,13 @@ func (c *Client) GetGroup(ctx context.Context, name string) (*PartitionGroup, er
 	} else if len(response.Groups) > 1 {
 		return nil, errors.New("partition group " + name + " is ambiguous")
 	}
+	return c.newGroup(response.Groups[0])
+}
 
-	group := response.Groups[0]
-	partitions := make([]*grpc.ClientConn, len(group.Partitions))
-	for i, partition := range group.Partitions {
-		ep := partition.Endpoints[0]
+func (c *Client) newGroup(groupProto *partition.PartitionGroup) (*PartitionGroup, error) {
+	partitions := make([]*grpc.ClientConn, len(groupProto.Partitions))
+	for i, partitionProto := range groupProto.Partitions {
+		ep := partitionProto.Endpoints[0]
 		conn, err := grpc.Dial(fmt.Sprintf("%s:%d", ep.Host, ep.Port), grpc.WithInsecure())
 		if err != nil {
 			return nil, err
@@ -98,11 +125,25 @@ func (c *Client) GetGroup(ctx context.Context, name string) (*PartitionGroup, er
 		partitions[i] = conn
 		c.conns = append(c.conns, conn)
 	}
+
+	proto := ""
+	switch groupProto.Spec.Group.(type) {
+	case *partition.PartitionGroupSpec_Raft:
+		proto = "raft"
+	case *partition.PartitionGroupSpec_PrimaryBackup:
+		proto = "backup"
+	case *partition.PartitionGroupSpec_Log:
+		proto = "log"
+	}
+
 	return &PartitionGroup{
-		Namespace:   c.namespace,
-		Name:        name,
-		application: c.application,
-		partitions:  partitions,
+		Namespace:     groupProto.Id.Namespace,
+		Name:          groupProto.Id.Name,
+		Partitions:    int(groupProto.Spec.Partitions),
+		PartitionSize: int(groupProto.Spec.PartitionSize),
+		Protocol:      proto,
+		application:   c.application,
+		partitions:    partitions,
 	}, nil
 }
 
@@ -167,8 +208,11 @@ type PartitionGroup struct {
 	lock.LockClient
 	set.SetClient
 
-	Namespace string
-	Name      string
+	Namespace     string
+	Name          string
+	Partitions    int
+	PartitionSize int
+	Protocol      string
 
 	application string
 	partitions  []*grpc.ClientConn
