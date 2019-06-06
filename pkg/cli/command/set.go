@@ -1,6 +1,7 @@
 package command
 
 import (
+	"fmt"
 	"github.com/atomix/atomix-go-client/pkg/client/set"
 	"github.com/spf13/cobra"
 )
@@ -41,7 +42,7 @@ func newSetCreateCommand() *cobra.Command {
 func runSetCreateCommand(cmd *cobra.Command, args []string) {
 	set := newSetFromName(args[0])
 	set.Close()
-	ExitWithOutput("Created %s", set.Name().String())
+	ExitWithOutput(fmt.Sprintf("Created %s", set.Name().String()))
 }
 
 func newSetDeleteCommand() *cobra.Command {
@@ -58,7 +59,7 @@ func runSetDeleteCommand(cmd *cobra.Command, args []string) {
 	if err != nil {
 		ExitWithError(ExitError, err)
 	} else {
-		ExitWithOutput("Deleted %s", set.Name().String())
+		ExitWithOutput(fmt.Sprintf("Deleted %s", set.Name().String()))
 	}
 }
 

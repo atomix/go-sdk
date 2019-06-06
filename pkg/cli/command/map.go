@@ -1,6 +1,7 @@
 package command
 
 import (
+	"fmt"
 	"github.com/atomix/atomix-go-client/pkg/client/_map"
 	"github.com/spf13/cobra"
 )
@@ -41,7 +42,7 @@ func newMapCreateCommand() *cobra.Command {
 func runMapCreateCommand(cmd *cobra.Command, args []string) {
 	_map := newMapFromName(args[0])
 	_map.Close()
-	ExitWithOutput("Created %s", _map.Name().String())
+	ExitWithOutput(fmt.Sprintf("Created %s", _map.Name().String()))
 }
 
 func newMapDeleteCommand() *cobra.Command {
@@ -58,7 +59,7 @@ func runMapDeleteCommand(cmd *cobra.Command, args []string) {
 	if err != nil {
 		ExitWithError(ExitError, err)
 	} else {
-		ExitWithOutput("Deleted %s", _map.Name().String())
+		ExitWithOutput(fmt.Sprintf("Deleted %s", _map.Name().String()))
 	}
 }
 

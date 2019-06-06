@@ -1,6 +1,7 @@
 package command
 
 import (
+	"fmt"
 	"github.com/atomix/atomix-go-client/pkg/client/lock"
 	"github.com/spf13/cobra"
 )
@@ -39,7 +40,7 @@ func newLockCreateCommand() *cobra.Command {
 func runLockCreateCommand(cmd *cobra.Command, args []string) {
 	lock := newLockFromName(args[0])
 	lock.Close()
-	ExitWithOutput("Created %s", lock.Name().String())
+	ExitWithOutput(fmt.Sprintf("Created %s", lock.Name().String()))
 }
 
 func newLockDeleteCommand() *cobra.Command {
@@ -56,7 +57,7 @@ func runLockDeleteCommand(cmd *cobra.Command, args []string) {
 	if err != nil {
 		ExitWithError(ExitError, err)
 	} else {
-		ExitWithOutput("Deleted %s", lock.Name().String())
+		ExitWithOutput(fmt.Sprintf("Deleted %s", lock.Name().String()))
 	}
 }
 

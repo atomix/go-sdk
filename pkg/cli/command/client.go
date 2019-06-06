@@ -52,7 +52,7 @@ func newClientFromGroup(name string) *client.Client {
 }
 
 func newClientFromName(name string) *client.Client {
-	ns := getPrimitiveNamespace(name)
+	ns := getClientNamespace()
 	app := getPrimitiveApplication(name)
 	c, err := client.NewClient(globalFlags.Controller, client.WithNamespace(ns), client.WithApplication(app))
 	if err != nil {
@@ -63,7 +63,7 @@ func newClientFromName(name string) *client.Client {
 
 func newGroupFromName(name string) *client.PartitionGroup {
 	c := newClientFromName(name)
-	group, err := c.GetGroup(newTimeoutContext(), getPrimitiveGroup(name))
+	group, err := c.GetGroup(newTimeoutContext(), getClientGroup())
 	if err != nil {
 		ExitWithError(ExitError, err)
 	}
@@ -87,34 +87,25 @@ func getGroupName(name string) string {
 	return nameParts[len(nameParts)-1]
 }
 
-func getPrimitiveNamespace(name string) string {
-	nameParts := splitName(name)
-	if len(nameParts) == 4 {
+func getClientNamespace() string {
+	nameParts := splitName(clientFlags.Group)
+	if len(nameParts) == 2 {
 		return nameParts[0]
 	}
 	return globalFlags.Namespace
 }
 
-func getPrimitiveApplication(name string) string {
-	nameParts := splitName(name)
-	if len(nameParts) == 4 {
-		return nameParts[2]
-	} else if len(nameParts) == 3 {
-		return nameParts[1]
-	}
-	return globalFlags.Application
+func getClientGroup() string {
+	nameParts := splitName(clientFlags.Group)
+	return nameParts[len(nameParts)-1]
 }
 
-func getPrimitiveGroup(name string) string {
+func getPrimitiveApplication(name string) string {
 	nameParts := splitName(name)
-	if len(nameParts) == 4 {
-		return nameParts[1]
-	} else if len(nameParts) == 3 {
-		return nameParts[0]
-	} else if len(nameParts) == 2 {
+	if len(nameParts) == 2 {
 		return nameParts[0]
 	}
-	return clientFlags.Group
+	return globalFlags.Application
 }
 
 func getPrimitiveName(name string) string {

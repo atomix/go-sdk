@@ -1,6 +1,7 @@
 package command
 
 import (
+	"fmt"
 	"github.com/atomix/atomix-go-client/pkg/client/counter"
 	"github.com/spf13/cobra"
 	"strconv"
@@ -41,7 +42,7 @@ func newCounterCreateCommand() *cobra.Command {
 func runCounterCreateCommand(cmd *cobra.Command, args []string) {
 	counter := newCounterFromName(args[0])
 	counter.Close()
-	ExitWithOutput("Created %s", counter.Name().String())
+	ExitWithOutput(fmt.Sprintf("Created %s", counter.Name().String()))
 }
 
 func newCounterDeleteCommand() *cobra.Command {
@@ -58,7 +59,7 @@ func runCounterDeleteCommand(cmd *cobra.Command, args []string) {
 	if err != nil {
 		ExitWithError(ExitError, err)
 	} else {
-		ExitWithOutput("Deleted %s", counter.Name().String())
+		ExitWithOutput(fmt.Sprintf("Deleted %s", counter.Name().String()))
 	}
 }
 

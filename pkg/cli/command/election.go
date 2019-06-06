@@ -1,6 +1,7 @@
 package command
 
 import (
+	"fmt"
 	"github.com/atomix/atomix-go-client/pkg/client/election"
 	"github.com/spf13/cobra"
 )
@@ -39,7 +40,7 @@ func newElectionCreateCommand() *cobra.Command {
 func runElectionCreateCommand(cmd *cobra.Command, args []string) {
 	election := newElectionFromName(args[0])
 	election.Close()
-	ExitWithOutput("Created %s", election.Name().String())
+	ExitWithOutput(fmt.Sprintf("Created %s", election.Name().String()))
 }
 
 func newElectionDeleteCommand() *cobra.Command {
@@ -56,7 +57,7 @@ func runElectionDeleteCommand(cmd *cobra.Command, args []string) {
 	if err != nil {
 		ExitWithError(ExitError, err)
 	} else {
-		ExitWithOutput("Deleted %s", election.Name().String())
+		ExitWithOutput(fmt.Sprintf("Deleted %s", election.Name().String()))
 	}
 }
 
