@@ -8,6 +8,14 @@ import (
 	"os"
 )
 
+var (
+	configFile = ""
+)
+
+func init() {
+	cobra.OnInitialize(initConfig)
+}
+
 func newConfigCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "config <subcommand>",
@@ -105,8 +113,8 @@ func newInitCommand() *cobra.Command {
 }
 
 func initConfig() {
-	if globalFlags.Config != "" {
-		viper.SetConfigFile(globalFlags.Config)
+	if configFile != "" {
+		viper.SetConfigFile(configFile)
 	} else {
 		home, err := homedir.Dir()
 		if err != nil {

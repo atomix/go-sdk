@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"fmt"
 	"github.com/atomix/atomix-go-client/pkg/client"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -13,20 +14,11 @@ const (
 	nameSep = "."
 )
 
-var (
-	clientFlags = &ClientFlags{}
-)
-
-type ClientFlags struct {
-	Group   string
-	Timeout string
-}
-
 func addClientFlags(cmd *cobra.Command) {
-	cmd.PersistentFlags().StringVarP(&clientFlags.Group, "group", "g", "default", "the partition group name")
-	cmd.PersistentFlags().StringVarP(&clientFlags.Timeout, "timeout", "t", "15s", "the operation timeout")
-	viper.BindPFlag("group", cmd.PersistentFlags().Lookup("group"))
 	viper.SetDefault("group", "")
+	cmd.PersistentFlags().StringP("group", "g", viper.GetString("group"), fmt.Sprintf("the partition group name (default %s)", viper.GetString("group")))
+	cmd.PersistentFlags().StringP("timeout", "t", "15s", "the operation timeout")
+	viper.BindPFlag("group", cmd.PersistentFlags().Lookup("group"))
 }
 
 func newTimeoutContext() context.Context {
@@ -35,7 +27,10 @@ func newTimeoutContext() context.Context {
 }
 
 func newClientFromEnv() *client.Client {
-	c, err := client.NewClient(globalFlags.Controller, client.WithNamespace(globalFlags.Namespace), client.WithApplication(globalFlags.Application))
+	c, err := client.NewClient(
+		getClientController(),
+		client.WithNamespace(getClientNamespace()),
+		client.WithApplication(getClientApp()))
 	if err != nil {
 		ExitWithError(ExitError, err)
 	}
@@ -43,8 +38,10 @@ func newClientFromEnv() *client.Client {
 }
 
 func newClientFromGroup(name string) *client.Client {
-	ns := getGroupNamespace(name)
-	c, err := client.NewClient(globalFlags.Controller, client.WithNamespace(ns), client.WithApplication(globalFlags.Application))
+	c, err := client.NewClient(
+		getClientController(),
+		client.WithNamespace(getGroupNamespace(name)),
+		client.WithApplication(getClientApp()))
 	if err != nil {
 		ExitWithError(ExitError, err)
 	}
@@ -52,9 +49,7 @@ func newClientFromGroup(name string) *client.Client {
 }
 
 func newClientFromName(name string) *client.Client {
-	ns := getClientNamespace()
-	app := getPrimitiveApplication(name)
-	c, err := client.NewClient(globalFlags.Controller, client.WithNamespace(ns), client.WithApplication(app))
+	c, err := client.NewClient(getClientController(), client.WithNamespace(getClientNamespace()), client.WithApplication(getPrimitiveApp(name)))
 	if err != nil {
 		ExitWithError(ExitError, err)
 	}
@@ -79,7 +74,7 @@ func getGroupNamespace(name string) string {
 	if len(nameParts) == 2 {
 		return nameParts[0]
 	}
-	return globalFlags.Namespace
+	return getClientNamespace()
 }
 
 func getGroupName(name string) string {
@@ -87,25 +82,28 @@ func getGroupName(name string) string {
 	return nameParts[len(nameParts)-1]
 }
 
+func getClientController() string {
+	return viper.GetString("controller")
+}
+
 func getClientNamespace() string {
-	nameParts := splitName(clientFlags.Group)
-	if len(nameParts) == 2 {
-		return nameParts[0]
-	}
-	return globalFlags.Namespace
+	return viper.GetString("namespace")
 }
 
 func getClientGroup() string {
-	nameParts := splitName(clientFlags.Group)
-	return nameParts[len(nameParts)-1]
+	return viper.GetString("group")
 }
 
-func getPrimitiveApplication(name string) string {
+func getClientApp() string {
+	return viper.GetString("app")
+}
+
+func getPrimitiveApp(name string) string {
 	nameParts := splitName(name)
 	if len(nameParts) == 2 {
 		return nameParts[0]
 	}
-	return globalFlags.Application
+	return getClientApp()
 }
 
 func getPrimitiveName(name string) string {
