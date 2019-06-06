@@ -76,8 +76,10 @@ func runMapGetCommand(cmd *cobra.Command, args []string) {
 	value, err := _map.Get(newTimeoutContext(), args[1])
 	if err != nil {
 		ExitWithError(ExitError, err)
-	} else {
+	} else if value != nil {
 		ExitWithOutput(value.String())
+	} else {
+		ExitWithOutput(nil)
 	}
 }
 
@@ -102,8 +104,10 @@ func runMapPutCommand(cmd *cobra.Command, args []string) {
 	value, err := m.Put(newTimeoutContext(), args[1], []byte(args[2]), opts...)
 	if err != nil {
 		ExitWithError(ExitError, err)
-	} else {
+	} else if value != nil {
 		ExitWithOutput(value.String())
+	} else {
+		ExitWithOutput(nil)
 	}
 }
 
@@ -128,8 +132,10 @@ func runMapRemoveCommand(cmd *cobra.Command, args []string) {
 	value, err := m.Remove(newTimeoutContext(), args[1], opts...)
 	if err != nil {
 		ExitWithError(ExitError, err)
-	} else {
+	} else if value != nil {
 		ExitWithOutput(value.String())
+	} else {
+		ExitWithOutput(nil)
 	}
 }
 
