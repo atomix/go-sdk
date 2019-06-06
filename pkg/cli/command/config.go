@@ -1,7 +1,6 @@
 package command
 
 import (
-	"fmt"
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -127,7 +126,5 @@ func initConfig() {
 		viper.AddConfigPath(".")
 	}
 
-	if err := viper.ReadInConfig(); err != nil {
-		fmt.Println("No configuration found")
-	}
+	viper.ReadInConfig()
 }
