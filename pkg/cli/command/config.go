@@ -1,8 +1,11 @@
 package command
 
 import (
+	"fmt"
+	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"os"
 )
 
 func newConfigCommand() *cobra.Command {
@@ -39,7 +42,12 @@ func newConfigSetCommand() *cobra.Command {
 
 func runConfigSetCommand(cmd *cobra.Command, args []string) {
 	viper.Set(args[0], args[1])
-	ExitWithOutput(args[1])
+	if err := viper.WriteConfig(); err != nil {
+		ExitWithError(ExitError, err)
+	} else {
+		value := viper.Get(args[0])
+		ExitWithOutput(value)
+	}
 }
 
 func newConfigDeleteCommand() *cobra.Command {
@@ -52,6 +60,66 @@ func newConfigDeleteCommand() *cobra.Command {
 
 func runConfigDeleteCommand(cmd *cobra.Command, args []string) {
 	viper.Set(args[0], nil)
-	value := viper.Get(args[0])
-	ExitWithOutput(value)
+	if err := viper.WriteConfig(); err != nil {
+		ExitWithError(ExitError, err)
+	} else {
+		value := viper.Get(args[0])
+		ExitWithOutput(value)
+	}
+}
+
+func newInitCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "init",
+		Short: "Initialize the Atomix CLI configuration",
+		Run: func(cmd *cobra.Command, args []string) {
+			if err := viper.ReadInConfig(); err == nil {
+				ExitWithSuccess()
+			}
+
+			home, err := homedir.Dir()
+			if err != nil {
+				ExitWithError(ExitError, err)
+			}
+
+			err = os.MkdirAll(home+"/.atomix", 0777)
+			if err != nil {
+				ExitWithError(ExitError, err)
+			}
+
+			f, err := os.Create(home + "/.atomix/config.yaml")
+			if err != nil {
+				ExitWithError(ExitError, err)
+			} else {
+				f.Close()
+			}
+
+			err = viper.WriteConfig()
+			if err != nil {
+				ExitWithError(ExitError, err)
+			} else {
+				ExitWithSuccess()
+			}
+		},
+	}
+}
+
+func initConfig() {
+	if globalFlags.Config != "" {
+		viper.SetConfigFile(globalFlags.Config)
+	} else {
+		home, err := homedir.Dir()
+		if err != nil {
+			ExitWithError(ExitError, err)
+		}
+
+		viper.SetConfigName("config")
+		viper.AddConfigPath(home + "/.atomix")
+		viper.AddConfigPath("/etc/atomix")
+		viper.AddConfigPath(".")
+	}
+
+	if err := viper.ReadInConfig(); err != nil {
+		fmt.Println("No configuration found")
+	}
 }

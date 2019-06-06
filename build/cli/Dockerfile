@@ -1,7 +1,9 @@
 FROM alpine:3.8
 
 RUN apk upgrade --update --no-cache
+RUN addgroup -S atomix && adduser -S -G atomix atomix
 
-USER nobody
+USER atomix
+WORKDIR /home/atomix
 
 ADD build/cli/_output/bin/atomix-cli /usr/local/bin/atomix-cli

@@ -1,11 +1,8 @@
 package command
 
 import (
-	"fmt"
-	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"os"
 )
 
 var (
@@ -20,7 +17,7 @@ type GlobalFlags struct {
 }
 
 func init() {
-	cobra.OnInitialize(initConfigSettings)
+	cobra.OnInitialize(initConfig)
 }
 
 func GetRootCommand() *cobra.Command {
@@ -43,77 +40,12 @@ func GetRootCommand() *cobra.Command {
 	viper.SetDefault("application", "default")
 
 	cmd.AddCommand(newInitCommand())
-	cmd.AddCommand(configCommand(newConfigCommand()))
-	cmd.AddCommand(configCommand(newGroupCommand()))
-	cmd.AddCommand(configCommand(newCounterCommand()))
-	cmd.AddCommand(configCommand(newElectionCommand()))
-	cmd.AddCommand(configCommand(newLockCommand()))
-	cmd.AddCommand(configCommand(newMapCommand()))
-	cmd.AddCommand(configCommand(newSetCommand()))
+	cmd.AddCommand(newConfigCommand())
+	cmd.AddCommand(newGroupCommand())
+	cmd.AddCommand(newCounterCommand())
+	cmd.AddCommand(newElectionCommand())
+	cmd.AddCommand(newLockCommand())
+	cmd.AddCommand(newMapCommand())
+	cmd.AddCommand(newSetCommand())
 	return cmd
-}
-
-func configCommand(cmd *cobra.Command) *cobra.Command {
-	cmd.PreRun = func(c *cobra.Command, args []string) {
-		readConfig()
-	}
-	return cmd
-}
-
-func newInitCommand() *cobra.Command {
-	return &cobra.Command{
-		Use:   "init",
-		Short: "Initialize the Atomix CLI configuration",
-		Run: func(cmd *cobra.Command, args []string) {
-			if err := viper.ReadInConfig(); err == nil {
-				ExitWithSuccess()
-			}
-
-			home, err := homedir.Dir()
-			if err != nil {
-				ExitWithError(ExitError, err)
-			}
-
-			err = os.MkdirAll(home+"/.atomix", 0777)
-			if err != nil {
-				ExitWithError(ExitError, err)
-			}
-
-			f, err := os.Create(home + "/.atomix/config.yaml")
-			if err != nil {
-				ExitWithError(ExitError, err)
-			} else {
-				f.Close()
-			}
-
-			err = viper.WriteConfig()
-			if err != nil {
-				ExitWithError(ExitError, err)
-			} else {
-				ExitWithSuccess()
-			}
-		},
-	}
-}
-
-func initConfigSettings() {
-	if globalFlags.Config != "" {
-		viper.SetConfigFile(globalFlags.Config)
-	} else {
-		home, err := homedir.Dir()
-		if err != nil {
-			ExitWithError(ExitError, err)
-		}
-
-		viper.SetConfigName("config")
-		viper.AddConfigPath(home + "/.atomix")
-		viper.AddConfigPath("/etc/atomix")
-		viper.AddConfigPath(".")
-	}
-}
-
-func readConfig() {
-	if err := viper.ReadInConfig(); err != nil {
-		fmt.Println("No configuration found")
-	}
 }
