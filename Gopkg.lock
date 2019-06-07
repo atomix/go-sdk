@@ -38,6 +38,14 @@
   version = "v1.3.1"
 
 [[projects]]
+  digest = "1:582b704bebaa06b48c29b0cec224a6058a09c86883aaddabde889cd1a5f73e1b"
+  name = "github.com/google/uuid"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "0cd6bf5da1e1c83f8b45653022c74f71af0538a4"
+  version = "v1.1.1"
+
+[[projects]]
   digest = "1:0028cb19b2e4c3112225cd871870f2d9cf49b9b4276531f03438a88e94be86fe"
   name = "github.com/pmezard/go-difflib"
   packages = ["difflib"]
@@ -162,29 +170,21 @@
   pruneopts = "UT"
   revision = "d49e237a2683fa6dc43a86c7b1b766e0219fb6e7"
 
-[[projects]]
-  digest = "1:93153ae93df78ae288f0b601122f2a784df3187c9b3fae45c5960a36b52aa771"
-  name = "k8s.io/klog"
-  packages = [
-    ".",
-    "glog",
-  ]
-  pruneopts = "UT"
-  revision = "a5bc97fbc634d635061f3146511332c7e313a55a"
-  version = "v0.1.0"
-
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
     "github.com/golang/glog",
+    "github.com/golang/protobuf/proto",
     "github.com/golang/protobuf/protoc-gen-go",
+    "github.com/golang/protobuf/ptypes",
+    "github.com/golang/protobuf/ptypes/any",
     "github.com/golang/protobuf/ptypes/duration",
+    "github.com/google/uuid",
     "github.com/stretchr/testify/assert",
     "google.golang.org/grpc",
     "google.golang.org/grpc/test/bufconn",
     "k8s.io/apimachinery/pkg/util/wait",
-    "k8s.io/klog/glog",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

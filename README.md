@@ -11,7 +11,6 @@ This project provides a [Go] client for [Atomix].
    * [Lock](#lock)
    * [Leader Election](#leader-election)
 3. [Partition Group Management](#managing-partition-groups)
-4. [Command Line Interface](#cli)
 
 ## Client Usage
 To pull the project run `go get -u github.com/atomix/atomix-go`
@@ -556,88 +555,6 @@ err = client.DeleteGroup(context.TODO(), "raft")
 if err != nil {
 	...
 }
-```
-
-## Command Line Interface
-
-![atomixctl](https://media.giphy.com/media/cnufJZziPUaGKlzlHy/giphy.gif)
-
-The Atomix Go client provides a CLI that can be used to operate on Atomix clusters.
-The CLI can be configured using a `config.yaml`, `config.json`, or `config.toml`
-file in `~/.atomix`. To initialize the CLI configuration, run `atomixctl init`:
-
-```bash
-> atomixctl init
-Created ~/.atomix/config.yaml
-```
-
-The `config` subcommand can be used to get or set global configuration values:
-
-```bash
-> atomixctl config set controller "atomix-controller.kube-system.svc.cluster.local:5679"
-atomix-controller.kube-system.svc.cluster.local:5679
-```
-
-```bash
-> atomixctl config get controller
-atomix-controller.kube-system.svc.cluster.local:5679
-```
-
-```bash
-> atomixctl group get raft
-name: raft
-namespace: default
-partitions: 3
-partitionSize: 3
-protocol: raft
-```
-
-```bash
-> atomixctl group create raft -n default --protocol raft --partitions 3 --partitionSize 3
-name: raft
-namespace: default
-partitions: 3
-partitionSize: 3
-protocol: raft
-```
-
-```bash
-> atomixctl map put foo bar baz
-version: 1
-key: bar
-value: baz
-```
-
-```bash
-> atomixctl map get foo bar
-baz
-```
-
-### Completion
-
-`atomixctl` provides support for completion both in `bash` and in `zsh`. To enable
-completion in either shell, source the `atomixctl completion` output:
-
-```bash
-> source <(atomixctl completion bash)
-```
-
-### Docker Image
-
-A Docker image is provided to facilitate the usage of `atomixctl` in containerized environments
-like Kubernetes. The Docker image is built with `atomixctl` installed and support for bash
-completion enabled. To use `atomixctl`, simply run the `atomix/atomixctl` image.
-To use `atomixctl` in Kubernetes, run the `atomix/atomixctl` image via `kubectl`:
-
-```bash
-> kubectl run atomixctl --rm -it --image atomix/atomixctl:latest --image-pull-policy "IfNotPresent" --restart "Never"
-```
-
-This command will create a single-pod `Deployment` and log in to the `atomixctl` pod. To connect
-to a controller, override the default `controller` setting:
-
-```bash
-> atomixctl config set controller atomix-controller.kube-system.svc.cluster.local:5679
 ```
 
 [go]: https://golang.org
