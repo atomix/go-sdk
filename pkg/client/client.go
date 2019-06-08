@@ -16,6 +16,7 @@ import (
 	"github.com/atomix/atomix-go-client/proto/atomix/partition"
 	"google.golang.org/grpc"
 	"net"
+	"sort"
 )
 
 // NewClient returns a new Atomix client
@@ -115,8 +116,15 @@ func (c *Client) GetGroup(ctx context.Context, name string) (*PartitionGroup, er
 }
 
 func (c *Client) newGroup(groupProto *partition.PartitionGroup) (*PartitionGroup, error) {
+	// Ensure the partitions are sorted in case the controller sent them out of order.
+	partitionProtos := groupProto.Partitions
+	sort.Slice(partitionProtos, func(i, j int) bool {
+		return partitionProtos[i].PartitionId < partitionProtos[j].PartitionId
+	})
+
+	// Iterate through the partitions and create gRPC client connections for each partitino.
 	partitions := make([]*grpc.ClientConn, len(groupProto.Partitions))
-	for i, partitionProto := range groupProto.Partitions {
+	for i, partitionProto := range partitionProtos {
 		ep := partitionProto.Endpoints[0]
 		conn, err := grpc.Dial(fmt.Sprintf("%s:%d", ep.Host, ep.Port), grpc.WithInsecure())
 		if err != nil {
@@ -126,6 +134,7 @@ func (c *Client) newGroup(groupProto *partition.PartitionGroup) (*PartitionGroup
 		c.conns = append(c.conns, conn)
 	}
 
+	// Determine the name of the protocol implemented by the group.
 	proto := ""
 	switch groupProto.Spec.Group.(type) {
 	case *partition.PartitionGroupSpec_Raft:

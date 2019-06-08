@@ -141,9 +141,8 @@ func (s *TestServer) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetRe
 		return nil, err
 	}
 
-	v := s.entries[request.Key]
-
-	if v.Version != 0 {
+	v, ok := s.entries[request.Key]
+	if ok {
 		return &pb.GetResponse{
 			Header:  header,
 			Value:   v.Value,
@@ -408,11 +407,15 @@ func TestMapOperations(t *testing.T) {
 	m, err := newPartition(context.TODO(), conn, primitive.NewName("default", "test", "default", "test"))
 	assert.NoError(t, err)
 
+	kv, err := m.Get(context.Background(), "foo")
+	assert.NoError(t, err)
+	assert.Nil(t, kv)
+
 	size, err := m.Size(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, 0, size)
 
-	kv, err := m.Put(context.Background(), "foo", []byte("bar"))
+	kv, err = m.Put(context.Background(), "foo", []byte("bar"))
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "bar", string(kv.Value))

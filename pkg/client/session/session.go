@@ -126,6 +126,7 @@ func (s *Session) UpdateHeader(header *headers.ResponseHeader) {
 
 	if header.SessionId > s.SessionId {
 		s.SessionId = header.SessionId
+		s.lastIndex = header.SessionId
 	}
 	if header.Index > s.lastIndex {
 		s.lastIndex = header.Index
