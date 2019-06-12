@@ -9,11 +9,10 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/client/election"
 	"github.com/atomix/atomix-go-client/pkg/client/lock"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
-	"github.com/atomix/atomix-go-client/pkg/client/protocol"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/set"
 	"github.com/atomix/atomix-go-client/proto/atomix/controller"
-	"github.com/atomix/atomix-go-client/proto/atomix/partition"
+	"github.com/golang/protobuf/ptypes/any"
 	"google.golang.org/grpc"
 	"net"
 	"sort"
@@ -46,17 +45,17 @@ type Client struct {
 }
 
 // CreateGroup creates a new partition group
-func (c *Client) CreateGroup(ctx context.Context, name string, partitions int, partitionSize int, protocol protocol.Protocol) (*PartitionGroup, error) {
+func (c *Client) CreateGroup(ctx context.Context, name string, partitions int, partitionSize int, protocol any.Any) (*PartitionGroup, error) {
 	client := controller.NewControllerServiceClient(c.conn)
 	request := &controller.CreatePartitionGroupRequest{
-		Id: &partition.PartitionGroupId{
+		Id: &controller.PartitionGroupId{
 			Name:      name,
 			Namespace: c.namespace,
 		},
-		Spec: &partition.PartitionGroupSpec{
+		Spec: &controller.PartitionGroupSpec{
 			Partitions:    uint32(partitions),
 			PartitionSize: uint32(partitionSize),
-			Group:         protocol.Spec().GetGroup(),
+			Protocol:      &protocol,
 		},
 	}
 
@@ -71,7 +70,7 @@ func (c *Client) CreateGroup(ctx context.Context, name string, partitions int, p
 func (c *Client) GetGroups(ctx context.Context) ([]*PartitionGroup, error) {
 	client := controller.NewControllerServiceClient(c.conn)
 	request := &controller.GetPartitionGroupsRequest{
-		Id: &partition.PartitionGroupId{
+		Id: &controller.PartitionGroupId{
 			Namespace: c.namespace,
 		},
 	}
@@ -96,7 +95,7 @@ func (c *Client) GetGroups(ctx context.Context) ([]*PartitionGroup, error) {
 func (c *Client) GetGroup(ctx context.Context, name string) (*PartitionGroup, error) {
 	client := controller.NewControllerServiceClient(c.conn)
 	request := &controller.GetPartitionGroupsRequest{
-		Id: &partition.PartitionGroupId{
+		Id: &controller.PartitionGroupId{
 			Name:      name,
 			Namespace: c.namespace,
 		},
@@ -115,7 +114,7 @@ func (c *Client) GetGroup(ctx context.Context, name string) (*PartitionGroup, er
 	return c.newGroup(response.Groups[0])
 }
 
-func (c *Client) newGroup(groupProto *partition.PartitionGroup) (*PartitionGroup, error) {
+func (c *Client) newGroup(groupProto *controller.PartitionGroup) (*PartitionGroup, error) {
 	// Ensure the partitions are sorted in case the controller sent them out of order.
 	partitionProtos := groupProto.Partitions
 	sort.Slice(partitionProtos, func(i, j int) bool {
@@ -134,23 +133,12 @@ func (c *Client) newGroup(groupProto *partition.PartitionGroup) (*PartitionGroup
 		c.conns = append(c.conns, conn)
 	}
 
-	// Determine the name of the protocol implemented by the group.
-	proto := ""
-	switch groupProto.Spec.Group.(type) {
-	case *partition.PartitionGroupSpec_Raft:
-		proto = "raft"
-	case *partition.PartitionGroupSpec_PrimaryBackup:
-		proto = "backup"
-	case *partition.PartitionGroupSpec_Log:
-		proto = "log"
-	}
-
 	return &PartitionGroup{
 		Namespace:     groupProto.Id.Namespace,
 		Name:          groupProto.Id.Name,
 		Partitions:    int(groupProto.Spec.Partitions),
 		PartitionSize: int(groupProto.Spec.PartitionSize),
-		Protocol:      proto,
+		Protocol:      groupProto.Spec.Protocol.TypeUrl,
 		application:   c.application,
 		partitions:    partitions,
 	}, nil
@@ -160,7 +148,7 @@ func (c *Client) newGroup(groupProto *partition.PartitionGroup) (*PartitionGroup
 func (c *Client) DeleteGroup(ctx context.Context, name string) error {
 	client := controller.NewControllerServiceClient(c.conn)
 	request := &controller.DeletePartitionGroupRequest{
-		Id: &partition.PartitionGroupId{
+		Id: &controller.PartitionGroupId{
 			Name:      name,
 			Namespace: c.namespace,
 		},
