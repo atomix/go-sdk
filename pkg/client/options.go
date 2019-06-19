@@ -1,7 +1,12 @@
 package client
 
+import "os"
+
 func applyOptions(opts ...ClientOption) *clientOptions {
-	options := &clientOptions{}
+	options := &clientOptions{
+		namespace: os.Getenv("ATOMIX_NAMESPACE"),
+		application: os.Getenv("ATOMIX_APP"),
+	}
 	for _, opt := range opts {
 		opt.apply(options)
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/set"
 	"github.com/atomix/atomix-go-client/proto/atomix/controller"
+	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/any"
 	"google.golang.org/grpc"
 	"net"
@@ -45,8 +46,15 @@ type Client struct {
 }
 
 // CreateGroup creates a new partition group
-func (c *Client) CreateGroup(ctx context.Context, name string, partitions int, partitionSize int, protocol any.Any) (*PartitionGroup, error) {
+func (c *Client) CreateGroup(ctx context.Context, name string, partitions int, partitionSize int, protocol proto.Message) (*PartitionGroup, error) {
 	client := controller.NewControllerServiceClient(c.conn)
+
+	typeUrl := "type.googleapis.com/" + proto.MessageName(protocol)
+	bytes, err := proto.Marshal(protocol)
+	if err != nil {
+		return nil, err
+	}
+
 	request := &controller.CreatePartitionGroupRequest{
 		Id: &controller.PartitionGroupId{
 			Name:      name,
@@ -55,7 +63,10 @@ func (c *Client) CreateGroup(ctx context.Context, name string, partitions int, p
 		Spec: &controller.PartitionGroupSpec{
 			Partitions:    uint32(partitions),
 			PartitionSize: uint32(partitionSize),
-			Protocol:      &protocol,
+			Protocol: &any.Any{
+				TypeUrl: typeUrl,
+				Value:   bytes,
+			},
 		},
 	}
 
