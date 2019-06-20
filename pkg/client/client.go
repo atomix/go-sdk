@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/atomix/atomix-go-client/pkg/client/_map"
+	"github.com/atomix/atomix-go-client/pkg/client/map_"
 	"github.com/atomix/atomix-go-client/pkg/client/counter"
 	"github.com/atomix/atomix-go-client/pkg/client/election"
 	"github.com/atomix/atomix-go-client/pkg/client/lock"
@@ -70,7 +70,7 @@ func (c *Client) CreateGroup(ctx context.Context, name string, partitions int, p
 		},
 	}
 
-	_, err := client.CreatePartitionGroup(ctx, request)
+	_, err = client.CreatePartitionGroup(ctx, request)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +211,7 @@ func NewGroup(address string, opts ...ClientOption) (*PartitionGroup, error) {
 // Primitive partition group.
 type PartitionGroup struct {
 	counter.CounterClient
-	_map.MapClient
+	map_.MapClient
 	election.ElectionClient
 	lock.LockClient
 	set.SetClient
@@ -238,8 +238,8 @@ func (g *PartitionGroup) GetLock(ctx context.Context, name string, opts ...sessi
 	return lock.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.partitions, opts...)
 }
 
-func (g *PartitionGroup) GetMap(ctx context.Context, name string, opts ...session.SessionOption) (_map.Map, error) {
-	return _map.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.partitions, opts...)
+func (g *PartitionGroup) GetMap(ctx context.Context, name string, opts ...session.SessionOption) (map_.Map, error) {
+	return map_.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.partitions, opts...)
 }
 
 func (g *PartitionGroup) GetSet(ctx context.Context, name string, opts ...session.SessionOption) (set.Set, error) {

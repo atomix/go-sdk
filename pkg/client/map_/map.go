@@ -1,4 +1,4 @@
-package _map
+package map_
 
 import (
 	"context"

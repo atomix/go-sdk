@@ -1,4 +1,4 @@
-package _map
+package map_
 
 import (
 	pb "github.com/atomix/atomix-go-client/proto/atomix/map"
