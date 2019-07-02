@@ -20,6 +20,7 @@ type Map interface {
 	Remove(ctx context.Context, key string, opts ...RemoveOption) (*KeyValue, error)
 	Size(ctx context.Context) (int, error)
 	Clear(ctx context.Context) error
+	Entries(ctx context.Context, ch chan<- *KeyValue) error
 	Listen(ctx context.Context, ch chan<- *MapEvent) error
 }
 
@@ -121,6 +122,12 @@ func (m *_map) Size(ctx context.Context) (int, error) {
 		size += result.(int)
 	}
 	return size, nil
+}
+
+func (m *_map) Entries(ctx context.Context, ch chan<- *KeyValue) error {
+	return util.IterAsync(len(m.partitions), func(i int) error {
+		return m.partitions[i].Entries(ctx, ch)
+	})
 }
 
 func (m *_map) Clear(ctx context.Context) error {
