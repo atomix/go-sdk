@@ -170,7 +170,7 @@ func (m *mapPartition) Clear(ctx context.Context) error {
 	return nil
 }
 
-func (m *mapPartition) Entries(ctx context.Context, c chan<- *KeyValue) error {
+func (m *mapPartition) Entries(ctx context.Context, ch chan<- *KeyValue) error {
 	request := &pb.EntriesRequest{
 		Header: m.session.GetHeader(),
 	}
@@ -183,13 +183,14 @@ func (m *mapPartition) Entries(ctx context.Context, c chan<- *KeyValue) error {
 		for {
 			response, err := entries.Recv()
 			if err == io.EOF {
+				close(ch)
 				break
 			}
 
 			if err != nil {
 				glog.Error("Failed to receive entry stream", err)
 			}
-			c <- &KeyValue{
+			ch <- &KeyValue{
 				Key:     response.Key,
 				Value:   response.Value,
 				Version: response.Version,

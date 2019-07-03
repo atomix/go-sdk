@@ -7,6 +7,7 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/util"
 	"google.golang.org/grpc"
+	"sync"
 )
 
 type MapClient interface {
@@ -125,8 +126,24 @@ func (m *_map) Size(ctx context.Context) (int, error) {
 }
 
 func (m *_map) Entries(ctx context.Context, ch chan<- *KeyValue) error {
-	return util.IterAsync(len(m.partitions), func(i int) error {
-		return m.partitions[i].Entries(ctx, ch)
+	n := len(m.partitions)
+	wg := sync.WaitGroup{}
+	wg.Add(n)
+
+	go func() {
+		wg.Wait()
+		close(ch)
+	}()
+
+	return util.IterAsync(n, func(i int) error {
+		c := make(chan *KeyValue)
+		go func() {
+			for kv := range c {
+				ch <- kv
+			}
+			wg.Done()
+		}()
+		return m.partitions[i].Entries(ctx, c)
 	})
 }
 
@@ -142,14 +159,14 @@ func (m *_map) Listen(ctx context.Context, ch chan<- *MapEvent) error {
 	})
 }
 
-func (s *_map) Close() error {
-	return util.IterAsync(len(s.partitions), func(i int) error {
-		return s.partitions[i].Close()
+func (m *_map) Close() error {
+	return util.IterAsync(len(m.partitions), func(i int) error {
+		return m.partitions[i].Close()
 	})
 }
 
-func (s *_map) Delete() error {
-	return util.IterAsync(len(s.partitions), func(i int) error {
-		return s.partitions[i].Delete()
+func (m *_map) Delete() error {
+	return util.IterAsync(len(m.partitions), func(i int) error {
+		return m.partitions[i].Delete()
 	})
 }
