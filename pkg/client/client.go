@@ -12,12 +12,15 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/set"
+	"github.com/atomix/atomix-go-client/pkg/client/util"
 	"github.com/atomix/atomix-go-client/proto/atomix/controller"
+	pbprimitive "github.com/atomix/atomix-go-client/proto/atomix/primitive"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/any"
 	"google.golang.org/grpc"
 	"net"
 	"sort"
+	"time"
 )
 
 // NewClient returns a new Atomix client
@@ -226,6 +229,55 @@ type PartitionGroup struct {
 
 	application string
 	partitions  []*grpc.ClientConn
+}
+
+func (g *PartitionGroup) GetPrimitives(ctx context.Context, types ...string) ([]*pbprimitive.PrimitiveInfo, error) {
+	if len(types) == 0 {
+		return g.getPrimitives(ctx, "")
+	} else {
+		primitives := []*pbprimitive.PrimitiveInfo{}
+		for _, t := range types {
+			typePrimitives, err := g.getPrimitives(ctx, t)
+			if err != nil {
+				return nil, err
+			}
+			for _, info := range typePrimitives {
+				primitives = append(primitives, info)
+			}
+		}
+		return primitives, nil
+	}
+}
+
+func (g *PartitionGroup) getPrimitives(ctx context.Context, t string) ([]*pbprimitive.PrimitiveInfo, error) {
+	results, err := util.ExecuteAsync(len(g.partitions), func(i int) (i2 interface{}, e error) {
+		client := pbprimitive.NewPrimitiveServiceClient(g.partitions[i])
+		request := &pbprimitive.GetPrimitivesRequest{
+			Type: t,
+		}
+		ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+		response, err := client.GetPrimitives(ctx, request)
+		if err != nil {
+			return nil, err
+		}
+		return response.Primitives, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	primitiveResults := make(map[pbprimitive.Name]*pbprimitive.PrimitiveInfo)
+	for _, result := range results {
+		info := result.(*pbprimitive.PrimitiveInfo)
+		primitiveResults[*info.Name] = info
+	}
+
+	primitives := make([]*pbprimitive.PrimitiveInfo, 0, len(primitiveResults))
+	for _, info := range primitiveResults {
+		primitives = append(primitives, info)
+	}
+	return primitives, nil
 }
 
 func (g *PartitionGroup) GetCounter(ctx context.Context, name string, opts ...session.SessionOption) (counter.Counter, error) {

@@ -9,7 +9,7 @@ mv build/proto/_output/atomix-api/proto proto
 
 proto_imports="./proto:${GOPATH}/src/github.com/google/protobuf/src:${GOPATH}/src"
 
-protoc -I=$proto_imports --go_out=import_path=atomix/primitive:proto proto/atomix/primitive/*.proto
+protoc -I=$proto_imports --go_out=import_path=atomix/primitive,plugins=grpc:proto proto/atomix/primitive/*.proto
 protoc -I=$proto_imports --go_out=Matomix/primitive/primitive.proto=github.com/atomix/atomix-go-client/proto/atomix/primitive,import_path=atomix/headers,plugins=grpc:proto proto/atomix/headers/*.proto
 protoc -I=$proto_imports --go_out=proto proto/atomix/protocols/raft/*.proto
 protoc -I=$proto_imports --go_out=proto proto/atomix/protocols/log/*.proto
