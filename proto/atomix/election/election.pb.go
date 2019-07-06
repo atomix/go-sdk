@@ -10,6 +10,8 @@ import (
 	proto "github.com/golang/protobuf/proto"
 	duration "github.com/golang/protobuf/ptypes/duration"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -1250,6 +1252,41 @@ type LeaderElectionServiceServer interface {
 	Evict(context.Context, *EvictRequest) (*EvictResponse, error)
 	GetLeadership(context.Context, *GetLeadershipRequest) (*GetLeadershipResponse, error)
 	Events(*EventRequest, LeaderElectionService_EventsServer) error
+}
+
+// UnimplementedLeaderElectionServiceServer can be embedded to have forward compatible implementations.
+type UnimplementedLeaderElectionServiceServer struct {
+}
+
+func (*UnimplementedLeaderElectionServiceServer) Create(ctx context.Context, req *CreateRequest) (*CreateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Create not implemented")
+}
+func (*UnimplementedLeaderElectionServiceServer) KeepAlive(ctx context.Context, req *KeepAliveRequest) (*KeepAliveResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method KeepAlive not implemented")
+}
+func (*UnimplementedLeaderElectionServiceServer) Close(ctx context.Context, req *CloseRequest) (*CloseResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Close not implemented")
+}
+func (*UnimplementedLeaderElectionServiceServer) Enter(ctx context.Context, req *EnterRequest) (*EnterResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Enter not implemented")
+}
+func (*UnimplementedLeaderElectionServiceServer) Withdraw(ctx context.Context, req *WithdrawRequest) (*WithdrawResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Withdraw not implemented")
+}
+func (*UnimplementedLeaderElectionServiceServer) Anoint(ctx context.Context, req *AnointRequest) (*AnointResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Anoint not implemented")
+}
+func (*UnimplementedLeaderElectionServiceServer) Promote(ctx context.Context, req *PromoteRequest) (*PromoteResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Promote not implemented")
+}
+func (*UnimplementedLeaderElectionServiceServer) Evict(ctx context.Context, req *EvictRequest) (*EvictResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Evict not implemented")
+}
+func (*UnimplementedLeaderElectionServiceServer) GetLeadership(ctx context.Context, req *GetLeadershipRequest) (*GetLeadershipResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetLeadership not implemented")
+}
+func (*UnimplementedLeaderElectionServiceServer) Events(req *EventRequest, srv LeaderElectionService_EventsServer) error {
+	return status.Errorf(codes.Unimplemented, "method Events not implemented")
 }
 
 func RegisterLeaderElectionServiceServer(s *grpc.Server, srv LeaderElectionServiceServer) {

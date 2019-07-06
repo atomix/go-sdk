@@ -9,6 +9,8 @@ import (
 	headers "github.com/atomix/atomix-go-client/proto/atomix/headers"
 	proto "github.com/golang/protobuf/proto"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -828,6 +830,32 @@ type CounterServiceServer interface {
 	Increment(context.Context, *IncrementRequest) (*IncrementResponse, error)
 	Decrement(context.Context, *DecrementRequest) (*DecrementResponse, error)
 	CheckAndSet(context.Context, *CheckAndSetRequest) (*CheckAndSetResponse, error)
+}
+
+// UnimplementedCounterServiceServer can be embedded to have forward compatible implementations.
+type UnimplementedCounterServiceServer struct {
+}
+
+func (*UnimplementedCounterServiceServer) Create(ctx context.Context, req *CreateRequest) (*CreateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Create not implemented")
+}
+func (*UnimplementedCounterServiceServer) Close(ctx context.Context, req *CloseRequest) (*CloseResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Close not implemented")
+}
+func (*UnimplementedCounterServiceServer) Set(ctx context.Context, req *SetRequest) (*SetResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Set not implemented")
+}
+func (*UnimplementedCounterServiceServer) Get(ctx context.Context, req *GetRequest) (*GetResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Get not implemented")
+}
+func (*UnimplementedCounterServiceServer) Increment(ctx context.Context, req *IncrementRequest) (*IncrementResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Increment not implemented")
+}
+func (*UnimplementedCounterServiceServer) Decrement(ctx context.Context, req *DecrementRequest) (*DecrementResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Decrement not implemented")
+}
+func (*UnimplementedCounterServiceServer) CheckAndSet(ctx context.Context, req *CheckAndSetRequest) (*CheckAndSetResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CheckAndSet not implemented")
 }
 
 func RegisterCounterServiceServer(s *grpc.Server, srv CounterServiceServer) {

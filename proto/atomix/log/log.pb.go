@@ -8,6 +8,8 @@ import (
 	fmt "fmt"
 	proto "github.com/golang/protobuf/proto"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -308,6 +310,17 @@ func (x *logServiceConsumeClient) Recv() (*LogRecord, error) {
 type LogServiceServer interface {
 	Produce(LogService_ProduceServer) error
 	Consume(*ConsumeRequest, LogService_ConsumeServer) error
+}
+
+// UnimplementedLogServiceServer can be embedded to have forward compatible implementations.
+type UnimplementedLogServiceServer struct {
+}
+
+func (*UnimplementedLogServiceServer) Produce(srv LogService_ProduceServer) error {
+	return status.Errorf(codes.Unimplemented, "method Produce not implemented")
+}
+func (*UnimplementedLogServiceServer) Consume(req *ConsumeRequest, srv LogService_ConsumeServer) error {
+	return status.Errorf(codes.Unimplemented, "method Consume not implemented")
 }
 
 func RegisterLogServiceServer(s *grpc.Server, srv LogServiceServer) {

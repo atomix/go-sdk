@@ -9,6 +9,8 @@ import (
 	proto "github.com/golang/protobuf/proto"
 	_ "github.com/golang/protobuf/ptypes/any"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -544,6 +546,23 @@ type ControllerServiceServer interface {
 	GetPartitionGroups(context.Context, *GetPartitionGroupsRequest) (*GetPartitionGroupsResponse, error)
 	// Enters a primary election for a specific partition
 	EnterElection(*PartitionElectionRequest, ControllerService_EnterElectionServer) error
+}
+
+// UnimplementedControllerServiceServer can be embedded to have forward compatible implementations.
+type UnimplementedControllerServiceServer struct {
+}
+
+func (*UnimplementedControllerServiceServer) CreatePartitionGroup(ctx context.Context, req *CreatePartitionGroupRequest) (*CreatePartitionGroupResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreatePartitionGroup not implemented")
+}
+func (*UnimplementedControllerServiceServer) DeletePartitionGroup(ctx context.Context, req *DeletePartitionGroupRequest) (*DeletePartitionGroupResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeletePartitionGroup not implemented")
+}
+func (*UnimplementedControllerServiceServer) GetPartitionGroups(ctx context.Context, req *GetPartitionGroupsRequest) (*GetPartitionGroupsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetPartitionGroups not implemented")
+}
+func (*UnimplementedControllerServiceServer) EnterElection(req *PartitionElectionRequest, srv ControllerService_EnterElectionServer) error {
+	return status.Errorf(codes.Unimplemented, "method EnterElection not implemented")
 }
 
 func RegisterControllerServiceServer(s *grpc.Server, srv ControllerServiceServer) {

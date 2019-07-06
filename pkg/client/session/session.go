@@ -2,8 +2,9 @@ package session
 
 import (
 	"context"
+	pbprimitive "github.com/atomix/atomix-go-client/proto/atomix/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
-	headers "github.com/atomix/atomix-go-client/proto/atomix/headers"
+	"github.com/atomix/atomix-go-client/proto/atomix/headers"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sync"
 	"time"
@@ -42,7 +43,7 @@ func New(ctx context.Context, name primitive.Name, handler Handler, opts ...Sess
 		opts[i].prepare(options)
 	}
 	session := &Session{
-		Name: &headers.Name{
+		Name: &pbprimitive.Name{
 			Namespace: name.Application,
 			Name:      name.Name,
 		},
@@ -59,7 +60,7 @@ func New(ctx context.Context, name primitive.Name, handler Handler, opts ...Sess
 }
 
 type Session struct {
-	Name               *headers.Name
+	Name               *pbprimitive.Name
 	Timeout            time.Duration
 	SessionId          uint64
 	handler            Handler

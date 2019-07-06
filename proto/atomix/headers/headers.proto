@@ -2,14 +2,10 @@ syntax = "proto3";
 
 package atomix.headers;
 
-// Namespaced primitive name
-message Name {
-    string name = 1;
-    string namespace = 2;
-}
+import "atomix/primitive/primitive.proto";
 
 message RequestHeader {
-    Name name = 1;
+    atomix.primitive.Name name = 1;
     uint64 session_id = 2;
     uint64 index = 3;
     uint64 sequence_number = 4;

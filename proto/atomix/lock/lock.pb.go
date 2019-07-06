@@ -10,6 +10,8 @@ import (
 	proto "github.com/golang/protobuf/proto"
 	duration "github.com/golang/protobuf/ptypes/duration"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -696,6 +698,29 @@ type LockServiceServer interface {
 	Lock(context.Context, *LockRequest) (*LockResponse, error)
 	Unlock(context.Context, *UnlockRequest) (*UnlockResponse, error)
 	IsLocked(context.Context, *IsLockedRequest) (*IsLockedResponse, error)
+}
+
+// UnimplementedLockServiceServer can be embedded to have forward compatible implementations.
+type UnimplementedLockServiceServer struct {
+}
+
+func (*UnimplementedLockServiceServer) Create(ctx context.Context, req *CreateRequest) (*CreateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Create not implemented")
+}
+func (*UnimplementedLockServiceServer) KeepAlive(ctx context.Context, req *KeepAliveRequest) (*KeepAliveResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method KeepAlive not implemented")
+}
+func (*UnimplementedLockServiceServer) Close(ctx context.Context, req *CloseRequest) (*CloseResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Close not implemented")
+}
+func (*UnimplementedLockServiceServer) Lock(ctx context.Context, req *LockRequest) (*LockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Lock not implemented")
+}
+func (*UnimplementedLockServiceServer) Unlock(ctx context.Context, req *UnlockRequest) (*UnlockResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Unlock not implemented")
+}
+func (*UnimplementedLockServiceServer) IsLocked(ctx context.Context, req *IsLockedRequest) (*IsLockedResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method IsLocked not implemented")
 }
 
 func RegisterLockServiceServer(s *grpc.Server, srv LockServiceServer) {

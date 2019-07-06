@@ -30,24 +30,24 @@ func (s *TestServer) IncrementIndex() uint64 {
 	return s.Index
 }
 
-func (s *TestServer) CreateHeader(ctx context.Context) (*atomix_headers.ResponseHeader, error) {
+func (s *TestServer) CreateHeader(ctx context.Context) (*headers.ResponseHeader, error) {
 	index := s.IncrementIndex()
 	session := s.NewSession()
 	session.Complete(0)
-	return &atomix_headers.ResponseHeader{
+	return &headers.ResponseHeader{
 		SessionId: index,
 		Index:     index,
 	}, nil
 }
 
-func (s *TestServer) KeepAliveHeader(ctx context.Context, h *atomix_headers.RequestHeader) (*atomix_headers.ResponseHeader, error) {
+func (s *TestServer) KeepAliveHeader(ctx context.Context, h *headers.RequestHeader) (*headers.ResponseHeader, error) {
 	index := s.IncrementIndex()
 	if session, exists := s.sessions[h.SessionId]; exists {
-		streams := []*atomix_headers.StreamHeader{}
+		streams := []*headers.StreamHeader{}
 		for _, stream := range session.streams {
 			streams = append(streams, stream.Header(uint64(index)))
 		}
-		return &atomix_headers.ResponseHeader{
+		return &headers.ResponseHeader{
 			SessionId:      h.SessionId,
 			Index:          index,
 			SequenceNumber: session.SequenceNumber,
@@ -58,7 +58,7 @@ func (s *TestServer) KeepAliveHeader(ctx context.Context, h *atomix_headers.Requ
 	}
 }
 
-func (s *TestServer) CloseHeader(ctx context.Context, h *atomix_headers.RequestHeader) error {
+func (s *TestServer) CloseHeader(ctx context.Context, h *headers.RequestHeader) error {
 	s.IncrementIndex()
 	if _, exists := s.sessions[h.SessionId]; exists {
 		delete(s.sessions, h.SessionId)
@@ -146,12 +146,12 @@ func (s *TestSession) Complete(sequence uint64) {
 }
 
 // NewResponseHeaders creates a new response header with headers for all open streams
-func (s *TestSession) NewResponseHeader() (*atomix_headers.ResponseHeader, error) {
-	streams := []*atomix_headers.StreamHeader{}
+func (s *TestSession) NewResponseHeader() (*headers.ResponseHeader, error) {
+	streams := []*headers.StreamHeader{}
 	for _, stream := range s.streams {
 		streams = append(streams, stream.Header(uint64(s.server.Index)))
 	}
-	return &atomix_headers.ResponseHeader{
+	return &headers.ResponseHeader{
 		SessionId:      s.Id,
 		Index:          s.server.Index,
 		SequenceNumber: s.SequenceNumber,
@@ -173,8 +173,8 @@ type TestStream struct {
 }
 
 // header creates a new stream header
-func (s *TestStream) Header(index uint64) *atomix_headers.StreamHeader {
-	return &atomix_headers.StreamHeader{
+func (s *TestStream) Header(index uint64) *headers.StreamHeader {
+	return &headers.StreamHeader{
 		StreamId:       s.Id,
 		Index:          index,
 		LastItemNumber: s.ItemNumber,
@@ -182,12 +182,12 @@ func (s *TestStream) Header(index uint64) *atomix_headers.StreamHeader {
 }
 
 // NewResponseHeaders returns headers for the stream
-func (s *TestStream) NewResponseHeader() *atomix_headers.ResponseHeader {
-	return &atomix_headers.ResponseHeader{
+func (s *TestStream) NewResponseHeader() *headers.ResponseHeader {
+	return &headers.ResponseHeader{
 		SessionId:      s.Id,
 		Index:          s.session.server.Index,
 		SequenceNumber: s.session.SequenceNumber,
-		Streams: []*atomix_headers.StreamHeader{
+		Streams: []*headers.StreamHeader{
 			{
 				StreamId:       s.Id,
 				Index:          s.session.server.Index,

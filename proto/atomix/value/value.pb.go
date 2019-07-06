@@ -10,6 +10,8 @@ import (
 	proto "github.com/golang/protobuf/proto"
 	duration "github.com/golang/protobuf/ptypes/duration"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -924,6 +926,32 @@ type ValueServiceServer interface {
 	Get(context.Context, *GetRequest) (*GetResponse, error)
 	CheckAndSet(context.Context, *CheckAndSetRequest) (*CheckAndSetResponse, error)
 	Event(*EventRequest, ValueService_EventServer) error
+}
+
+// UnimplementedValueServiceServer can be embedded to have forward compatible implementations.
+type UnimplementedValueServiceServer struct {
+}
+
+func (*UnimplementedValueServiceServer) Create(ctx context.Context, req *CreateRequest) (*CreateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Create not implemented")
+}
+func (*UnimplementedValueServiceServer) KeepAlive(ctx context.Context, req *KeepAliveRequest) (*KeepAliveResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method KeepAlive not implemented")
+}
+func (*UnimplementedValueServiceServer) Close(ctx context.Context, req *CloseRequest) (*CloseResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Close not implemented")
+}
+func (*UnimplementedValueServiceServer) Set(ctx context.Context, req *SetRequest) (*SetResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Set not implemented")
+}
+func (*UnimplementedValueServiceServer) Get(ctx context.Context, req *GetRequest) (*GetResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Get not implemented")
+}
+func (*UnimplementedValueServiceServer) CheckAndSet(ctx context.Context, req *CheckAndSetRequest) (*CheckAndSetResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CheckAndSet not implemented")
+}
+func (*UnimplementedValueServiceServer) Event(req *EventRequest, srv ValueService_EventServer) error {
+	return status.Errorf(codes.Unimplemented, "method Event not implemented")
 }
 
 func RegisterValueServiceServer(s *grpc.Server, srv ValueServiceServer) {

@@ -10,6 +10,8 @@ import (
 	proto "github.com/golang/protobuf/proto"
 	duration "github.com/golang/protobuf/ptypes/duration"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -1621,6 +1623,47 @@ type MapServiceServer interface {
 	Clear(context.Context, *ClearRequest) (*ClearResponse, error)
 	Events(*EventRequest, MapService_EventsServer) error
 	Entries(*EntriesRequest, MapService_EntriesServer) error
+}
+
+// UnimplementedMapServiceServer can be embedded to have forward compatible implementations.
+type UnimplementedMapServiceServer struct {
+}
+
+func (*UnimplementedMapServiceServer) Create(ctx context.Context, req *CreateRequest) (*CreateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Create not implemented")
+}
+func (*UnimplementedMapServiceServer) KeepAlive(ctx context.Context, req *KeepAliveRequest) (*KeepAliveResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method KeepAlive not implemented")
+}
+func (*UnimplementedMapServiceServer) Close(ctx context.Context, req *CloseRequest) (*CloseResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Close not implemented")
+}
+func (*UnimplementedMapServiceServer) Size(ctx context.Context, req *SizeRequest) (*SizeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Size not implemented")
+}
+func (*UnimplementedMapServiceServer) Exists(ctx context.Context, req *ExistsRequest) (*ExistsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Exists not implemented")
+}
+func (*UnimplementedMapServiceServer) Put(ctx context.Context, req *PutRequest) (*PutResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Put not implemented")
+}
+func (*UnimplementedMapServiceServer) Replace(ctx context.Context, req *ReplaceRequest) (*ReplaceResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Replace not implemented")
+}
+func (*UnimplementedMapServiceServer) Get(ctx context.Context, req *GetRequest) (*GetResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Get not implemented")
+}
+func (*UnimplementedMapServiceServer) Remove(ctx context.Context, req *RemoveRequest) (*RemoveResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Remove not implemented")
+}
+func (*UnimplementedMapServiceServer) Clear(ctx context.Context, req *ClearRequest) (*ClearResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Clear not implemented")
+}
+func (*UnimplementedMapServiceServer) Events(req *EventRequest, srv MapService_EventsServer) error {
+	return status.Errorf(codes.Unimplemented, "method Events not implemented")
+}
+func (*UnimplementedMapServiceServer) Entries(req *EntriesRequest, srv MapService_EntriesServer) error {
+	return status.Errorf(codes.Unimplemented, "method Entries not implemented")
 }
 
 func RegisterMapServiceServer(s *grpc.Server, srv MapServiceServer) {
