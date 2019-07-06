@@ -267,10 +267,10 @@ func (g *PartitionGroup) getPrimitives(ctx context.Context, t string) ([]*pbprim
 		return nil, err
 	}
 
-	primitiveResults := make(map[pbprimitive.Name]*pbprimitive.PrimitiveInfo)
+	primitiveResults := make(map[string]*pbprimitive.PrimitiveInfo)
 	for _, result := range results {
 		info := result.(*pbprimitive.PrimitiveInfo)
-		primitiveResults[*info.Name] = info
+		primitiveResults[info.Name.String()] = info
 	}
 
 	primitives := make([]*pbprimitive.PrimitiveInfo, 0, len(primitiveResults))
