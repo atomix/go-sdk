@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/atomix/atomix-go-client/pkg/client/map_"
 	"github.com/atomix/atomix-go-client/pkg/client/counter"
 	"github.com/atomix/atomix-go-client/pkg/client/election"
+	"github.com/atomix/atomix-go-client/pkg/client/list"
 	"github.com/atomix/atomix-go-client/pkg/client/lock"
+	"github.com/atomix/atomix-go-client/pkg/client/map_"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/set"
@@ -213,6 +214,7 @@ type PartitionGroup struct {
 	counter.CounterClient
 	map_.MapClient
 	election.ElectionClient
+	list.ListClient
 	lock.LockClient
 	set.SetClient
 
@@ -232,6 +234,10 @@ func (g *PartitionGroup) GetCounter(ctx context.Context, name string, opts ...se
 
 func (g *PartitionGroup) GetElection(ctx context.Context, name string, opts ...session.SessionOption) (election.Election, error) {
 	return election.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.partitions, opts...)
+}
+
+func (g *PartitionGroup) GetList(ctx context.Context, name string, opts ...session.SessionOption) (list.List, error) {
+	return list.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.partitions, opts...)
 }
 
 func (g *PartitionGroup) GetLock(ctx context.Context, name string, opts ...session.SessionOption) (lock.Lock, error) {

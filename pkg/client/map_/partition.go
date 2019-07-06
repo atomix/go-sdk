@@ -223,11 +223,11 @@ func (m *mapPartition) Listen(ctx context.Context, c chan<- *MapEvent) error {
 			var t MapEventType
 			switch response.Type {
 			case pb.EventResponse_INSERTED:
-				t = EVENT_INSERTED
+				t = EventInserted
 			case pb.EventResponse_UPDATED:
-				t = EVENT_UPDATED
+				t = EventUpdated
 			case pb.EventResponse_REMOVED:
-				t = EVENT_REMOVED
+				t = EventRemoved
 			}
 
 			// If no stream headers are provided by the server, immediately complete the event.

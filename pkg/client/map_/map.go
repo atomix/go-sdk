@@ -38,9 +38,9 @@ func (kv KeyValue) String() string {
 type MapEventType string
 
 const (
-	EVENT_INSERTED MapEventType = "inserted"
-	EVENT_UPDATED  MapEventType = "updated"
-	EVENT_REMOVED  MapEventType = "removed"
+	EventInserted MapEventType = "inserted"
+	EventUpdated  MapEventType = "updated"
+	EventRemoved  MapEventType = "removed"
 )
 
 type MapEvent struct {
