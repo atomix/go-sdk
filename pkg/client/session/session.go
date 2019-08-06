@@ -5,7 +5,6 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/proto/atomix/headers"
 	pbprimitive "github.com/atomix/atomix-go-client/proto/atomix/primitive"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"sync"
 	"time"
 )
@@ -51,7 +50,7 @@ func New(ctx context.Context, name primitive.Name, handler Handler, opts ...Sess
 		Timeout: options.timeout,
 		streams: make(map[uint64]*Stream),
 		mu:      sync.RWMutex{},
-		stopped: make(chan struct{}),
+		ticker:  time.NewTicker(options.timeout / 2),
 	}
 	if err := session.start(ctx); err != nil {
 		return nil, err
@@ -69,7 +68,7 @@ type Session struct {
 	lastSequenceNumber uint64
 	streams            map[uint64]*Stream
 	mu                 sync.RWMutex
-	stopped            chan struct{}
+	ticker             *time.Ticker
 }
 
 // start creates the session and begins keep-alives
@@ -79,23 +78,25 @@ func (s *Session) start(ctx context.Context) error {
 		return err
 	}
 
-	go wait.Until(func() {
-		s.handler.KeepAlive(context.TODO(), s)
-	}, s.Timeout/2, s.stopped)
+	go func() {
+		for _ := range s.ticker.C {
+			s.handler.KeepAlive(context.TODO(), s)
+		}
+	}()
 	return nil
 }
 
 // Close closes the session
 func (s *Session) Close() error {
 	err := s.handler.Close(context.TODO(), s)
-	close(s.stopped)
+	s.ticker.Stop()
 	return err
 }
 
 // Delete closes the session and deletes the primitive
 func (s *Session) Delete() error {
 	err := s.handler.Delete(context.TODO(), s)
-	close(s.stopped)
+	s.ticker.Stop()
 	return err
 }
 
