@@ -61,3 +61,24 @@ func (o defaultOption) afterGet(response *pb.GetResponse) {
 		response.Value = o.def
 	}
 }
+
+// WatchOption is an option for a map Watch request
+type WatchOption interface {
+	beforeWatch(request *pb.EventRequest)
+	afterWatch(response *pb.EventResponse)
+}
+
+// WithReplay returns a watch option that enables replay of watch events
+func WithReplay() WatchOption {
+	return replayOption{}
+}
+
+type replayOption struct{}
+
+func (o replayOption) beforeWatch(request *pb.EventRequest) {
+	request.Replay = true
+}
+
+func (o replayOption) afterWatch(response *pb.EventResponse) {
+
+}

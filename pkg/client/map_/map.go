@@ -22,7 +22,7 @@ type Map interface {
 	Size(ctx context.Context) (int, error)
 	Clear(ctx context.Context) error
 	Entries(ctx context.Context, ch chan<- *KeyValue) error
-	Listen(ctx context.Context, ch chan<- *MapEvent) error
+	Watch(ctx context.Context, ch chan<- *MapEvent, opts ...WatchOption) error
 }
 
 type KeyValue struct {
@@ -38,6 +38,7 @@ func (kv KeyValue) String() string {
 type MapEventType string
 
 const (
+	EventNone     MapEventType = ""
 	EventInserted MapEventType = "inserted"
 	EventUpdated  MapEventType = "updated"
 	EventRemoved  MapEventType = "removed"
@@ -63,22 +64,22 @@ func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn
 		maps[i] = result.(Map)
 	}
 
-	return &_map{
+	return &map_{
 		name:       name,
 		partitions: maps,
 	}, nil
 }
 
-type _map struct {
+type map_ struct {
 	name       primitive.Name
 	partitions []Map
 }
 
-func (m *_map) Name() primitive.Name {
+func (m *map_) Name() primitive.Name {
 	return m.name
 }
 
-func (m *_map) getPartition(key string) (Map, error) {
+func (m *map_) getPartition(key string) (Map, error) {
 	i, err := util.GetPartitionIndex(key, len(m.partitions))
 	if err != nil {
 		return nil, err
@@ -86,7 +87,7 @@ func (m *_map) getPartition(key string) (Map, error) {
 	return m.partitions[i], nil
 }
 
-func (m *_map) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*KeyValue, error) {
+func (m *map_) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*KeyValue, error) {
 	session, err := m.getPartition(key)
 	if err != nil {
 		return nil, err
@@ -94,7 +95,7 @@ func (m *_map) Put(ctx context.Context, key string, value []byte, opts ...PutOpt
 	return session.Put(ctx, key, value, opts...)
 }
 
-func (m *_map) Get(ctx context.Context, key string, opts ...GetOption) (*KeyValue, error) {
+func (m *map_) Get(ctx context.Context, key string, opts ...GetOption) (*KeyValue, error) {
 	session, err := m.getPartition(key)
 	if err != nil {
 		return nil, err
@@ -102,7 +103,7 @@ func (m *_map) Get(ctx context.Context, key string, opts ...GetOption) (*KeyValu
 	return session.Get(ctx, key, opts...)
 }
 
-func (m *_map) Remove(ctx context.Context, key string, opts ...RemoveOption) (*KeyValue, error) {
+func (m *map_) Remove(ctx context.Context, key string, opts ...RemoveOption) (*KeyValue, error) {
 	session, err := m.getPartition(key)
 	if err != nil {
 		return nil, err
@@ -110,7 +111,7 @@ func (m *_map) Remove(ctx context.Context, key string, opts ...RemoveOption) (*K
 	return session.Remove(ctx, key, opts...)
 }
 
-func (m *_map) Size(ctx context.Context) (int, error) {
+func (m *map_) Size(ctx context.Context) (int, error) {
 	results, err := util.ExecuteAsync(len(m.partitions), func(i int) (interface{}, error) {
 		return m.partitions[i].Size(ctx)
 	})
@@ -125,7 +126,7 @@ func (m *_map) Size(ctx context.Context) (int, error) {
 	return size, nil
 }
 
-func (m *_map) Entries(ctx context.Context, ch chan<- *KeyValue) error {
+func (m *map_) Entries(ctx context.Context, ch chan<- *KeyValue) error {
 	n := len(m.partitions)
 	wg := sync.WaitGroup{}
 	wg.Add(n)
@@ -147,25 +148,25 @@ func (m *_map) Entries(ctx context.Context, ch chan<- *KeyValue) error {
 	})
 }
 
-func (m *_map) Clear(ctx context.Context) error {
+func (m *map_) Clear(ctx context.Context) error {
 	return util.IterAsync(len(m.partitions), func(i int) error {
 		return m.partitions[i].Clear(ctx)
 	})
 }
 
-func (m *_map) Listen(ctx context.Context, ch chan<- *MapEvent) error {
+func (m *map_) Watch(ctx context.Context, ch chan<- *MapEvent, opts ...WatchOption) error {
 	return util.IterAsync(len(m.partitions), func(i int) error {
-		return m.partitions[i].Listen(ctx, ch)
+		return m.partitions[i].Watch(ctx, ch, opts...)
 	})
 }
 
-func (m *_map) Close() error {
+func (m *map_) Close() error {
 	return util.IterAsync(len(m.partitions), func(i int) error {
 		return m.partitions[i].Close()
 	})
 }
 
-func (m *_map) Delete() error {
+func (m *map_) Delete() error {
 	return util.IterAsync(len(m.partitions), func(i int) error {
 		return m.partitions[i].Delete()
 	})

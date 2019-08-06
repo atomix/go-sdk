@@ -23,19 +23,21 @@ type List interface {
 	Remove(ctx context.Context, index int) (string, error)
 	Size(ctx context.Context) (int, error)
 	Items(ctx context.Context, ch chan<- string) error
-	Listen(ctx context.Context, ch chan<- *ListEvent) error
+	Watch(ctx context.Context, ch chan<- *ListEvent, opts ...WatchOption) error
 	Clear(ctx context.Context) error
 }
 
 type ListEventType string
 
 const (
+	EventNone     ListEventType = ""
 	EventInserted ListEventType = "added"
 	EventRemoved  ListEventType = "removed"
 )
 
 type ListEvent struct {
 	Type  ListEventType
+	Index int
 	Value string
 }
 
@@ -155,11 +157,16 @@ func (l *list) Items(ctx context.Context, ch chan<- string) error {
 	return nil
 }
 
-func (l *list) Listen(ctx context.Context, c chan<- *ListEvent) error {
+func (l *list) Watch(ctx context.Context, c chan<- *ListEvent, opts ...WatchOption) error {
 	request := &pb.EventRequest{
 		Header: l.session.NextHeader(),
 	}
-	events, err := l.client.Listen(ctx, request)
+
+	for _, opt := range opts {
+		opt.beforeWatch(request)
+	}
+
+	events, err := l.client.Events(ctx, request)
 	if err != nil {
 		return err
 	}
@@ -175,30 +182,24 @@ func (l *list) Listen(ctx context.Context, c chan<- *ListEvent) error {
 				glog.Error("Failed to receive event stream", err)
 			}
 
+			for _, opt := range opts {
+				opt.afterWatch(response)
+			}
+
 			var t ListEventType
 			switch response.Type {
+			case pb.EventResponse_NONE:
+				t = EventNone
 			case pb.EventResponse_ADDED:
 				t = EventInserted
 			case pb.EventResponse_REMOVED:
 				t = EventRemoved
 			}
 
-			// If no stream headers are provided by the server, immediately complete the event.
-			if len(response.Header.Streams) == 0 {
-				c <- &ListEvent{
-					Type:  t,
-					Value: response.Value,
-				}
-			} else {
-				// Wait for the stream to advanced at least to the responses.
-				stream := response.Header.Streams[0]
-				_, ok := <-l.session.WaitStream(stream)
-				if ok {
-					c <- &ListEvent{
-						Type:  t,
-						Value: response.Value,
-					}
-				}
+			c <- &ListEvent{
+				Type:  t,
+				Index: int(response.Index),
+				Value: response.Value,
 			}
 		}
 	}()

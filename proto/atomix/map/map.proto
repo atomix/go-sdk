@@ -127,6 +127,7 @@ message EntriesResponse {
 
 message EventRequest {
     atomix.headers.RequestHeader header = 1;
+    bool replay = 2;
 }
 
 message EventResponse {
@@ -139,9 +140,10 @@ message EventResponse {
     int64 new_version = 7;
 
     enum Type {
-        INSERTED = 0;
-        UPDATED = 1;
-        REMOVED = 2;
+        NONE = 0;
+        INSERTED = 1;
+        UPDATED = 2;
+        REMOVED = 3;
     }
 }
 
@@ -155,28 +157,40 @@ enum ResponseStatus {
 // Map service
 service MapService {
 
-    rpc Create (CreateRequest) returns (CreateResponse) {}
+    rpc Create (CreateRequest) returns (CreateResponse) {
+    }
 
-    rpc KeepAlive (KeepAliveRequest) returns (KeepAliveResponse) {}
+    rpc KeepAlive (KeepAliveRequest) returns (KeepAliveResponse) {
+    }
 
-    rpc Close (CloseRequest) returns (CloseResponse) {}
+    rpc Close (CloseRequest) returns (CloseResponse) {
+    }
 
-    rpc Size (SizeRequest) returns (SizeResponse) {}
+    rpc Size (SizeRequest) returns (SizeResponse) {
+    }
 
-    rpc Exists (ExistsRequest) returns (ExistsResponse) {}
+    rpc Exists (ExistsRequest) returns (ExistsResponse) {
+    }
 
-    rpc Put (PutRequest) returns (PutResponse) {}
+    rpc Put (PutRequest) returns (PutResponse) {
+    }
 
-    rpc Replace (ReplaceRequest) returns (ReplaceResponse) {}
+    rpc Replace (ReplaceRequest) returns (ReplaceResponse) {
+    }
 
-    rpc Get (GetRequest) returns (GetResponse) {}
+    rpc Get (GetRequest) returns (GetResponse) {
+    }
 
-    rpc Remove (RemoveRequest) returns (RemoveResponse) {}
+    rpc Remove (RemoveRequest) returns (RemoveResponse) {
+    }
 
-    rpc Clear (ClearRequest) returns (ClearResponse) {}
+    rpc Clear (ClearRequest) returns (ClearResponse) {
+    }
 
-    rpc Events (EventRequest) returns (stream EventResponse) {}
+    rpc Events (EventRequest) returns (stream EventResponse) {
+    }
 
-    rpc Entries (EntriesRequest) returns (stream EntriesResponse) {}
+    rpc Entries (EntriesRequest) returns (stream EntriesResponse) {
+    }
 
 }

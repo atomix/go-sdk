@@ -19,7 +19,7 @@ type Set interface {
 	Contains(ctx context.Context, value string) (bool, error)
 	Size(ctx context.Context) (int, error)
 	Clear(ctx context.Context) error
-	Listen(ctx context.Context, ch chan<- *SetEvent) error
+	Watch(ctx context.Context, ch chan<- *SetEvent, opts ...WatchOption) error
 }
 
 type SetEventType string
@@ -115,9 +115,9 @@ func (s *set) Clear(ctx context.Context) error {
 	})
 }
 
-func (s *set) Listen(ctx context.Context, ch chan<- *SetEvent) error {
+func (s *set) Watch(ctx context.Context, ch chan<- *SetEvent, opts ...WatchOption) error {
 	return util.IterAsync(len(s.partitions), func(i int) error {
-		return s.partitions[i].Listen(ctx, ch)
+		return s.partitions[i].Watch(ctx, ch, opts...)
 	})
 }
 

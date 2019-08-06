@@ -115,11 +115,11 @@ func (s *setPartition) Clear(ctx context.Context) error {
 	return nil
 }
 
-func (s *setPartition) Listen(ctx context.Context, c chan<- *SetEvent) error {
+func (s *setPartition) Watch(ctx context.Context, c chan<- *SetEvent, opts ...WatchOption) error {
 	request := &pb.EventRequest{
 		Header: s.session.NextHeader(),
 	}
-	events, err := s.client.Listen(ctx, request)
+	events, err := s.client.Events(ctx, request)
 	if err != nil {
 		return err
 	}
@@ -143,22 +143,9 @@ func (s *setPartition) Listen(ctx context.Context, c chan<- *SetEvent) error {
 				t = EVENT_REMOVED
 			}
 
-			// If no stream headers are provided by the server, immediately complete the event.
-			if len(response.Header.Streams) == 0 {
-				c <- &SetEvent{
-					Type:  t,
-					Value: response.Value,
-				}
-			} else {
-				// Wait for the stream to advanced at least to the responses.
-				stream := response.Header.Streams[0]
-				_, ok := <-s.session.WaitStream(stream)
-				if ok {
-					c <- &SetEvent{
-						Type:  t,
-						Value: response.Value,
-					}
-				}
+			c <- &SetEvent{
+				Type:  t,
+				Value: response.Value,
 			}
 		}
 	}()

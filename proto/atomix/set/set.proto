@@ -82,6 +82,7 @@ message ClearResponse {
 
 message EventRequest {
     atomix.headers.RequestHeader header = 1;
+    bool replay = 2;
 }
 
 message EventResponse {
@@ -90,8 +91,9 @@ message EventResponse {
     string value = 3;
 
     enum Type {
-        ADDED = 0;
-        REMOVED = 1;
+        NONE = 0;
+        ADDED = 1;
+        REMOVED = 2;
     }
 }
 
@@ -113,43 +115,43 @@ enum ResponseStatus {
 // Set service
 service SetService {
 
-    rpc Create(CreateRequest) returns (CreateResponse) {
+    rpc Create (CreateRequest) returns (CreateResponse) {
 
     }
 
-    rpc KeepAlive(KeepAliveRequest) returns (KeepAliveResponse) {
+    rpc KeepAlive (KeepAliveRequest) returns (KeepAliveResponse) {
 
     }
 
-    rpc Close(CloseRequest) returns (CloseResponse) {
+    rpc Close (CloseRequest) returns (CloseResponse) {
 
     }
 
-    rpc Size(SizeRequest) returns (SizeResponse) {
+    rpc Size (SizeRequest) returns (SizeResponse) {
 
     }
 
-    rpc Contains(ContainsRequest) returns (ContainsResponse) {
+    rpc Contains (ContainsRequest) returns (ContainsResponse) {
 
     }
 
-    rpc Add(AddRequest) returns (AddResponse) {
+    rpc Add (AddRequest) returns (AddResponse) {
 
     }
 
-    rpc Remove(RemoveRequest) returns (RemoveResponse) {
+    rpc Remove (RemoveRequest) returns (RemoveResponse) {
 
     }
 
-    rpc Clear(ClearRequest) returns (ClearResponse) {
+    rpc Clear (ClearRequest) returns (ClearResponse) {
 
     }
 
-    rpc Listen(EventRequest) returns (stream EventResponse) {
+    rpc Events (EventRequest) returns (stream EventResponse) {
 
     }
 
-    rpc Iterate(IterateRequest) returns (stream IterateResponse) {
+    rpc Iterate (IterateRequest) returns (stream IterateResponse) {
 
     }
 }

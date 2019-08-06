@@ -200,10 +200,15 @@ func (m *mapPartition) Entries(ctx context.Context, ch chan<- *KeyValue) error {
 	return nil
 }
 
-func (m *mapPartition) Listen(ctx context.Context, c chan<- *MapEvent) error {
+func (m *mapPartition) Watch(ctx context.Context, c chan<- *MapEvent, opts ...WatchOption) error {
 	request := &pb.EventRequest{
 		Header: m.session.NextHeader(),
 	}
+
+	for _, opt := range opts {
+		opt.beforeWatch(request)
+	}
+
 	events, err := m.client.Events(ctx, request)
 	if err != nil {
 		return err
@@ -220,8 +225,14 @@ func (m *mapPartition) Listen(ctx context.Context, c chan<- *MapEvent) error {
 				glog.Error("Failed to receive event stream", err)
 			}
 
+			for _, opt := range opts {
+				opt.afterWatch(response)
+			}
+
 			var t MapEventType
 			switch response.Type {
+			case pb.EventResponse_NONE:
+				t = EventNone
 			case pb.EventResponse_INSERTED:
 				t = EventInserted
 			case pb.EventResponse_UPDATED:
@@ -230,26 +241,11 @@ func (m *mapPartition) Listen(ctx context.Context, c chan<- *MapEvent) error {
 				t = EventRemoved
 			}
 
-			// If no stream headers are provided by the server, immediately complete the event.
-			if len(response.Header.Streams) == 0 {
-				c <- &MapEvent{
-					Type:    t,
-					Key:     response.Key,
-					Value:   response.NewValue,
-					Version: response.NewVersion,
-				}
-			} else {
-				// Wait for the stream to advanced at least to the responses.
-				stream := response.Header.Streams[0]
-				_, ok := <-m.session.WaitStream(stream)
-				if ok {
-					c <- &MapEvent{
-						Type:    t,
-						Key:     response.Key,
-						Value:   response.NewValue,
-						Version: response.NewVersion,
-					}
-				}
+			c <- &MapEvent{
+				Type:    t,
+				Key:     response.Key,
+				Value:   response.NewValue,
+				Version: response.NewVersion,
 			}
 		}
 	}()
