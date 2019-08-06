@@ -2,9 +2,9 @@ package session
 
 import (
 	"context"
-	pbprimitive "github.com/atomix/atomix-go-client/proto/atomix/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/proto/atomix/headers"
+	pbprimitive "github.com/atomix/atomix-go-client/proto/atomix/primitive"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sync"
 	"time"
@@ -62,16 +62,17 @@ func New(ctx context.Context, name primitive.Name, handler Handler, opts ...Sess
 type Session struct {
 	Name               *pbprimitive.Name
 	Timeout            time.Duration
-	SessionId          uint64
+	SessionID          uint64
 	handler            Handler
 	lastIndex          uint64
-	sequenceNumber     uint64
+	requestID          uint64
 	lastSequenceNumber uint64
 	streams            map[uint64]*Stream
 	mu                 sync.RWMutex
 	stopped            chan struct{}
 }
 
+// start creates the session and begins keep-alives
 func (s *Session) start(ctx context.Context) error {
 	err := s.handler.Create(ctx, s)
 	if err != nil {
@@ -84,157 +85,124 @@ func (s *Session) start(ctx context.Context) error {
 	return nil
 }
 
+// Close closes the session
 func (s *Session) Close() error {
 	err := s.handler.Close(context.TODO(), s)
 	close(s.stopped)
 	return err
 }
 
+// Delete closes the session and deletes the primitive
 func (s *Session) Delete() error {
 	err := s.handler.Delete(context.TODO(), s)
 	close(s.stopped)
 	return err
 }
 
-func (s *Session) GetHeader() *headers.RequestHeader {
+// GetRequest gets the current read header
+func (s *Session) GetRequest() *headers.RequestHeader {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return &headers.RequestHeader{
-		Name:           s.Name,
-		SessionId:      s.SessionId,
-		Index:          s.lastIndex,
-		SequenceNumber: s.sequenceNumber,
-		Streams:        s.getStreamHeaders(),
+		Name:      s.Name,
+		SessionId: s.SessionID,
+		Index:     s.lastIndex,
+		RequestId: s.requestID,
 	}
 }
 
-func (s *Session) NextHeader() *headers.RequestHeader {
+// NextRequest returns the next write header
+func (s *Session) NextRequest() *headers.RequestHeader {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.sequenceNumber = s.sequenceNumber + 1
+	s.requestID = s.requestID + 1
 	return &headers.RequestHeader{
-		Name:           s.Name,
-		SessionId:      s.SessionId,
-		Index:          s.lastIndex,
-		SequenceNumber: s.sequenceNumber,
-		Streams:        s.getStreamHeaders(),
+		Name:      s.Name,
+		SessionId: s.SessionID,
+		Index:     s.lastIndex,
+		RequestId: s.requestID,
+		Streams:   s.getStreamHeaders(),
 	}
 }
 
-func (s *Session) UpdateHeader(header *headers.ResponseHeader) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if header.SessionId > s.SessionId {
-		s.SessionId = header.SessionId
-		s.lastIndex = header.SessionId
-	}
+// RecordResponse records the index in a response header
+func (s *Session) RecordResponse(header *headers.ResponseHeader) {
+	// Use a double-checked lock to avoid locking when multiple responses are received for an index.
 	if header.Index > s.lastIndex {
-		s.lastIndex = header.Index
-	}
+		s.mu.Lock()
+		defer s.mu.Unlock()
 
-	streams := s.streams
-	for j := range header.Streams {
-		streamHeader := header.Streams[j]
-		id := streamHeader.StreamId
-		stream, ok := streams[id]
-		if ok {
-			stream.complete(streamHeader)
-		} else {
-			streams[id] = newStream(id)
+		// If the session ID is set, ensure the session is initialized
+		if header.SessionId > s.SessionID {
+			s.SessionID = header.SessionId
+			s.lastIndex = header.SessionId
+		}
+
+		// If the response index has increased, update the last received index
+		if header.Index > s.lastIndex {
+			s.lastIndex = header.Index
 		}
 	}
 }
 
-func (s *Session) WaitStream(header *headers.StreamHeader) chan struct{} {
-	ch := make(chan struct{}, 1)
-
+// NewStream creates a new stream
+func (s *Session) NewStream(streamID uint64) *Stream {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	stream, ok := s.streams[header.StreamId]
-
-	// If the stream does not exist, close and return the channel.
-	if !ok {
-		close(ch)
-		return ch
+	stream := &Stream{
+		ID:      streamID,
+		session: s,
 	}
-
-	// If the response was not received in stream order, skip the response.
-	if header.LastItemNumber != stream.lastItemNumber+1 {
-		close(ch)
-		return ch
-	}
-
-	// Update the stream received index and last item number to ensure the next response can be handled.
-	stream.receivedIndex = header.Index
-	stream.lastItemNumber = header.LastItemNumber
-
-	// If the response index for the session has advanced to the stream index, complete the stream.
-	if s.lastIndex >= header.Index {
-		stream.completeIndex = header.Index
-		stream.lastItemNumber = header.LastItemNumber
-		ch <- struct{}{}
-		close(ch)
-		return ch
-	}
-
-	// If the response index has not advanced to the stream index, enqueue the channel to be completed
-	// once the session has advanced to the response index.
-	queue, ok := stream.queue[header.Index]
-	if !ok {
-		queue := []chan struct{}{
-			ch,
-		}
-		stream.queue[header.Index] = queue
-	} else {
-		stream.queue[header.Index] = append(queue, ch)
-	}
-	return ch
+	s.streams[streamID] = stream
+	return stream
 }
 
+// deleteStream deletes the given stream from the session
+func (s *Session) deleteStream(streamID uint64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.streams, streamID)
+}
+
+// getStreamHeaders returns a slice of headers for all open streams
 func (s *Session) getStreamHeaders() []*headers.StreamHeader {
 	result := make([]*headers.StreamHeader, 0, len(s.streams))
 	for _, stream := range s.streams {
-		result = append(result, stream.newStreamHeader())
+		result = append(result, stream.getHeader())
 	}
 	return result
 }
 
-func newStream(id uint64) *Stream {
-	return &Stream{
-		id:            id,
-		receivedIndex: id,
-		completeIndex: id,
-		queue: make(map[uint64][]chan struct{}),
-	}
-}
-
+// Stream manages the context for a single response stream within a session
 type Stream struct {
-	id             uint64
-	receivedIndex  uint64
-	completeIndex  uint64
-	lastItemNumber uint64
-	queue          map[uint64][]chan struct{}
+	ID         uint64
+	session    *Session
+	responseID uint64
+	mu         sync.RWMutex
 }
 
-func (s *Stream) newStreamHeader() *headers.StreamHeader {
+// getHeader returns the current header for the stream
+func (s *Stream) getHeader() *headers.StreamHeader {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	return &headers.StreamHeader{
-		StreamId:       s.id,
-		Index:          s.receivedIndex,
-		LastItemNumber: s.lastItemNumber,
+		StreamId:   s.ID,
+		ResponseId: s.responseID,
 	}
 }
 
-func (s *Stream) complete(header *headers.StreamHeader) {
-	for s.completeIndex < header.Index {
-		s.completeIndex += 1
-		queue, ok := s.queue[s.completeIndex]
-		if ok {
-			for _, ch := range queue {
-				ch <- struct{}{}
-			}
-			delete(s.queue, s.completeIndex)
-		}
+// Serialize updates the stream response metadata and returns whether the response was received in sequential order
+func (s *Stream) Serialize(header *headers.ResponseHeader) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if header.ResponseId == s.responseID+1 {
+		s.responseID++
+		return true
 	}
+	return false
+}
+
+// Close closes the stream
+func (s *Stream) Close() {
+	s.session.deleteStream(s.ID)
 }

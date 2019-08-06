@@ -53,7 +53,7 @@ func (c *counter) Name() primitive.Name {
 
 func (c *counter) Get(ctx context.Context) (int64, error) {
 	request := &pb.GetRequest{
-		Header: c.session.GetHeader(),
+		Header: c.session.GetRequest(),
 	}
 
 	response, err := c.client.Get(ctx, request)
@@ -61,13 +61,13 @@ func (c *counter) Get(ctx context.Context) (int64, error) {
 		return 0, err
 	}
 
-	c.session.UpdateHeader(response.Header)
+	c.session.RecordResponse(response.Header)
 	return response.Value, nil
 }
 
 func (c *counter) Set(ctx context.Context, value int64) error {
 	request := &pb.SetRequest{
-		Header: c.session.NextHeader(),
+		Header: c.session.NextRequest(),
 		Value:  value,
 	}
 
@@ -76,13 +76,13 @@ func (c *counter) Set(ctx context.Context, value int64) error {
 		return err
 	}
 
-	c.session.UpdateHeader(response.Header)
+	c.session.RecordResponse(response.Header)
 	return nil
 }
 
 func (c *counter) Increment(ctx context.Context, delta int64) (int64, error) {
 	request := &pb.IncrementRequest{
-		Header: c.session.NextHeader(),
+		Header: c.session.NextRequest(),
 		Delta:  delta,
 	}
 
@@ -91,13 +91,13 @@ func (c *counter) Increment(ctx context.Context, delta int64) (int64, error) {
 		return 0, err
 	}
 
-	c.session.UpdateHeader(response.Header)
+	c.session.RecordResponse(response.Header)
 	return response.NextValue, nil
 }
 
 func (c *counter) Decrement(ctx context.Context, delta int64) (int64, error) {
 	request := &pb.DecrementRequest{
-		Header: c.session.NextHeader(),
+		Header: c.session.NextRequest(),
 		Delta:  delta,
 	}
 
@@ -106,7 +106,7 @@ func (c *counter) Decrement(ctx context.Context, delta int64) (int64, error) {
 		return 0, err
 	}
 
-	c.session.UpdateHeader(response.Header)
+	c.session.RecordResponse(response.Header)
 	return response.NextValue, nil
 }
 

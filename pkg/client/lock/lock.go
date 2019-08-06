@@ -53,7 +53,7 @@ func (l *lock) Name() primitive.Name {
 
 func (l *lock) Lock(ctx context.Context, opts ...LockOption) (uint64, error) {
 	request := &pb.LockRequest{
-		Header: l.session.NextHeader(),
+		Header: l.session.NextRequest(),
 	}
 
 	for _, opt := range opts {
@@ -69,13 +69,13 @@ func (l *lock) Lock(ctx context.Context, opts ...LockOption) (uint64, error) {
 		opt.after(response)
 	}
 
-	l.session.UpdateHeader(response.Header)
+	l.session.RecordResponse(response.Header)
 	return response.Version, nil
 }
 
 func (l *lock) Unlock(ctx context.Context, opts ...UnlockOption) (bool, error) {
 	request := &pb.UnlockRequest{
-		Header: l.session.NextHeader(),
+		Header: l.session.NextRequest(),
 	}
 
 	for i := range opts {
@@ -91,13 +91,13 @@ func (l *lock) Unlock(ctx context.Context, opts ...UnlockOption) (bool, error) {
 		opts[i].after(response)
 	}
 
-	l.session.UpdateHeader(response.Header)
+	l.session.RecordResponse(response.Header)
 	return response.Unlocked, nil
 }
 
 func (l *lock) IsLocked(ctx context.Context, opts ...IsLockedOption) (bool, error) {
 	request := &pb.IsLockedRequest{
-		Header: l.session.GetHeader(),
+		Header: l.session.GetRequest(),
 	}
 
 	for i := range opts {
@@ -113,7 +113,7 @@ func (l *lock) IsLocked(ctx context.Context, opts ...IsLockedOption) (bool, erro
 		opts[i].after(response)
 	}
 
-	l.session.UpdateHeader(response.Header)
+	l.session.RecordResponse(response.Header)
 	return response.IsLocked, nil
 }
 

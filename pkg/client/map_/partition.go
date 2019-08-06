@@ -36,7 +36,7 @@ func (m *mapPartition) Name() primitive.Name {
 
 func (m *mapPartition) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*KeyValue, error) {
 	request := &pb.PutRequest{
-		Header: m.session.NextHeader(),
+		Header: m.session.NextRequest(),
 		Key:    key,
 		Value:  value,
 	}
@@ -54,7 +54,7 @@ func (m *mapPartition) Put(ctx context.Context, key string, value []byte, opts .
 		opts[i].afterPut(response)
 	}
 
-	m.session.UpdateHeader(response.Header)
+	m.session.RecordResponse(response.Header)
 
 	if response.Status == pb.ResponseStatus_OK {
 		return &KeyValue{
@@ -77,7 +77,7 @@ func (m *mapPartition) Put(ctx context.Context, key string, value []byte, opts .
 
 func (m *mapPartition) Get(ctx context.Context, key string, opts ...GetOption) (*KeyValue, error) {
 	request := &pb.GetRequest{
-		Header: m.session.GetHeader(),
+		Header: m.session.GetRequest(),
 		Key:    key,
 	}
 
@@ -94,7 +94,7 @@ func (m *mapPartition) Get(ctx context.Context, key string, opts ...GetOption) (
 		opts[i].afterGet(response)
 	}
 
-	m.session.UpdateHeader(response.Header)
+	m.session.RecordResponse(response.Header)
 
 	if response.Version != 0 {
 		return &KeyValue{
@@ -108,7 +108,7 @@ func (m *mapPartition) Get(ctx context.Context, key string, opts ...GetOption) (
 
 func (m *mapPartition) Remove(ctx context.Context, key string, opts ...RemoveOption) (*KeyValue, error) {
 	request := &pb.RemoveRequest{
-		Header: m.session.NextHeader(),
+		Header: m.session.NextRequest(),
 		Key:    key,
 	}
 
@@ -125,7 +125,7 @@ func (m *mapPartition) Remove(ctx context.Context, key string, opts ...RemoveOpt
 		opts[i].afterRemove(response)
 	}
 
-	m.session.UpdateHeader(response.Header)
+	m.session.RecordResponse(response.Header)
 
 	if response.Status == pb.ResponseStatus_OK {
 		return &KeyValue{
@@ -144,7 +144,7 @@ func (m *mapPartition) Remove(ctx context.Context, key string, opts ...RemoveOpt
 
 func (m *mapPartition) Size(ctx context.Context) (int, error) {
 	request := &pb.SizeRequest{
-		Header: m.session.GetHeader(),
+		Header: m.session.GetRequest(),
 	}
 
 	response, err := m.client.Size(ctx, request)
@@ -152,13 +152,13 @@ func (m *mapPartition) Size(ctx context.Context) (int, error) {
 		return 0, err
 	}
 
-	m.session.UpdateHeader(response.Header)
+	m.session.RecordResponse(response.Header)
 	return int(response.Size), nil
 }
 
 func (m *mapPartition) Clear(ctx context.Context) error {
 	request := &pb.ClearRequest{
-		Header: m.session.NextHeader(),
+		Header: m.session.NextRequest(),
 	}
 
 	response, err := m.client.Clear(ctx, request)
@@ -166,13 +166,13 @@ func (m *mapPartition) Clear(ctx context.Context) error {
 		return err
 	}
 
-	m.session.UpdateHeader(response.Header)
+	m.session.RecordResponse(response.Header)
 	return nil
 }
 
 func (m *mapPartition) Entries(ctx context.Context, ch chan<- *KeyValue) error {
 	request := &pb.EntriesRequest{
-		Header: m.session.GetHeader(),
+		Header: m.session.GetRequest(),
 	}
 	entries, err := m.client.Entries(ctx, request)
 	if err != nil {
@@ -190,6 +190,10 @@ func (m *mapPartition) Entries(ctx context.Context, ch chan<- *KeyValue) error {
 			if err != nil {
 				glog.Error("Failed to receive entry stream", err)
 			}
+
+			// Record the response header
+			m.session.RecordResponse(response.Header)
+
 			ch <- &KeyValue{
 				Key:     response.Key,
 				Value:   response.Value,
@@ -202,7 +206,7 @@ func (m *mapPartition) Entries(ctx context.Context, ch chan<- *KeyValue) error {
 
 func (m *mapPartition) Watch(ctx context.Context, c chan<- *MapEvent, opts ...WatchOption) error {
 	request := &pb.EventRequest{
-		Header: m.session.NextHeader(),
+		Header: m.session.NextRequest(),
 	}
 
 	for _, opt := range opts {
@@ -215,9 +219,13 @@ func (m *mapPartition) Watch(ctx context.Context, c chan<- *MapEvent, opts ...Wa
 	}
 
 	go func() {
+		var stream *session.Stream
 		for {
 			response, err := events.Recv()
 			if err == io.EOF {
+				if stream != nil {
+					stream.Close()
+				}
 				break
 			}
 
@@ -229,23 +237,48 @@ func (m *mapPartition) Watch(ctx context.Context, c chan<- *MapEvent, opts ...Wa
 				opt.afterWatch(response)
 			}
 
-			var t MapEventType
-			switch response.Type {
-			case pb.EventResponse_NONE:
-				t = EventNone
-			case pb.EventResponse_INSERTED:
-				t = EventInserted
-			case pb.EventResponse_UPDATED:
-				t = EventUpdated
-			case pb.EventResponse_REMOVED:
-				t = EventRemoved
+			// Record the response header
+			m.session.RecordResponse(response.Header)
+
+			// Initialize the session stream if necessary.
+			if stream == nil {
+				stream = m.session.NewStream(response.Header.StreamId)
 			}
 
-			c <- &MapEvent{
-				Type:    t,
-				Key:     response.Key,
-				Value:   response.NewValue,
-				Version: response.NewVersion,
+			// Attempt to serialize the response to the stream and skip the response if serialization failed.
+			if !stream.Serialize(response.Header) {
+				continue
+			}
+
+			switch response.Type {
+			case pb.EventResponse_NONE:
+				c <- &MapEvent{
+					Type:    EventNone,
+					Key:     response.Key,
+					Value:   response.NewValue,
+					Version: response.NewVersion,
+				}
+			case pb.EventResponse_INSERTED:
+				c <- &MapEvent{
+					Type:    EventInserted,
+					Key:     response.Key,
+					Value:   response.NewValue,
+					Version: response.NewVersion,
+				}
+			case pb.EventResponse_UPDATED:
+				c <- &MapEvent{
+					Type:    EventUpdated,
+					Key:     response.Key,
+					Value:   response.NewValue,
+					Version: response.NewVersion,
+				}
+			case pb.EventResponse_REMOVED:
+				c <- &MapEvent{
+					Type:    EventRemoved,
+					Key:     response.Key,
+					Value:   response.OldValue,
+					Version: response.OldVersion,
+				}
 			}
 		}
 	}()

@@ -74,28 +74,38 @@ func (l *list) Name() primitive.Name {
 
 func (l *list) Append(ctx context.Context, value string) error {
 	request := &pb.AppendRequest{
-		Header: l.session.NextHeader(),
+		Header: l.session.NextRequest(),
 		Value:  value,
 	}
 
-	_, err := l.client.Append(ctx, request)
+	response, err := l.client.Append(ctx, request)
+	if err != nil {
+		return err
+	}
+
+	l.session.RecordResponse(response.Header)
 	return err
 }
 
 func (l *list) Insert(ctx context.Context, index int, value string) error {
 	request := &pb.InsertRequest{
-		Header: l.session.NextHeader(),
+		Header: l.session.NextRequest(),
 		Index:  uint32(index),
 		Value:  value,
 	}
 
-	_, err := l.client.Insert(ctx, request)
+	response, err := l.client.Insert(ctx, request)
+	if err != nil {
+		return err
+	}
+
+	l.session.RecordResponse(response.Header)
 	return err
 }
 
 func (l *list) Get(ctx context.Context, index int) (string, error) {
 	request := &pb.GetRequest{
-		Header: l.session.GetHeader(),
+		Header: l.session.GetRequest(),
 		Index:  uint32(index),
 	}
 
@@ -103,12 +113,14 @@ func (l *list) Get(ctx context.Context, index int) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	l.session.RecordResponse(response.Header)
 	return response.Value, nil
 }
 
 func (l *list) Remove(ctx context.Context, index int) (string, error) {
 	request := &pb.RemoveRequest{
-		Header: l.session.NextHeader(),
+		Header: l.session.NextRequest(),
 		Index:  uint32(index),
 	}
 
@@ -116,24 +128,28 @@ func (l *list) Remove(ctx context.Context, index int) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	l.session.RecordResponse(response.Header)
 	return response.Value, nil
 }
 
 func (l *list) Size(ctx context.Context) (int, error) {
 	request := &pb.SizeRequest{
-		Header: l.session.GetHeader(),
+		Header: l.session.GetRequest(),
 	}
 
 	response, err := l.client.Size(ctx, request)
 	if err != nil {
 		return 0, err
 	}
+
+	l.session.RecordResponse(response.Header)
 	return int(response.Size), nil
 }
 
 func (l *list) Items(ctx context.Context, ch chan<- string) error {
 	request := &pb.IterateRequest{
-		Header: l.session.GetHeader(),
+		Header: l.session.GetRequest(),
 	}
 	entries, err := l.client.Iterate(ctx, request)
 	if err != nil {
@@ -151,6 +167,10 @@ func (l *list) Items(ctx context.Context, ch chan<- string) error {
 			if err != nil {
 				glog.Error("Failed to receive items stream", err)
 			}
+
+			// Record the response header
+			l.session.RecordResponse(response.Header)
+
 			ch <- response.Value
 		}
 	}()
@@ -159,7 +179,7 @@ func (l *list) Items(ctx context.Context, ch chan<- string) error {
 
 func (l *list) Watch(ctx context.Context, c chan<- *ListEvent, opts ...WatchOption) error {
 	request := &pb.EventRequest{
-		Header: l.session.NextHeader(),
+		Header: l.session.NextRequest(),
 	}
 
 	for _, opt := range opts {
@@ -172,9 +192,13 @@ func (l *list) Watch(ctx context.Context, c chan<- *ListEvent, opts ...WatchOpti
 	}
 
 	go func() {
+		var stream *session.Stream
 		for {
 			response, err := events.Recv()
 			if err == io.EOF {
+				if stream != nil {
+					stream.Close()
+				}
 				break
 			}
 
@@ -184,6 +208,19 @@ func (l *list) Watch(ctx context.Context, c chan<- *ListEvent, opts ...WatchOpti
 
 			for _, opt := range opts {
 				opt.afterWatch(response)
+			}
+
+			// Record the response header
+			l.session.RecordResponse(response.Header)
+
+			// Initialize the session stream if necessary.
+			if stream == nil {
+				stream = l.session.NewStream(response.Header.StreamId)
+			}
+
+			// Attempt to serialize the response to the stream and skip the response if serialization failed.
+			if !stream.Serialize(response.Header) {
+				continue
 			}
 
 			var t ListEventType
@@ -208,10 +245,16 @@ func (l *list) Watch(ctx context.Context, c chan<- *ListEvent, opts ...WatchOpti
 
 func (l *list) Clear(ctx context.Context) error {
 	request := &pb.ClearRequest{
-		Header: l.session.NextHeader(),
+		Header: l.session.NextRequest(),
 	}
-	_, err := l.client.Clear(ctx, request)
-	return err
+
+	response, err := l.client.Clear(ctx, request)
+	if err != nil {
+		return err
+	}
+
+	l.session.RecordResponse(response.Header)
+	return nil
 }
 
 func (l *list) Close() error {

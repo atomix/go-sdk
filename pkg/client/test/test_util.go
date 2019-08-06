@@ -43,15 +43,10 @@ func (s *TestServer) CreateHeader(ctx context.Context) (*headers.ResponseHeader,
 func (s *TestServer) KeepAliveHeader(ctx context.Context, h *headers.RequestHeader) (*headers.ResponseHeader, error) {
 	index := s.IncrementIndex()
 	if session, exists := s.sessions[h.SessionId]; exists {
-		streams := []*headers.StreamHeader{}
-		for _, stream := range session.streams {
-			streams = append(streams, stream.Header(uint64(index)))
-		}
 		return &headers.ResponseHeader{
-			SessionId:      h.SessionId,
-			Index:          index,
-			SequenceNumber: session.SequenceNumber,
-			Streams:        streams,
+			SessionId:  h.SessionId,
+			Index:      index,
+			ResponseId: session.SequenceNumber,
 		}, nil
 	} else {
 		return nil, errors.New("session not found")
@@ -147,15 +142,10 @@ func (s *TestSession) Complete(sequence uint64) {
 
 // NewResponseHeaders creates a new response header with headers for all open streams
 func (s *TestSession) NewResponseHeader() (*headers.ResponseHeader, error) {
-	streams := []*headers.StreamHeader{}
-	for _, stream := range s.streams {
-		streams = append(streams, stream.Header(uint64(s.server.Index)))
-	}
 	return &headers.ResponseHeader{
-		SessionId:      s.Id,
-		Index:          s.server.Index,
-		SequenceNumber: s.SequenceNumber,
-		Streams:        streams,
+		SessionId:  s.Id,
+		Index:      s.server.Index,
+		ResponseId: s.SequenceNumber,
 	}, nil
 }
 
@@ -175,25 +165,17 @@ type TestStream struct {
 // header creates a new stream header
 func (s *TestStream) Header(index uint64) *headers.StreamHeader {
 	return &headers.StreamHeader{
-		StreamId:       s.Id,
-		Index:          index,
-		LastItemNumber: s.ItemNumber,
+		StreamId:   s.Id,
+		ResponseId: s.ItemNumber,
 	}
 }
 
 // NewResponseHeaders returns headers for the stream
 func (s *TestStream) NewResponseHeader() *headers.ResponseHeader {
 	return &headers.ResponseHeader{
-		SessionId:      s.Id,
-		Index:          s.session.server.Index,
-		SequenceNumber: s.session.SequenceNumber,
-		Streams: []*headers.StreamHeader{
-			{
-				StreamId:       s.Id,
-				Index:          s.session.server.Index,
-				LastItemNumber: s.ItemNumber + 1,
-			},
-		},
+		SessionId:  s.Id,
+		Index:      s.session.server.Index,
+		ResponseId: s.session.SequenceNumber,
 	}
 }
 

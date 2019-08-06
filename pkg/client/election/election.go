@@ -27,7 +27,7 @@ type Election interface {
 	Anoint(ctx context.Context, id string) (bool, error)
 	Promote(ctx context.Context, id string) (bool, error)
 	Evict(ctx context.Context, id string) (bool, error)
-	Listen(ctx context.Context, c chan<- *ElectionEvent) error
+	Watch(ctx context.Context, c chan<- *ElectionEvent) error
 }
 
 type Term struct {
@@ -86,7 +86,7 @@ func (e *election) Id() string {
 
 func (e *election) GetTerm(ctx context.Context) (*Term, error) {
 	request := &pb.GetLeadershipRequest{
-		Header: e.session.GetHeader(),
+		Header: e.session.GetRequest(),
 	}
 
 	response, err := e.client.GetLeadership(ctx, request)
@@ -94,7 +94,7 @@ func (e *election) GetTerm(ctx context.Context) (*Term, error) {
 		return nil, err
 	}
 
-	e.session.UpdateHeader(response.Header)
+	e.session.RecordResponse(response.Header)
 	return &Term{
 		Term:       response.Term,
 		Leader:     response.Leader,
@@ -104,7 +104,7 @@ func (e *election) GetTerm(ctx context.Context) (*Term, error) {
 
 func (e *election) Enter(ctx context.Context) (*Term, error) {
 	request := &pb.EnterRequest{
-		Header:      e.session.NextHeader(),
+		Header:      e.session.NextRequest(),
 		CandidateId: e.id,
 	}
 
@@ -113,7 +113,7 @@ func (e *election) Enter(ctx context.Context) (*Term, error) {
 		return nil, err
 	}
 
-	e.session.UpdateHeader(response.Header)
+	e.session.RecordResponse(response.Header)
 	return &Term{
 		Term:       response.Term,
 		Leader:     response.Leader,
@@ -123,7 +123,7 @@ func (e *election) Enter(ctx context.Context) (*Term, error) {
 
 func (e *election) Leave(ctx context.Context) error {
 	request := &pb.WithdrawRequest{
-		Header:      e.session.NextHeader(),
+		Header:      e.session.NextRequest(),
 		CandidateId: e.id,
 	}
 
@@ -132,13 +132,13 @@ func (e *election) Leave(ctx context.Context) error {
 		return err
 	}
 
-	e.session.UpdateHeader(response.Header)
+	e.session.RecordResponse(response.Header)
 	return nil
 }
 
 func (e *election) Anoint(ctx context.Context, id string) (bool, error) {
 	request := &pb.AnointRequest{
-		Header:      e.session.NextHeader(),
+		Header:      e.session.NextRequest(),
 		CandidateId: id,
 	}
 
@@ -147,13 +147,13 @@ func (e *election) Anoint(ctx context.Context, id string) (bool, error) {
 		return false, err
 	}
 
-	e.session.UpdateHeader(response.Header)
+	e.session.RecordResponse(response.Header)
 	return response.Succeeded, nil
 }
 
 func (e *election) Promote(ctx context.Context, id string) (bool, error) {
 	request := &pb.PromoteRequest{
-		Header:      e.session.NextHeader(),
+		Header:      e.session.NextRequest(),
 		CandidateId: id,
 	}
 
@@ -162,13 +162,13 @@ func (e *election) Promote(ctx context.Context, id string) (bool, error) {
 		return false, err
 	}
 
-	e.session.UpdateHeader(response.Header)
+	e.session.RecordResponse(response.Header)
 	return response.Succeeded, nil
 }
 
 func (e *election) Evict(ctx context.Context, id string) (bool, error) {
 	request := &pb.EvictRequest{
-		Header:      e.session.NextHeader(),
+		Header:      e.session.NextRequest(),
 		CandidateId: id,
 	}
 
@@ -177,13 +177,13 @@ func (e *election) Evict(ctx context.Context, id string) (bool, error) {
 		return false, err
 	}
 
-	e.session.UpdateHeader(response.Header)
+	e.session.RecordResponse(response.Header)
 	return response.Succeeded, nil
 }
 
-func (e *election) Listen(ctx context.Context, c chan<- *ElectionEvent) error {
+func (e *election) Watch(ctx context.Context, c chan<- *ElectionEvent) error {
 	request := &pb.EventRequest{
-		Header: e.session.NextHeader(),
+		Header: e.session.NextRequest(),
 	}
 	events, err := e.client.Events(ctx, request)
 	if err != nil {
@@ -191,9 +191,13 @@ func (e *election) Listen(ctx context.Context, c chan<- *ElectionEvent) error {
 	}
 
 	go func() {
+		var stream *session.Stream
 		for {
 			response, err := events.Recv()
 			if err == io.EOF {
+				if stream != nil {
+					stream.Close()
+				}
 				break
 			}
 
@@ -201,30 +205,26 @@ func (e *election) Listen(ctx context.Context, c chan<- *ElectionEvent) error {
 				glog.Error("Failed to receive event stream", err)
 			}
 
-			// If no stream headers are provided by the server, immediately complete the event.
-			if len(response.Header.Streams) == 0 {
-				c <- &ElectionEvent{
-					Type: EVENT_CHANGED,
-					Term: Term{
-						Term:       response.Term,
-						Leader:     response.Leader,
-						Candidates: response.Candidates,
-					},
-				}
-			} else {
-				// Wait for the stream to advanced at least to the responses.
-				stream := response.Header.Streams[0]
-				_, ok := <-e.session.WaitStream(stream)
-				if ok {
-					c <- &ElectionEvent{
-						Type: EVENT_CHANGED,
-						Term: Term{
-							Term:       response.Term,
-							Leader:     response.Leader,
-							Candidates: response.Candidates,
-						},
-					}
-				}
+			// Record the response header
+			e.session.RecordResponse(response.Header)
+
+			// Initialize the session stream if necessary.
+			if stream == nil {
+				stream = e.session.NewStream(response.Header.StreamId)
+			}
+
+			// Attempt to serialize the response to the stream and skip the response if serialization failed.
+			if !stream.Serialize(response.Header) {
+				continue
+			}
+
+			c <- &ElectionEvent{
+				Type: EVENT_CHANGED,
+				Term: Term{
+					Term:       response.Term,
+					Leader:     response.Leader,
+					Candidates: response.Candidates,
+				},
 			}
 		}
 	}()
