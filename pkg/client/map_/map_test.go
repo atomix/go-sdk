@@ -61,7 +61,7 @@ func (s *TestServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRe
 		return nil, err
 	}
 
-	sequenceNumber := request.Header.SequenceNumber
+	sequenceNumber := request.Header.RequestId
 	session.Await(sequenceNumber)
 	defer session.Complete(sequenceNumber)
 
@@ -163,7 +163,7 @@ func (s *TestServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb
 		return nil, err
 	}
 
-	sequenceNumber := request.Header.SequenceNumber
+	sequenceNumber := request.Header.RequestId
 	session.Await(sequenceNumber)
 	defer session.Complete(sequenceNumber)
 
@@ -223,7 +223,7 @@ func (s *TestServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*
 		return nil, err
 	}
 
-	sequenceNumber := request.Header.SequenceNumber
+	sequenceNumber := request.Header.RequestId
 	session.Await(sequenceNumber)
 	defer session.Complete(sequenceNumber)
 
@@ -340,7 +340,7 @@ func (s *TestServer) Clear(ctx context.Context, request *pb.ClearRequest) (*pb.C
 		return nil, err
 	}
 
-	sequenceNumber := request.Header.SequenceNumber
+	sequenceNumber := request.Header.RequestId
 	session.Await(sequenceNumber)
 	defer session.Complete(sequenceNumber)
 
@@ -364,7 +364,7 @@ func (s *TestServer) Events(request *pb.EventRequest, server pb.MapService_Event
 		return err
 	}
 
-	sequenceNumber := request.Header.SequenceNumber
+	sequenceNumber := request.Header.RequestId
 	session.Await(sequenceNumber)
 	session.Complete(sequenceNumber)
 
@@ -521,7 +521,7 @@ func TestMapStreams(t *testing.T) {
 		latch <- struct{}{}
 	}()
 
-	err = m.Listen(context.Background(), c)
+	err = m.Watch(context.Background(), c)
 	assert.NoError(t, err)
 
 	kv, err = m.Put(context.Background(), "foo", []byte{2})

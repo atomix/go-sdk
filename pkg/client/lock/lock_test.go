@@ -68,7 +68,7 @@ func (s *TestServer) Lock(ctx context.Context, request *pb.LockRequest) (*pb.Loc
 		return nil, err
 	}
 
-	sequenceNumber := request.Header.SequenceNumber
+	sequenceNumber := request.Header.RequestId
 	session.Await(sequenceNumber)
 	defer session.Complete(sequenceNumber)
 
@@ -125,7 +125,7 @@ func (s *TestServer) Unlock(ctx context.Context, request *pb.UnlockRequest) (*pb
 		return nil, err
 	}
 
-	sequenceNumber := request.Header.SequenceNumber
+	sequenceNumber := request.Header.RequestId
 	session.Await(sequenceNumber)
 	defer session.Complete(sequenceNumber)
 
