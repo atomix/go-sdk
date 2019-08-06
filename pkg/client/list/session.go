@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	pb "github.com/atomix/atomix-go-client/proto/atomix/list"
-	"github.com/golang/protobuf/ptypes/duration"
+	"github.com/golang/protobuf/ptypes"
 )
 
 type SessionHandler struct {
@@ -14,10 +14,7 @@ type SessionHandler struct {
 func (h *SessionHandler) Create(ctx context.Context, s *session.Session) error {
 	request := &pb.CreateRequest{
 		Header: s.GetRequest(),
-		Timeout: &duration.Duration{
-			Seconds: int64(s.Timeout.Seconds()),
-			Nanos:   int32(s.Timeout.Nanoseconds()),
-		},
+		Timeout: ptypes.DurationProto(s.Timeout),
 	}
 
 	response, err := h.client.Create(ctx, request)
