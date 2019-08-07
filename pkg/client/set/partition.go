@@ -115,7 +115,7 @@ func (s *setPartition) Clear(ctx context.Context) error {
 	return nil
 }
 
-func (s *setPartition) Watch(ctx context.Context, c chan<- *SetEvent, opts ...WatchOption) error {
+func (s *setPartition) Watch(ctx context.Context, ch chan<- *SetEvent, opts ...WatchOption) error {
 	request := &pb.EventRequest{
 		Header: s.session.NextRequest(),
 	}
@@ -130,6 +130,7 @@ func (s *setPartition) Watch(ctx context.Context, c chan<- *SetEvent, opts ...Wa
 	}
 
 	go func() {
+		defer close(ch)
 		var stream *session.Stream
 		for {
 			response, err := events.Recv()
@@ -142,6 +143,7 @@ func (s *setPartition) Watch(ctx context.Context, c chan<- *SetEvent, opts ...Wa
 
 			if err != nil {
 				glog.Error("Failed to receive event stream", err)
+				break
 			}
 
 			for _, opt := range opts {
@@ -169,7 +171,7 @@ func (s *setPartition) Watch(ctx context.Context, c chan<- *SetEvent, opts ...Wa
 				t = EVENT_REMOVED
 			}
 
-			c <- &SetEvent{
+			ch <- &SetEvent{
 				Type:  t,
 				Value: response.Value,
 			}

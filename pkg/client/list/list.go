@@ -157,15 +157,16 @@ func (l *list) Items(ctx context.Context, ch chan<- string) error {
 	}
 
 	go func() {
+		defer close(ch)
 		for {
 			response, err := entries.Recv()
 			if err == io.EOF {
-				close(ch)
 				break
 			}
 
 			if err != nil {
 				glog.Error("Failed to receive items stream", err)
+				break
 			}
 
 			// Record the response header
@@ -177,7 +178,7 @@ func (l *list) Items(ctx context.Context, ch chan<- string) error {
 	return nil
 }
 
-func (l *list) Watch(ctx context.Context, c chan<- *ListEvent, opts ...WatchOption) error {
+func (l *list) Watch(ctx context.Context, ch chan<- *ListEvent, opts ...WatchOption) error {
 	request := &pb.EventRequest{
 		Header: l.session.NextRequest(),
 	}
@@ -192,6 +193,7 @@ func (l *list) Watch(ctx context.Context, c chan<- *ListEvent, opts ...WatchOpti
 	}
 
 	go func() {
+		defer close(ch)
 		var stream *session.Stream
 		for {
 			response, err := events.Recv()
@@ -204,6 +206,7 @@ func (l *list) Watch(ctx context.Context, c chan<- *ListEvent, opts ...WatchOpti
 
 			if err != nil {
 				glog.Error("Failed to receive event stream", err)
+				break
 			}
 
 			for _, opt := range opts {
@@ -233,7 +236,7 @@ func (l *list) Watch(ctx context.Context, c chan<- *ListEvent, opts ...WatchOpti
 				t = EventRemoved
 			}
 
-			c <- &ListEvent{
+			ch <- &ListEvent{
 				Type:  t,
 				Index: int(response.Index),
 				Value: response.Value,

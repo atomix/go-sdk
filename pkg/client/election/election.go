@@ -181,7 +181,7 @@ func (e *election) Evict(ctx context.Context, id string) (bool, error) {
 	return response.Succeeded, nil
 }
 
-func (e *election) Watch(ctx context.Context, c chan<- *ElectionEvent) error {
+func (e *election) Watch(ctx context.Context, ch chan<- *ElectionEvent) error {
 	request := &pb.EventRequest{
 		Header: e.session.NextRequest(),
 	}
@@ -191,6 +191,7 @@ func (e *election) Watch(ctx context.Context, c chan<- *ElectionEvent) error {
 	}
 
 	go func() {
+		defer close(ch)
 		var stream *session.Stream
 		for {
 			response, err := events.Recv()
@@ -203,6 +204,7 @@ func (e *election) Watch(ctx context.Context, c chan<- *ElectionEvent) error {
 
 			if err != nil {
 				glog.Error("Failed to receive event stream", err)
+				break
 			}
 
 			// Record the response header
@@ -218,7 +220,7 @@ func (e *election) Watch(ctx context.Context, c chan<- *ElectionEvent) error {
 				continue
 			}
 
-			c <- &ElectionEvent{
+			ch <- &ElectionEvent{
 				Type: EVENT_CHANGED,
 				Term: Term{
 					Term:       response.Term,

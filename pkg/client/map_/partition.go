@@ -180,15 +180,16 @@ func (m *mapPartition) Entries(ctx context.Context, ch chan<- *KeyValue) error {
 	}
 
 	go func() {
+		defer close(ch)
 		for {
 			response, err := entries.Recv()
 			if err == io.EOF {
-				close(ch)
 				break
 			}
 
 			if err != nil {
 				glog.Error("Failed to receive entry stream", err)
+				break
 			}
 
 			// Record the response header
@@ -204,7 +205,7 @@ func (m *mapPartition) Entries(ctx context.Context, ch chan<- *KeyValue) error {
 	return nil
 }
 
-func (m *mapPartition) Watch(ctx context.Context, c chan<- *MapEvent, opts ...WatchOption) error {
+func (m *mapPartition) Watch(ctx context.Context, ch chan<- *MapEvent, opts ...WatchOption) error {
 	request := &pb.EventRequest{
 		Header: m.session.NextRequest(),
 	}
@@ -219,6 +220,7 @@ func (m *mapPartition) Watch(ctx context.Context, c chan<- *MapEvent, opts ...Wa
 	}
 
 	go func() {
+		defer close(ch)
 		var stream *session.Stream
 		for {
 			response, err := events.Recv()
@@ -231,6 +233,7 @@ func (m *mapPartition) Watch(ctx context.Context, c chan<- *MapEvent, opts ...Wa
 
 			if err != nil {
 				glog.Error("Failed to receive event stream", err)
+				break
 			}
 
 			for _, opt := range opts {
@@ -252,28 +255,28 @@ func (m *mapPartition) Watch(ctx context.Context, c chan<- *MapEvent, opts ...Wa
 
 			switch response.Type {
 			case pb.EventResponse_NONE:
-				c <- &MapEvent{
+				ch <- &MapEvent{
 					Type:    EventNone,
 					Key:     response.Key,
 					Value:   response.NewValue,
 					Version: response.NewVersion,
 				}
 			case pb.EventResponse_INSERTED:
-				c <- &MapEvent{
+				ch <- &MapEvent{
 					Type:    EventInserted,
 					Key:     response.Key,
 					Value:   response.NewValue,
 					Version: response.NewVersion,
 				}
 			case pb.EventResponse_UPDATED:
-				c <- &MapEvent{
+				ch <- &MapEvent{
 					Type:    EventUpdated,
 					Key:     response.Key,
 					Value:   response.NewValue,
 					Version: response.NewVersion,
 				}
 			case pb.EventResponse_REMOVED:
-				c <- &MapEvent{
+				ch <- &MapEvent{
 					Type:    EventRemoved,
 					Key:     response.Key,
 					Value:   response.OldValue,
