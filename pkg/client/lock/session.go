@@ -13,7 +13,7 @@ type SessionHandler struct {
 
 func (h *SessionHandler) Create(ctx context.Context, s *session.Session) error {
 	request := &pb.CreateRequest{
-		Header: s.GetRequest(),
+		Header: s.GetState(),
 		Timeout: ptypes.DurationProto(s.Timeout),
 	}
 
@@ -21,13 +21,13 @@ func (h *SessionHandler) Create(ctx context.Context, s *session.Session) error {
 	if err != nil {
 		return err
 	}
-	s.RecordResponse(response.Header)
+	s.RecordResponse(request.Header, response.Header)
 	return nil
 }
 
 func (h *SessionHandler) KeepAlive(ctx context.Context, s *session.Session) error {
 	request := &pb.KeepAliveRequest{
-		Header: s.GetRequest(),
+		Header: s.GetState(),
 	}
 
 	if _, err := h.client.KeepAlive(ctx, request); err != nil {
@@ -38,7 +38,7 @@ func (h *SessionHandler) KeepAlive(ctx context.Context, s *session.Session) erro
 
 func (h *SessionHandler) Close(ctx context.Context, s *session.Session) error {
 	request := &pb.CloseRequest{
-		Header: s.GetRequest(),
+		Header: s.GetState(),
 	}
 	_, err := h.client.Close(ctx, request);
 	return err
@@ -46,7 +46,7 @@ func (h *SessionHandler) Close(ctx context.Context, s *session.Session) error {
 
 func (h *SessionHandler) Delete(ctx context.Context, s *session.Session) error {
 	request := &pb.CloseRequest{
-		Header: s.GetRequest(),
+		Header: s.GetState(),
 		Delete: true,
 	}
 	_, err := h.client.Close(ctx, request);

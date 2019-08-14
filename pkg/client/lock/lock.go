@@ -69,7 +69,7 @@ func (l *lock) Lock(ctx context.Context, opts ...LockOption) (uint64, error) {
 		opt.after(response)
 	}
 
-	l.session.RecordResponse(response.Header)
+	l.session.RecordResponse(request.Header, response.Header)
 	return response.Version, nil
 }
 
@@ -91,7 +91,7 @@ func (l *lock) Unlock(ctx context.Context, opts ...UnlockOption) (bool, error) {
 		opts[i].after(response)
 	}
 
-	l.session.RecordResponse(response.Header)
+	l.session.RecordResponse(request.Header, response.Header)
 	return response.Unlocked, nil
 }
 
@@ -113,7 +113,7 @@ func (l *lock) IsLocked(ctx context.Context, opts ...IsLockedOption) (bool, erro
 		opts[i].after(response)
 	}
 
-	l.session.RecordResponse(response.Header)
+	l.session.RecordResponse(request.Header, response.Header)
 	return response.IsLocked, nil
 }
 

@@ -94,7 +94,7 @@ func (e *election) GetTerm(ctx context.Context) (*Term, error) {
 		return nil, err
 	}
 
-	e.session.RecordResponse(response.Header)
+	e.session.RecordResponse(request.Header, response.Header)
 	return &Term{
 		Term:       response.Term,
 		Leader:     response.Leader,
@@ -113,7 +113,7 @@ func (e *election) Enter(ctx context.Context) (*Term, error) {
 		return nil, err
 	}
 
-	e.session.RecordResponse(response.Header)
+	e.session.RecordResponse(request.Header, response.Header)
 	return &Term{
 		Term:       response.Term,
 		Leader:     response.Leader,
@@ -132,7 +132,7 @@ func (e *election) Leave(ctx context.Context) error {
 		return err
 	}
 
-	e.session.RecordResponse(response.Header)
+	e.session.RecordResponse(request.Header, response.Header)
 	return nil
 }
 
@@ -147,7 +147,7 @@ func (e *election) Anoint(ctx context.Context, id string) (bool, error) {
 		return false, err
 	}
 
-	e.session.RecordResponse(response.Header)
+	e.session.RecordResponse(request.Header, response.Header)
 	return response.Succeeded, nil
 }
 
@@ -162,7 +162,7 @@ func (e *election) Promote(ctx context.Context, id string) (bool, error) {
 		return false, err
 	}
 
-	e.session.RecordResponse(response.Header)
+	e.session.RecordResponse(request.Header, response.Header)
 	return response.Succeeded, nil
 }
 
@@ -177,7 +177,7 @@ func (e *election) Evict(ctx context.Context, id string) (bool, error) {
 		return false, err
 	}
 
-	e.session.RecordResponse(response.Header)
+	e.session.RecordResponse(request.Header, response.Header)
 	return response.Succeeded, nil
 }
 
@@ -208,7 +208,7 @@ func (e *election) Watch(ctx context.Context, ch chan<- *ElectionEvent) error {
 			}
 
 			// Record the response header
-			e.session.RecordResponse(response.Header)
+			e.session.RecordResponse(request.Header, response.Header)
 
 			// Initialize the session stream if necessary.
 			if stream == nil {

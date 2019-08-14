@@ -61,7 +61,7 @@ func (c *counter) Get(ctx context.Context) (int64, error) {
 		return 0, err
 	}
 
-	c.session.RecordResponse(response.Header)
+	c.session.RecordResponse(request.Header, response.Header)
 	return response.Value, nil
 }
 
@@ -76,7 +76,7 @@ func (c *counter) Set(ctx context.Context, value int64) error {
 		return err
 	}
 
-	c.session.RecordResponse(response.Header)
+	c.session.RecordResponse(request.Header, response.Header)
 	return nil
 }
 
@@ -91,7 +91,7 @@ func (c *counter) Increment(ctx context.Context, delta int64) (int64, error) {
 		return 0, err
 	}
 
-	c.session.RecordResponse(response.Header)
+	c.session.RecordResponse(request.Header, response.Header)
 	return response.NextValue, nil
 }
 
@@ -106,7 +106,7 @@ func (c *counter) Decrement(ctx context.Context, delta int64) (int64, error) {
 		return 0, err
 	}
 
-	c.session.RecordResponse(response.Header)
+	c.session.RecordResponse(request.Header, response.Header)
 	return response.NextValue, nil
 }
 

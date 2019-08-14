@@ -59,16 +59,16 @@ func New(ctx context.Context, name primitive.Name, handler Handler, opts ...Sess
 }
 
 type Session struct {
-	Name               *pbprimitive.Name
-	Timeout            time.Duration
-	SessionID          uint64
-	handler            Handler
-	lastIndex          uint64
-	requestID          uint64
-	lastSequenceNumber uint64
-	streams            map[uint64]*Stream
-	mu                 sync.RWMutex
-	ticker             *time.Ticker
+	Name       *pbprimitive.Name
+	Timeout    time.Duration
+	SessionID  uint64
+	handler    Handler
+	lastIndex  uint64
+	requestID  uint64
+	responseID uint64
+	streams    map[uint64]*Stream
+	mu         sync.RWMutex
+	ticker     *time.Ticker
 }
 
 // start creates the session and begins keep-alives
@@ -100,6 +100,19 @@ func (s *Session) Delete() error {
 	return err
 }
 
+// GetState gets the header for the current state of the session
+func (s *Session) GetState() *headers.RequestHeader {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return &headers.RequestHeader{
+		Name:      s.Name,
+		SessionId: s.SessionID,
+		Index:     s.lastIndex,
+		RequestId: s.responseID,
+		Streams:   s.getStreamHeaders(),
+	}
+}
+
 // GetRequest gets the current read header
 func (s *Session) GetRequest() *headers.RequestHeader {
 	s.mu.RLock()
@@ -122,26 +135,30 @@ func (s *Session) NextRequest() *headers.RequestHeader {
 		SessionId: s.SessionID,
 		Index:     s.lastIndex,
 		RequestId: s.requestID,
-		Streams:   s.getStreamHeaders(),
 	}
 }
 
 // RecordResponse records the index in a response header
-func (s *Session) RecordResponse(header *headers.ResponseHeader) {
+func (s *Session) RecordResponse(requestHeader *headers.RequestHeader, responseHeader *headers.ResponseHeader) {
 	// Use a double-checked lock to avoid locking when multiple responses are received for an index.
-	if header.Index > s.lastIndex {
+	if responseHeader.Index > s.lastIndex {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 
 		// If the session ID is set, ensure the session is initialized
-		if header.SessionId > s.SessionID {
-			s.SessionID = header.SessionId
-			s.lastIndex = header.SessionId
+		if responseHeader.SessionId > s.SessionID {
+			s.SessionID = responseHeader.SessionId
+			s.lastIndex = responseHeader.SessionId
+		}
+
+		// If the request ID is greater than the highest response ID, update the response ID.
+		if requestHeader.RequestId > s.responseID {
+			s.responseID = requestHeader.RequestId
 		}
 
 		// If the response index has increased, update the last received index
-		if header.Index > s.lastIndex {
-			s.lastIndex = header.Index
+		if responseHeader.Index > s.lastIndex {
+			s.lastIndex = responseHeader.Index
 		}
 	}
 }

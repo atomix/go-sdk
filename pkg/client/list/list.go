@@ -83,7 +83,7 @@ func (l *list) Append(ctx context.Context, value string) error {
 		return err
 	}
 
-	l.session.RecordResponse(response.Header)
+	l.session.RecordResponse(request.Header, response.Header)
 	return err
 }
 
@@ -99,7 +99,7 @@ func (l *list) Insert(ctx context.Context, index int, value string) error {
 		return err
 	}
 
-	l.session.RecordResponse(response.Header)
+	l.session.RecordResponse(request.Header, response.Header)
 	return err
 }
 
@@ -114,7 +114,7 @@ func (l *list) Get(ctx context.Context, index int) (string, error) {
 		return "", err
 	}
 
-	l.session.RecordResponse(response.Header)
+	l.session.RecordResponse(request.Header, response.Header)
 	return response.Value, nil
 }
 
@@ -129,7 +129,7 @@ func (l *list) Remove(ctx context.Context, index int) (string, error) {
 		return "", err
 	}
 
-	l.session.RecordResponse(response.Header)
+	l.session.RecordResponse(request.Header, response.Header)
 	return response.Value, nil
 }
 
@@ -143,7 +143,7 @@ func (l *list) Size(ctx context.Context) (int, error) {
 		return 0, err
 	}
 
-	l.session.RecordResponse(response.Header)
+	l.session.RecordResponse(request.Header, response.Header)
 	return int(response.Size), nil
 }
 
@@ -170,7 +170,7 @@ func (l *list) Items(ctx context.Context, ch chan<- string) error {
 			}
 
 			// Record the response header
-			l.session.RecordResponse(response.Header)
+			l.session.RecordResponse(request.Header, response.Header)
 
 			ch <- response.Value
 		}
@@ -214,7 +214,7 @@ func (l *list) Watch(ctx context.Context, ch chan<- *ListEvent, opts ...WatchOpt
 			}
 
 			// Record the response header
-			l.session.RecordResponse(response.Header)
+			l.session.RecordResponse(request.Header, response.Header)
 
 			// Initialize the session stream if necessary.
 			if stream == nil {
@@ -256,7 +256,7 @@ func (l *list) Clear(ctx context.Context) error {
 		return err
 	}
 
-	l.session.RecordResponse(response.Header)
+	l.session.RecordResponse(request.Header, response.Header)
 	return nil
 }
 

@@ -45,7 +45,7 @@ func (s *setPartition) Add(ctx context.Context, value string) (bool, error) {
 		return false, err
 	}
 
-	s.session.RecordResponse(response.Header)
+	s.session.RecordResponse(request.Header, response.Header)
 
 	if response.Status == pb.ResponseStatus_WRITE_LOCK {
 		return false, errors.New("write lock failed")
@@ -64,7 +64,7 @@ func (s *setPartition) Remove(ctx context.Context, value string) (bool, error) {
 		return false, err
 	}
 
-	s.session.RecordResponse(response.Header)
+	s.session.RecordResponse(request.Header, response.Header)
 
 	if response.Status == pb.ResponseStatus_WRITE_LOCK {
 		return false, errors.New("write lock failed")
@@ -83,7 +83,7 @@ func (s *setPartition) Contains(ctx context.Context, value string) (bool, error)
 		return false, err
 	}
 
-	s.session.RecordResponse(response.Header)
+	s.session.RecordResponse(request.Header, response.Header)
 	return response.Contains, nil
 }
 
@@ -97,7 +97,7 @@ func (s *setPartition) Size(ctx context.Context) (int, error) {
 		return 0, err
 	}
 
-	s.session.RecordResponse(response.Header)
+	s.session.RecordResponse(request.Header, response.Header)
 	return int(response.Size), nil
 }
 
@@ -111,7 +111,7 @@ func (s *setPartition) Clear(ctx context.Context) error {
 		return err
 	}
 
-	s.session.RecordResponse(response.Header)
+	s.session.RecordResponse(request.Header, response.Header)
 	return nil
 }
 
@@ -151,7 +151,7 @@ func (s *setPartition) Watch(ctx context.Context, ch chan<- *SetEvent, opts ...W
 			}
 
 			// Record the response header
-			s.session.RecordResponse(response.Header)
+			s.session.RecordResponse(request.Header, response.Header)
 
 			// Initialize the session stream if necessary.
 			if stream == nil {

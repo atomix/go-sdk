@@ -12,13 +12,12 @@ type SessionHandler struct {
 
 func (m *SessionHandler) Create(ctx context.Context, s *session.Session) error {
 	request := &pb.CreateRequest{
-		Header: s.GetRequest(),
+		Header: s.GetState(),
 	}
-	response, err := m.client.Create(ctx, request)
+	_, err := m.client.Create(ctx, request)
 	if err != nil {
 		return err
 	}
-	s.RecordResponse(response.Header)
 	return nil
 }
 
@@ -28,7 +27,7 @@ func (m *SessionHandler) KeepAlive(ctx context.Context, s *session.Session) erro
 
 func (m *SessionHandler) Close(ctx context.Context, s *session.Session) error {
 	request := &pb.CloseRequest{
-		Header: s.GetRequest(),
+		Header: s.GetState(),
 	}
 	_, err := m.client.Close(ctx, request)
 	return err
@@ -36,7 +35,7 @@ func (m *SessionHandler) Close(ctx context.Context, s *session.Session) error {
 
 func (m *SessionHandler) Delete(ctx context.Context, s *session.Session) error {
 	request := &pb.CloseRequest{
-		Header: s.GetRequest(),
+		Header: s.GetState(),
 		Delete: true,
 	}
 	_, err := m.client.Close(ctx, request)

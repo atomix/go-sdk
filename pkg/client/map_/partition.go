@@ -54,7 +54,7 @@ func (m *mapPartition) Put(ctx context.Context, key string, value []byte, opts .
 		opts[i].afterPut(response)
 	}
 
-	m.session.RecordResponse(response.Header)
+	m.session.RecordResponse(request.Header, response.Header)
 
 	if response.Status == pb.ResponseStatus_OK {
 		return &KeyValue{
@@ -94,7 +94,7 @@ func (m *mapPartition) Get(ctx context.Context, key string, opts ...GetOption) (
 		opts[i].afterGet(response)
 	}
 
-	m.session.RecordResponse(response.Header)
+	m.session.RecordResponse(request.Header, response.Header)
 
 	if response.Version != 0 {
 		return &KeyValue{
@@ -125,7 +125,7 @@ func (m *mapPartition) Remove(ctx context.Context, key string, opts ...RemoveOpt
 		opts[i].afterRemove(response)
 	}
 
-	m.session.RecordResponse(response.Header)
+	m.session.RecordResponse(request.Header, response.Header)
 
 	if response.Status == pb.ResponseStatus_OK {
 		return &KeyValue{
@@ -152,7 +152,7 @@ func (m *mapPartition) Size(ctx context.Context) (int, error) {
 		return 0, err
 	}
 
-	m.session.RecordResponse(response.Header)
+	m.session.RecordResponse(request.Header, response.Header)
 	return int(response.Size), nil
 }
 
@@ -166,7 +166,7 @@ func (m *mapPartition) Clear(ctx context.Context) error {
 		return err
 	}
 
-	m.session.RecordResponse(response.Header)
+	m.session.RecordResponse(request.Header, response.Header)
 	return nil
 }
 
@@ -193,7 +193,7 @@ func (m *mapPartition) Entries(ctx context.Context, ch chan<- *KeyValue) error {
 			}
 
 			// Record the response header
-			m.session.RecordResponse(response.Header)
+			m.session.RecordResponse(request.Header, response.Header)
 
 			ch <- &KeyValue{
 				Key:     response.Key,
@@ -241,7 +241,7 @@ func (m *mapPartition) Watch(ctx context.Context, ch chan<- *MapEvent, opts ...W
 			}
 
 			// Record the response header
-			m.session.RecordResponse(response.Header)
+			m.session.RecordResponse(request.Header, response.Header)
 
 			// Initialize the session stream if necessary.
 			if stream == nil {
