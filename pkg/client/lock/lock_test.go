@@ -2,9 +2,9 @@ package lock
 
 import (
 	"context"
+	api "github.com/atomix/atomix-api/proto/atomix/lock"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/test"
-	pb "github.com/atomix/atomix-go-client/proto/atomix/lock"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"testing"
@@ -27,48 +27,48 @@ type TestServer struct {
 
 type LockAttempt struct {
 	version uint64
-	request *pb.LockRequest
+	request *api.LockRequest
 	time    time.Time
 	c       chan<- bool
 }
 
-func (s *TestServer) Create(ctx context.Context, request *pb.CreateRequest) (*pb.CreateResponse, error) {
+func (s *TestServer) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
 	header, err := s.CreateHeader(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return &pb.CreateResponse{
+	return &api.CreateResponse{
 		Header: header,
 	}, nil
 }
 
-func (s *TestServer) KeepAlive(ctx context.Context, request *pb.KeepAliveRequest) (*pb.KeepAliveResponse, error) {
+func (s *TestServer) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (*api.KeepAliveResponse, error) {
 	header, err := s.KeepAliveHeader(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
-	return &pb.KeepAliveResponse{
+	return &api.KeepAliveResponse{
 		Header: header,
 	}, nil
 }
 
-func (s *TestServer) Close(ctx context.Context, request *pb.CloseRequest) (*pb.CloseResponse, error) {
+func (s *TestServer) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	err := s.CloseHeader(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
-	return &pb.CloseResponse{}, nil
+	return &api.CloseResponse{}, nil
 }
 
-func (s *TestServer) Lock(ctx context.Context, request *pb.LockRequest) (*pb.LockResponse, error) {
+func (s *TestServer) Lock(ctx context.Context, request *api.LockRequest) (*api.LockResponse, error) {
 	index := s.IncrementIndex()
 
-	session, err := s.GetSession(request.Header.SessionId)
+	session, err := s.GetSession(request.Header.SessionID)
 	if err != nil {
 		return nil, err
 	}
 
-	sequenceNumber := request.Header.RequestId
+	sequenceNumber := request.Header.RequestID
 	session.Await(sequenceNumber)
 	defer session.Complete(sequenceNumber)
 
@@ -90,12 +90,12 @@ func (s *TestServer) Lock(ctx context.Context, request *pb.LockRequest) (*pb.Loc
 		if succeeded {
 			attempt.version = s.Index
 			s.lock = attempt
-			return &pb.LockResponse{
+			return &api.LockResponse{
 				Header:  header,
 				Version: s.Index,
 			}, nil
 		} else {
-			return &pb.LockResponse{
+			return &api.LockResponse{
 				Header:  header,
 				Version: 0,
 			}, nil
@@ -110,22 +110,22 @@ func (s *TestServer) Lock(ctx context.Context, request *pb.LockRequest) (*pb.Loc
 			version: index,
 			request: request,
 		}
-		return &pb.LockResponse{
+		return &api.LockResponse{
 			Header:  header,
 			Version: index,
 		}, nil
 	}
 }
 
-func (s *TestServer) Unlock(ctx context.Context, request *pb.UnlockRequest) (*pb.UnlockResponse, error) {
+func (s *TestServer) Unlock(ctx context.Context, request *api.UnlockRequest) (*api.UnlockResponse, error) {
 	s.IncrementIndex()
 
-	session, err := s.GetSession(request.Header.SessionId)
+	session, err := s.GetSession(request.Header.SessionID)
 	if err != nil {
 		return nil, err
 	}
 
-	sequenceNumber := request.Header.RequestId
+	sequenceNumber := request.Header.RequestID
 	session.Await(sequenceNumber)
 	defer session.Complete(sequenceNumber)
 
@@ -135,7 +135,7 @@ func (s *TestServer) Unlock(ctx context.Context, request *pb.UnlockRequest) (*pb
 	}
 
 	if s.lock == nil || (request.Version != 0 && s.lock.version != request.Version) {
-		return &pb.UnlockResponse{
+		return &api.UnlockResponse{
 			Header:   header,
 			Unlocked: false,
 		}, nil
@@ -147,10 +147,10 @@ func (s *TestServer) Unlock(ctx context.Context, request *pb.UnlockRequest) (*pb
 		attempt := s.queue[0]
 		s.queue = s.queue[1:]
 
-		if attempt.request.Timeout != nil && (attempt.request.Timeout.Seconds > 0 || attempt.request.Timeout.Nanos > 0) {
-			t := time.Duration(attempt.request.Timeout.Seconds + int64(attempt.request.Timeout.Nanos))
+		if attempt.request.Timeout != nil && attempt.request.Timeout != nil {
+			t := *attempt.request.Timeout
 			d := time.Now().Sub(attempt.time)
-			if d > t {
+			if int64(d) > int64(t) {
 				attempt.c <- false
 			} else {
 				attempt.c <- true
@@ -160,14 +160,14 @@ func (s *TestServer) Unlock(ctx context.Context, request *pb.UnlockRequest) (*pb
 		}
 	}
 
-	return &pb.UnlockResponse{
+	return &api.UnlockResponse{
 		Header:   header,
 		Unlocked: true,
 	}, nil
 }
 
-func (s *TestServer) IsLocked(ctx context.Context, request *pb.IsLockedRequest) (*pb.IsLockedResponse, error) {
-	session, err := s.GetSession(request.Header.SessionId)
+func (s *TestServer) IsLocked(ctx context.Context, request *api.IsLockedRequest) (*api.IsLockedResponse, error) {
+	session, err := s.GetSession(request.Header.SessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -178,17 +178,17 @@ func (s *TestServer) IsLocked(ctx context.Context, request *pb.IsLockedRequest) 
 	}
 
 	if s.lock == nil {
-		return &pb.IsLockedResponse{
+		return &api.IsLockedResponse{
 			Header:   header,
 			IsLocked: false,
 		}, nil
 	} else if request.Version > 0 && s.lock.version != request.Version {
-		return &pb.IsLockedResponse{
+		return &api.IsLockedResponse{
 			Header:   header,
 			IsLocked: false,
 		}, nil
 	} else {
-		return &pb.IsLockedResponse{
+		return &api.IsLockedResponse{
 			Header:   header,
 			IsLocked: true,
 		}, nil
@@ -197,7 +197,7 @@ func (s *TestServer) IsLocked(ctx context.Context, request *pb.IsLockedRequest) 
 
 func TestLock(t *testing.T) {
 	conn, server := test.StartTestServer(func(server *grpc.Server) {
-		pb.RegisterLockServiceServer(server, NewTestServer())
+		api.RegisterLockServiceServer(server, NewTestServer())
 	})
 
 	l1, err := newLock(context.TODO(), primitive.NewName("default", "test", "default", "test"), conn)

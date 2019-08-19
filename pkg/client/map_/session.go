@@ -2,19 +2,18 @@ package map_
 
 import (
 	"context"
+	api "github.com/atomix/atomix-api/proto/atomix/map"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
-	pb "github.com/atomix/atomix-go-client/proto/atomix/map"
-	"github.com/golang/protobuf/ptypes"
 )
 
 type SessionHandler struct {
-	client pb.MapServiceClient
+	client api.MapServiceClient
 }
 
 func (m *SessionHandler) Create(ctx context.Context, s *session.Session) error {
-	request := &pb.CreateRequest{
+	request := &api.CreateRequest{
 		Header:  s.GetState(),
-		Timeout: ptypes.DurationProto(s.Timeout),
+		Timeout: &s.Timeout,
 	}
 	response, err := m.client.Create(ctx, request)
 	if err != nil {
@@ -25,7 +24,7 @@ func (m *SessionHandler) Create(ctx context.Context, s *session.Session) error {
 }
 
 func (m *SessionHandler) KeepAlive(ctx context.Context, s *session.Session) error {
-	request := &pb.KeepAliveRequest{
+	request := &api.KeepAliveRequest{
 		Header: s.GetState(),
 	}
 
@@ -37,7 +36,7 @@ func (m *SessionHandler) KeepAlive(ctx context.Context, s *session.Session) erro
 }
 
 func (m *SessionHandler) Close(ctx context.Context, s *session.Session) error {
-	request := &pb.CloseRequest{
+	request := &api.CloseRequest{
 		Header: s.GetState(),
 	}
 	_, err := m.client.Close(ctx, request)
@@ -45,7 +44,7 @@ func (m *SessionHandler) Close(ctx context.Context, s *session.Session) error {
 }
 
 func (m *SessionHandler) Delete(ctx context.Context, s *session.Session) error {
-	request := &pb.CloseRequest{
+	request := &api.CloseRequest{
 		Header: s.GetState(),
 		Delete: true,
 	}

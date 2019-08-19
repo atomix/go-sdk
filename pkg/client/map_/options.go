@@ -1,17 +1,17 @@
 package map_
 
 import (
-	pb "github.com/atomix/atomix-go-client/proto/atomix/map"
+	api "github.com/atomix/atomix-api/proto/atomix/map"
 )
 
 type PutOption interface {
-	beforePut(request *pb.PutRequest)
-	afterPut(response *pb.PutResponse)
+	beforePut(request *api.PutRequest)
+	afterPut(response *api.PutResponse)
 }
 
 type RemoveOption interface {
-	beforeRemove(request *pb.RemoveRequest)
-	afterRemove(response *pb.RemoveResponse)
+	beforeRemove(request *api.RemoveRequest)
+	afterRemove(response *api.RemoveResponse)
 }
 
 func WithVersion(version int64) VersionOption {
@@ -24,25 +24,25 @@ type VersionOption struct {
 	version int64
 }
 
-func (o VersionOption) beforePut(request *pb.PutRequest) {
+func (o VersionOption) beforePut(request *api.PutRequest) {
 	request.Version = o.version
 }
 
-func (o VersionOption) afterPut(response *pb.PutResponse) {
+func (o VersionOption) afterPut(response *api.PutResponse) {
 
 }
 
-func (o VersionOption) beforeRemove(request *pb.RemoveRequest) {
+func (o VersionOption) beforeRemove(request *api.RemoveRequest) {
 	request.Version = o.version
 }
 
-func (o VersionOption) afterRemove(response *pb.RemoveResponse) {
+func (o VersionOption) afterRemove(response *api.RemoveResponse) {
 
 }
 
 type GetOption interface {
-	beforeGet(request *pb.GetRequest)
-	afterGet(response *pb.GetResponse)
+	beforeGet(request *api.GetRequest)
+	afterGet(response *api.GetResponse)
 }
 
 func WithDefault(def []byte) GetOption {
@@ -53,10 +53,10 @@ type defaultOption struct {
 	def []byte
 }
 
-func (o defaultOption) beforeGet(request *pb.GetRequest) {
+func (o defaultOption) beforeGet(request *api.GetRequest) {
 }
 
-func (o defaultOption) afterGet(response *pb.GetResponse) {
+func (o defaultOption) afterGet(response *api.GetResponse) {
 	if response.Version == 0 {
 		response.Value = o.def
 	}
@@ -64,8 +64,8 @@ func (o defaultOption) afterGet(response *pb.GetResponse) {
 
 // WatchOption is an option for a map Watch request
 type WatchOption interface {
-	beforeWatch(request *pb.EventRequest)
-	afterWatch(response *pb.EventResponse)
+	beforeWatch(request *api.EventRequest)
+	afterWatch(response *api.EventResponse)
 }
 
 // WithReplay returns a watch option that enables replay of watch events
@@ -75,10 +75,10 @@ func WithReplay() WatchOption {
 
 type replayOption struct{}
 
-func (o replayOption) beforeWatch(request *pb.EventRequest) {
+func (o replayOption) beforeWatch(request *api.EventRequest) {
 	request.Replay = true
 }
 
-func (o replayOption) afterWatch(response *pb.EventResponse) {
+func (o replayOption) afterWatch(response *api.EventResponse) {
 
 }

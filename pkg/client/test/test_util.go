@@ -3,7 +3,7 @@ package test
 import (
 	"context"
 	"errors"
-	"github.com/atomix/atomix-go-client/proto/atomix/headers"
+	"github.com/atomix/atomix-api/proto/atomix/headers"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
 	"log"
@@ -35,18 +35,18 @@ func (s *TestServer) CreateHeader(ctx context.Context) (*headers.ResponseHeader,
 	session := s.NewSession()
 	session.Complete(0)
 	return &headers.ResponseHeader{
-		SessionId: index,
+		SessionID: index,
 		Index:     index,
 	}, nil
 }
 
 func (s *TestServer) KeepAliveHeader(ctx context.Context, h *headers.RequestHeader) (*headers.ResponseHeader, error) {
 	index := s.IncrementIndex()
-	if session, exists := s.sessions[h.SessionId]; exists {
+	if session, exists := s.sessions[h.SessionID]; exists {
 		return &headers.ResponseHeader{
-			SessionId:  h.SessionId,
+			SessionID:  h.SessionID,
 			Index:      index,
-			ResponseId: session.SequenceNumber,
+			ResponseID: session.SequenceNumber,
 		}, nil
 	} else {
 		return nil, errors.New("session not found")
@@ -55,8 +55,8 @@ func (s *TestServer) KeepAliveHeader(ctx context.Context, h *headers.RequestHead
 
 func (s *TestServer) CloseHeader(ctx context.Context, h *headers.RequestHeader) error {
 	s.IncrementIndex()
-	if _, exists := s.sessions[h.SessionId]; exists {
-		delete(s.sessions, h.SessionId)
+	if _, exists := s.sessions[h.SessionID]; exists {
+		delete(s.sessions, h.SessionID)
 		return nil
 	} else {
 		return errors.New("session not found")
@@ -143,9 +143,9 @@ func (s *TestSession) Complete(sequence uint64) {
 // NewResponseHeaders creates a new response header with headers for all open streams
 func (s *TestSession) NewResponseHeader() (*headers.ResponseHeader, error) {
 	return &headers.ResponseHeader{
-		SessionId:  s.Id,
+		SessionID:  s.Id,
 		Index:      s.server.Index,
-		ResponseId: s.SequenceNumber,
+		ResponseID: s.SequenceNumber,
 	}, nil
 }
 
@@ -165,17 +165,17 @@ type TestStream struct {
 // header creates a new stream header
 func (s *TestStream) Header(index uint64) *headers.StreamHeader {
 	return &headers.StreamHeader{
-		StreamId:   s.Id,
-		ResponseId: s.ItemNumber,
+		StreamID:   s.Id,
+		ResponseID: s.ItemNumber,
 	}
 }
 
 // NewResponseHeaders returns headers for the stream
 func (s *TestStream) NewResponseHeader() *headers.ResponseHeader {
 	return &headers.ResponseHeader{
-		SessionId:  s.Id,
+		SessionID:  s.Id,
 		Index:      s.session.server.Index,
-		ResponseId: s.session.SequenceNumber,
+		ResponseID: s.session.SequenceNumber,
 	}
 }
 

@@ -2,19 +2,18 @@ package lock
 
 import (
 	"context"
+	api "github.com/atomix/atomix-api/proto/atomix/lock"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
-	pb "github.com/atomix/atomix-go-client/proto/atomix/lock"
-	"github.com/golang/protobuf/ptypes"
 )
 
 type SessionHandler struct {
-	client pb.LockServiceClient
+	client api.LockServiceClient
 }
 
 func (h *SessionHandler) Create(ctx context.Context, s *session.Session) error {
-	request := &pb.CreateRequest{
-		Header: s.GetState(),
-		Timeout: ptypes.DurationProto(s.Timeout),
+	request := &api.CreateRequest{
+		Header:  s.GetState(),
+		Timeout: &s.Timeout,
 	}
 
 	response, err := h.client.Create(ctx, request)
@@ -26,7 +25,7 @@ func (h *SessionHandler) Create(ctx context.Context, s *session.Session) error {
 }
 
 func (h *SessionHandler) KeepAlive(ctx context.Context, s *session.Session) error {
-	request := &pb.KeepAliveRequest{
+	request := &api.KeepAliveRequest{
 		Header: s.GetState(),
 	}
 
@@ -37,7 +36,7 @@ func (h *SessionHandler) KeepAlive(ctx context.Context, s *session.Session) erro
 }
 
 func (h *SessionHandler) Close(ctx context.Context, s *session.Session) error {
-	request := &pb.CloseRequest{
+	request := &api.CloseRequest{
 		Header: s.GetState(),
 	}
 	_, err := h.client.Close(ctx, request);
@@ -45,7 +44,7 @@ func (h *SessionHandler) Close(ctx context.Context, s *session.Session) error {
 }
 
 func (h *SessionHandler) Delete(ctx context.Context, s *session.Session) error {
-	request := &pb.CloseRequest{
+	request := &api.CloseRequest{
 		Header: s.GetState(),
 		Delete: true,
 	}

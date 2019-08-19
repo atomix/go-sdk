@@ -2,10 +2,10 @@ package counter
 
 import (
 	"context"
+	api "github.com/atomix/atomix-api/proto/atomix/counter"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/util"
-	pb "github.com/atomix/atomix-go-client/proto/atomix/counter"
 	"google.golang.org/grpc"
 )
 
@@ -28,7 +28,7 @@ func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn
 		return nil, err
 	}
 
-	client := pb.NewCounterServiceClient(partitions[i])
+	client := api.NewCounterServiceClient(partitions[i])
 	sess, err := session.New(ctx, name, &SessionHandler{client: client}, opts...)
 	if err != nil {
 		return nil, err
@@ -43,7 +43,7 @@ func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn
 
 type counter struct {
 	name    primitive.Name
-	client  pb.CounterServiceClient
+	client  api.CounterServiceClient
 	session *session.Session
 }
 
@@ -52,7 +52,7 @@ func (c *counter) Name() primitive.Name {
 }
 
 func (c *counter) Get(ctx context.Context) (int64, error) {
-	request := &pb.GetRequest{
+	request := &api.GetRequest{
 		Header: c.session.GetRequest(),
 	}
 
@@ -66,7 +66,7 @@ func (c *counter) Get(ctx context.Context) (int64, error) {
 }
 
 func (c *counter) Set(ctx context.Context, value int64) error {
-	request := &pb.SetRequest{
+	request := &api.SetRequest{
 		Header: c.session.NextRequest(),
 		Value:  value,
 	}
@@ -81,7 +81,7 @@ func (c *counter) Set(ctx context.Context, value int64) error {
 }
 
 func (c *counter) Increment(ctx context.Context, delta int64) (int64, error) {
-	request := &pb.IncrementRequest{
+	request := &api.IncrementRequest{
 		Header: c.session.NextRequest(),
 		Delta:  delta,
 	}
@@ -96,7 +96,7 @@ func (c *counter) Increment(ctx context.Context, delta int64) (int64, error) {
 }
 
 func (c *counter) Decrement(ctx context.Context, delta int64) (int64, error) {
-	request := &pb.DecrementRequest{
+	request := &api.DecrementRequest{
 		Header: c.session.NextRequest(),
 		Delta:  delta,
 	}

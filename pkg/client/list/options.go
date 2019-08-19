@@ -1,12 +1,12 @@
 package list
 
 import (
-	pb "github.com/atomix/atomix-go-client/proto/atomix/list"
+	api "github.com/atomix/atomix-api/proto/atomix/list"
 )
 
 type WatchOption interface {
-	beforeWatch(request *pb.EventRequest)
-	afterWatch(response *pb.EventResponse)
+	beforeWatch(request *api.EventRequest)
+	afterWatch(response *api.EventResponse)
 }
 
 // WithReplay returns a Watch option to replay entries
@@ -16,10 +16,10 @@ func WithReplay() WatchOption {
 
 type replayOption struct{}
 
-func (o replayOption) beforeWatch(request *pb.EventRequest) {
+func (o replayOption) beforeWatch(request *api.EventRequest) {
 	request.Replay = true
 }
 
-func (o replayOption) afterWatch(response *pb.EventResponse) {
+func (o replayOption) afterWatch(response *api.EventResponse) {
 
 }

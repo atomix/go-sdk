@@ -3,16 +3,16 @@ package set
 import (
 	"context"
 	"errors"
+	api "github.com/atomix/atomix-api/proto/atomix/set"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
-	pb "github.com/atomix/atomix-go-client/proto/atomix/set"
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
 	"io"
 )
 
 func newPartition(ctx context.Context, conn *grpc.ClientConn, name primitive.Name, opts ...session.SessionOption) (Set, error) {
-	client := pb.NewSetServiceClient(conn)
+	client := api.NewSetServiceClient(conn)
 	sess, err := session.New(ctx, name, &SessionHandler{client: client}, opts...)
 	if err != nil {
 		return nil, err
@@ -26,7 +26,7 @@ func newPartition(ctx context.Context, conn *grpc.ClientConn, name primitive.Nam
 
 type setPartition struct {
 	name    primitive.Name
-	client  pb.SetServiceClient
+	client  api.SetServiceClient
 	session *session.Session
 }
 
@@ -35,7 +35,7 @@ func (s *setPartition) Name() primitive.Name {
 }
 
 func (s *setPartition) Add(ctx context.Context, value string) (bool, error) {
-	request := &pb.AddRequest{
+	request := &api.AddRequest{
 		Header: s.session.NextRequest(),
 		Values: []string{value},
 	}
@@ -47,14 +47,14 @@ func (s *setPartition) Add(ctx context.Context, value string) (bool, error) {
 
 	s.session.RecordResponse(request.Header, response.Header)
 
-	if response.Status == pb.ResponseStatus_WRITE_LOCK {
+	if response.Status == api.ResponseStatus_WRITE_LOCK {
 		return false, errors.New("write lock failed")
 	}
 	return response.Added, nil
 }
 
 func (s *setPartition) Remove(ctx context.Context, value string) (bool, error) {
-	request := &pb.RemoveRequest{
+	request := &api.RemoveRequest{
 		Header: s.session.NextRequest(),
 		Values: []string{value},
 	}
@@ -66,14 +66,14 @@ func (s *setPartition) Remove(ctx context.Context, value string) (bool, error) {
 
 	s.session.RecordResponse(request.Header, response.Header)
 
-	if response.Status == pb.ResponseStatus_WRITE_LOCK {
+	if response.Status == api.ResponseStatus_WRITE_LOCK {
 		return false, errors.New("write lock failed")
 	}
 	return response.Removed, nil
 }
 
 func (s *setPartition) Contains(ctx context.Context, value string) (bool, error) {
-	request := &pb.ContainsRequest{
+	request := &api.ContainsRequest{
 		Header: s.session.GetRequest(),
 		Values: []string{value},
 	}
@@ -88,7 +88,7 @@ func (s *setPartition) Contains(ctx context.Context, value string) (bool, error)
 }
 
 func (s *setPartition) Size(ctx context.Context) (int, error) {
-	request := &pb.SizeRequest{
+	request := &api.SizeRequest{
 		Header: s.session.GetRequest(),
 	}
 
@@ -98,11 +98,11 @@ func (s *setPartition) Size(ctx context.Context) (int, error) {
 	}
 
 	s.session.RecordResponse(request.Header, response.Header)
-	return int(response.Size), nil
+	return int(response.Size_), nil
 }
 
 func (s *setPartition) Clear(ctx context.Context) error {
-	request := &pb.ClearRequest{
+	request := &api.ClearRequest{
 		Header: s.session.NextRequest(),
 	}
 
@@ -116,7 +116,7 @@ func (s *setPartition) Clear(ctx context.Context) error {
 }
 
 func (s *setPartition) Watch(ctx context.Context, ch chan<- *SetEvent, opts ...WatchOption) error {
-	request := &pb.EventRequest{
+	request := &api.EventRequest{
 		Header: s.session.NextRequest(),
 	}
 
@@ -155,7 +155,7 @@ func (s *setPartition) Watch(ctx context.Context, ch chan<- *SetEvent, opts ...W
 
 			// Initialize the session stream if necessary.
 			if stream == nil {
-				stream = s.session.NewStream(response.Header.StreamId)
+				stream = s.session.NewStream(response.Header.StreamID)
 			}
 
 			// Attempt to serialize the response to the stream and skip the response if serialization failed.
@@ -165,9 +165,9 @@ func (s *setPartition) Watch(ctx context.Context, ch chan<- *SetEvent, opts ...W
 
 			var t SetEventType
 			switch response.Type {
-			case pb.EventResponse_ADDED:
+			case api.EventResponse_ADDED:
 				t = EVENT_ADDED
-			case pb.EventResponse_REMOVED:
+			case api.EventResponse_REMOVED:
 				t = EVENT_REMOVED
 			}
 

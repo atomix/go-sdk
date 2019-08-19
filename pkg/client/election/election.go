@@ -3,10 +3,10 @@ package election
 import (
 	"context"
 	"encoding/base64"
+	api "github.com/atomix/atomix-api/proto/atomix/election"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/util"
-	pb "github.com/atomix/atomix-go-client/proto/atomix/election"
 	"github.com/golang/glog"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
@@ -53,7 +53,7 @@ func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn
 		return nil, err
 	}
 
-	client := pb.NewLeaderElectionServiceClient(partitions[i])
+	client := api.NewLeaderElectionServiceClient(partitions[i])
 	sess, err := session.New(ctx, name, &SessionHandler{client: client}, opts...)
 	if err != nil {
 		return nil, err
@@ -71,7 +71,7 @@ func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn
 
 type election struct {
 	name    primitive.Name
-	client  pb.LeaderElectionServiceClient
+	client  api.LeaderElectionServiceClient
 	session *session.Session
 	id      string
 }
@@ -85,7 +85,7 @@ func (e *election) Id() string {
 }
 
 func (e *election) GetTerm(ctx context.Context) (*Term, error) {
-	request := &pb.GetLeadershipRequest{
+	request := &api.GetLeadershipRequest{
 		Header: e.session.GetRequest(),
 	}
 
@@ -103,7 +103,7 @@ func (e *election) GetTerm(ctx context.Context) (*Term, error) {
 }
 
 func (e *election) Enter(ctx context.Context) (*Term, error) {
-	request := &pb.EnterRequest{
+	request := &api.EnterRequest{
 		Header:      e.session.NextRequest(),
 		CandidateId: e.id,
 	}
@@ -122,9 +122,9 @@ func (e *election) Enter(ctx context.Context) (*Term, error) {
 }
 
 func (e *election) Leave(ctx context.Context) error {
-	request := &pb.WithdrawRequest{
+	request := &api.WithdrawRequest{
 		Header:      e.session.NextRequest(),
-		CandidateId: e.id,
+		CandidateID: e.id,
 	}
 
 	response, err := e.client.Withdraw(ctx, request)
@@ -137,9 +137,9 @@ func (e *election) Leave(ctx context.Context) error {
 }
 
 func (e *election) Anoint(ctx context.Context, id string) (bool, error) {
-	request := &pb.AnointRequest{
+	request := &api.AnointRequest{
 		Header:      e.session.NextRequest(),
-		CandidateId: id,
+		CandidateID: id,
 	}
 
 	response, err := e.client.Anoint(ctx, request)
@@ -152,9 +152,9 @@ func (e *election) Anoint(ctx context.Context, id string) (bool, error) {
 }
 
 func (e *election) Promote(ctx context.Context, id string) (bool, error) {
-	request := &pb.PromoteRequest{
+	request := &api.PromoteRequest{
 		Header:      e.session.NextRequest(),
-		CandidateId: id,
+		CandidateID: id,
 	}
 
 	response, err := e.client.Promote(ctx, request)
@@ -167,9 +167,9 @@ func (e *election) Promote(ctx context.Context, id string) (bool, error) {
 }
 
 func (e *election) Evict(ctx context.Context, id string) (bool, error) {
-	request := &pb.EvictRequest{
+	request := &api.EvictRequest{
 		Header:      e.session.NextRequest(),
-		CandidateId: id,
+		CandidateID: id,
 	}
 
 	response, err := e.client.Evict(ctx, request)
@@ -182,7 +182,7 @@ func (e *election) Evict(ctx context.Context, id string) (bool, error) {
 }
 
 func (e *election) Watch(ctx context.Context, ch chan<- *ElectionEvent) error {
-	request := &pb.EventRequest{
+	request := &api.EventRequest{
 		Header: e.session.NextRequest(),
 	}
 	events, err := e.client.Events(ctx, request)
@@ -212,7 +212,7 @@ func (e *election) Watch(ctx context.Context, ch chan<- *ElectionEvent) error {
 
 			// Initialize the session stream if necessary.
 			if stream == nil {
-				stream = e.session.NewStream(response.Header.StreamId)
+				stream = e.session.NewStream(response.Header.StreamID)
 			}
 
 			// Attempt to serialize the response to the stream and skip the response if serialization failed.

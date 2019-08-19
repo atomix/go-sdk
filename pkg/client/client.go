@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	controllerapi "github.com/atomix/atomix-api/proto/atomix/controller"
+	primitiveapi "github.com/atomix/atomix-api/proto/atomix/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/counter"
 	"github.com/atomix/atomix-go-client/pkg/client/election"
 	"github.com/atomix/atomix-go-client/pkg/client/list"
@@ -13,10 +15,8 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/set"
 	"github.com/atomix/atomix-go-client/pkg/client/util"
-	"github.com/atomix/atomix-go-client/proto/atomix/controller"
-	pbprimitive "github.com/atomix/atomix-go-client/proto/atomix/primitive"
-	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/ptypes/any"
+	"github.com/gogo/protobuf/proto"
+	"github.com/gogo/protobuf/types"
 	"google.golang.org/grpc"
 	"net"
 	"sort"
@@ -51,7 +51,7 @@ type Client struct {
 
 // CreateGroup creates a new partition group
 func (c *Client) CreateGroup(ctx context.Context, name string, partitions int, partitionSize int, protocol proto.Message) (*PartitionGroup, error) {
-	client := controller.NewControllerServiceClient(c.conn)
+	client := controllerapi.NewControllerServiceClient(c.conn)
 
 	typeUrl := "type.googleapis.com/" + proto.MessageName(protocol)
 	bytes, err := proto.Marshal(protocol)
@@ -59,15 +59,15 @@ func (c *Client) CreateGroup(ctx context.Context, name string, partitions int, p
 		return nil, err
 	}
 
-	request := &controller.CreatePartitionGroupRequest{
-		Id: &controller.PartitionGroupId{
+	request := &controllerapi.CreatePartitionGroupRequest{
+		ID: &controllerapi.PartitionGroupId{
 			Name:      name,
 			Namespace: c.namespace,
 		},
-		Spec: &controller.PartitionGroupSpec{
+		Spec: &controllerapi.PartitionGroupSpec{
 			Partitions:    uint32(partitions),
 			PartitionSize: uint32(partitionSize),
-			Protocol: &any.Any{
+			Protocol: &types.Any{
 				TypeUrl: typeUrl,
 				Value:   bytes,
 			},
@@ -83,9 +83,9 @@ func (c *Client) CreateGroup(ctx context.Context, name string, partitions int, p
 
 // GetGroups returns a list of all partition group in the client's namespace
 func (c *Client) GetGroups(ctx context.Context) ([]*PartitionGroup, error) {
-	client := controller.NewControllerServiceClient(c.conn)
-	request := &controller.GetPartitionGroupsRequest{
-		Id: &controller.PartitionGroupId{
+	client := controllerapi.NewControllerServiceClient(c.conn)
+	request := &controllerapi.GetPartitionGroupsRequest{
+		ID: &controllerapi.PartitionGroupId{
 			Namespace: c.namespace,
 		},
 	}
@@ -108,9 +108,9 @@ func (c *Client) GetGroups(ctx context.Context) ([]*PartitionGroup, error) {
 
 // GetGroup returns a partition group primitive client
 func (c *Client) GetGroup(ctx context.Context, name string) (*PartitionGroup, error) {
-	client := controller.NewControllerServiceClient(c.conn)
-	request := &controller.GetPartitionGroupsRequest{
-		Id: &controller.PartitionGroupId{
+	client := controllerapi.NewControllerServiceClient(c.conn)
+	request := &controllerapi.GetPartitionGroupsRequest{
+		ID: &controllerapi.PartitionGroupId{
 			Name:      name,
 			Namespace: c.namespace,
 		},
@@ -129,11 +129,11 @@ func (c *Client) GetGroup(ctx context.Context, name string) (*PartitionGroup, er
 	return c.newGroup(response.Groups[0])
 }
 
-func (c *Client) newGroup(groupProto *controller.PartitionGroup) (*PartitionGroup, error) {
+func (c *Client) newGroup(groupProto *controllerapi.PartitionGroup) (*PartitionGroup, error) {
 	// Ensure the partitions are sorted in case the controller sent them out of order.
 	partitionProtos := groupProto.Partitions
 	sort.Slice(partitionProtos, func(i, j int) bool {
-		return partitionProtos[i].PartitionId < partitionProtos[j].PartitionId
+		return partitionProtos[i].PartitionID < partitionProtos[j].PartitionID
 	})
 
 	// Iterate through the partitions and create gRPC client connections for each partitino.
@@ -149,8 +149,8 @@ func (c *Client) newGroup(groupProto *controller.PartitionGroup) (*PartitionGrou
 	}
 
 	return &PartitionGroup{
-		Namespace:     groupProto.Id.Namespace,
-		Name:          groupProto.Id.Name,
+		Namespace:     groupProto.ID.Namespace,
+		Name:          groupProto.ID.Name,
 		Partitions:    int(groupProto.Spec.Partitions),
 		PartitionSize: int(groupProto.Spec.PartitionSize),
 		Protocol:      groupProto.Spec.Protocol.TypeUrl,
@@ -161,9 +161,9 @@ func (c *Client) newGroup(groupProto *controller.PartitionGroup) (*PartitionGrou
 
 // DeleteGroup deletes a partition group via the controller
 func (c *Client) DeleteGroup(ctx context.Context, name string) error {
-	client := controller.NewControllerServiceClient(c.conn)
-	request := &controller.DeletePartitionGroupRequest{
-		Id: &controller.PartitionGroupId{
+	client := controllerapi.NewControllerServiceClient(c.conn)
+	request := &controllerapi.DeletePartitionGroupRequest{
+		ID: &controllerapi.PartitionGroupId{
 			Name:      name,
 			Namespace: c.namespace,
 		},
@@ -231,11 +231,11 @@ type PartitionGroup struct {
 	partitions  []*grpc.ClientConn
 }
 
-func (g *PartitionGroup) GetPrimitives(ctx context.Context, types ...string) ([]*pbprimitive.PrimitiveInfo, error) {
+func (g *PartitionGroup) GetPrimitives(ctx context.Context, types ...string) ([]*primitiveapi.PrimitiveInfo, error) {
 	if len(types) == 0 {
 		return g.getPrimitives(ctx, "")
 	} else {
-		primitives := []*pbprimitive.PrimitiveInfo{}
+		primitives := []*primitiveapi.PrimitiveInfo{}
 		for _, t := range types {
 			typePrimitives, err := g.getPrimitives(ctx, t)
 			if err != nil {
@@ -249,10 +249,10 @@ func (g *PartitionGroup) GetPrimitives(ctx context.Context, types ...string) ([]
 	}
 }
 
-func (g *PartitionGroup) getPrimitives(ctx context.Context, t string) ([]*pbprimitive.PrimitiveInfo, error) {
+func (g *PartitionGroup) getPrimitives(ctx context.Context, t string) ([]*primitiveapi.PrimitiveInfo, error) {
 	results, err := util.ExecuteAsync(len(g.partitions), func(i int) (i2 interface{}, e error) {
-		client := pbprimitive.NewPrimitiveServiceClient(g.partitions[i])
-		request := &pbprimitive.GetPrimitivesRequest{
+		client := primitiveapi.NewPrimitiveServiceClient(g.partitions[i])
+		request := &primitiveapi.GetPrimitivesRequest{
 			Type: t,
 		}
 		ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
@@ -267,13 +267,13 @@ func (g *PartitionGroup) getPrimitives(ctx context.Context, t string) ([]*pbprim
 		return nil, err
 	}
 
-	primitiveResults := make(map[string]*pbprimitive.PrimitiveInfo)
+	primitiveResults := make(map[string]*primitiveapi.PrimitiveInfo)
 	for _, result := range results {
-		info := result.(*pbprimitive.PrimitiveInfo)
+		info := result.(*primitiveapi.PrimitiveInfo)
 		primitiveResults[info.Name.String()] = info
 	}
 
-	primitives := make([]*pbprimitive.PrimitiveInfo, 0, len(primitiveResults))
+	primitives := make([]*primitiveapi.PrimitiveInfo, 0, len(primitiveResults))
 	for _, info := range primitiveResults {
 		primitives = append(primitives, info)
 	}

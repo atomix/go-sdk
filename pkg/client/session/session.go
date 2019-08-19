@@ -2,9 +2,9 @@ package session
 
 import (
 	"context"
+	"github.com/atomix/atomix-api/proto/atomix/headers"
+	api "github.com/atomix/atomix-api/proto/atomix/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
-	"github.com/atomix/atomix-go-client/proto/atomix/headers"
-	pbprimitive "github.com/atomix/atomix-go-client/proto/atomix/primitive"
 	"sync"
 	"time"
 )
@@ -38,11 +38,12 @@ type Handler interface {
 
 func New(ctx context.Context, name primitive.Name, handler Handler, opts ...SessionOption) (*Session, error) {
 	options := &sessionOptions{}
+	WithTimeout(30 * time.Second).prepare(options)
 	for i := range opts {
 		opts[i].prepare(options)
 	}
 	session := &Session{
-		Name: &pbprimitive.Name{
+		Name: &api.Name{
 			Namespace: name.Application,
 			Name:      name.Name,
 		},
@@ -59,7 +60,7 @@ func New(ctx context.Context, name primitive.Name, handler Handler, opts ...Sess
 }
 
 type Session struct {
-	Name       *pbprimitive.Name
+	Name       *api.Name
 	Timeout    time.Duration
 	SessionID  uint64
 	handler    Handler
@@ -106,9 +107,9 @@ func (s *Session) GetState() *headers.RequestHeader {
 	defer s.mu.RUnlock()
 	return &headers.RequestHeader{
 		Name:      s.Name,
-		SessionId: s.SessionID,
+		SessionID: s.SessionID,
 		Index:     s.lastIndex,
-		RequestId: s.responseID,
+		RequestID: s.responseID,
 		Streams:   s.getStreamHeaders(),
 	}
 }
@@ -119,9 +120,9 @@ func (s *Session) GetRequest() *headers.RequestHeader {
 	defer s.mu.RUnlock()
 	return &headers.RequestHeader{
 		Name:      s.Name,
-		SessionId: s.SessionID,
+		SessionID: s.SessionID,
 		Index:     s.lastIndex,
-		RequestId: s.requestID,
+		RequestID: s.requestID,
 	}
 }
 
@@ -132,9 +133,9 @@ func (s *Session) NextRequest() *headers.RequestHeader {
 	s.requestID = s.requestID + 1
 	return &headers.RequestHeader{
 		Name:      s.Name,
-		SessionId: s.SessionID,
+		SessionID: s.SessionID,
 		Index:     s.lastIndex,
-		RequestId: s.requestID,
+		RequestID: s.requestID,
 	}
 }
 
@@ -146,14 +147,14 @@ func (s *Session) RecordResponse(requestHeader *headers.RequestHeader, responseH
 		defer s.mu.Unlock()
 
 		// If the session ID is set, ensure the session is initialized
-		if responseHeader.SessionId > s.SessionID {
-			s.SessionID = responseHeader.SessionId
-			s.lastIndex = responseHeader.SessionId
+		if responseHeader.SessionID > s.SessionID {
+			s.SessionID = responseHeader.SessionID
+			s.lastIndex = responseHeader.SessionID
 		}
 
 		// If the request ID is greater than the highest response ID, update the response ID.
-		if requestHeader.RequestId > s.responseID {
-			s.responseID = requestHeader.RequestId
+		if requestHeader.RequestID > s.responseID {
+			s.responseID = requestHeader.RequestID
 		}
 
 		// If the response index has increased, update the last received index
@@ -204,8 +205,8 @@ func (s *Stream) getHeader() *headers.StreamHeader {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return &headers.StreamHeader{
-		StreamId:   s.ID,
-		ResponseId: s.responseID,
+		StreamID:   s.ID,
+		ResponseID: s.responseID,
 	}
 }
 
@@ -213,7 +214,7 @@ func (s *Stream) getHeader() *headers.StreamHeader {
 func (s *Stream) Serialize(header *headers.ResponseHeader) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if header.ResponseId == s.responseID+1 {
+	if header.ResponseID == s.responseID+1 {
 		s.responseID++
 		return true
 	}

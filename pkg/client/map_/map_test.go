@@ -3,9 +3,9 @@ package map_
 import (
 	"context"
 	"errors"
+	api "github.com/atomix/atomix-api/proto/atomix/map"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/test"
-	pb "github.com/atomix/atomix-go-client/proto/atomix/map"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"io"
@@ -25,43 +25,43 @@ type TestServer struct {
 	entries map[string]*KeyValue
 }
 
-func (s *TestServer) Create(ctx context.Context, request *pb.CreateRequest) (*pb.CreateResponse, error) {
+func (s *TestServer) Create(ctx context.Context, request *api.CreateRequest) (*api.CreateResponse, error) {
 	headers, err := s.CreateHeader(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return &pb.CreateResponse{
+	return &api.CreateResponse{
 		Header: headers,
 	}, nil
 }
 
-func (s *TestServer) KeepAlive(ctx context.Context, request *pb.KeepAliveRequest) (*pb.KeepAliveResponse, error) {
+func (s *TestServer) KeepAlive(ctx context.Context, request *api.KeepAliveRequest) (*api.KeepAliveResponse, error) {
 	headers, err := s.KeepAliveHeader(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
-	return &pb.KeepAliveResponse{
+	return &api.KeepAliveResponse{
 		Header: headers,
 	}, nil
 }
 
-func (s *TestServer) Close(ctx context.Context, request *pb.CloseRequest) (*pb.CloseResponse, error) {
+func (s *TestServer) Close(ctx context.Context, request *api.CloseRequest) (*api.CloseResponse, error) {
 	err := s.CloseHeader(ctx, request.Header)
 	if err != nil {
 		return nil, err
 	}
-	return &pb.CloseResponse{}, nil
+	return &api.CloseResponse{}, nil
 }
 
-func (s *TestServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutResponse, error) {
+func (s *TestServer) Put(ctx context.Context, request *api.PutRequest) (*api.PutResponse, error) {
 	index := s.IncrementIndex()
 
-	session, err := s.GetSession(request.Header.SessionId)
+	session, err := s.GetSession(request.Header.SessionID)
 	if err != nil {
 		return nil, err
 	}
 
-	sequenceNumber := request.Header.RequestId
+	sequenceNumber := request.Header.RequestID
 	session.Await(sequenceNumber)
 	defer session.Complete(sequenceNumber)
 
@@ -73,16 +73,16 @@ func (s *TestServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRe
 	v := s.entries[request.Key]
 
 	if request.Version != 0 && (v == nil || v.Version != request.Version) {
-		return &pb.PutResponse{
+		return &api.PutResponse{
 			Header: header,
-			Status: pb.ResponseStatus_PRECONDITION_FAILED,
+			Status: api.ResponseStatus_PRECONDITION_FAILED,
 		}, nil
 	}
 
 	if v != nil && valuesEqual(v.Value, request.Value) {
-		return &pb.PutResponse{
+		return &api.PutResponse{
 			Header: header,
-			Status: pb.ResponseStatus_NOOP,
+			Status: api.ResponseStatus_NOOP,
 		}, nil
 	}
 
@@ -95,17 +95,17 @@ func (s *TestServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRe
 	streams := session.Streams()
 	for _, stream := range streams {
 		if v == nil {
-			stream.Send(&pb.EventResponse{
+			stream.Send(&api.EventResponse{
 				Header:     stream.NewResponseHeader(),
-				Type:       pb.EventResponse_INSERTED,
+				Type:       api.EventResponse_INSERTED,
 				Key:        request.Key,
 				NewValue:   request.Value,
 				NewVersion: request.Version,
 			})
 		} else {
-			stream.Send(&pb.EventResponse{
+			stream.Send(&api.EventResponse{
 				Header:     stream.NewResponseHeader(),
-				Type:       pb.EventResponse_UPDATED,
+				Type:       api.EventResponse_UPDATED,
 				Key:        request.Key,
 				OldValue:   v.Value,
 				OldVersion: v.Version,
@@ -116,22 +116,22 @@ func (s *TestServer) Put(ctx context.Context, request *pb.PutRequest) (*pb.PutRe
 	}
 
 	if v != nil {
-		return &pb.PutResponse{
+		return &api.PutResponse{
 			Header:          header,
-			Status:          pb.ResponseStatus_OK,
+			Status:          api.ResponseStatus_OK,
 			PreviousValue:   v.Value,
 			PreviousVersion: v.Version,
 		}, nil
 	} else {
-		return &pb.PutResponse{
+		return &api.PutResponse{
 			Header: header,
-			Status: pb.ResponseStatus_OK,
+			Status: api.ResponseStatus_OK,
 		}, nil
 	}
 }
 
-func (s *TestServer) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetResponse, error) {
-	session, err := s.GetSession(request.Header.SessionId)
+func (s *TestServer) Get(ctx context.Context, request *api.GetRequest) (*api.GetResponse, error) {
+	session, err := s.GetSession(request.Header.SessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -143,27 +143,27 @@ func (s *TestServer) Get(ctx context.Context, request *pb.GetRequest) (*pb.GetRe
 
 	v, ok := s.entries[request.Key]
 	if ok {
-		return &pb.GetResponse{
+		return &api.GetResponse{
 			Header:  header,
 			Value:   v.Value,
 			Version: v.Version,
 		}, nil
 	} else {
-		return &pb.GetResponse{
+		return &api.GetResponse{
 			Header: header,
 		}, nil
 	}
 }
 
-func (s *TestServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb.RemoveResponse, error) {
+func (s *TestServer) Remove(ctx context.Context, request *api.RemoveRequest) (*api.RemoveResponse, error) {
 	s.IncrementIndex()
 
-	session, err := s.GetSession(request.Header.SessionId)
+	session, err := s.GetSession(request.Header.SessionID)
 	if err != nil {
 		return nil, err
 	}
 
-	sequenceNumber := request.Header.RequestId
+	sequenceNumber := request.Header.RequestID
 	session.Await(sequenceNumber)
 	defer session.Complete(sequenceNumber)
 
@@ -175,25 +175,25 @@ func (s *TestServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb
 	v := s.entries[request.Key]
 
 	if v == nil {
-		return &pb.RemoveResponse{
+		return &api.RemoveResponse{
 			Header: header,
-			Status: pb.ResponseStatus_NOOP,
+			Status: api.ResponseStatus_NOOP,
 		}, nil
 	}
 
 	if request.Version != 0 && v.Version != request.Version {
-		return &pb.RemoveResponse{
+		return &api.RemoveResponse{
 			Header: header,
-			Status: pb.ResponseStatus_PRECONDITION_FAILED,
+			Status: api.ResponseStatus_PRECONDITION_FAILED,
 		}, nil
 	}
 
 	delete(s.entries, request.Key)
 
 	for _, stream := range session.Streams() {
-		stream.Send(&pb.EventResponse{
+		stream.Send(&api.EventResponse{
 			Header:     stream.NewResponseHeader(),
-			Type:       pb.EventResponse_REMOVED,
+			Type:       api.EventResponse_REMOVED,
 			Key:        request.Key,
 			OldValue:   v.Value,
 			OldVersion: v.Version,
@@ -201,29 +201,29 @@ func (s *TestServer) Remove(ctx context.Context, request *pb.RemoveRequest) (*pb
 	}
 
 	if v.Version != 0 {
-		return &pb.RemoveResponse{
+		return &api.RemoveResponse{
 			Header:          header,
-			Status:          pb.ResponseStatus_OK,
+			Status:          api.ResponseStatus_OK,
 			PreviousValue:   v.Value,
 			PreviousVersion: v.Version,
 		}, nil
 	} else {
-		return &pb.RemoveResponse{
+		return &api.RemoveResponse{
 			Header: header,
-			Status: pb.ResponseStatus_OK,
+			Status: api.ResponseStatus_OK,
 		}, nil
 	}
 }
 
-func (s *TestServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*pb.ReplaceResponse, error) {
+func (s *TestServer) Replace(ctx context.Context, request *api.ReplaceRequest) (*api.ReplaceResponse, error) {
 	index := s.IncrementIndex()
 
-	session, err := s.GetSession(request.Header.SessionId)
+	session, err := s.GetSession(request.Header.SessionID)
 	if err != nil {
 		return nil, err
 	}
 
-	sequenceNumber := request.Header.RequestId
+	sequenceNumber := request.Header.RequestID
 	session.Await(sequenceNumber)
 	defer session.Complete(sequenceNumber)
 
@@ -235,16 +235,16 @@ func (s *TestServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*
 	v := s.entries[request.Key]
 
 	if (v == nil && request.PreviousVersion != 0) || (v != nil && v.Version != request.PreviousVersion) || (v != nil && !valuesEqual(v.Value, request.PreviousValue)) {
-		return &pb.ReplaceResponse{
+		return &api.ReplaceResponse{
 			Header: header,
-			Status: pb.ResponseStatus_PRECONDITION_FAILED,
+			Status: api.ResponseStatus_PRECONDITION_FAILED,
 		}, nil
 	}
 
 	if v != nil && valuesEqual(v.Value, request.NewValue) {
-		return &pb.ReplaceResponse{
+		return &api.ReplaceResponse{
 			Header: header,
-			Status: pb.ResponseStatus_NOOP,
+			Status: api.ResponseStatus_NOOP,
 		}, nil
 	}
 
@@ -256,17 +256,17 @@ func (s *TestServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*
 
 	for _, stream := range session.Streams() {
 		if v.Version == 0 {
-			stream.Send(&pb.EventResponse{
+			stream.Send(&api.EventResponse{
 				Header:     stream.NewResponseHeader(),
-				Type:       pb.EventResponse_INSERTED,
+				Type:       api.EventResponse_INSERTED,
 				Key:        request.Key,
 				NewValue:   request.NewValue,
 				NewVersion: int64(index),
 			})
 		} else {
-			stream.Send(&pb.EventResponse{
+			stream.Send(&api.EventResponse{
 				Header:     stream.NewResponseHeader(),
-				Type:       pb.EventResponse_UPDATED,
+				Type:       api.EventResponse_UPDATED,
 				Key:        request.Key,
 				OldValue:   v.Value,
 				OldVersion: v.Version,
@@ -277,22 +277,22 @@ func (s *TestServer) Replace(ctx context.Context, request *pb.ReplaceRequest) (*
 	}
 
 	if v != nil {
-		return &pb.ReplaceResponse{
+		return &api.ReplaceResponse{
 			Header:          header,
-			Status:          pb.ResponseStatus_OK,
+			Status:          api.ResponseStatus_OK,
 			PreviousValue:   v.Value,
 			PreviousVersion: v.Version,
 		}, nil
 	} else {
-		return &pb.ReplaceResponse{
+		return &api.ReplaceResponse{
 			Header: header,
-			Status: pb.ResponseStatus_OK,
+			Status: api.ResponseStatus_OK,
 		}, nil
 	}
 }
 
-func (s *TestServer) Exists(ctx context.Context, request *pb.ExistsRequest) (*pb.ExistsResponse, error) {
-	session, err := s.GetSession(request.Header.SessionId)
+func (s *TestServer) Exists(ctx context.Context, request *api.ExistsRequest) (*api.ExistsResponse, error) {
+	session, err := s.GetSession(request.Header.SessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -304,20 +304,20 @@ func (s *TestServer) Exists(ctx context.Context, request *pb.ExistsRequest) (*pb
 
 	_, ok := s.entries[request.Key]
 	if !ok {
-		return &pb.ExistsResponse{
+		return &api.ExistsResponse{
 			Header:      header,
 			ContainsKey: false,
 		}, nil
 	} else {
-		return &pb.ExistsResponse{
+		return &api.ExistsResponse{
 			Header:      header,
 			ContainsKey: true,
 		}, nil
 	}
 }
 
-func (s *TestServer) Size(ctx context.Context, request *pb.SizeRequest) (*pb.SizeResponse, error) {
-	session, err := s.GetSession(request.Header.SessionId)
+func (s *TestServer) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeResponse, error) {
+	session, err := s.GetSession(request.Header.SessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -326,21 +326,21 @@ func (s *TestServer) Size(ctx context.Context, request *pb.SizeRequest) (*pb.Siz
 	if err != nil {
 		return nil, err
 	}
-	return &pb.SizeResponse{
+	return &api.SizeResponse{
 		Header: headers,
-		Size:   int32(len(s.entries)),
+		Size_:  int32(len(s.entries)),
 	}, nil
 }
 
-func (s *TestServer) Clear(ctx context.Context, request *pb.ClearRequest) (*pb.ClearResponse, error) {
+func (s *TestServer) Clear(ctx context.Context, request *api.ClearRequest) (*api.ClearResponse, error) {
 	s.IncrementIndex()
 
-	session, err := s.GetSession(request.Header.SessionId)
+	session, err := s.GetSession(request.Header.SessionID)
 	if err != nil {
 		return nil, err
 	}
 
-	sequenceNumber := request.Header.RequestId
+	sequenceNumber := request.Header.RequestID
 	session.Await(sequenceNumber)
 	defer session.Complete(sequenceNumber)
 
@@ -351,20 +351,20 @@ func (s *TestServer) Clear(ctx context.Context, request *pb.ClearRequest) (*pb.C
 
 	s.entries = make(map[string]*KeyValue)
 
-	return &pb.ClearResponse{
+	return &api.ClearResponse{
 		Header: headers,
 	}, nil
 }
 
-func (s *TestServer) Events(request *pb.EventRequest, server pb.MapService_EventsServer) error {
+func (s *TestServer) Events(request *api.EventRequest, server api.MapService_EventsServer) error {
 	s.IncrementIndex()
 
-	session, err := s.GetSession(request.Header.SessionId)
+	session, err := s.GetSession(request.Header.SessionID)
 	if err != nil {
 		return err
 	}
 
-	sequenceNumber := request.Header.RequestId
+	sequenceNumber := request.Header.RequestID
 	session.Await(sequenceNumber)
 	session.Complete(sequenceNumber)
 
@@ -372,7 +372,7 @@ func (s *TestServer) Events(request *pb.EventRequest, server pb.MapService_Event
 	stream := session.NewStream(c)
 
 	for e := range c {
-		if err := server.Send(e.(*pb.EventResponse)); err != nil {
+		if err := server.Send(e.(*api.EventResponse)); err != nil {
 			if err == io.EOF {
 				stream.Delete()
 				return nil
@@ -383,7 +383,7 @@ func (s *TestServer) Events(request *pb.EventRequest, server pb.MapService_Event
 	return nil
 }
 
-func (s *TestServer) Entries(request *pb.EntriesRequest, server pb.MapService_EntriesServer) error {
+func (s *TestServer) Entries(request *api.EntriesRequest, server api.MapService_EntriesServer) error {
 	return errors.New("not implemented")
 }
 
@@ -401,7 +401,7 @@ func valuesEqual(a []byte, b []byte) bool {
 
 func TestMapOperations(t *testing.T) {
 	conn, server := test.StartTestServer(func(server *grpc.Server) {
-		pb.RegisterMapServiceServer(server, NewTestServer())
+		api.RegisterMapServiceServer(server, NewTestServer())
 	})
 
 	m, err := newPartition(context.TODO(), conn, primitive.NewName("default", "test", "default", "test"))
@@ -493,7 +493,7 @@ func TestMapOperations(t *testing.T) {
 
 func TestMapStreams(t *testing.T) {
 	conn, server := test.StartTestServer(func(server *grpc.Server) {
-		pb.RegisterMapServiceServer(server, NewTestServer())
+		api.RegisterMapServiceServer(server, NewTestServer())
 	})
 
 	m, err := newPartition(context.TODO(), conn, primitive.NewName("default", "test", "default", "test"))

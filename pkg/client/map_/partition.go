@@ -3,16 +3,16 @@ package map_
 import (
 	"context"
 	"errors"
+	api "github.com/atomix/atomix-api/proto/atomix/map"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
-	pb "github.com/atomix/atomix-go-client/proto/atomix/map"
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
 	"io"
 )
 
 func newPartition(ctx context.Context, conn *grpc.ClientConn, name primitive.Name, opts ...session.SessionOption) (Map, error) {
-	client := pb.NewMapServiceClient(conn)
+	client := api.NewMapServiceClient(conn)
 	sess, err := session.New(ctx, name, &SessionHandler{client: client}, opts...)
 	if err != nil {
 		return nil, err
@@ -26,7 +26,7 @@ func newPartition(ctx context.Context, conn *grpc.ClientConn, name primitive.Nam
 
 type mapPartition struct {
 	name    primitive.Name
-	client  pb.MapServiceClient
+	client  api.MapServiceClient
 	session *session.Session
 }
 
@@ -35,7 +35,7 @@ func (m *mapPartition) Name() primitive.Name {
 }
 
 func (m *mapPartition) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*KeyValue, error) {
-	request := &pb.PutRequest{
+	request := &api.PutRequest{
 		Header: m.session.NextRequest(),
 		Key:    key,
 		Value:  value,
@@ -56,15 +56,15 @@ func (m *mapPartition) Put(ctx context.Context, key string, value []byte, opts .
 
 	m.session.RecordResponse(request.Header, response.Header)
 
-	if response.Status == pb.ResponseStatus_OK {
+	if response.Status == api.ResponseStatus_OK {
 		return &KeyValue{
 			Key:     key,
 			Value:   value,
 			Version: int64(response.Header.Index),
 		}, nil
-	} else if response.Status == pb.ResponseStatus_PRECONDITION_FAILED {
+	} else if response.Status == api.ResponseStatus_PRECONDITION_FAILED {
 		return nil, errors.New("write condition failed")
-	} else if response.Status == pb.ResponseStatus_WRITE_LOCK {
+	} else if response.Status == api.ResponseStatus_WRITE_LOCK {
 		return nil, errors.New("write lock failed")
 	} else {
 		return &KeyValue{
@@ -76,7 +76,7 @@ func (m *mapPartition) Put(ctx context.Context, key string, value []byte, opts .
 }
 
 func (m *mapPartition) Get(ctx context.Context, key string, opts ...GetOption) (*KeyValue, error) {
-	request := &pb.GetRequest{
+	request := &api.GetRequest{
 		Header: m.session.GetRequest(),
 		Key:    key,
 	}
@@ -107,7 +107,7 @@ func (m *mapPartition) Get(ctx context.Context, key string, opts ...GetOption) (
 }
 
 func (m *mapPartition) Remove(ctx context.Context, key string, opts ...RemoveOption) (*KeyValue, error) {
-	request := &pb.RemoveRequest{
+	request := &api.RemoveRequest{
 		Header: m.session.NextRequest(),
 		Key:    key,
 	}
@@ -127,15 +127,15 @@ func (m *mapPartition) Remove(ctx context.Context, key string, opts ...RemoveOpt
 
 	m.session.RecordResponse(request.Header, response.Header)
 
-	if response.Status == pb.ResponseStatus_OK {
+	if response.Status == api.ResponseStatus_OK {
 		return &KeyValue{
 			Key:     key,
 			Value:   response.PreviousValue,
 			Version: response.PreviousVersion,
 		}, nil
-	} else if response.Status == pb.ResponseStatus_PRECONDITION_FAILED {
+	} else if response.Status == api.ResponseStatus_PRECONDITION_FAILED {
 		return nil, errors.New("write condition failed")
-	} else if response.Status == pb.ResponseStatus_WRITE_LOCK {
+	} else if response.Status == api.ResponseStatus_WRITE_LOCK {
 		return nil, errors.New("write lock failed")
 	} else {
 		return nil, nil
@@ -143,7 +143,7 @@ func (m *mapPartition) Remove(ctx context.Context, key string, opts ...RemoveOpt
 }
 
 func (m *mapPartition) Size(ctx context.Context) (int, error) {
-	request := &pb.SizeRequest{
+	request := &api.SizeRequest{
 		Header: m.session.GetRequest(),
 	}
 
@@ -153,11 +153,11 @@ func (m *mapPartition) Size(ctx context.Context) (int, error) {
 	}
 
 	m.session.RecordResponse(request.Header, response.Header)
-	return int(response.Size), nil
+	return int(response.Size_), nil
 }
 
 func (m *mapPartition) Clear(ctx context.Context) error {
-	request := &pb.ClearRequest{
+	request := &api.ClearRequest{
 		Header: m.session.NextRequest(),
 	}
 
@@ -171,7 +171,7 @@ func (m *mapPartition) Clear(ctx context.Context) error {
 }
 
 func (m *mapPartition) Entries(ctx context.Context, ch chan<- *KeyValue) error {
-	request := &pb.EntriesRequest{
+	request := &api.EntriesRequest{
 		Header: m.session.GetRequest(),
 	}
 	entries, err := m.client.Entries(ctx, request)
@@ -206,7 +206,7 @@ func (m *mapPartition) Entries(ctx context.Context, ch chan<- *KeyValue) error {
 }
 
 func (m *mapPartition) Watch(ctx context.Context, ch chan<- *MapEvent, opts ...WatchOption) error {
-	request := &pb.EventRequest{
+	request := &api.EventRequest{
 		Header: m.session.NextRequest(),
 	}
 
@@ -245,7 +245,7 @@ func (m *mapPartition) Watch(ctx context.Context, ch chan<- *MapEvent, opts ...W
 
 			// Initialize the session stream if necessary.
 			if stream == nil {
-				stream = m.session.NewStream(response.Header.StreamId)
+				stream = m.session.NewStream(response.Header.StreamID)
 			}
 
 			// Attempt to serialize the response to the stream and skip the response if serialization failed.
@@ -254,28 +254,28 @@ func (m *mapPartition) Watch(ctx context.Context, ch chan<- *MapEvent, opts ...W
 			}
 
 			switch response.Type {
-			case pb.EventResponse_NONE:
+			case api.EventResponse_NONE:
 				ch <- &MapEvent{
 					Type:    EventNone,
 					Key:     response.Key,
 					Value:   response.NewValue,
 					Version: response.NewVersion,
 				}
-			case pb.EventResponse_INSERTED:
+			case api.EventResponse_INSERTED:
 				ch <- &MapEvent{
 					Type:    EventInserted,
 					Key:     response.Key,
 					Value:   response.NewValue,
 					Version: response.NewVersion,
 				}
-			case pb.EventResponse_UPDATED:
+			case api.EventResponse_UPDATED:
 				ch <- &MapEvent{
 					Type:    EventUpdated,
 					Key:     response.Key,
 					Value:   response.NewValue,
 					Version: response.NewVersion,
 				}
-			case pb.EventResponse_REMOVED:
+			case api.EventResponse_REMOVED:
 				ch <- &MapEvent{
 					Type:    EventRemoved,
 					Key:     response.Key,

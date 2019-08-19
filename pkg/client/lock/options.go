@@ -1,14 +1,13 @@
 package lock
 
 import (
-	pb "github.com/atomix/atomix-go-client/proto/atomix/lock"
-	"github.com/golang/protobuf/ptypes/duration"
+	api "github.com/atomix/atomix-api/proto/atomix/lock"
 	"time"
 )
 
 type LockOption interface {
-	before(request *pb.LockRequest)
-	after(response *pb.LockResponse)
+	before(request *api.LockRequest)
+	after(response *api.LockResponse)
 }
 
 func WithTimeout(timeout time.Duration) LockOption {
@@ -19,20 +18,17 @@ type timeoutOption struct {
 	timeout time.Duration
 }
 
-func (o timeoutOption) before(request *pb.LockRequest) {
-	request.Timeout = &duration.Duration{
-		Seconds: int64(o.timeout.Seconds()),
-		Nanos:   int32(o.timeout.Nanoseconds()),
-	}
+func (o timeoutOption) before(request *api.LockRequest) {
+	request.Timeout = &o.timeout
 }
 
-func (o timeoutOption) after(response *pb.LockResponse) {
+func (o timeoutOption) after(response *api.LockResponse) {
 
 }
 
 type UnlockOption interface {
-	before(request *pb.UnlockRequest)
-	after(response *pb.UnlockResponse)
+	before(request *api.UnlockRequest)
+	after(response *api.UnlockResponse)
 }
 
 func WithVersion(version uint64) UnlockOption {
@@ -43,17 +39,17 @@ type versionOption struct {
 	version uint64
 }
 
-func (o versionOption) before(request *pb.UnlockRequest) {
+func (o versionOption) before(request *api.UnlockRequest) {
 	request.Version = o.version
 }
 
-func (o versionOption) after(response *pb.UnlockResponse) {
+func (o versionOption) after(response *api.UnlockResponse) {
 
 }
 
 type IsLockedOption interface {
-	before(request *pb.IsLockedRequest)
-	after(response *pb.IsLockedResponse)
+	before(request *api.IsLockedRequest)
+	after(response *api.IsLockedResponse)
 }
 
 func WithIsVersion(version uint64) IsLockedOption {
@@ -64,10 +60,10 @@ type isVersionOption struct {
 	version uint64
 }
 
-func (o isVersionOption) before(request *pb.IsLockedRequest) {
+func (o isVersionOption) before(request *api.IsLockedRequest) {
 	request.Version = o.version
 }
 
-func (o isVersionOption) after(response *pb.IsLockedResponse) {
+func (o isVersionOption) after(response *api.IsLockedResponse) {
 
 }

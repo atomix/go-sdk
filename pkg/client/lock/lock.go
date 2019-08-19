@@ -2,10 +2,10 @@ package lock
 
 import (
 	"context"
+	api "github.com/atomix/atomix-api/proto/atomix/lock"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/util"
-	pb "github.com/atomix/atomix-go-client/proto/atomix/lock"
 	"google.golang.org/grpc"
 )
 
@@ -29,7 +29,7 @@ func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn
 }
 
 func newLock(ctx context.Context, name primitive.Name, conn *grpc.ClientConn, opts ...session.SessionOption) (*lock, error) {
-	client := pb.NewLockServiceClient(conn)
+	client := api.NewLockServiceClient(conn)
 	sess, err := session.New(ctx, name, &SessionHandler{client: client}, opts...)
 	if err != nil {
 		return nil, err
@@ -43,7 +43,7 @@ func newLock(ctx context.Context, name primitive.Name, conn *grpc.ClientConn, op
 
 type lock struct {
 	name    primitive.Name
-	client  pb.LockServiceClient
+	client  api.LockServiceClient
 	session *session.Session
 }
 
@@ -52,7 +52,7 @@ func (l *lock) Name() primitive.Name {
 }
 
 func (l *lock) Lock(ctx context.Context, opts ...LockOption) (uint64, error) {
-	request := &pb.LockRequest{
+	request := &api.LockRequest{
 		Header: l.session.NextRequest(),
 	}
 
@@ -74,7 +74,7 @@ func (l *lock) Lock(ctx context.Context, opts ...LockOption) (uint64, error) {
 }
 
 func (l *lock) Unlock(ctx context.Context, opts ...UnlockOption) (bool, error) {
-	request := &pb.UnlockRequest{
+	request := &api.UnlockRequest{
 		Header: l.session.NextRequest(),
 	}
 
@@ -96,7 +96,7 @@ func (l *lock) Unlock(ctx context.Context, opts ...UnlockOption) (bool, error) {
 }
 
 func (l *lock) IsLocked(ctx context.Context, opts ...IsLockedOption) (bool, error) {
-	request := &pb.IsLockedRequest{
+	request := &api.IsLockedRequest{
 		Header: l.session.GetRequest(),
 	}
 

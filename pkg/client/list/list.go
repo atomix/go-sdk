@@ -2,10 +2,10 @@ package list
 
 import (
 	"context"
+	api "github.com/atomix/atomix-api/proto/atomix/list"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/util"
-	pb "github.com/atomix/atomix-go-client/proto/atomix/list"
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
 	"io"
@@ -50,7 +50,7 @@ func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn
 }
 
 func newList(ctx context.Context, name primitive.Name, conn *grpc.ClientConn, opts ...session.SessionOption) (*list, error) {
-	client := pb.NewListServiceClient(conn)
+	client := api.NewListServiceClient(conn)
 	sess, err := session.New(ctx, name, &SessionHandler{client: client}, opts...)
 	if err != nil {
 		return nil, err
@@ -64,7 +64,7 @@ func newList(ctx context.Context, name primitive.Name, conn *grpc.ClientConn, op
 
 type list struct {
 	name    primitive.Name
-	client  pb.ListServiceClient
+	client  api.ListServiceClient
 	session *session.Session
 }
 
@@ -73,7 +73,7 @@ func (l *list) Name() primitive.Name {
 }
 
 func (l *list) Append(ctx context.Context, value string) error {
-	request := &pb.AppendRequest{
+	request := &api.AppendRequest{
 		Header: l.session.NextRequest(),
 		Value:  value,
 	}
@@ -88,7 +88,7 @@ func (l *list) Append(ctx context.Context, value string) error {
 }
 
 func (l *list) Insert(ctx context.Context, index int, value string) error {
-	request := &pb.InsertRequest{
+	request := &api.InsertRequest{
 		Header: l.session.NextRequest(),
 		Index:  uint32(index),
 		Value:  value,
@@ -104,7 +104,7 @@ func (l *list) Insert(ctx context.Context, index int, value string) error {
 }
 
 func (l *list) Get(ctx context.Context, index int) (string, error) {
-	request := &pb.GetRequest{
+	request := &api.GetRequest{
 		Header: l.session.GetRequest(),
 		Index:  uint32(index),
 	}
@@ -119,7 +119,7 @@ func (l *list) Get(ctx context.Context, index int) (string, error) {
 }
 
 func (l *list) Remove(ctx context.Context, index int) (string, error) {
-	request := &pb.RemoveRequest{
+	request := &api.RemoveRequest{
 		Header: l.session.NextRequest(),
 		Index:  uint32(index),
 	}
@@ -134,7 +134,7 @@ func (l *list) Remove(ctx context.Context, index int) (string, error) {
 }
 
 func (l *list) Size(ctx context.Context) (int, error) {
-	request := &pb.SizeRequest{
+	request := &api.SizeRequest{
 		Header: l.session.GetRequest(),
 	}
 
@@ -144,11 +144,11 @@ func (l *list) Size(ctx context.Context) (int, error) {
 	}
 
 	l.session.RecordResponse(request.Header, response.Header)
-	return int(response.Size), nil
+	return int(response.Size_), nil
 }
 
 func (l *list) Items(ctx context.Context, ch chan<- string) error {
-	request := &pb.IterateRequest{
+	request := &api.IterateRequest{
 		Header: l.session.GetRequest(),
 	}
 	entries, err := l.client.Iterate(ctx, request)
@@ -179,7 +179,7 @@ func (l *list) Items(ctx context.Context, ch chan<- string) error {
 }
 
 func (l *list) Watch(ctx context.Context, ch chan<- *ListEvent, opts ...WatchOption) error {
-	request := &pb.EventRequest{
+	request := &api.EventRequest{
 		Header: l.session.NextRequest(),
 	}
 
@@ -218,7 +218,7 @@ func (l *list) Watch(ctx context.Context, ch chan<- *ListEvent, opts ...WatchOpt
 
 			// Initialize the session stream if necessary.
 			if stream == nil {
-				stream = l.session.NewStream(response.Header.StreamId)
+				stream = l.session.NewStream(response.Header.StreamID)
 			}
 
 			// Attempt to serialize the response to the stream and skip the response if serialization failed.
@@ -228,11 +228,11 @@ func (l *list) Watch(ctx context.Context, ch chan<- *ListEvent, opts ...WatchOpt
 
 			var t ListEventType
 			switch response.Type {
-			case pb.EventResponse_NONE:
+			case api.EventResponse_NONE:
 				t = EventNone
-			case pb.EventResponse_ADDED:
+			case api.EventResponse_ADDED:
 				t = EventInserted
-			case pb.EventResponse_REMOVED:
+			case api.EventResponse_REMOVED:
 				t = EventRemoved
 			}
 
@@ -247,7 +247,7 @@ func (l *list) Watch(ctx context.Context, ch chan<- *ListEvent, opts ...WatchOpt
 }
 
 func (l *list) Clear(ctx context.Context) error {
-	request := &pb.ClearRequest{
+	request := &api.ClearRequest{
 		Header: l.session.NextRequest(),
 	}
 
