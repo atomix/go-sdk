@@ -1,4 +1,4 @@
-package map_
+package _map
 
 import (
 	api "github.com/atomix/atomix-api/proto/atomix/map"
