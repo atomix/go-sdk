@@ -142,7 +142,7 @@ func (m *mapPartition) Remove(ctx context.Context, key string, opts ...RemoveOpt
 	}
 }
 
-func (m *mapPartition) Size(ctx context.Context) (int, error) {
+func (m *mapPartition) Len(ctx context.Context) (int, error) {
 	request := &api.SizeRequest{
 		Header: m.session.GetRequest(),
 	}

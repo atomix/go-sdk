@@ -21,7 +21,7 @@ type List interface {
 	Insert(ctx context.Context, index int, value string) error
 	Get(ctx context.Context, index int) (string, error)
 	Remove(ctx context.Context, index int) (string, error)
-	Size(ctx context.Context) (int, error)
+	Len(ctx context.Context) (int, error)
 	Items(ctx context.Context, ch chan<- string) error
 	Watch(ctx context.Context, ch chan<- *ListEvent, opts ...WatchOption) error
 	Clear(ctx context.Context) error
@@ -133,7 +133,7 @@ func (l *list) Remove(ctx context.Context, index int) (string, error) {
 	return response.Value, nil
 }
 
-func (l *list) Size(ctx context.Context) (int, error) {
+func (l *list) Len(ctx context.Context) (int, error) {
 	request := &api.SizeRequest{
 		Header: l.session.GetRequest(),
 	}

@@ -19,7 +19,7 @@ type Map interface {
 	Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*KeyValue, error)
 	Get(ctx context.Context, key string, opts ...GetOption) (*KeyValue, error)
 	Remove(ctx context.Context, key string, opts ...RemoveOption) (*KeyValue, error)
-	Size(ctx context.Context) (int, error)
+	Len(ctx context.Context) (int, error)
 	Clear(ctx context.Context) error
 	Entries(ctx context.Context, ch chan<- *KeyValue) error
 	Watch(ctx context.Context, ch chan<- *MapEvent, opts ...WatchOption) error
@@ -111,19 +111,19 @@ func (m *map_) Remove(ctx context.Context, key string, opts ...RemoveOption) (*K
 	return session.Remove(ctx, key, opts...)
 }
 
-func (m *map_) Size(ctx context.Context) (int, error) {
+func (m *map_) Len(ctx context.Context) (int, error) {
 	results, err := util.ExecuteAsync(len(m.partitions), func(i int) (interface{}, error) {
-		return m.partitions[i].Size(ctx)
+		return m.partitions[i].Len(ctx)
 	})
 	if err != nil {
 		return 0, err
 	}
 
-	size := 0
+	total := 0
 	for _, result := range results {
-		size += result.(int)
+		total += result.(int)
 	}
-	return size, nil
+	return total, nil
 }
 
 func (m *map_) Entries(ctx context.Context, ch chan<- *KeyValue) error {

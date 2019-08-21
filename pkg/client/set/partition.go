@@ -87,7 +87,7 @@ func (s *setPartition) Contains(ctx context.Context, value string) (bool, error)
 	return response.Contains, nil
 }
 
-func (s *setPartition) Size(ctx context.Context) (int, error) {
+func (s *setPartition) Len(ctx context.Context) (int, error) {
 	request := &api.SizeRequest{
 		Header: s.session.GetRequest(),
 	}

@@ -17,7 +17,7 @@ type Set interface {
 	Add(ctx context.Context, value string) (bool, error)
 	Remove(ctx context.Context, value string) (bool, error)
 	Contains(ctx context.Context, value string) (bool, error)
-	Size(ctx context.Context) (int, error)
+	Len(ctx context.Context) (int, error)
 	Clear(ctx context.Context) error
 	Watch(ctx context.Context, ch chan<- *SetEvent, opts ...WatchOption) error
 }
@@ -94,19 +94,19 @@ func (s *set) Contains(ctx context.Context, value string) (bool, error) {
 	return partition.Contains(ctx, value)
 }
 
-func (s *set) Size(ctx context.Context) (int, error) {
+func (s *set) Len(ctx context.Context) (int, error) {
 	results, err := util.ExecuteAsync(len(s.partitions), func(i int) (interface{}, error) {
-		return s.partitions[i].Size(ctx)
+		return s.partitions[i].Len(ctx)
 	})
 	if err != nil {
 		return 0, err
 	}
 
-	size := 0
+	total := 0
 	for _, result := range results {
-		size += result.(int)
+		total += result.(int)
 	}
-	return size, nil
+	return total, nil
 }
 
 func (s *set) Clear(ctx context.Context) error {
