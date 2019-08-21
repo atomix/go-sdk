@@ -253,7 +253,8 @@ func (g *PartitionGroup) getPrimitives(ctx context.Context, t string) ([]*primit
 	results, err := util.ExecuteAsync(len(g.partitions), func(i int) (i2 interface{}, e error) {
 		client := primitiveapi.NewPrimitiveServiceClient(g.partitions[i])
 		request := &primitiveapi.GetPrimitivesRequest{
-			Type: t,
+			Type:      t,
+			Namespace: g.application,
 		}
 		ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
 		response, err := client.GetPrimitives(ctx, request)
