@@ -270,8 +270,10 @@ func (g *PartitionGroup) getPrimitives(ctx context.Context, t string) ([]*primit
 
 	primitiveResults := make(map[string]*primitiveapi.PrimitiveInfo)
 	for _, result := range results {
-		info := result.(*primitiveapi.PrimitiveInfo)
-		primitiveResults[info.Name.String()] = info
+		primitives := result.([]*primitiveapi.PrimitiveInfo)
+		for _, info := range primitives {
+			primitiveResults[info.Name.String()] = info
+		}
 	}
 
 	primitives := make([]*primitiveapi.PrimitiveInfo, 0, len(primitiveResults))
