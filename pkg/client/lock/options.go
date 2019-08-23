@@ -19,11 +19,14 @@ import (
 	"time"
 )
 
+// LockOption is an option for Lock calls
+//nolint:golint
 type LockOption interface {
 	before(request *api.LockRequest)
 	after(response *api.LockResponse)
 }
 
+// WithTimeout sets the lock timeout
 func WithTimeout(timeout time.Duration) LockOption {
 	return timeoutOption{timeout: timeout}
 }
@@ -40,11 +43,13 @@ func (o timeoutOption) after(response *api.LockResponse) {
 
 }
 
+// UnlockOption is an option for Unlock calls
 type UnlockOption interface {
 	before(request *api.UnlockRequest)
 	after(response *api.UnlockResponse)
 }
 
+// WithVersion sets the required version for the lock to be unlocked
 func WithVersion(version uint64) UnlockOption {
 	return versionOption{version: version}
 }
@@ -61,11 +66,13 @@ func (o versionOption) after(response *api.UnlockResponse) {
 
 }
 
+// IsLockedOption is an option for IsLocked calls
 type IsLockedOption interface {
 	before(request *api.IsLockedRequest)
 	after(response *api.IsLockedResponse)
 }
 
+// WithIsVersion sets the lock version to check
 func WithIsVersion(version uint64) IsLockedOption {
 	return isVersionOption{version: version}
 }
