@@ -1,8 +1,6 @@
 .PHONY: build
 
-ATOMIX_K8S_CONTROLLER_VERSION := latest
-
-all: image
+all: build
 
 build: # @HELP build the source code
 build:

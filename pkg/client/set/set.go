@@ -22,8 +22,8 @@ import (
 	"google.golang.org/grpc"
 )
 
-type SetClient interface {
-	GetSet(ctx context.Context, name string, opts ...session.SessionOption) (Set, error)
+type Client interface {
+	GetSet(ctx context.Context, name string, opts ...session.Option) (Set, error)
 }
 
 type Set interface {
@@ -33,22 +33,22 @@ type Set interface {
 	Contains(ctx context.Context, value string) (bool, error)
 	Len(ctx context.Context) (int, error)
 	Clear(ctx context.Context) error
-	Watch(ctx context.Context, ch chan<- *SetEvent, opts ...WatchOption) error
+	Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error
 }
 
-type SetEventType string
+type EventType string
 
 const (
-	EVENT_ADDED   SetEventType = "added"
-	EVENT_REMOVED SetEventType = "removed"
+	EventAdded   EventType = "added"
+	EventRemoved EventType = "removed"
 )
 
-type SetEvent struct {
-	Type  SetEventType
+type Event struct {
+	Type  EventType
 	Value string
 }
 
-func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.SessionOption) (Set, error) {
+func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.Option) (Set, error) {
 	results, err := util.ExecuteOrderedAsync(len(partitions), func(i int) (interface{}, error) {
 		return newPartition(ctx, partitions[i], name, opts...)
 	})
@@ -129,7 +129,7 @@ func (s *set) Clear(ctx context.Context) error {
 	})
 }
 
-func (s *set) Watch(ctx context.Context, ch chan<- *SetEvent, opts ...WatchOption) error {
+func (s *set) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error {
 	return util.IterAsync(len(s.partitions), func(i int) error {
 		return s.partitions[i].Watch(ctx, ch, opts...)
 	})

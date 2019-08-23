@@ -27,21 +27,21 @@ import (
 	"io"
 )
 
-type ElectionClient interface {
-	GetElection(ctx context.Context, name string, opts ...session.SessionOption) (Election, error)
+type Client interface {
+	GetElection(ctx context.Context, name string, opts ...session.Option) (Election, error)
 }
 
 // Election is the interface for the leader election primitive
 type Election interface {
 	primitive.Primitive
-	Id() string
+	ID() string
 	GetTerm(ctx context.Context) (*Term, error)
 	Enter(ctx context.Context) (*Term, error)
 	Leave(ctx context.Context) error
 	Anoint(ctx context.Context, id string) (bool, error)
 	Promote(ctx context.Context, id string) (bool, error)
 	Evict(ctx context.Context, id string) (bool, error)
-	Watch(ctx context.Context, c chan<- *ElectionEvent) error
+	Watch(ctx context.Context, c chan<- *Event) error
 }
 
 type Term struct {
@@ -50,18 +50,18 @@ type Term struct {
 	Candidates []string
 }
 
-type ElectionEventType string
+type EventType string
 
 const (
-	EVENT_CHANGED ElectionEventType = "changed"
+	EventChanged EventType = "changed"
 )
 
-type ElectionEvent struct {
-	Type ElectionEventType
+type Event struct {
+	Type EventType
 	Term Term
 }
 
-func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.SessionOption) (Election, error) {
+func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.Option) (Election, error) {
 	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
 		return nil, err
@@ -73,8 +73,8 @@ func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn
 		return nil, err
 	}
 
-	nodeId := uuid.NodeID()
-	candidate := base64.StdEncoding.EncodeToString(nodeId)
+	nodeID := uuid.NodeID()
+	candidate := base64.StdEncoding.EncodeToString(nodeID)
 	return &election{
 		name:    name,
 		client:  client,
@@ -94,7 +94,7 @@ func (e *election) Name() primitive.Name {
 	return e.name
 }
 
-func (e *election) Id() string {
+func (e *election) ID() string {
 	return e.id
 }
 
@@ -195,7 +195,7 @@ func (e *election) Evict(ctx context.Context, id string) (bool, error) {
 	return response.Succeeded, nil
 }
 
-func (e *election) Watch(ctx context.Context, ch chan<- *ElectionEvent) error {
+func (e *election) Watch(ctx context.Context, ch chan<- *Event) error {
 	request := &api.EventRequest{
 		Header: e.session.NextRequest(),
 	}
@@ -234,8 +234,8 @@ func (e *election) Watch(ctx context.Context, ch chan<- *ElectionEvent) error {
 				continue
 			}
 
-			ch <- &ElectionEvent{
-				Type: EVENT_CHANGED,
+			ch <- &Event{
+				Type: EventChanged,
 				Term: Term{
 					Term:       response.Term,
 					Leader:     response.Leader,

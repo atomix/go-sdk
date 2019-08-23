@@ -25,8 +25,8 @@ import (
 	"io"
 )
 
-type ListClient interface {
-	GetList(ctx context.Context, name string, opts ...session.SessionOption) (List, error)
+type Client interface {
+	GetList(ctx context.Context, name string, opts ...session.Option) (List, error)
 }
 
 type List interface {
@@ -37,25 +37,25 @@ type List interface {
 	Remove(ctx context.Context, index int) (string, error)
 	Len(ctx context.Context) (int, error)
 	Items(ctx context.Context, ch chan<- string) error
-	Watch(ctx context.Context, ch chan<- *ListEvent, opts ...WatchOption) error
+	Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error
 	Clear(ctx context.Context) error
 }
 
-type ListEventType string
+type EventType string
 
 const (
-	EventNone     ListEventType = ""
-	EventInserted ListEventType = "added"
-	EventRemoved  ListEventType = "removed"
+	EventNone     EventType = ""
+	EventInserted EventType = "added"
+	EventRemoved  EventType = "removed"
 )
 
-type ListEvent struct {
-	Type  ListEventType
+type Event struct {
+	Type  EventType
 	Index int
 	Value string
 }
 
-func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.SessionOption) (List, error) {
+func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.Option) (List, error) {
 	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
 		return nil, err
@@ -63,7 +63,7 @@ func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn
 	return newList(ctx, name, partitions[i], opts...)
 }
 
-func newList(ctx context.Context, name primitive.Name, conn *grpc.ClientConn, opts ...session.SessionOption) (*list, error) {
+func newList(ctx context.Context, name primitive.Name, conn *grpc.ClientConn, opts ...session.Option) (*list, error) {
 	client := api.NewListServiceClient(conn)
 	sess, err := session.New(ctx, name, &SessionHandler{client: client}, opts...)
 	if err != nil {
@@ -192,7 +192,7 @@ func (l *list) Items(ctx context.Context, ch chan<- string) error {
 	return nil
 }
 
-func (l *list) Watch(ctx context.Context, ch chan<- *ListEvent, opts ...WatchOption) error {
+func (l *list) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error {
 	request := &api.EventRequest{
 		Header: l.session.NextRequest(),
 	}
@@ -240,7 +240,7 @@ func (l *list) Watch(ctx context.Context, ch chan<- *ListEvent, opts ...WatchOpt
 				continue
 			}
 
-			var t ListEventType
+			var t EventType
 			switch response.Type {
 			case api.EventResponse_NONE:
 				t = EventNone
@@ -250,7 +250,7 @@ func (l *list) Watch(ctx context.Context, ch chan<- *ListEvent, opts ...WatchOpt
 				t = EventRemoved
 			}
 
-			ch <- &ListEvent{
+			ch <- &Event{
 				Type:  t,
 				Index: int(response.Index),
 				Value: response.Value,

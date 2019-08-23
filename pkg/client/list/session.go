@@ -53,7 +53,7 @@ func (h *SessionHandler) Close(ctx context.Context, s *session.Session) error {
 	request := &api.CloseRequest{
 		Header: s.GetState(),
 	}
-	_, err := h.client.Close(ctx, request);
+	_, err := h.client.Close(ctx, request)
 	return err
 }
 
@@ -62,6 +62,6 @@ func (h *SessionHandler) Delete(ctx context.Context, s *session.Session) error {
 		Header: s.GetState(),
 		Delete: true,
 	}
-	_, err := h.client.Close(ctx, request);
+	_, err := h.client.Close(ctx, request)
 	return err
 }

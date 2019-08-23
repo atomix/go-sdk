@@ -25,26 +25,26 @@ import (
 	"sync"
 )
 
-func NewTestServer() *TestServer {
-	return &TestServer{
-		sessions: make(map[uint64]*TestSession),
+func NewTestServer() *Server {
+	return &Server{
+		sessions: make(map[uint64]*Session),
 		Index:    0,
 	}
 }
 
-// TestServer manages the map state machine for testing
-type TestServer struct {
-	sessions map[uint64]*TestSession
+// Server manages the map state machine for testing
+type Server struct {
+	sessions map[uint64]*Session
 	Index    uint64
 }
 
 // IncrementIndex increments and returns the server's index
-func (s *TestServer) IncrementIndex() uint64 {
-	s.Index += 1
+func (s *Server) IncrementIndex() uint64 {
+	s.Index++
 	return s.Index
 }
 
-func (s *TestServer) CreateHeader(ctx context.Context) (*headers.ResponseHeader, error) {
+func (s *Server) CreateHeader(ctx context.Context) (*headers.ResponseHeader, error) {
 	index := s.IncrementIndex()
 	session := s.NewSession()
 	session.Complete(0)
@@ -54,7 +54,7 @@ func (s *TestServer) CreateHeader(ctx context.Context) (*headers.ResponseHeader,
 	}, nil
 }
 
-func (s *TestServer) KeepAliveHeader(ctx context.Context, h *headers.RequestHeader) (*headers.ResponseHeader, error) {
+func (s *Server) KeepAliveHeader(ctx context.Context, h *headers.RequestHeader) (*headers.ResponseHeader, error) {
 	index := s.IncrementIndex()
 	if session, exists := s.sessions[h.SessionID]; exists {
 		return &headers.ResponseHeader{
@@ -62,70 +62,67 @@ func (s *TestServer) KeepAliveHeader(ctx context.Context, h *headers.RequestHead
 			Index:      index,
 			ResponseID: session.SequenceNumber,
 		}, nil
-	} else {
-		return nil, errors.New("session not found")
 	}
+	return nil, errors.New("session not found")
 }
 
-func (s *TestServer) CloseHeader(ctx context.Context, h *headers.RequestHeader) error {
+func (s *Server) CloseHeader(ctx context.Context, h *headers.RequestHeader) error {
 	s.IncrementIndex()
 	if _, exists := s.sessions[h.SessionID]; exists {
 		delete(s.sessions, h.SessionID)
 		return nil
-	} else {
-		return errors.New("session not found")
 	}
+	return errors.New("session not found")
 }
 
 // NewSession adds a test session to the server
-func (s *TestServer) NewSession() *TestSession {
-	session := &TestSession{
-		Id:             s.Index,
+func (s *Server) NewSession() *Session {
+	session := &Session{
+		ID:             s.Index,
 		server:         s,
 		sequences:      make(map[uint64]chan struct{}),
 		mu:             sync.Mutex{},
 		SequenceNumber: 0,
-		streams:        make(map[uint64]*TestStream),
+		streams:        make(map[uint64]*Stream),
 	}
-	s.sessions[session.Id] = session
+	s.sessions[session.ID] = session
 	return session
 }
 
 // GetSession gets a test session
-func (s *TestServer) GetSession(id uint64) (*TestSession, error) {
+func (s *Server) GetSession(id uint64) (*Session, error) {
 	sess, ok := s.sessions[id]
 	if ok {
 		return sess, nil
-	} else {
-		return sess, errors.New("session not found")
 	}
+	return sess, errors.New("session not found")
 }
 
-// TestSession manages a session, orders session operations, and manages streams for the session
-type TestSession struct {
-	Id             uint64
-	server         *TestServer
+// Session manages a session, orders session operations, and manages streams for the session
+type Session struct {
+	ID             uint64
+	server         *Server
 	sequences      map[uint64]chan struct{}
 	mu             sync.Mutex
 	SequenceNumber uint64
-	streams        map[uint64]*TestStream
+	streams        map[uint64]*Stream
 }
 
 // NewStream creates a new stream for the session
-func (s *TestSession) NewStream(c chan<- interface{}) *TestStream {
-	stream := &TestStream{
-		Id:         s.server.Index,
+func (s *Session) NewStream(c chan<- interface{}) *Stream {
+	stream := &Stream{
+		ID:         s.server.Index,
 		session:    s,
 		ItemNumber: 0,
 		c:          c,
 	}
-	s.streams[stream.Id] = stream
+	s.streams[stream.ID] = stream
 	return stream
 }
 
 // Streams returns a slice of all streams open for the sesssion
-func (s *TestSession) Streams() []*TestStream {
-	streams := make([]*TestStream, 0)
+func (s *Session) Streams() []*Stream {
+	streams := make([]*Stream, 0)
 	for _, value := range s.streams {
 		streams = append(streams, value)
 	}
@@ -133,7 +130,7 @@ func (s *TestSession) Streams() []*TestStream {
 }
 
 // getLatch returns a channel on which to wait for operations to be ordered for the given sequence number
-func (s *TestSession) getLatch(sequence uint64) chan struct{} {
+func (s *Session) getLatch(sequence uint64) chan struct{} {
 	s.mu.Lock()
 	if _, ok := s.sequences[sequence]; !ok {
 		s.sequences[sequence] = make(chan struct{}, 1)
@@ -144,64 +141,64 @@ func (s *TestSession) getLatch(sequence uint64) chan struct{} {
 }
 
 // Await waits for all commands prior to the given sequence number to be applied to the server
-func (s *TestSession) Await(sequence uint64) {
+func (s *Session) Await(sequence uint64) {
 	<-s.getLatch(sequence)
 	s.SequenceNumber = sequence
 }
 
 // Complete unblocks the command following the given sequence number to be applied to the server
-func (s *TestSession) Complete(sequence uint64) {
+func (s *Session) Complete(sequence uint64) {
 	s.getLatch(sequence + 1) <- struct{}{}
 }
 
 // NewResponseHeaders creates a new response header with headers for all open streams
-func (s *TestSession) NewResponseHeader() (*headers.ResponseHeader, error) {
+func (s *Session) NewResponseHeader() (*headers.ResponseHeader, error) {
 	return &headers.ResponseHeader{
-		SessionID:  s.Id,
+		SessionID:  s.ID,
 		Index:      s.server.Index,
 		ResponseID: s.SequenceNumber,
 	}, nil
 }
 
 // Delete deletes the test stream
-func (s *TestSession) Delete() {
-	delete(s.server.sessions, s.Id)
+func (s *Session) Delete() {
+	delete(s.server.sessions, s.ID)
 }
 
-// TestStream manages ordering for a single stream
-type TestStream struct {
-	session    *TestSession
-	Id         uint64
+// Stream manages ordering for a single stream
+type Stream struct {
+	session    *Session
+	ID         uint64
 	ItemNumber uint64
 	c          chan<- interface{}
 }
 
 // header creates a new stream header
-func (s *TestStream) Header(index uint64) *headers.StreamHeader {
+func (s *Stream) Header(index uint64) *headers.StreamHeader {
 	return &headers.StreamHeader{
-		StreamID:   s.Id,
+		StreamID:   s.ID,
 		ResponseID: s.ItemNumber,
 	}
 }
 
 // NewResponseHeaders returns headers for the stream
-func (s *TestStream) NewResponseHeader() *headers.ResponseHeader {
+func (s *Stream) NewResponseHeader() *headers.ResponseHeader {
 	return &headers.ResponseHeader{
-		SessionID:  s.Id,
+		SessionID:  s.ID,
 		Index:      s.session.server.Index,
 		ResponseID: s.session.SequenceNumber,
 	}
 }
 
 // Send sends an EventResponse on the stream
-func (s *TestStream) Send(response interface{}) {
-	s.ItemNumber += 1
+func (s *Stream) Send(response interface{}) {
+	s.ItemNumber++
 	s.c <- response
 }
 
 // Delete deletes the test stream
-func (s *TestStream) Delete() {
-	delete(s.session.streams, s.Id)
+func (s *Stream) Delete() {
+	delete(s.session.streams, s.ID)
 }
 
 func serve(r func(server *grpc.Server), l *bufconn.Listener, c <-chan struct{}) {
@@ -235,7 +232,7 @@ func StartTestServer(r func(server *grpc.Server)) (*grpc.ClientConn, chan struct
 
 	go func() {
 		<-stop
-		c.Close()
+		_ = c.Close()
 	}()
 
 	return c, stop

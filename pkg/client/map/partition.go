@@ -25,7 +25,7 @@ import (
 	"io"
 )
 
-func newPartition(ctx context.Context, conn *grpc.ClientConn, name primitive.Name, opts ...session.SessionOption) (Map, error) {
+func newPartition(ctx context.Context, conn *grpc.ClientConn, name primitive.Name, opts ...session.Option) (Map, error) {
 	client := api.NewMapServiceClient(conn)
 	sess, err := session.New(ctx, name, &SessionHandler{client: client}, opts...)
 	if err != nil {
@@ -219,7 +219,7 @@ func (m *mapPartition) Entries(ctx context.Context, ch chan<- *KeyValue) error {
 	return nil
 }
 
-func (m *mapPartition) Watch(ctx context.Context, ch chan<- *MapEvent, opts ...WatchOption) error {
+func (m *mapPartition) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error {
 	request := &api.EventRequest{
 		Header: m.session.NextRequest(),
 	}
@@ -269,28 +269,28 @@ func (m *mapPartition) Watch(ctx context.Context, ch chan<- *MapEvent, opts ...W
 
 			switch response.Type {
 			case api.EventResponse_NONE:
-				ch <- &MapEvent{
+				ch <- &Event{
 					Type:    EventNone,
 					Key:     response.Key,
 					Value:   response.NewValue,
 					Version: response.NewVersion,
 				}
 			case api.EventResponse_INSERTED:
-				ch <- &MapEvent{
+				ch <- &Event{
 					Type:    EventInserted,
 					Key:     response.Key,
 					Value:   response.NewValue,
 					Version: response.NewVersion,
 				}
 			case api.EventResponse_UPDATED:
-				ch <- &MapEvent{
+				ch <- &Event{
 					Type:    EventUpdated,
 					Key:     response.Key,
 					Value:   response.NewValue,
 					Version: response.NewVersion,
 				}
 			case api.EventResponse_REMOVED:
-				ch <- &MapEvent{
+				ch <- &Event{
 					Type:    EventRemoved,
 					Key:     response.Key,
 					Value:   response.OldValue,

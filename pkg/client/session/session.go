@@ -23,11 +23,11 @@ import (
 	"time"
 )
 
-type SessionOption interface {
-	prepare(options *sessionOptions)
+type Option interface {
+	prepare(options *options)
 }
 
-func WithTimeout(timeout time.Duration) SessionOption {
+func WithTimeout(timeout time.Duration) Option {
 	return timeoutOption{timeout: timeout}
 }
 
@@ -35,11 +35,11 @@ type timeoutOption struct {
 	timeout time.Duration
 }
 
-func (o timeoutOption) prepare(options *sessionOptions) {
+func (o timeoutOption) prepare(options *options) {
 	options.timeout = o.timeout
 }
 
-type sessionOptions struct {
+type options struct {
 	timeout time.Duration
 }
 
@@ -50,8 +50,8 @@ type Handler interface {
 	Delete(ctx context.Context, session *Session) error
 }
 
-func New(ctx context.Context, name primitive.Name, handler Handler, opts ...SessionOption) (*Session, error) {
-	options := &sessionOptions{}
+func New(ctx context.Context, name primitive.Name, handler Handler, opts ...Option) (*Session, error) {
+	options := &options{}
 	WithTimeout(30 * time.Second).prepare(options)
 	for i := range opts {
 		opts[i].prepare(options)

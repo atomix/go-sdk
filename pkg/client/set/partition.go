@@ -25,7 +25,7 @@ import (
 	"io"
 )
 
-func newPartition(ctx context.Context, conn *grpc.ClientConn, name primitive.Name, opts ...session.SessionOption) (Set, error) {
+func newPartition(ctx context.Context, conn *grpc.ClientConn, name primitive.Name, opts ...session.Option) (Set, error) {
 	client := api.NewSetServiceClient(conn)
 	sess, err := session.New(ctx, name, &SessionHandler{client: client}, opts...)
 	if err != nil {
@@ -129,7 +129,7 @@ func (s *setPartition) Clear(ctx context.Context) error {
 	return nil
 }
 
-func (s *setPartition) Watch(ctx context.Context, ch chan<- *SetEvent, opts ...WatchOption) error {
+func (s *setPartition) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error {
 	request := &api.EventRequest{
 		Header: s.session.NextRequest(),
 	}
@@ -177,15 +177,15 @@ func (s *setPartition) Watch(ctx context.Context, ch chan<- *SetEvent, opts ...W
 				continue
 			}
 
-			var t SetEventType
+			var t EventType
 			switch response.Type {
 			case api.EventResponse_ADDED:
-				t = EVENT_ADDED
+				t = EventAdded
 			case api.EventResponse_REMOVED:
-				t = EVENT_REMOVED
+				t = EventRemoved
 			}
 
-			ch <- &SetEvent{
+			ch <- &Event{
 				Type:  t,
 				Value: response.Value,
 			}

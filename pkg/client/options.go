@@ -16,9 +16,9 @@ package client
 
 import "os"
 
-func applyOptions(opts ...ClientOption) *clientOptions {
-	options := &clientOptions{
-		namespace: os.Getenv("ATOMIX_NAMESPACE"),
+func applyOptions(opts ...Option) *options {
+	options := &options{
+		namespace:   os.Getenv("ATOMIX_NAMESPACE"),
 		application: os.Getenv("ATOMIX_APP"),
 	}
 	for _, opt := range opts {
@@ -27,24 +27,24 @@ func applyOptions(opts ...ClientOption) *clientOptions {
 	return options
 }
 
-type clientOptions struct {
+type options struct {
 	application string
 	namespace   string
 }
 
-type ClientOption interface {
-	apply(options *clientOptions)
+type Option interface {
+	apply(options *options)
 }
 
 type applicationOption struct {
 	application string
 }
 
-func (o *applicationOption) apply(options *clientOptions) {
+func (o *applicationOption) apply(options *options) {
 	options.application = o.application
 }
 
-func WithApplication(application string) ClientOption {
+func WithApplication(application string) Option {
 	return &applicationOption{application: application}
 }
 
@@ -52,10 +52,10 @@ type namespaceOption struct {
 	namespace string
 }
 
-func (o *namespaceOption) apply(options *clientOptions) {
+func (o *namespaceOption) apply(options *options) {
 	options.namespace = o.namespace
 }
 
-func WithNamespace(namespace string) ClientOption {
+func WithNamespace(namespace string) Option {
 	return &namespaceOption{namespace: namespace}
 }

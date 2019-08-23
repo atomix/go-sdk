@@ -24,8 +24,8 @@ import (
 	"sync"
 )
 
-type MapClient interface {
-	GetMap(ctx context.Context, name string, opts ...session.SessionOption) (Map, error)
+type Client interface {
+	GetMap(ctx context.Context, name string, opts ...session.Option) (Map, error)
 }
 
 type Map interface {
@@ -36,7 +36,7 @@ type Map interface {
 	Len(ctx context.Context) (int, error)
 	Clear(ctx context.Context) error
 	Entries(ctx context.Context, ch chan<- *KeyValue) error
-	Watch(ctx context.Context, ch chan<- *MapEvent, opts ...WatchOption) error
+	Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error
 }
 
 type KeyValue struct {
@@ -49,23 +49,23 @@ func (kv KeyValue) String() string {
 	return fmt.Sprintf("key: %s\nvalue: %s\nversion: %d", kv.Key, string(kv.Value), kv.Version)
 }
 
-type MapEventType string
+type EventType string
 
 const (
-	EventNone     MapEventType = ""
-	EventInserted MapEventType = "inserted"
-	EventUpdated  MapEventType = "updated"
-	EventRemoved  MapEventType = "removed"
+	EventNone     EventType = ""
+	EventInserted EventType = "inserted"
+	EventUpdated  EventType = "updated"
+	EventRemoved  EventType = "removed"
 )
 
-type MapEvent struct {
-	Type    MapEventType
+type Event struct {
+	Type    EventType
 	Key     string
 	Value   []byte
 	Version int64
 }
 
-func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.SessionOption) (Map, error) {
+func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.Option) (Map, error) {
 	results, err := util.ExecuteOrderedAsync(len(partitions), func(i int) (interface{}, error) {
 		return newPartition(ctx, partitions[i], name, opts...)
 	})
@@ -78,22 +78,22 @@ func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn
 		maps[i] = result.(Map)
 	}
 
-	return &map_{
+	return &_map{
 		name:       name,
 		partitions: maps,
 	}, nil
 }
 
-type map_ struct {
+type _map struct {
 	name       primitive.Name
 	partitions []Map
 }
 
-func (m *map_) Name() primitive.Name {
+func (m *_map) Name() primitive.Name {
 	return m.name
 }
 
-func (m *map_) getPartition(key string) (Map, error) {
+func (m *_map) getPartition(key string) (Map, error) {
 	i, err := util.GetPartitionIndex(key, len(m.partitions))
 	if err != nil {
 		return nil, err
@@ -101,7 +101,7 @@ func (m *map_) getPartition(key string) (Map, error) {
 	return m.partitions[i], nil
 }
 
-func (m *map_) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*KeyValue, error) {
+func (m *_map) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*KeyValue, error) {
 	session, err := m.getPartition(key)
 	if err != nil {
 		return nil, err
@@ -109,7 +109,7 @@ func (m *map_) Put(ctx context.Context, key string, value []byte, opts ...PutOpt
 	return session.Put(ctx, key, value, opts...)
 }
 
-func (m *map_) Get(ctx context.Context, key string, opts ...GetOption) (*KeyValue, error) {
+func (m *_map) Get(ctx context.Context, key string, opts ...GetOption) (*KeyValue, error) {
 	session, err := m.getPartition(key)
 	if err != nil {
 		return nil, err
@@ -117,7 +117,7 @@ func (m *map_) Get(ctx context.Context, key string, opts ...GetOption) (*KeyValu
 	return session.Get(ctx, key, opts...)
 }
 
-func (m *map_) Remove(ctx context.Context, key string, opts ...RemoveOption) (*KeyValue, error) {
+func (m *_map) Remove(ctx context.Context, key string, opts ...RemoveOption) (*KeyValue, error) {
 	session, err := m.getPartition(key)
 	if err != nil {
 		return nil, err
@@ -125,7 +125,7 @@ func (m *map_) Remove(ctx context.Context, key string, opts ...RemoveOption) (*K
 	return session.Remove(ctx, key, opts...)
 }
 
-func (m *map_) Len(ctx context.Context) (int, error) {
+func (m *_map) Len(ctx context.Context) (int, error) {
 	results, err := util.ExecuteAsync(len(m.partitions), func(i int) (interface{}, error) {
 		return m.partitions[i].Len(ctx)
 	})
@@ -140,7 +140,7 @@ func (m *map_) Len(ctx context.Context) (int, error) {
 	return total, nil
 }
 
-func (m *map_) Entries(ctx context.Context, ch chan<- *KeyValue) error {
+func (m *_map) Entries(ctx context.Context, ch chan<- *KeyValue) error {
 	n := len(m.partitions)
 	wg := sync.WaitGroup{}
 	wg.Add(n)
@@ -162,25 +162,25 @@ func (m *map_) Entries(ctx context.Context, ch chan<- *KeyValue) error {
 	})
 }
 
-func (m *map_) Clear(ctx context.Context) error {
+func (m *_map) Clear(ctx context.Context) error {
 	return util.IterAsync(len(m.partitions), func(i int) error {
 		return m.partitions[i].Clear(ctx)
 	})
 }
 
-func (m *map_) Watch(ctx context.Context, ch chan<- *MapEvent, opts ...WatchOption) error {
+func (m *_map) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error {
 	return util.IterAsync(len(m.partitions), func(i int) error {
 		return m.partitions[i].Watch(ctx, ch, opts...)
 	})
 }
 
-func (m *map_) Close() error {
+func (m *_map) Close() error {
 	return util.IterAsync(len(m.partitions), func(i int) error {
 		return m.partitions[i].Close()
 	})
 }
 
-func (m *map_) Delete() error {
+func (m *_map) Delete() error {
 	return util.IterAsync(len(m.partitions), func(i int) error {
 		return m.partitions[i].Delete()
 	})

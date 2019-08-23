@@ -28,13 +28,13 @@ import (
 // NewTestServer creates a new server for managing sessions
 func NewTestServer() *TestServer {
 	return &TestServer{
-		TestServer: test.NewTestServer(),
-		queue:      []*LockAttempt{},
+		Server: test.NewTestServer(),
+		queue:  []*LockAttempt{},
 	}
 }
 
 type TestServer struct {
-	*test.TestServer
+	*test.Server
 	lock  *LockAttempt
 	queue []*LockAttempt
 }
@@ -108,27 +108,26 @@ func (s *TestServer) Lock(ctx context.Context, request *api.LockRequest) (*api.L
 				Header:  header,
 				Version: s.Index,
 			}, nil
-		} else {
-			return &api.LockResponse{
-				Header:  header,
-				Version: 0,
-			}, nil
-		}
-	} else {
-		header, err := session.NewResponseHeader()
-		if err != nil {
-			return nil, err
-		}
-
-		s.lock = &LockAttempt{
-			version: index,
-			request: request,
 		}
 		return &api.LockResponse{
 			Header:  header,
-			Version: index,
+			Version: 0,
 		}, nil
 	}
+
+	header, err := session.NewResponseHeader()
+	if err != nil {
+		return nil, err
+	}
+
+	s.lock = &LockAttempt{
+		version: index,
+		request: request,
+	}
+	return &api.LockResponse{
+		Header:  header,
+		Version: index,
+	}, nil
 }
 
 func (s *TestServer) Unlock(ctx context.Context, request *api.UnlockRequest) (*api.UnlockResponse, error) {

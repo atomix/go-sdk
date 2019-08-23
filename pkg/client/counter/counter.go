@@ -23,8 +23,8 @@ import (
 	"google.golang.org/grpc"
 )
 
-type CounterClient interface {
-	GetCounter(ctx context.Context, name string, opts ...session.SessionOption) (Counter, error)
+type Client interface {
+	GetCounter(ctx context.Context, name string, opts ...session.Option) (Counter, error)
 }
 
 // Counter is the interface for the counter primitive
@@ -36,7 +36,7 @@ type Counter interface {
 	Decrement(ctx context.Context, delta int64) (int64, error)
 }
 
-func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.SessionOption) (Counter, error) {
+func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.Option) (Counter, error) {
 	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
 		return nil, err

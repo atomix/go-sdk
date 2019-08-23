@@ -29,13 +29,13 @@ import (
 // NewTestServer creates a new server for managing sessions
 func NewTestServer() *TestServer {
 	return &TestServer{
-		TestServer: test.NewTestServer(),
-		entries:    make(map[string]*KeyValue),
+		Server:  test.NewTestServer(),
+		entries: make(map[string]*KeyValue),
 	}
 }
 
 type TestServer struct {
-	*test.TestServer
+	*test.Server
 	entries map[string]*KeyValue
 }
 
@@ -136,12 +136,11 @@ func (s *TestServer) Put(ctx context.Context, request *api.PutRequest) (*api.Put
 			PreviousValue:   v.Value,
 			PreviousVersion: v.Version,
 		}, nil
-	} else {
-		return &api.PutResponse{
-			Header: header,
-			Status: api.ResponseStatus_OK,
-		}, nil
 	}
+	return &api.PutResponse{
+		Header: header,
+		Status: api.ResponseStatus_OK,
+	}, nil
 }
 
 func (s *TestServer) Get(ctx context.Context, request *api.GetRequest) (*api.GetResponse, error) {
@@ -162,11 +161,10 @@ func (s *TestServer) Get(ctx context.Context, request *api.GetRequest) (*api.Get
 			Value:   v.Value,
 			Version: v.Version,
 		}, nil
-	} else {
-		return &api.GetResponse{
-			Header: header,
-		}, nil
 	}
+	return &api.GetResponse{
+		Header: header,
+	}, nil
 }
 
 func (s *TestServer) Remove(ctx context.Context, request *api.RemoveRequest) (*api.RemoveResponse, error) {
@@ -221,12 +219,11 @@ func (s *TestServer) Remove(ctx context.Context, request *api.RemoveRequest) (*a
 			PreviousValue:   v.Value,
 			PreviousVersion: v.Version,
 		}, nil
-	} else {
-		return &api.RemoveResponse{
-			Header: header,
-			Status: api.ResponseStatus_OK,
-		}, nil
 	}
+	return &api.RemoveResponse{
+		Header: header,
+		Status: api.ResponseStatus_OK,
+	}, nil
 }
 
 func (s *TestServer) Replace(ctx context.Context, request *api.ReplaceRequest) (*api.ReplaceResponse, error) {
@@ -297,12 +294,11 @@ func (s *TestServer) Replace(ctx context.Context, request *api.ReplaceRequest) (
 			PreviousValue:   v.Value,
 			PreviousVersion: v.Version,
 		}, nil
-	} else {
-		return &api.ReplaceResponse{
-			Header: header,
-			Status: api.ResponseStatus_OK,
-		}, nil
 	}
+	return &api.ReplaceResponse{
+		Header: header,
+		Status: api.ResponseStatus_OK,
+	}, nil
 }
 
 func (s *TestServer) Exists(ctx context.Context, request *api.ExistsRequest) (*api.ExistsResponse, error) {
@@ -322,12 +318,11 @@ func (s *TestServer) Exists(ctx context.Context, request *api.ExistsRequest) (*a
 			Header:      header,
 			ContainsKey: false,
 		}, nil
-	} else {
-		return &api.ExistsResponse{
-			Header:      header,
-			ContainsKey: true,
-		}, nil
 	}
+	return &api.ExistsResponse{
+		Header:      header,
+		ContainsKey: true,
+	}, nil
 }
 
 func (s *TestServer) Size(ctx context.Context, request *api.SizeRequest) (*api.SizeResponse, error) {
@@ -517,7 +512,7 @@ func TestMapStreams(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 
-	c := make(chan *MapEvent)
+	c := make(chan *Event)
 	latch := make(chan struct{})
 	go func() {
 		e := <-c

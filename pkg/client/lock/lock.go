@@ -23,8 +23,8 @@ import (
 	"google.golang.org/grpc"
 )
 
-type LockClient interface {
-	GetLock(ctx context.Context, name string, opts ...session.SessionOption) (Lock, error)
+type Client interface {
+	GetLock(ctx context.Context, name string, opts ...session.Option) (Lock, error)
 }
 
 type Lock interface {
@@ -34,7 +34,7 @@ type Lock interface {
 	IsLocked(ctx context.Context, opts ...IsLockedOption) (bool, error)
 }
 
-func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.SessionOption) (Lock, error) {
+func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.Option) (Lock, error) {
 	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
 		return nil, err
@@ -42,7 +42,7 @@ func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn
 	return newLock(ctx, name, partitions[i], opts...)
 }
 
-func newLock(ctx context.Context, name primitive.Name, conn *grpc.ClientConn, opts ...session.SessionOption) (*lock, error) {
+func newLock(ctx context.Context, name primitive.Name, conn *grpc.ClientConn, opts ...session.Option) (*lock, error) {
 	client := api.NewLockServiceClient(conn)
 	sess, err := session.New(ctx, name, &SessionHandler{client: client}, opts...)
 	if err != nil {
