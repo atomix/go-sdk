@@ -161,9 +161,9 @@ func (s *TestServer) Unlock(ctx context.Context, request *api.UnlockRequest) (*a
 		attempt := s.queue[0]
 		s.queue = s.queue[1:]
 
-		if attempt.request.Timeout != nil && attempt.request.Timeout != nil {
+		if attempt.request.Timeout != nil {
 			t := *attempt.request.Timeout
-			d := time.Now().Sub(attempt.time)
+			d := time.Since(attempt.time)
 			if int64(d) > int64(t) {
 				attempt.c <- false
 			} else {

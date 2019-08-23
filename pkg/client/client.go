@@ -255,9 +255,7 @@ func (g *PartitionGroup) GetPrimitives(ctx context.Context, types ...string) ([]
 			if err != nil {
 				return nil, err
 			}
-			for _, info := range typePrimitives {
-				primitives = append(primitives, info)
-			}
+			primitives = append(primitives, typePrimitives...)
 		}
 		return primitives, nil
 	}
@@ -270,7 +268,8 @@ func (g *PartitionGroup) getPrimitives(ctx context.Context, t string) ([]*primit
 			Type:      t,
 			Namespace: g.application,
 		}
-		ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 		response, err := client.GetPrimitives(ctx, request)
 		if err != nil {
 			return nil, err

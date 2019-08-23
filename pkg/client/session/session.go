@@ -95,7 +95,7 @@ func (s *Session) start(ctx context.Context) error {
 
 	go func() {
 		for range s.ticker.C {
-			s.handler.KeepAlive(context.TODO(), s)
+			_ = s.handler.KeepAlive(context.TODO(), s)
 		}
 	}()
 	return nil

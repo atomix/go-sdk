@@ -214,13 +214,8 @@ func serve(r func(server *grpc.Server), l *bufconn.Listener, c <-chan struct{}) 
 	}()
 
 	go func() {
-		for {
-			select {
-			case <-c:
-				s.Stop()
-				return
-			}
-		}
+		<-c
+		s.Stop()
 	}()
 }
 

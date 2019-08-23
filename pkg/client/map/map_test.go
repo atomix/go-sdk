@@ -486,7 +486,7 @@ func TestMapOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 
-	kv, err = m.Put(context.Background(), "foo", []byte("baz"), WithVersion(1))
+	_, err = m.Put(context.Background(), "foo", []byte("baz"), WithVersion(1))
 	assert.Error(t, err)
 
 	kv2, err := m.Put(context.Background(), "foo", []byte("baz"), WithVersion(kv1.Version))
