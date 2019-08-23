@@ -22,32 +22,61 @@ import (
 	"google.golang.org/grpc"
 )
 
+// Client provides an API for creating Sets
 type Client interface {
+	// GetSet gets the Set instance of the given name
 	GetSet(ctx context.Context, name string, opts ...session.Option) (Set, error)
 }
 
+// Set provides a distributed set data structure
+// The set values are defines as strings. To store more complex types in the set, encode values to strings e.g.
+// using base 64 encoding.
 type Set interface {
 	primitive.Primitive
+
+	// Add adds a value to the set
 	Add(ctx context.Context, value string) (bool, error)
+
+	// Remove removes a value from the set
+	// A bool indicating whether the set contained the given value will be returned
 	Remove(ctx context.Context, value string) (bool, error)
+
+	// Contains returns a bool indicating whether the set contains the given value
 	Contains(ctx context.Context, value string) (bool, error)
+
+	// Len gets the set size in number of elements
 	Len(ctx context.Context) (int, error)
+
+	// Clear removes all values from the set
 	Clear(ctx context.Context) error
+
+	// Watch watches the set for changes
+	// This is a non-blocking method. If the method returns without error, set events will be pushed onto
+	// the given channel.
 	Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error
 }
 
+// EventType is the type of a set event
 type EventType string
 
 const (
-	EventAdded   EventType = "added"
+	// EventAdded indicates a value was added to the set
+	EventAdded EventType = "added"
+
+	// EventRemoved indicates a value was removed from the set
 	EventRemoved EventType = "removed"
 )
 
+// Event is a set change event
 type Event struct {
-	Type  EventType
+	// Type is the change event type
+	Type EventType
+
+	// Value is the value that changed
 	Value string
 }
 
+// New creates a new partitioned set primitive
 func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.Option) (Set, error) {
 	results, err := util.ExecuteOrderedAsync(len(partitions), func(i int) (interface{}, error) {
 		return newPartition(ctx, partitions[i], name, opts...)
@@ -67,6 +96,7 @@ func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn
 	}, nil
 }
 
+// set is the partitioned implementation of Set
 type set struct {
 	name       primitive.Name
 	partitions []Set

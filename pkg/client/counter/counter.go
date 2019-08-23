@@ -23,19 +23,30 @@ import (
 	"google.golang.org/grpc"
 )
 
+// Client provides an API for creating Counters
 type Client interface {
+	// GetCounter gets the Counter instance of the given name
 	GetCounter(ctx context.Context, name string, opts ...session.Option) (Counter, error)
 }
 
-// Counter is the interface for the counter primitive
+// Counter provides a distributed atomic counter
 type Counter interface {
 	primitive.Primitive
+
+	// Get gets the current value of the counter
 	Get(ctx context.Context) (int64, error)
+
+	// Set sets the value of the counter
 	Set(ctx context.Context, value int64) error
+
+	// Increment increments the counter by the given delta
 	Increment(ctx context.Context, delta int64) (int64, error)
+
+	// Decrement decrements the counter by the given delta
 	Decrement(ctx context.Context, delta int64) (int64, error)
 }
 
+// New creates a new counter for the given partitions
 func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.Option) (Counter, error) {
 	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
@@ -43,7 +54,7 @@ func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn
 	}
 
 	client := api.NewCounterServiceClient(partitions[i])
-	sess, err := session.New(ctx, name, &SessionHandler{client: client}, opts...)
+	sess, err := session.New(ctx, name, &sessionHandler{client: client}, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -55,6 +66,7 @@ func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn
 	}, nil
 }
 
+// counter is the single partition implementation of Counter
 type counter struct {
 	name    primitive.Name
 	client  api.CounterServiceClient

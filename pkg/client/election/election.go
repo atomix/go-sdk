@@ -27,11 +27,13 @@ import (
 	"io"
 )
 
+// Client provides an API for creating Elections
 type Client interface {
+	// GetElection gets the Election instance of the given name
 	GetElection(ctx context.Context, name string, opts ...session.Option) (Election, error)
 }
 
-// Election is the interface for the leader election primitive
+// Election provides distributed leader election
 type Election interface {
 	primitive.Primitive
 	ID() string
@@ -44,23 +46,37 @@ type Election interface {
 	Watch(ctx context.Context, c chan<- *Event) error
 }
 
+// Term is a leadership term
+// A term is guaranteed to have a monotonically increasing, globally unique ID.
 type Term struct {
-	Term       uint64
-	Leader     string
+	// ID is a globally unique, monotonically increasing term number
+	ID uint64
+
+	// Leader is the ID of the leader that was elected
+	Leader string
+
+	// Candidates is a list of candidates currently participating in the election
 	Candidates []string
 }
 
+// EventType is the type of an Election event
 type EventType string
 
 const (
+	// EventChanged indicates the election term changed
 	EventChanged EventType = "changed"
 )
 
+// Event is an election event
 type Event struct {
+	// Type is the type of the event
 	Type EventType
+
+	// Term is the term that occurs as a result of the election event
 	Term Term
 }
 
+// New creates a new election primitive
 func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.Option) (Election, error) {
 	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
@@ -68,7 +84,7 @@ func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn
 	}
 
 	client := api.NewLeaderElectionServiceClient(partitions[i])
-	sess, err := session.New(ctx, name, &SessionHandler{client: client}, opts...)
+	sess, err := session.New(ctx, name, &sessionHandler{client: client}, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -83,6 +99,7 @@ func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn
 	}, nil
 }
 
+// election is the default single-partition implementation of Election
 type election struct {
 	name    primitive.Name
 	client  api.LeaderElectionServiceClient
@@ -110,7 +127,7 @@ func (e *election) GetTerm(ctx context.Context) (*Term, error) {
 
 	e.session.RecordResponse(request.Header, response.Header)
 	return &Term{
-		Term:       response.Term,
+		ID:         response.Term,
 		Leader:     response.Leader,
 		Candidates: response.Candidates,
 	}, nil
@@ -129,7 +146,7 @@ func (e *election) Enter(ctx context.Context) (*Term, error) {
 
 	e.session.RecordResponse(request.Header, response.Header)
 	return &Term{
-		Term:       response.Term,
+		ID:         response.Term,
 		Leader:     response.Leader,
 		Candidates: response.Candidates,
 	}, nil
@@ -237,7 +254,7 @@ func (e *election) Watch(ctx context.Context, ch chan<- *Event) error {
 			ch <- &Event{
 				Type: EventChanged,
 				Term: Term{
-					Term:       response.Term,
+					ID:         response.Term,
 					Leader:     response.Leader,
 					Candidates: response.Candidates,
 				},

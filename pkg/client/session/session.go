@@ -23,10 +23,12 @@ import (
 	"time"
 )
 
+// Option implements a session option
 type Option interface {
 	prepare(options *options)
 }
 
+// WithTimeout returns a session Option to configure the session timeout
 func WithTimeout(timeout time.Duration) Option {
 	return timeoutOption{timeout: timeout}
 }
@@ -43,13 +45,24 @@ type options struct {
 	timeout time.Duration
 }
 
+// Handler provides session management for a primitive implementation
 type Handler interface {
+	// Create is called to create the session
 	Create(ctx context.Context, session *Session) error
+
+	// KeepAlive is called periodically to keep the session alive
 	KeepAlive(ctx context.Context, session *Session) error
+
+	// Close is called to close the session
 	Close(ctx context.Context, session *Session) error
+
+	// Delete is called to delete the primitive
 	Delete(ctx context.Context, session *Session) error
 }
 
+// New creates a new Session for the given primitive
+// name is the name of the primitive
+// handler is the primitive's session handler
 func New(ctx context.Context, name primitive.Name, handler Handler, opts ...Option) (*Session, error) {
 	options := &options{}
 	WithTimeout(30 * time.Second).prepare(options)
@@ -73,6 +86,7 @@ func New(ctx context.Context, name primitive.Name, handler Handler, opts ...Opti
 	return session, nil
 }
 
+// Session maintains the session for a primitive
 type Session struct {
 	Name       *api.Name
 	Timeout    time.Duration

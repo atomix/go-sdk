@@ -28,7 +28,7 @@ import (
 // NewTestServer creates a new server for managing sessions
 func NewTestServer() *TestServer {
 	return &TestServer{
-		Server: test.NewTestServer(),
+		Server: test.NewServer(),
 		queue:  []*LockAttempt{},
 	}
 }

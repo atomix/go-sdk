@@ -93,7 +93,7 @@ func ExecuteAsync(n int, f func(i int) (interface{}, error)) ([]interface{}, err
 	return results, nil
 }
 
-// ExecuteAsync executes the given function f up to n times concurrently, populating
+// ExecuteOrderedAsync executes the given function f up to n times concurrently, populating
 // the given results slice with the results of each function call.
 // Each call is done in a separate goroutine. On each iteration, the function f
 // will be called with a unique sequential index i such that the index can be

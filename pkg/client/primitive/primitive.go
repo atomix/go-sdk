@@ -16,6 +16,7 @@ package primitive
 
 import "fmt"
 
+// NewName returns a qualified primitive name with the given namespace, group, application, and name
 func NewName(namespace string, group string, application string, name string) Name {
 	return Name{
 		Namespace:   namespace,
@@ -25,11 +26,16 @@ func NewName(namespace string, group string, application string, name string) Na
 	}
 }
 
+// Name is a qualified primitive name consisting of Namespace, Group, Application, and Name
 type Name struct {
-	Namespace   string
-	Group       string
+	// Namespace is the namespace within which the partition group is stored
+	Namespace string
+	// Group is the partition group in which the primitive is stored
+	Group string
+	// Application is the name of the application that owns the primitive
 	Application string
-	Name        string
+	// Name is the simple name of the primitive
+	Name string
 }
 
 func (n Name) String() string {

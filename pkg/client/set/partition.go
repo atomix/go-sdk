@@ -27,7 +27,7 @@ import (
 
 func newPartition(ctx context.Context, conn *grpc.ClientConn, name primitive.Name, opts ...session.Option) (Set, error) {
 	client := api.NewSetServiceClient(conn)
-	sess, err := session.New(ctx, name, &SessionHandler{client: client}, opts...)
+	sess, err := session.New(ctx, name, &sessionHandler{client: client}, opts...)
 	if err != nil {
 		return nil, err
 	}

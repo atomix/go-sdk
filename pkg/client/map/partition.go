@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package _map
+package _map //nolint:golint
 
 import (
 	"context"
@@ -27,7 +27,7 @@ import (
 
 func newPartition(ctx context.Context, conn *grpc.ClientConn, name primitive.Name, opts ...session.Option) (Map, error) {
 	client := api.NewMapServiceClient(conn)
-	sess, err := session.New(ctx, name, &SessionHandler{client: client}, opts...)
+	sess, err := session.New(ctx, name, &sessionHandler{client: client}, opts...)
 	if err != nil {
 		return nil, err
 	}

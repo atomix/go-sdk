@@ -32,6 +32,7 @@ type options struct {
 	namespace   string
 }
 
+// Option provides a client option
 type Option interface {
 	apply(options *options)
 }
@@ -44,6 +45,7 @@ func (o *applicationOption) apply(options *options) {
 	options.application = o.application
 }
 
+// WithApplication configures the application name for the client
 func WithApplication(application string) Option {
 	return &applicationOption{application: application}
 }
@@ -56,6 +58,7 @@ func (o *namespaceOption) apply(options *options) {
 	options.namespace = o.namespace
 }
 
+// WithNamespace configures the client's partition group namespace
 func WithNamespace(namespace string) Option {
 	return &namespaceOption{namespace: namespace}
 }

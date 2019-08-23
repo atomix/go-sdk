@@ -25,36 +25,74 @@ import (
 	"io"
 )
 
+// Client provides an API for creating Lists
 type Client interface {
+	// GetList gets the List instance of the given name
 	GetList(ctx context.Context, name string, opts ...session.Option) (List, error)
 }
 
+// List provides a distributed list data structure
+// The list values are defines as strings. To store more complex types in the list, encode values to strings e.g.
+// using base 64 encoding.
 type List interface {
 	primitive.Primitive
+
+	// Append pushes a value on to the end of the list
 	Append(ctx context.Context, value string) error
+
+	// Insert inserts a value at the given index
 	Insert(ctx context.Context, index int, value string) error
+
+	// Get gets the value at the given index
 	Get(ctx context.Context, index int) (string, error)
+
+	// Remove removes and returns the value at the given index
 	Remove(ctx context.Context, index int) (string, error)
+
+	// Len gets the length of the list
 	Len(ctx context.Context) (int, error)
+
+	// Items iterates through the values in the list
+	// This is a non-blocking method. If the method returns without error, values will be pushed on to the
+	// given channel and the channel will be closed once all values have been read from the list.
 	Items(ctx context.Context, ch chan<- string) error
+
+	// Watch watches the list for changes
+	// This is a non-blocking method. If the method returns without error, list events will be pushed onto
+	// the given channel.
 	Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error
+
+	// Clear removes all values from the list
 	Clear(ctx context.Context) error
 }
 
+// EventType is the type for a list Event
 type EventType string
 
 const (
-	EventNone     EventType = ""
+	// EventNone indicates the event is not a change event
+	EventNone EventType = ""
+
+	// EventInserted indicates a value was added to the list
 	EventInserted EventType = "added"
-	EventRemoved  EventType = "removed"
+
+	// EventRemoved indicates a value was removed from the list
+	EventRemoved EventType = "removed"
 )
 
+// Event is a list change event
 type Event struct {
-	Type  EventType
+	// Type indicates the event type
+	Type EventType
+
+	// Index is the index at which the event occurred
 	Index int
+
+	// Value is the value that was changed
 	Value string
 }
 
+// New creates a new list primitive
 func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.Option) (List, error) {
 	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
@@ -63,9 +101,10 @@ func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn
 	return newList(ctx, name, partitions[i], opts...)
 }
 
+// newList creates a new list for the given partition
 func newList(ctx context.Context, name primitive.Name, conn *grpc.ClientConn, opts ...session.Option) (*list, error) {
 	client := api.NewListServiceClient(conn)
-	sess, err := session.New(ctx, name, &SessionHandler{client: client}, opts...)
+	sess, err := session.New(ctx, name, &sessionHandler{client: client}, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -76,6 +115,7 @@ func newList(ctx context.Context, name primitive.Name, conn *grpc.ClientConn, op
 	}, nil
 }
 
+// list is the single partition implementation of List
 type list struct {
 	name    primitive.Name
 	client  api.ListServiceClient

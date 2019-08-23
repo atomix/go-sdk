@@ -18,6 +18,7 @@ import (
 	api "github.com/atomix/atomix-api/proto/atomix/set"
 )
 
+// WatchOption is an option for set Watch calls
 type WatchOption interface {
 	beforeWatch(request *api.EventRequest)
 	afterWatch(response *api.EventResponse)

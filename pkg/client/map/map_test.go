@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package _map
+package _map //nolint:golint
 
 import (
 	"context"
@@ -29,7 +29,7 @@ import (
 // NewTestServer creates a new server for managing sessions
 func NewTestServer() *TestServer {
 	return &TestServer{
-		Server:  test.NewTestServer(),
+		Server:  test.NewServer(),
 		entries: make(map[string]*KeyValue),
 	}
 }

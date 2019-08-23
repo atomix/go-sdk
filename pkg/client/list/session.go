@@ -20,11 +20,11 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 )
 
-type SessionHandler struct {
+type sessionHandler struct {
 	client api.ListServiceClient
 }
 
-func (h *SessionHandler) Create(ctx context.Context, s *session.Session) error {
+func (h *sessionHandler) Create(ctx context.Context, s *session.Session) error {
 	request := &api.CreateRequest{
 		Header:  s.GetState(),
 		Timeout: &s.Timeout,
@@ -38,7 +38,7 @@ func (h *SessionHandler) Create(ctx context.Context, s *session.Session) error {
 	return nil
 }
 
-func (h *SessionHandler) KeepAlive(ctx context.Context, s *session.Session) error {
+func (h *sessionHandler) KeepAlive(ctx context.Context, s *session.Session) error {
 	request := &api.KeepAliveRequest{
 		Header: s.GetState(),
 	}
@@ -49,7 +49,7 @@ func (h *SessionHandler) KeepAlive(ctx context.Context, s *session.Session) erro
 	return nil
 }
 
-func (h *SessionHandler) Close(ctx context.Context, s *session.Session) error {
+func (h *sessionHandler) Close(ctx context.Context, s *session.Session) error {
 	request := &api.CloseRequest{
 		Header: s.GetState(),
 	}
@@ -57,7 +57,7 @@ func (h *SessionHandler) Close(ctx context.Context, s *session.Session) error {
 	return err
 }
 
-func (h *SessionHandler) Delete(ctx context.Context, s *session.Session) error {
+func (h *sessionHandler) Delete(ctx context.Context, s *session.Session) error {
 	request := &api.CloseRequest{
 		Header: s.GetState(),
 		Delete: true,

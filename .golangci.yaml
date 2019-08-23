@@ -13,9 +13,9 @@ run:
 
 issues:
   exclude-rules:
-    - path: pkg/client/map
-      linters:
-        - golint
+    #- path: pkg/client/map
+    #  linters:
+    #    - golint
     - path: pkg/client/lock/options.go
       linters:
         - golint

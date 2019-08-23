@@ -25,7 +25,8 @@ import (
 	"sync"
 )
 
-func NewTestServer() *Server {
+// NewServer creates a new test Server
+func NewServer() *Server {
 	return &Server{
 		sessions: make(map[uint64]*Session),
 		Index:    0,

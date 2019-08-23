@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package _map
+package _map //nolint:golint
 
 import (
 	"context"
@@ -24,47 +24,92 @@ import (
 	"sync"
 )
 
+// Client provides an API for creating Maps
 type Client interface {
+	// GetMap gets the Map instance of the given name
 	GetMap(ctx context.Context, name string, opts ...session.Option) (Map, error)
 }
 
+// Map is a distributed set of keys and values
 type Map interface {
 	primitive.Primitive
+
+	// Put sets a key/value pair in the map
 	Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*KeyValue, error)
+
+	// Get gets the value of the given key
 	Get(ctx context.Context, key string, opts ...GetOption) (*KeyValue, error)
+
+	// Remove removes a key from the map
 	Remove(ctx context.Context, key string, opts ...RemoveOption) (*KeyValue, error)
+
+	// Len returns the number of entries in the map
 	Len(ctx context.Context) (int, error)
+
+	// Clear removes all entries from the map
 	Clear(ctx context.Context) error
+
+	// Entries lists the entries in the map
+	// This is a non-blocking method. If the method returns without error, key/value paids will be pushed on to the
+	// given channel and the channel will be closed once all entries have been read from the map.
 	Entries(ctx context.Context, ch chan<- *KeyValue) error
+
+	// Watch watches the map for changes
+	// This is a non-blocking method. If the method returns without error, map events will be pushed onto
+	// the given channel in the order in which they occur.
 	Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error
 }
 
+// KeyValue is a versioned key/value pair
 type KeyValue struct {
+	// Version is the unique, monotonically increasing version number for the key/value pair. The version is
+	// suitable for use in optimistic locking.
 	Version int64
-	Key     string
-	Value   []byte
+
+	// Key is the key of the pair
+	Key string
+
+	// Value is the value of the pair
+	Value []byte
 }
 
 func (kv KeyValue) String() string {
 	return fmt.Sprintf("key: %s\nvalue: %s\nversion: %d", kv.Key, string(kv.Value), kv.Version)
 }
 
+// EventType is the type of a map event
 type EventType string
 
 const (
-	EventNone     EventType = ""
+	// EventNone indicates the event is not a change event
+	EventNone EventType = ""
+
+	// EventInserted indicates a key was newly created in the map
 	EventInserted EventType = "inserted"
-	EventUpdated  EventType = "updated"
-	EventRemoved  EventType = "removed"
+
+	// EventUpdated indicates the value of an existing key was changed
+	EventUpdated EventType = "updated"
+
+	// EventRemoved indicates a key was removed from the map
+	EventRemoved EventType = "removed"
 )
 
+// Event is a map change event
 type Event struct {
-	Type    EventType
-	Key     string
-	Value   []byte
+	// Type indicates the change event type
+	Type EventType
+
+	// Key is the key that changed
+	Key string
+
+	// Value is the new value
+	Value []byte
+
+	// Version is the new version
 	Version int64
 }
 
+// New creates a new partitioned Map
 func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.Option) (Map, error) {
 	results, err := util.ExecuteOrderedAsync(len(partitions), func(i int) (interface{}, error) {
 		return newPartition(ctx, partitions[i], name, opts...)
@@ -84,6 +129,7 @@ func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn
 	}, nil
 }
 
+// _map is the default single-partition implementation of Map
 type _map struct {
 	name       primitive.Name
 	partitions []Map

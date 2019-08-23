@@ -55,7 +55,7 @@ func NewClient(address string, opts ...Option) (*Client, error) {
 	}, nil
 }
 
-// Atomix primitive client
+// Client is an Atomix client
 type Client struct {
 	application string
 	namespace   string
@@ -226,7 +226,7 @@ func NewGroup(address string, opts ...Option) (*PartitionGroup, error) {
 	}, nil
 }
 
-// Primitive partition group.
+// PartitionGroup manages the primitives in a partition group
 type PartitionGroup struct {
 	Namespace     string
 	Name          string
@@ -238,6 +238,7 @@ type PartitionGroup struct {
 	partitions  []*grpc.ClientConn
 }
 
+// GetPrimitives gets a list of primitives of the given types
 func (g *PartitionGroup) GetPrimitives(ctx context.Context, types ...string) ([]*primitiveapi.PrimitiveInfo, error) {
 	if len(types) == 0 {
 		return g.getPrimitives(ctx, "")
@@ -254,6 +255,7 @@ func (g *PartitionGroup) GetPrimitives(ctx context.Context, types ...string) ([]
 	return primitives, nil
 }
 
+// getPrimitives gets a list of primitives of the given type
 func (g *PartitionGroup) getPrimitives(ctx context.Context, t string) ([]*primitiveapi.PrimitiveInfo, error) {
 	results, err := util.ExecuteAsync(len(g.partitions), func(i int) (i2 interface{}, e error) {
 		client := primitiveapi.NewPrimitiveServiceClient(g.partitions[i])
@@ -289,26 +291,32 @@ func (g *PartitionGroup) getPrimitives(ctx context.Context, t string) ([]*primit
 	return primitives, nil
 }
 
+// GetCounter gets or creates a Counter with the given name
 func (g *PartitionGroup) GetCounter(ctx context.Context, name string, opts ...session.Option) (counter.Counter, error) {
 	return counter.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.partitions, opts...)
 }
 
+// GetElection gets or creates an Election with the given name
 func (g *PartitionGroup) GetElection(ctx context.Context, name string, opts ...session.Option) (election.Election, error) {
 	return election.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.partitions, opts...)
 }
 
+// GetList gets or creates a List with the given name
 func (g *PartitionGroup) GetList(ctx context.Context, name string, opts ...session.Option) (list.List, error) {
 	return list.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.partitions, opts...)
 }
 
+// GetLock gets or creates a Lock with the given name
 func (g *PartitionGroup) GetLock(ctx context.Context, name string, opts ...session.Option) (lock.Lock, error) {
 	return lock.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.partitions, opts...)
 }
 
+// GetMap gets or creates a Map with the given name
 func (g *PartitionGroup) GetMap(ctx context.Context, name string, opts ...session.Option) (_map.Map, error) {
 	return _map.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.partitions, opts...)
 }
 
+// GetSet gets or creates a Set with the given name
 func (g *PartitionGroup) GetSet(ctx context.Context, name string, opts ...session.Option) (set.Set, error) {
 	return set.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.partitions, opts...)
 }

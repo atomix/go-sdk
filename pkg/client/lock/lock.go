@@ -23,17 +23,28 @@ import (
 	"google.golang.org/grpc"
 )
 
+// Client provides an API for creating Locks
 type Client interface {
+	// GetLock gets the Lock instance of the given name
 	GetLock(ctx context.Context, name string, opts ...session.Option) (Lock, error)
 }
 
+// Lock provides distributed concurrency control
 type Lock interface {
 	primitive.Primitive
+
+	// Lock acquires the lock
 	Lock(ctx context.Context, opts ...LockOption) (uint64, error)
+
+	// Unlock releases the lock
 	Unlock(ctx context.Context, opts ...UnlockOption) (bool, error)
+
+	// IsLocked returns a bool indicating whether the lock is held
 	IsLocked(ctx context.Context, opts ...IsLockedOption) (bool, error)
 }
 
+// New creates a new Lock primitive for the given partitions
+// The lock will be created in one of the given partitions.
 func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.Option) (Lock, error) {
 	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
@@ -42,9 +53,10 @@ func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn
 	return newLock(ctx, name, partitions[i], opts...)
 }
 
+// newLock creates a new Lock primitive for the given partition
 func newLock(ctx context.Context, name primitive.Name, conn *grpc.ClientConn, opts ...session.Option) (*lock, error) {
 	client := api.NewLockServiceClient(conn)
-	sess, err := session.New(ctx, name, &SessionHandler{client: client}, opts...)
+	sess, err := session.New(ctx, name, &sessionHandler{client: client}, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -55,6 +67,7 @@ func newLock(ctx context.Context, name primitive.Name, conn *grpc.ClientConn, op
 	}, nil
 }
 
+// lock is the single partition implementation of Lock
 type lock struct {
 	name    primitive.Name
 	client  api.LockServiceClient
