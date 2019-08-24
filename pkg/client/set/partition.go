@@ -51,7 +51,7 @@ func (s *setPartition) Name() primitive.Name {
 func (s *setPartition) Add(ctx context.Context, value string) (bool, error) {
 	request := &api.AddRequest{
 		Header: s.session.NextRequest(),
-		Values: []string{value},
+		Value:  value,
 	}
 
 	response, err := s.client.Add(ctx, request)
@@ -70,7 +70,7 @@ func (s *setPartition) Add(ctx context.Context, value string) (bool, error) {
 func (s *setPartition) Remove(ctx context.Context, value string) (bool, error) {
 	request := &api.RemoveRequest{
 		Header: s.session.NextRequest(),
-		Values: []string{value},
+		Value:  value,
 	}
 
 	response, err := s.client.Remove(ctx, request)
@@ -89,7 +89,7 @@ func (s *setPartition) Remove(ctx context.Context, value string) (bool, error) {
 func (s *setPartition) Contains(ctx context.Context, value string) (bool, error) {
 	request := &api.ContainsRequest{
 		Header: s.session.GetRequest(),
-		Values: []string{value},
+		Value:  value,
 	}
 
 	response, err := s.client.Contains(ctx, request)
