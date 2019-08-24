@@ -52,6 +52,7 @@ github.com/atomix/atomix-go-node v0.0.0-20190824065046-e1126ff7b058 h1:xrLkw9Tg5
 github.com/atomix/atomix-go-node v0.0.0-20190824065046-e1126ff7b058/go.mod h1:h5oT0ENWZLikNIFoBr+03V9F2bI4It/6S96q7qD6Mpw=
 github.com/atomix/atomix-go-node v0.0.0-20190824080749-595793f45da7 h1:fA/gontHw4fI2N8Wa+zvhtW6jbT92iCTEj0C21IpAp8=
 github.com/atomix/atomix-go-node v0.0.0-20190824080749-595793f45da7/go.mod h1:7Ebv4TwMO0ImtUN4exyfVB1TBEfR1aBifV2s/QSbpdU=
+github.com/atomix/atomix-go-node v0.0.0-20190824081047-f53ab8a17772 h1:G3llckFs/XC5xznJ1FYhdvTwqqDyTwcMcHRL6bjBbS4=
 github.com/atomix/atomix-go-node v0.0.0-20190824081047-f53ab8a17772/go.mod h1:7Ebv4TwMO0ImtUN4exyfVB1TBEfR1aBifV2s/QSbpdU=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
 github.com/creack/pty v1.1.7/go.mod h1:lj5s0c3V2DBrqTV7llrYr5NG6My20zk30Fl46Y7DoTY=
