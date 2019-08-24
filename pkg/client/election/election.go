@@ -136,7 +136,7 @@ func (e *election) GetTerm(ctx context.Context) (*Term, error) {
 func (e *election) Enter(ctx context.Context) (*Term, error) {
 	request := &api.EnterRequest{
 		Header:      e.session.NextRequest(),
-		CandidateId: e.id,
+		CandidateID: e.id,
 	}
 
 	response, err := e.client.Enter(ctx, request)
