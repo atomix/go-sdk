@@ -29,6 +29,7 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/set"
 	"github.com/atomix/atomix-go-client/pkg/client/util"
+	"github.com/atomix/atomix-go-client/pkg/client/value"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
 	"google.golang.org/grpc"
@@ -319,4 +320,9 @@ func (g *PartitionGroup) GetMap(ctx context.Context, name string, opts ...sessio
 // GetSet gets or creates a Set with the given name
 func (g *PartitionGroup) GetSet(ctx context.Context, name string, opts ...session.Option) (set.Set, error) {
 	return set.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.partitions, opts...)
+}
+
+// GetValue gets or creates a Value with the given name
+func (g *PartitionGroup) GetValue(ctx context.Context, name string, opts ...session.Option) (value.Value, error) {
+	return value.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.partitions, opts...)
 }

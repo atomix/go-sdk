@@ -28,6 +28,16 @@ github.com/atomix/atomix-api v0.0.0-20190824075904-5419ba0d59e3 h1:tKW1cf4z5bliR
 github.com/atomix/atomix-api v0.0.0-20190824075904-5419ba0d59e3/go.mod h1:joWKUd0zIeYbAQ0vmYHGsnV03ZgRalhceHgnJ3EN0mI=
 github.com/atomix/atomix-api v0.0.0-20190826175736-311672751efc h1:RnWkI42WwW/wHmMAuxssK3CFQbsAqppGrwr0y/cly0E=
 github.com/atomix/atomix-api v0.0.0-20190826175736-311672751efc/go.mod h1:joWKUd0zIeYbAQ0vmYHGsnV03ZgRalhceHgnJ3EN0mI=
+github.com/atomix/atomix-api v0.0.0-20190826200438-e441d532c7dd h1:JifxyrLxfkTpC81OGA9YQeff88l/iYQYIH/pRtqT6JI=
+github.com/atomix/atomix-api v0.0.0-20190826200438-e441d532c7dd/go.mod h1:joWKUd0zIeYbAQ0vmYHGsnV03ZgRalhceHgnJ3EN0mI=
+github.com/atomix/atomix-api v0.0.0-20190826200708-2fba2a812aa2 h1:hYrNbWjg3ksZu7joqzqzOnBOV8Ft6J6ZvGgop3d2mQw=
+github.com/atomix/atomix-api v0.0.0-20190826200708-2fba2a812aa2/go.mod h1:joWKUd0zIeYbAQ0vmYHGsnV03ZgRalhceHgnJ3EN0mI=
+github.com/atomix/atomix-api v0.0.0-20190826200807-8881925102db h1:hJ+4M+JXkMpnMnR8LxWjhNl2OG3rJ7tGJnR+WjijsoE=
+github.com/atomix/atomix-api v0.0.0-20190826200807-8881925102db/go.mod h1:joWKUd0zIeYbAQ0vmYHGsnV03ZgRalhceHgnJ3EN0mI=
+github.com/atomix/atomix-api v0.0.0-20190826201512-eae5fd032cca h1:sOIVGbSjfoTVUmW+M6Su3Ef/iN3qakdYapaNHHot54A=
+github.com/atomix/atomix-api v0.0.0-20190826201512-eae5fd032cca/go.mod h1:joWKUd0zIeYbAQ0vmYHGsnV03ZgRalhceHgnJ3EN0mI=
+github.com/atomix/atomix-api v0.0.0-20190826201611-6150fd9aaca1 h1:OhWeeiy/of0v2lpF286ttSQTNE3nYD+0IevUI9+IbT8=
+github.com/atomix/atomix-api v0.0.0-20190826201611-6150fd9aaca1/go.mod h1:joWKUd0zIeYbAQ0vmYHGsnV03ZgRalhceHgnJ3EN0mI=
 github.com/atomix/atomix-go-local v0.0.0-20190820000011-d55305ea0d8c h1:qVu0vfAkkeTFn4LgGTgCKlFp5JlPOKDFQGc7FuWtjw0=
 github.com/atomix/atomix-go-local v0.0.0-20190820000011-d55305ea0d8c/go.mod h1:YMZzUByozlrFK9BPkHN10WQirdPFRAkz3kEIn6c58uA=
 github.com/atomix/atomix-go-local v0.0.0-20190823235117-4398f8172525 h1:iKuRHug2WyAQ+BTKbOQu/WkFifS8Z8n+wbxT5Dmiy8k=
@@ -48,6 +58,9 @@ github.com/atomix/atomix-go-local v0.0.0-20190826180245-69471c019335 h1:G79wkrcB
 github.com/atomix/atomix-go-local v0.0.0-20190826180245-69471c019335/go.mod h1:Ukjg0ek01wscUoaTxQ0lsMWOq/YJi4Ga13sQ+99YYTE=
 github.com/atomix/atomix-go-local v0.0.0-20190826181924-3fca16f50edd h1:oPO5UiFs8aMMv9dgGZlOBlMnBEUCD3C/06jIFLN/uZ4=
 github.com/atomix/atomix-go-local v0.0.0-20190826181924-3fca16f50edd/go.mod h1:EY0RzDFwlNTZyxjR/4L7+XPGthw7TDJD8YpqMbBtM5g=
+github.com/atomix/atomix-go-local v0.0.0-20190826193423-498112921355/go.mod h1:a1klMSsQwTMwUCzgtL9Mw1Qbk653C5b5WMMHMbtKrR4=
+github.com/atomix/atomix-go-local v0.0.0-20190826203617-43e6da53bec7 h1:U6yGXuPULze/gfh9gZesWzv9nwB1DRxl675r0fHm3Q8=
+github.com/atomix/atomix-go-local v0.0.0-20190826203617-43e6da53bec7/go.mod h1:Up7ARB4D4WG16x1HCxwr+zpMN0xkN2Gb4Yh1bnuhJ5g=
 github.com/atomix/atomix-go-node v0.0.0-20190819235918-362f3143b084 h1:pp555c1uxKC8UqiifN/azV8CgNAsD3J/FQyrzwblbmA=
 github.com/atomix/atomix-go-node v0.0.0-20190819235918-362f3143b084/go.mod h1:rWp3DgtUt4qdHDm//ewTptIaEbFde298JSWYN90zeNo=
 github.com/atomix/atomix-go-node v0.0.0-20190823235037-38e2494ed153 h1:fsSdmRzoJ65OVZGp2M2lE4TccL5LgN/Wne+A6/9jOdQ=
@@ -67,6 +80,8 @@ github.com/atomix/atomix-go-node v0.0.0-20190826175103-b415dec69633/go.mod h1:7E
 github.com/atomix/atomix-go-node v0.0.0-20190826180229-eb5aecea4aef h1:yVAizAcu2w7CAFZun7lR+hlrh6OTp6E9eXNcv73o3Fw=
 github.com/atomix/atomix-go-node v0.0.0-20190826180229-eb5aecea4aef/go.mod h1:3xp90efgcqqB5Avh4JsEehf5SWRQ8hz9NnGVkFHXfqM=
 github.com/atomix/atomix-go-node v0.0.0-20190826181903-294ade6b55d8/go.mod h1:3xp90efgcqqB5Avh4JsEehf5SWRQ8hz9NnGVkFHXfqM=
+github.com/atomix/atomix-go-node v0.0.0-20190826193404-93c194555e86/go.mod h1:3xp90efgcqqB5Avh4JsEehf5SWRQ8hz9NnGVkFHXfqM=
+github.com/atomix/atomix-go-node v0.0.0-20190826203552-f2292fa451d5/go.mod h1:bVoPUOitgU/4hyZeyKYhjtWnOy9tb2HbuDsnXjgcNBU=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
 github.com/creack/pty v1.1.7/go.mod h1:lj5s0c3V2DBrqTV7llrYr5NG6My20zk30Fl46Y7DoTY=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
