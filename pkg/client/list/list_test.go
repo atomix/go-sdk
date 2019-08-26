@@ -36,7 +36,7 @@ func TestListOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 0, size)
 
-	_, err = list.Get(context.TODO(), 0);
+	_, err = list.Get(context.TODO(), 0)
 	assert.EqualError(t, err, "index out of bounds")
 
 	err = list.Append(context.TODO(), "foo")
