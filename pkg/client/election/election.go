@@ -16,7 +16,6 @@ package election
 
 import (
 	"context"
-	"encoding/base64"
 	api "github.com/atomix/atomix-api/proto/atomix/election"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
@@ -39,11 +38,23 @@ type Election interface {
 	ID() string
 	GetTerm(ctx context.Context) (*Term, error)
 	Enter(ctx context.Context) (*Term, error)
-	Leave(ctx context.Context) error
-	Anoint(ctx context.Context, id string) (bool, error)
-	Promote(ctx context.Context, id string) (bool, error)
-	Evict(ctx context.Context, id string) (bool, error)
+	Leave(ctx context.Context) (*Term, error)
+	Anoint(ctx context.Context, id string) (*Term, error)
+	Promote(ctx context.Context, id string) (*Term, error)
+	Evict(ctx context.Context, id string) (*Term, error)
 	Watch(ctx context.Context, c chan<- *Event) error
+}
+
+// newTerm returns a new term from the response term
+func newTerm(term *api.Term) *Term {
+	if term == nil {
+		return nil
+	}
+	return &Term{
+		ID:         term.ID,
+		Leader:     term.Leader,
+		Candidates: term.Candidates,
+	}
 }
 
 // Term is a leadership term
@@ -89,13 +100,11 @@ func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn
 		return nil, err
 	}
 
-	nodeID := uuid.NodeID()
-	candidate := base64.StdEncoding.EncodeToString(nodeID)
 	return &election{
 		name:    name,
 		client:  client,
 		session: sess,
-		id:      candidate,
+		id:      uuid.New().String(),
 	}, nil
 }
 
@@ -116,21 +125,17 @@ func (e *election) ID() string {
 }
 
 func (e *election) GetTerm(ctx context.Context) (*Term, error) {
-	request := &api.GetLeadershipRequest{
+	request := &api.GetTermRequest{
 		Header: e.session.GetRequest(),
 	}
 
-	response, err := e.client.GetLeadership(ctx, request)
+	response, err := e.client.GetTerm(ctx, request)
 	if err != nil {
 		return nil, err
 	}
 
 	e.session.RecordResponse(request.Header, response.Header)
-	return &Term{
-		ID:         response.Term,
-		Leader:     response.Leader,
-		Candidates: response.Candidates,
-	}, nil
+	return newTerm(response.Term), nil
 }
 
 func (e *election) Enter(ctx context.Context) (*Term, error) {
@@ -145,14 +150,10 @@ func (e *election) Enter(ctx context.Context) (*Term, error) {
 	}
 
 	e.session.RecordResponse(request.Header, response.Header)
-	return &Term{
-		ID:         response.Term,
-		Leader:     response.Leader,
-		Candidates: response.Candidates,
-	}, nil
+	return newTerm(response.Term), nil
 }
 
-func (e *election) Leave(ctx context.Context) error {
+func (e *election) Leave(ctx context.Context) (*Term, error) {
 	request := &api.WithdrawRequest{
 		Header:      e.session.NextRequest(),
 		CandidateID: e.id,
@@ -160,14 +161,14 @@ func (e *election) Leave(ctx context.Context) error {
 
 	response, err := e.client.Withdraw(ctx, request)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	e.session.RecordResponse(request.Header, response.Header)
-	return nil
+	return newTerm(response.Term), nil
 }
 
-func (e *election) Anoint(ctx context.Context, id string) (bool, error) {
+func (e *election) Anoint(ctx context.Context, id string) (*Term, error) {
 	request := &api.AnointRequest{
 		Header:      e.session.NextRequest(),
 		CandidateID: id,
@@ -175,14 +176,14 @@ func (e *election) Anoint(ctx context.Context, id string) (bool, error) {
 
 	response, err := e.client.Anoint(ctx, request)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
 	e.session.RecordResponse(request.Header, response.Header)
-	return response.Succeeded, nil
+	return newTerm(response.Term), nil
 }
 
-func (e *election) Promote(ctx context.Context, id string) (bool, error) {
+func (e *election) Promote(ctx context.Context, id string) (*Term, error) {
 	request := &api.PromoteRequest{
 		Header:      e.session.NextRequest(),
 		CandidateID: id,
@@ -190,14 +191,14 @@ func (e *election) Promote(ctx context.Context, id string) (bool, error) {
 
 	response, err := e.client.Promote(ctx, request)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
 	e.session.RecordResponse(request.Header, response.Header)
-	return response.Succeeded, nil
+	return newTerm(response.Term), nil
 }
 
-func (e *election) Evict(ctx context.Context, id string) (bool, error) {
+func (e *election) Evict(ctx context.Context, id string) (*Term, error) {
 	request := &api.EvictRequest{
 		Header:      e.session.NextRequest(),
 		CandidateID: id,
@@ -205,11 +206,11 @@ func (e *election) Evict(ctx context.Context, id string) (bool, error) {
 
 	response, err := e.client.Evict(ctx, request)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
 	e.session.RecordResponse(request.Header, response.Header)
-	return response.Succeeded, nil
+	return newTerm(response.Term), nil
 }
 
 func (e *election) Watch(ctx context.Context, ch chan<- *Event) error {
@@ -253,11 +254,7 @@ func (e *election) Watch(ctx context.Context, ch chan<- *Event) error {
 
 			ch <- &Event{
 				Type: EventChanged,
-				Term: Term{
-					ID:         response.Term,
-					Leader:     response.Leader,
-					Candidates: response.Candidates,
-				},
+				Term: *newTerm(response.Term),
 			}
 		}
 	}()
