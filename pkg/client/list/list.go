@@ -16,6 +16,7 @@ package list
 
 import (
 	"context"
+	"errors"
 	api "github.com/atomix/atomix-api/proto/atomix/list"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
@@ -42,6 +43,9 @@ type List interface {
 
 	// Insert inserts a value at the given index
 	Insert(ctx context.Context, index int, value string) error
+
+	// Set sets the value at the given index
+	Set(ctx context.Context, index int, value string) error
 
 	// Get gets the value at the given index
 	Get(ctx context.Context, index int) (string, error)
@@ -154,7 +158,35 @@ func (l *list) Insert(ctx context.Context, index int, value string) error {
 	}
 
 	l.session.RecordResponse(request.Header, response.Header)
-	return err
+
+	switch response.Status {
+	case api.ResponseStatus_OUT_OF_BOUNDS:
+		return errors.New("index out of bounds")
+	default:
+		return nil
+	}
+}
+
+func (l *list) Set(ctx context.Context, index int, value string) error {
+	request := &api.SetRequest{
+		Header: l.session.NextRequest(),
+		Index:  uint32(index),
+		Value:  value,
+	}
+
+	response, err := l.client.Set(ctx, request)
+	if err != nil {
+		return err
+	}
+
+	l.session.RecordResponse(request.Header, response.Header)
+
+	switch response.Status {
+	case api.ResponseStatus_OUT_OF_BOUNDS:
+		return errors.New("index out of bounds")
+	default:
+		return nil
+	}
 }
 
 func (l *list) Get(ctx context.Context, index int) (string, error) {
@@ -169,7 +201,13 @@ func (l *list) Get(ctx context.Context, index int) (string, error) {
 	}
 
 	l.session.RecordResponse(request.Header, response.Header)
-	return response.Value, nil
+
+	switch response.Status {
+	case api.ResponseStatus_OUT_OF_BOUNDS:
+		return "", errors.New("index out of bounds")
+	default:
+		return response.Value, nil
+	}
 }
 
 func (l *list) Remove(ctx context.Context, index int) (string, error) {
@@ -184,7 +222,13 @@ func (l *list) Remove(ctx context.Context, index int) (string, error) {
 	}
 
 	l.session.RecordResponse(request.Header, response.Header)
-	return response.Value, nil
+
+	switch response.Status {
+	case api.ResponseStatus_OUT_OF_BOUNDS:
+		return "", errors.New("index out of bounds")
+	default:
+		return response.Value, nil
+	}
 }
 
 func (l *list) Len(ctx context.Context) (int, error) {
