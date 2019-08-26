@@ -20,6 +20,7 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/util"
 	"google.golang.org/grpc"
+	"sync"
 )
 
 // Client provides an API for creating Sets
@@ -50,6 +51,9 @@ type Set interface {
 	// Clear removes all values from the set
 	Clear(ctx context.Context) error
 
+	// Elements lists the elements in the set
+	Elements(ctx context.Context, ch chan<- string) error
+
 	// Watch watches the set for changes
 	// This is a non-blocking method. If the method returns without error, set events will be pushed onto
 	// the given channel.
@@ -60,6 +64,9 @@ type Set interface {
 type EventType string
 
 const (
+	// EventNone indicates that the event is not in reaction to a state change
+	EventNone EventType = ""
+
 	// EventAdded indicates a value was added to the set
 	EventAdded EventType = "added"
 
@@ -151,6 +158,28 @@ func (s *set) Len(ctx context.Context) (int, error) {
 		total += result.(int)
 	}
 	return total, nil
+}
+
+func (s *set) Elements(ctx context.Context, ch chan<- string) error {
+	n := len(s.partitions)
+	wg := sync.WaitGroup{}
+	wg.Add(n)
+
+	go func() {
+		wg.Wait()
+		close(ch)
+	}()
+
+	return util.IterAsync(n, func(i int) error {
+		c := make(chan string)
+		go func() {
+			for kv := range c {
+				ch <- kv
+			}
+			wg.Done()
+		}()
+		return s.partitions[i].Elements(ctx, c)
+	})
 }
 
 func (s *set) Clear(ctx context.Context) error {

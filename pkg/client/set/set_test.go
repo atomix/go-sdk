@@ -25,12 +25,124 @@ import (
 )
 
 func TestSetOperations(t *testing.T) {
-	conns, partitions := test.StartTestPartitions(3)
+	conns, partitions := test.StartTestPartitions(1)
 
 	name := primitive.NewName("default", "test", "default", "test")
-	counter, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	set, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
-	assert.NotNil(t, counter)
+	assert.NotNil(t, set)
+
+	size, err := set.Len(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, 0, size)
+
+	contains, err := set.Contains(context.TODO(), "foo")
+	assert.NoError(t, err)
+	assert.False(t, contains)
+
+	added, err := set.Add(context.TODO(), "foo")
+	assert.NoError(t, err)
+	assert.True(t, added)
+
+	size, err = set.Len(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, 1, size)
+
+	contains, err = set.Contains(context.TODO(), "foo")
+	assert.NoError(t, err)
+	assert.True(t, contains)
+
+	added, err = set.Add(context.TODO(), "bar")
+	assert.NoError(t, err)
+	assert.True(t, added)
+
+	added, err = set.Add(context.TODO(), "foo")
+	assert.NoError(t, err)
+	assert.False(t, added)
+
+	size, err = set.Len(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, 2, size)
+
+	added, err = set.Add(context.TODO(), "baz")
+	assert.NoError(t, err)
+	assert.True(t, added)
+
+	size, err = set.Len(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, 3, size)
+
+	ch := make(chan string)
+	err = set.Elements(context.TODO(), ch)
+	assert.NoError(t, err)
+
+	value, ok := <-ch
+	assert.True(t, ok)
+	assert.Contains(t, []string{"foo", "bar", "baz"}, value)
+	value, ok = <-ch
+	assert.True(t, ok)
+	assert.Contains(t, []string{"foo", "bar", "baz"}, value)
+	value, ok = <-ch
+	assert.True(t, ok)
+	assert.Contains(t, []string{"foo", "bar", "baz"}, value)
+
+	_, ok = <-ch
+	assert.False(t, ok)
+
+	events := make(chan *Event)
+	err = set.Watch(context.TODO(), events, WithReplay())
+	assert.NoError(t, err)
+
+	done := make(chan bool)
+	go func() {
+		event := <-events
+		assert.Equal(t, EventNone, event.Type)
+		assert.Contains(t, []string{"foo", "bar", "baz"}, event.Value)
+
+		event = <-events
+		assert.Equal(t, EventNone, event.Type)
+		assert.Contains(t, []string{"foo", "bar", "baz"}, event.Value)
+
+		event = <-events
+		assert.Equal(t, EventNone, event.Type)
+		assert.Contains(t, []string{"foo", "bar", "baz"}, event.Value)
+
+		done <- true
+
+		event = <-events
+		assert.Equal(t, EventAdded, event.Type)
+		assert.Equal(t, "Hello world!", event.Value)
+
+		event = <-events
+		assert.Equal(t, EventAdded, event.Type)
+		assert.Equal(t, "Hello world again!", event.Value)
+
+		event = <-events
+		assert.Equal(t, EventRemoved, event.Type)
+		assert.Equal(t, "baz", event.Value)
+
+		close(done)
+	}()
+
+	<-done
+
+	added, err = set.Add(context.TODO(), "Hello world!")
+	assert.NoError(t, err)
+	assert.True(t, added)
+
+	added, err = set.Add(context.TODO(), "Hello world again!")
+	assert.NoError(t, err)
+	assert.True(t, added)
+
+	removed, err := set.Remove(context.TODO(), "baz")
+	assert.NoError(t, err)
+	assert.True(t, removed)
+
+	removed, err = set.Remove(context.TODO(), "baz")
+	assert.NoError(t, err)
+	assert.False(t, removed)
+
+	<-done
 
 	test.StopTestPartitions(partitions)
 }

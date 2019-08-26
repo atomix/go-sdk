@@ -2,7 +2,7 @@ module github.com/atomix/atomix-go-client
 
 require (
 	github.com/atomix/atomix-api v0.0.0-20190826175736-311672751efc
-	github.com/atomix/atomix-go-local v0.0.0-20190826181924-3fca16f50edd
+	github.com/atomix/atomix-go-local v0.0.0-20190826193423-498112921355
 	github.com/gogo/protobuf v1.2.1
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/protobuf v1.3.2
@@ -10,3 +10,7 @@ require (
 	github.com/stretchr/testify v1.3.0
 	google.golang.org/grpc v1.22.1
 )
+
+replace github.com/atomix/atomix-go-node => ../atomix-go-node
+
+replace github.com/atomix/atomix-go-local => ../atomix-go-local

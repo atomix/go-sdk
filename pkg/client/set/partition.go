@@ -129,6 +129,37 @@ func (s *setPartition) Clear(ctx context.Context) error {
 	return nil
 }
 
+func (s *setPartition) Elements(ctx context.Context, ch chan<- string) error {
+	request := &api.IterateRequest{
+		Header: s.session.GetRequest(),
+	}
+	entries, err := s.client.Iterate(ctx, request)
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		defer close(ch)
+		for {
+			response, err := entries.Recv()
+			if err == io.EOF {
+				break
+			}
+
+			if err != nil {
+				glog.Error("Failed to receive entry stream", err)
+				break
+			}
+
+			// Record the response header
+			s.session.RecordResponse(request.Header, response.Header)
+
+			ch <- response.Value
+		}
+	}()
+	return nil
+}
+
 func (s *setPartition) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error {
 	request := &api.EventRequest{
 		Header: s.session.NextRequest(),
@@ -179,6 +210,8 @@ func (s *setPartition) Watch(ctx context.Context, ch chan<- *Event, opts ...Watc
 
 			var t EventType
 			switch response.Type {
+			case api.EventResponse_NONE:
+				t = EventNone
 			case api.EventResponse_ADDED:
 				t = EventAdded
 			case api.EventResponse_REMOVED:

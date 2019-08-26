@@ -68,29 +68,18 @@ func TestListOperations(t *testing.T) {
 	err = list.Items(context.TODO(), ch)
 	assert.NoError(t, err)
 
-	value = <-ch
+	value, ok := <-ch
+	assert.True(t, ok)
 	assert.Equal(t, "foo", value)
-	value = <-ch
+	value, ok = <-ch
+	assert.True(t, ok)
 	assert.Equal(t, "baz", value)
-	value = <-ch
+	value, ok = <-ch
+	assert.True(t, ok)
 	assert.Equal(t, "bar", value)
 
-	_, ok := <-ch
+	_, ok = <-ch
 	assert.False(t, ok)
-
-	i := 0
-	for value := range ch {
-		if i == 0 {
-			assert.Equal(t, "foo", value)
-		} else if i == 1 {
-			assert.Equal(t, "baz", value)
-		} else if i == 2 {
-			assert.Equal(t, "bar", value)
-		} else {
-			assert.Fail(t, "too many items in list")
-		}
-		i++
-	}
 
 	events := make(chan *Event)
 	err = list.Watch(context.TODO(), events)
