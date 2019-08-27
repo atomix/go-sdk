@@ -2,7 +2,7 @@ module github.com/atomix/atomix-go-client
 
 require (
 	github.com/atomix/atomix-api v0.0.0-20190826211343-dd8f4db3bf77
-	github.com/atomix/atomix-go-local v0.0.0-20190826233718-ee5d1449f925
+	github.com/atomix/atomix-go-local v0.0.0-20190827010816-66129c8fb1ac
 	github.com/gogo/protobuf v1.2.1
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/protobuf v1.3.2
