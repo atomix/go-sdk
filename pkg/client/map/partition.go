@@ -234,7 +234,11 @@ func (m *mapPartition) Watch(ctx context.Context, ch chan<- *Event, opts ...Watc
 	}
 
 	go func() {
+		defer func() {
+			_ = recover()
+		}()
 		defer close(ch)
+
 		var stream *session.Stream
 		for {
 			response, err := events.Recv()

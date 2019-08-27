@@ -28,10 +28,11 @@ func (m *sessionHandler) Create(ctx context.Context, s *session.Session) error {
 	request := &api.CreateRequest{
 		Header: s.GetState(),
 	}
-	_, err := m.client.Create(ctx, request)
+	response, err := m.client.Create(ctx, request)
 	if err != nil {
 		return err
 	}
+	s.RecordResponse(request.Header, response.Header)
 	return nil
 }
 
