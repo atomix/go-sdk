@@ -96,18 +96,18 @@ func TestMapOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 
-	_, err = _map.Put(context.Background(), "foo", []byte("baz"), WithVersion(1))
+	_, err = _map.Put(context.Background(), "foo", []byte("baz"), IfVersion(1))
 	assert.Error(t, err)
 
-	kv2, err := _map.Put(context.Background(), "foo", []byte("baz"), WithVersion(kv1.Version))
+	kv2, err := _map.Put(context.Background(), "foo", []byte("baz"), IfVersion(kv1.Version))
 	assert.NoError(t, err)
 	assert.NotEqual(t, kv1.Version, kv2.Version)
 	assert.Equal(t, "baz", string(kv2.Value))
 
-	_, err = _map.Remove(context.Background(), "foo", WithVersion(1))
+	_, err = _map.Remove(context.Background(), "foo", IfVersion(1))
 	assert.Error(t, err)
 
-	removed, err := _map.Remove(context.Background(), "foo", WithVersion(kv2.Version))
+	removed, err := _map.Remove(context.Background(), "foo", IfVersion(kv2.Version))
 	assert.NoError(t, err)
 	assert.NotNil(t, removed)
 	assert.Equal(t, kv2.Version, removed.Version)

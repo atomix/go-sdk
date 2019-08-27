@@ -30,8 +30,8 @@ type RemoveOption interface {
 	afterRemove(response *api.RemoveResponse)
 }
 
-// WithVersion sets the required version for optimistic concurrency control
-func WithVersion(version int64) VersionOption {
+// IfVersion sets the required version for optimistic concurrency control
+func IfVersion(version int64) VersionOption {
 	return VersionOption{version: version}
 }
 

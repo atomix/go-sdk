@@ -87,7 +87,7 @@ func (l *lock) Lock(ctx context.Context, opts ...LockOption) (uint64, error) {
 	}
 
 	for _, opt := range opts {
-		opt.before(request)
+		opt.beforeLock(request)
 	}
 
 	response, err := l.client.Lock(ctx, request)
@@ -96,7 +96,7 @@ func (l *lock) Lock(ctx context.Context, opts ...LockOption) (uint64, error) {
 	}
 
 	for _, opt := range opts {
-		opt.after(response)
+		opt.afterLock(response)
 	}
 
 	l.session.RecordResponse(request.Header, response.Header)
