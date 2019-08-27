@@ -73,5 +73,21 @@ func TestLock(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, locked)
 
+	err = l1.Close()
+	assert.NoError(t, err)
+
+	err = l1.Delete()
+	assert.NoError(t, err)
+
+	err = l2.Delete()
+	assert.NoError(t, err)
+
+	l, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	assert.NoError(t, err)
+
+	locked, err = l.IsLocked(context.TODO())
+	assert.NoError(t, err)
+	assert.False(t, locked)
+
 	test.StopTestPartitions(partitions)
 }

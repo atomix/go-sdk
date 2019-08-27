@@ -173,5 +173,34 @@ func TestMapStreams(t *testing.T) {
 
 	<-latch
 
+	err = _map.Close()
+	assert.NoError(t, err)
+
+	map1, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	assert.NoError(t, err)
+
+	map2, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	assert.NoError(t, err)
+
+	size, err := map1.Len(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, 3, size)
+
+	err = map1.Close()
+	assert.NoError(t, err)
+
+	err = map1.Delete()
+	assert.NoError(t, err)
+
+	err = map2.Delete()
+	assert.NoError(t, err)
+
+	_map, err = New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	assert.NoError(t, err)
+
+	size, err = _map.Len(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, 0, size)
+
 	test.StopTestPartitions(partitions)
 }

@@ -93,5 +93,34 @@ func TestValue(t *testing.T) {
 	assert.Equal(t, uint64(3), event.Version)
 	assert.Equal(t, "baz", string(event.Value))
 
+	err = value.Close()
+	assert.NoError(t, err)
+
+	value1, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	assert.NoError(t, err)
+
+	value2, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	assert.NoError(t, err)
+
+	val, _, err = value1.Get(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, "baz", string(val))
+
+	err = value1.Close()
+	assert.NoError(t, err)
+
+	err = value1.Delete()
+	assert.NoError(t, err)
+
+	err = value2.Delete()
+	assert.NoError(t, err)
+
+	value, err = New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	assert.NoError(t, err)
+
+	val, _, err = value.Get(context.TODO())
+	assert.NoError(t, err)
+	assert.Nil(t, val)
+
 	test.StopTestPartitions(partitions)
 }

@@ -182,5 +182,42 @@ func TestElectionOperations(t *testing.T) {
 	assert.Len(t, event.Term.Candidates, 1)
 	assert.Equal(t, election1.ID(), event.Term.Candidates[0])
 
+	err = election1.Close()
+	assert.NoError(t, err)
+	err = election2.Close()
+	assert.NoError(t, err)
+	err = election3.Close()
+	assert.NoError(t, err)
+
+	election1, err = New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	assert.NoError(t, err)
+
+	election2, err = New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	assert.NoError(t, err)
+
+	term, err = election1.GetTerm(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(5), term.ID)
+	assert.NotEqual(t, "", term.Leader)
+	assert.Len(t, term.Candidates, 1)
+
+	err = election1.Close()
+	assert.NoError(t, err)
+
+	err = election1.Delete()
+	assert.NoError(t, err)
+
+	err = election2.Delete()
+	assert.NoError(t, err)
+
+	election, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	assert.NoError(t, err)
+
+	term, err = election.GetTerm(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(0), term.ID)
+	assert.Equal(t, "", term.Leader)
+	assert.Len(t, term.Candidates, 0)
+
 	test.StopTestPartitions(partitions)
 }

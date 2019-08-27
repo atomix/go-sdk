@@ -66,5 +66,34 @@ func TestCounterOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, int64(10), value)
 
+	err = counter.Close()
+	assert.NoError(t, err)
+
+	counter1, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	assert.NoError(t, err)
+
+	counter2, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	assert.NoError(t, err)
+
+	value, err = counter1.Get(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, int64(10), value)
+
+	err = counter1.Close()
+	assert.NoError(t, err)
+
+	err = counter1.Delete()
+	assert.NoError(t, err)
+
+	err = counter2.Delete()
+	assert.NoError(t, err)
+
+	counter, err = New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	assert.NoError(t, err)
+
+	value, err = counter.Get(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, int64(0), value)
+
 	test.StopTestPartitions(partitions)
 }

@@ -144,5 +144,34 @@ func TestSetOperations(t *testing.T) {
 
 	<-done
 
+	err = set.Close()
+	assert.NoError(t, err)
+
+	set1, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	assert.NoError(t, err)
+
+	set2, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	assert.NoError(t, err)
+
+	size, err = set1.Len(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, 4, size)
+
+	err = set1.Close()
+	assert.NoError(t, err)
+
+	err = set1.Delete()
+	assert.NoError(t, err)
+
+	err = set2.Delete()
+	assert.NoError(t, err)
+
+	set, err = New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	assert.NoError(t, err)
+
+	size, err = set.Len(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, 0, size)
+
 	test.StopTestPartitions(partitions)
 }
