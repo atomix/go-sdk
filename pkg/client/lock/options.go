@@ -45,46 +45,37 @@ func (o timeoutOption) after(response *api.LockResponse) {
 
 // UnlockOption is an option for Unlock calls
 type UnlockOption interface {
-	before(request *api.UnlockRequest)
-	after(response *api.UnlockResponse)
-}
-
-// WithVersion sets the required version for the lock to be unlocked
-func WithVersion(version uint64) UnlockOption {
-	return versionOption{version: version}
-}
-
-type versionOption struct {
-	version uint64
-}
-
-func (o versionOption) before(request *api.UnlockRequest) {
-	request.Version = o.version
-}
-
-func (o versionOption) after(response *api.UnlockResponse) {
-
+	beforeUnlock(request *api.UnlockRequest)
+	afterUnlock(response *api.UnlockResponse)
 }
 
 // IsLockedOption is an option for IsLocked calls
 type IsLockedOption interface {
-	before(request *api.IsLockedRequest)
-	after(response *api.IsLockedResponse)
+	beforeIsLocked(request *api.IsLockedRequest)
+	afterIsLocked(response *api.IsLockedResponse)
 }
 
-// WithIsVersion sets the lock version to check
-func WithIsVersion(version uint64) IsLockedOption {
-	return isVersionOption{version: version}
+// IfVersion sets the lock version to check
+func IfVersion(version uint64) ifVersionOption {
+	return ifVersionOption{version: version}
 }
 
-type isVersionOption struct {
+type ifVersionOption struct {
 	version uint64
 }
 
-func (o isVersionOption) before(request *api.IsLockedRequest) {
+func (o ifVersionOption) beforeUnlock(request *api.UnlockRequest) {
 	request.Version = o.version
 }
 
-func (o isVersionOption) after(response *api.IsLockedResponse) {
+func (o ifVersionOption) afterUnlock(response *api.UnlockResponse) {
+
+}
+
+func (o ifVersionOption) beforeIsLocked(request *api.IsLockedRequest) {
+	request.Version = o.version
+}
+
+func (o ifVersionOption) afterIsLocked(response *api.IsLockedResponse) {
 
 }

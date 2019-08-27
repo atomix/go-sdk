@@ -65,13 +65,17 @@ func TestLock(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, locked)
 
-	locked, err = l1.IsLocked(context.Background(), WithIsVersion(v1))
+	locked, err = l1.IsLocked(context.Background(), IfVersion(v1))
 	assert.NoError(t, err)
 	assert.False(t, locked)
 
-	locked, err = l1.IsLocked(context.Background(), WithIsVersion(v2))
+	locked, err = l1.IsLocked(context.Background(), IfVersion(v2))
 	assert.NoError(t, err)
 	assert.True(t, locked)
+
+	v2, err = l2.Lock(context.Background(), WithTimeout(1*time.Second))
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(0), v2)
 
 	err = l1.Close()
 	assert.NoError(t, err)

@@ -109,7 +109,7 @@ func (l *lock) Unlock(ctx context.Context, opts ...UnlockOption) (bool, error) {
 	}
 
 	for i := range opts {
-		opts[i].before(request)
+		opts[i].beforeUnlock(request)
 	}
 
 	response, err := l.client.Unlock(ctx, request)
@@ -118,7 +118,7 @@ func (l *lock) Unlock(ctx context.Context, opts ...UnlockOption) (bool, error) {
 	}
 
 	for i := range opts {
-		opts[i].after(response)
+		opts[i].afterUnlock(response)
 	}
 
 	l.session.RecordResponse(request.Header, response.Header)
@@ -131,7 +131,7 @@ func (l *lock) IsLocked(ctx context.Context, opts ...IsLockedOption) (bool, erro
 	}
 
 	for i := range opts {
-		opts[i].before(request)
+		opts[i].beforeIsLocked(request)
 	}
 
 	response, err := l.client.IsLocked(ctx, request)
@@ -140,7 +140,7 @@ func (l *lock) IsLocked(ctx context.Context, opts ...IsLockedOption) (bool, erro
 	}
 
 	for i := range opts {
-		opts[i].after(response)
+		opts[i].afterIsLocked(response)
 	}
 
 	l.session.RecordResponse(request.Header, response.Header)

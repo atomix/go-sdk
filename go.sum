@@ -67,6 +67,8 @@ github.com/atomix/atomix-go-local v0.0.0-20190826233718-ee5d1449f925 h1:xLaG+/c6
 github.com/atomix/atomix-go-local v0.0.0-20190826233718-ee5d1449f925/go.mod h1:VYjX9tKY5W5BxXQhqeL4CFrxQsgUyv8ZuE5lMTH8LVA=
 github.com/atomix/atomix-go-local v0.0.0-20190827010816-66129c8fb1ac h1:h+iCIyJakpFtpFUTcWYJMIhVcYIWZffijpF0jgqTxsE=
 github.com/atomix/atomix-go-local v0.0.0-20190827010816-66129c8fb1ac/go.mod h1:fdwJazYOvx0ZdblXyZx1FfUC6DzEw7Plzxj+po0nIHM=
+github.com/atomix/atomix-go-local v0.0.0-20190827192016-1cf148efd7dd h1:hFA09f2/inr1tGgTWnBjrtOeSUzNsrCYDD0MyYA8ytM=
+github.com/atomix/atomix-go-local v0.0.0-20190827192016-1cf148efd7dd/go.mod h1:SS5fK7Mu9koJVZAnAx4bnbPuYn5M9xuP17ynXAAz6R0=
 github.com/atomix/atomix-go-node v0.0.0-20190819235918-362f3143b084 h1:pp555c1uxKC8UqiifN/azV8CgNAsD3J/FQyrzwblbmA=
 github.com/atomix/atomix-go-node v0.0.0-20190819235918-362f3143b084/go.mod h1:rWp3DgtUt4qdHDm//ewTptIaEbFde298JSWYN90zeNo=
 github.com/atomix/atomix-go-node v0.0.0-20190823235037-38e2494ed153 h1:fsSdmRzoJ65OVZGp2M2lE4TccL5LgN/Wne+A6/9jOdQ=
@@ -91,7 +93,9 @@ github.com/atomix/atomix-go-node v0.0.0-20190826203552-f2292fa451d5 h1:M5lvOjRsC
 github.com/atomix/atomix-go-node v0.0.0-20190826203552-f2292fa451d5/go.mod h1:bVoPUOitgU/4hyZeyKYhjtWnOy9tb2HbuDsnXjgcNBU=
 github.com/atomix/atomix-go-node v0.0.0-20190826233653-987b53e69c9b h1:GY9qgci6t80+28WxAPuBdbLBZMDcVG8GKBSoriGji6k=
 github.com/atomix/atomix-go-node v0.0.0-20190826233653-987b53e69c9b/go.mod h1:PL1T5R78itch1QC1CN4JmbRL/2XQlg4R95R14822C6Q=
+github.com/atomix/atomix-go-node v0.0.0-20190827010800-2403202bdd19 h1:Kmr9zbOXGi+xO4viyN5hf5+IhPeFlkAtOMJwMhgWRbw=
 github.com/atomix/atomix-go-node v0.0.0-20190827010800-2403202bdd19/go.mod h1:PL1T5R78itch1QC1CN4JmbRL/2XQlg4R95R14822C6Q=
+github.com/atomix/atomix-go-node v0.0.0-20190827191929-2d3dc9c550d9/go.mod h1:PL1T5R78itch1QC1CN4JmbRL/2XQlg4R95R14822C6Q=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
 github.com/creack/pty v1.1.7/go.mod h1:lj5s0c3V2DBrqTV7llrYr5NG6My20zk30Fl46Y7DoTY=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
