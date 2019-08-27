@@ -18,7 +18,7 @@ coverage: build linters license_check
 	./build/bin/coveralls-coverage
 
 linters: # @HELP examines Go source code and reports coding problems
-	golangci-lint run --exclude-use-default=false
+	golangci-lint run
 
 license_check: # @HELP examine and ensure license headers exist
 	./build/licensing/boilerplate.py -v
