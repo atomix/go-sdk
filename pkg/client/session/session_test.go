@@ -14,8 +14,140 @@
 
 package session
 
-import "testing"
+import (
+	"context"
+	"github.com/atomix/atomix-api/proto/atomix/headers"
+	"github.com/atomix/atomix-go-client/pkg/client/primitive"
+	"github.com/stretchr/testify/assert"
+	"testing"
+	"time"
+)
+
+func TestSessionOptions(t *testing.T) {
+	options := &options{}
+	WithTimeout(5 * time.Second).prepare(options)
+	assert.Equal(t, 5*time.Second, options.timeout)
+}
+
+func newTestHandler() *testHandler {
+	return &testHandler{
+		create:    make(chan bool, 1),
+		keepAlive: make(chan bool),
+		close:     make(chan bool, 1),
+		delete:    make(chan bool, 1),
+	}
+}
+
+type testHandler struct {
+	create    chan bool
+	keepAlive chan bool
+	close     chan bool
+	delete    chan bool
+}
+
+func (h *testHandler) Create(ctx context.Context, session *Session) error {
+	h.create <- true
+	return nil
+}
+
+func (h *testHandler) KeepAlive(ctx context.Context, session *Session) error {
+	h.keepAlive <- true
+	return nil
+}
+
+func (h *testHandler) Close(ctx context.Context, session *Session) error {
+	h.close <- true
+	return nil
+}
+
+func (h *testHandler) Delete(ctx context.Context, session *Session) error {
+	h.delete <- true
+	return nil
+}
 
 func TestSession(t *testing.T) {
+	name := primitive.NewName("a", "b", "c", "d")
+	handler := newTestHandler()
+	session, err := New(context.TODO(), name, handler, WithTimeout(5*time.Second))
+	assert.NoError(t, err)
+	assert.NotNil(t, session)
+	assert.Equal(t, "c", session.Name.Namespace)
+	assert.Equal(t, "d", session.Name.Name)
+	assert.Equal(t, 5*time.Second, session.Timeout)
+	assert.True(t, <-handler.create)
 
+	header := session.GetRequest()
+	assert.Equal(t, "c", header.Name.Namespace)
+	assert.Equal(t, "d", header.Name.Name)
+	assert.Equal(t, uint64(0), header.Index)
+	assert.Equal(t, uint64(0), header.SessionID)
+
+	session.RecordResponse(header, &headers.ResponseHeader{
+		SessionID: uint64(1),
+		Index:     uint64(10),
+	})
+
+	header = session.GetRequest()
+	assert.Equal(t, "c", header.Name.Namespace)
+	assert.Equal(t, "d", header.Name.Name)
+	assert.Equal(t, uint64(10), header.Index)
+	assert.Equal(t, uint64(1), header.SessionID)
+	assert.Equal(t, uint64(0), header.RequestID)
+
+	header = session.NextRequest()
+	assert.Equal(t, "c", header.Name.Namespace)
+	assert.Equal(t, "d", header.Name.Name)
+	assert.Equal(t, uint64(10), header.Index)
+	assert.Equal(t, uint64(1), header.SessionID)
+	assert.Equal(t, uint64(1), header.RequestID)
+
+	session.RecordResponse(header, &headers.ResponseHeader{
+		SessionID:  uint64(1),
+		Index:      uint64(11),
+		ResponseID: uint64(1),
+		StreamID:   uint64(1),
+	})
+
+	stream := session.NewStream(uint64(1))
+	assert.True(t, stream.Serialize(&headers.ResponseHeader{
+		SessionID:  uint64(1),
+		Index:      uint64(11),
+		ResponseID: uint64(1),
+		StreamID:   uint64(1),
+	}))
+	assert.True(t, stream.Serialize(&headers.ResponseHeader{
+		SessionID:  uint64(1),
+		Index:      uint64(11),
+		ResponseID: uint64(2),
+		StreamID:   uint64(1),
+	}))
+	assert.True(t, stream.Serialize(&headers.ResponseHeader{
+		SessionID:  uint64(1),
+		Index:      uint64(11),
+		ResponseID: uint64(3),
+		StreamID:   uint64(1),
+	}))
+	assert.False(t, stream.Serialize(&headers.ResponseHeader{
+		SessionID:  uint64(1),
+		Index:      uint64(11),
+		ResponseID: uint64(5),
+		StreamID:   uint64(1),
+	}))
+	assert.True(t, stream.Serialize(&headers.ResponseHeader{
+		SessionID:  uint64(1),
+		Index:      uint64(11),
+		ResponseID: uint64(4),
+		StreamID:   uint64(1),
+	}))
+
+	header = session.GetState()
+	assert.Equal(t, "c", header.Name.Namespace)
+	assert.Equal(t, "d", header.Name.Name)
+	assert.Equal(t, uint64(11), header.Index)
+	assert.Equal(t, uint64(1), header.SessionID)
+	assert.Equal(t, uint64(1), header.RequestID)
+	assert.Len(t, header.Streams, 1)
+	assert.Equal(t, uint64(4), header.Streams[0].ResponseID)
+
+	assert.True(t, <-handler.keepAlive)
 }
