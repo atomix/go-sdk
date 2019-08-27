@@ -37,7 +37,7 @@ func StartTestPartitions(partitions int) ([]*grpc.ClientConn, []chan struct{}) {
 // startTestPartition starts a single local partition
 func startTestPartition() (*grpc.ClientConn, chan struct{}) {
 	lis := bufconn.Listen(1024 * 1024)
-	node := local.NewLocalNode(lis)
+	node := local.NewNode(lis)
 	go func() {
 		_ = node.Start()
 	}()

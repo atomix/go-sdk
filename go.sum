@@ -69,6 +69,10 @@ github.com/atomix/atomix-go-local v0.0.0-20190827010816-66129c8fb1ac h1:h+iCIyJa
 github.com/atomix/atomix-go-local v0.0.0-20190827010816-66129c8fb1ac/go.mod h1:fdwJazYOvx0ZdblXyZx1FfUC6DzEw7Plzxj+po0nIHM=
 github.com/atomix/atomix-go-local v0.0.0-20190827192016-1cf148efd7dd h1:hFA09f2/inr1tGgTWnBjrtOeSUzNsrCYDD0MyYA8ytM=
 github.com/atomix/atomix-go-local v0.0.0-20190827192016-1cf148efd7dd/go.mod h1:SS5fK7Mu9koJVZAnAx4bnbPuYn5M9xuP17ynXAAz6R0=
+github.com/atomix/atomix-go-local v0.0.0-20190827231429-751448b41ecb h1:jxxxUh77+bpUAGumB7NvFM6KuxCxx4RvJrR1/1z57uI=
+github.com/atomix/atomix-go-local v0.0.0-20190827231429-751448b41ecb/go.mod h1:qLBTOiVKoEqzYOjgxIgWFa+Hfa3SR+VexA6jGBcv0HA=
+github.com/atomix/atomix-go-local v0.0.0-20190827233944-938e35b06834 h1:4ddTmYmAaP3WrafV/X76Jq4qNir2jezMQwKgouqNdIU=
+github.com/atomix/atomix-go-local v0.0.0-20190827233944-938e35b06834/go.mod h1:qLBTOiVKoEqzYOjgxIgWFa+Hfa3SR+VexA6jGBcv0HA=
 github.com/atomix/atomix-go-node v0.0.0-20190819235918-362f3143b084 h1:pp555c1uxKC8UqiifN/azV8CgNAsD3J/FQyrzwblbmA=
 github.com/atomix/atomix-go-node v0.0.0-20190819235918-362f3143b084/go.mod h1:rWp3DgtUt4qdHDm//ewTptIaEbFde298JSWYN90zeNo=
 github.com/atomix/atomix-go-node v0.0.0-20190823235037-38e2494ed153 h1:fsSdmRzoJ65OVZGp2M2lE4TccL5LgN/Wne+A6/9jOdQ=

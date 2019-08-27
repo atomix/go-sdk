@@ -33,7 +33,6 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
 	"google.golang.org/grpc"
-	"net"
 	"sort"
 	"time"
 )
@@ -201,30 +200,6 @@ func (c *Client) Close() error {
 		return err
 	}
 	return result
-}
-
-// NewGroup returns a partition group client
-func NewGroup(address string, opts ...Option) (*PartitionGroup, error) {
-	_, records, err := net.LookupSRV("", "", address)
-	if err != nil {
-		return nil, err
-	}
-
-	options := applyOptions(opts...)
-	partitions := make([]*grpc.ClientConn, len(records))
-	for i, record := range records {
-		conn, err := grpc.Dial(fmt.Sprintf("%s:%d", record.Target, record.Port), grpc.WithInsecure())
-		if err != nil {
-			return nil, err
-		}
-		partitions[i] = conn
-	}
-	return &PartitionGroup{
-		Namespace:   options.namespace,
-		Name:        address,
-		application: options.application,
-		partitions:  partitions,
-	}, nil
 }
 
 // PartitionGroup manages the primitives in a partition group

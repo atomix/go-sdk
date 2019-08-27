@@ -24,9 +24,74 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/client/set"
 	"github.com/atomix/atomix-go-client/pkg/client/test"
 	"github.com/atomix/atomix-go-client/pkg/client/value"
+	"github.com/atomix/atomix-go-local/pkg/atomix/local"
+	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
+
+func TestClient(t *testing.T) {
+	controller := local.NewController(5679)
+	err := controller.Start()
+	assert.NoError(t, err)
+	defer controller.Stop()
+
+	client, err := NewClient("localhost:5679", WithNamespace("default"), WithApplication("test"))
+	assert.NoError(t, err)
+	assert.NotNil(t, client)
+
+	groups, err := client.GetGroups(context.TODO())
+	assert.NoError(t, err)
+	assert.Len(t, groups, 0)
+
+	_, err = client.GetGroup(context.TODO(), "none")
+	assert.EqualError(t, err, "unknown partition group none")
+
+	group, err := client.CreateGroup(context.TODO(), "test", 3, 1, &empty.Empty{})
+	assert.NoError(t, err)
+	assert.NotNil(t, group)
+	assert.Equal(t, "default", group.Namespace)
+	assert.Equal(t, "test", group.Name)
+	assert.Equal(t, 3, group.Partitions)
+	assert.Equal(t, 1, group.PartitionSize)
+
+	group, err = client.GetGroup(context.TODO(), "test")
+	assert.NoError(t, err)
+	assert.NotNil(t, group)
+	assert.Equal(t, "default", group.Namespace)
+	assert.Equal(t, "test", group.Name)
+	assert.Equal(t, 3, group.Partitions)
+	assert.Equal(t, 1, group.PartitionSize)
+
+	groups, err = client.GetGroups(context.TODO())
+	assert.NoError(t, err)
+	assert.Len(t, groups, 1)
+	group = groups[0]
+	assert.Equal(t, "default", group.Namespace)
+	assert.Equal(t, "test", group.Name)
+	assert.Equal(t, 3, group.Partitions)
+	assert.Equal(t, 1, group.PartitionSize)
+
+	val, err := group.GetValue(context.TODO(), "foo")
+	assert.NoError(t, err)
+	assert.NotNil(t, val)
+	_, err = val.Set(context.TODO(), []byte("bar"))
+	assert.NoError(t, err)
+	_, _, err = val.Get(context.TODO())
+	assert.NoError(t, err)
+
+	err = client.DeleteGroup(context.TODO(), "test")
+	assert.NoError(t, err)
+
+	_, err = client.GetGroup(context.TODO(), "test")
+	assert.EqualError(t, err, "unknown partition group test")
+
+	groups, err = client.GetGroups(context.TODO())
+	assert.NoError(t, err)
+	assert.Len(t, groups, 0)
+
+	client.Close()
+}
 
 func TestPartitionGroup(t *testing.T) {
 	conns, partitions := test.StartTestPartitions(3)
