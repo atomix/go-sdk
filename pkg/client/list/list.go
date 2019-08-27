@@ -26,6 +26,9 @@ import (
 	"io"
 )
 
+// Type is the list type
+const Type primitive.Type = "list"
+
 // Client provides an API for creating Lists
 type Client interface {
 	// GetList gets the List instance of the given name

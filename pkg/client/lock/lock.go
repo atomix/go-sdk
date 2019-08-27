@@ -23,6 +23,9 @@ import (
 	"google.golang.org/grpc"
 )
 
+// Type is the lock type
+const Type primitive.Type = "lock"
+
 // Client provides an API for creating Locks
 type Client interface {
 	// GetLock gets the Lock instance of the given name

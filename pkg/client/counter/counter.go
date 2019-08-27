@@ -23,6 +23,9 @@ import (
 	"google.golang.org/grpc"
 )
 
+// Type is the counter type
+const Type primitive.Type = "counter"
+
 // Client provides an API for creating Counters
 type Client interface {
 	// GetCounter gets the Counter instance of the given name

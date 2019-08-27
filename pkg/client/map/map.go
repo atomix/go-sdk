@@ -24,6 +24,9 @@ import (
 	"sync"
 )
 
+// Type is the map type
+const Type primitive.Type = "map"
+
 // Client provides an API for creating Maps
 type Client interface {
 	// GetMap gets the Map instance of the given name

@@ -16,6 +16,9 @@ package primitive
 
 import "fmt"
 
+// Type is the type of a primitive
+type Type string
+
 // NewName returns a qualified primitive name with the given namespace, group, application, and name
 func NewName(namespace string, group string, application string, name string) Name {
 	return Name{

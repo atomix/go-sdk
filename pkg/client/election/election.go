@@ -26,6 +26,9 @@ import (
 	"io"
 )
 
+// Type is the election type
+const Type primitive.Type = "election"
+
 // Client provides an API for creating Elections
 type Client interface {
 	// GetElection gets the Election instance of the given name

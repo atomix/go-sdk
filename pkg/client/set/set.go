@@ -23,6 +23,9 @@ import (
 	"sync"
 )
 
+// Type is the set type
+const Type primitive.Type = "set"
+
 // Client provides an API for creating Sets
 type Client interface {
 	// GetSet gets the Set instance of the given name

@@ -26,6 +26,9 @@ import (
 	"io"
 )
 
+// Type is the value type
+const Type primitive.Type = "value"
+
 // Client provides an API for creating Values
 type Client interface {
 	// GetValue gets the Value instance of the given name

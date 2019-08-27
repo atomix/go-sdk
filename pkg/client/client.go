@@ -240,7 +240,7 @@ type PartitionGroup struct {
 }
 
 // GetPrimitives gets a list of primitives of the given types
-func (g *PartitionGroup) GetPrimitives(ctx context.Context, types ...string) ([]*primitiveapi.PrimitiveInfo, error) {
+func (g *PartitionGroup) GetPrimitives(ctx context.Context, types ...primitive.Type) ([]*primitiveapi.PrimitiveInfo, error) {
 	if len(types) == 0 {
 		return g.getPrimitives(ctx, "")
 	}
@@ -257,11 +257,11 @@ func (g *PartitionGroup) GetPrimitives(ctx context.Context, types ...string) ([]
 }
 
 // getPrimitives gets a list of primitives of the given type
-func (g *PartitionGroup) getPrimitives(ctx context.Context, t string) ([]*primitiveapi.PrimitiveInfo, error) {
+func (g *PartitionGroup) getPrimitives(ctx context.Context, t primitive.Type) ([]*primitiveapi.PrimitiveInfo, error) {
 	results, err := util.ExecuteAsync(len(g.partitions), func(i int) (i2 interface{}, e error) {
 		client := primitiveapi.NewPrimitiveServiceClient(g.partitions[i])
 		request := &primitiveapi.GetPrimitivesRequest{
-			Type:      t,
+			Type:      string(t),
 			Namespace: g.application,
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
