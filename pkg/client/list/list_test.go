@@ -19,6 +19,7 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/test"
+	_ "github.com/atomix/atomix-go-node/pkg/atomix/list"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"

@@ -38,9 +38,7 @@ func StartTestPartitions(partitions int) ([]*grpc.ClientConn, []chan struct{}) {
 func startTestPartition() (*grpc.ClientConn, chan struct{}) {
 	lis := bufconn.Listen(1024 * 1024)
 	node := local.NewNode(lis)
-	go func() {
-		_ = node.Start()
-	}()
+	node.Start()
 
 	dialer := func(ctx context.Context, address string) (net.Conn, error) {
 		return lis.Dial()
@@ -54,7 +52,7 @@ func startTestPartition() (*grpc.ClientConn, chan struct{}) {
 	ch := make(chan struct{})
 	go func() {
 		<-ch
-		_ = node.Stop()
+		node.Stop()
 	}()
 	return conn, ch
 }
