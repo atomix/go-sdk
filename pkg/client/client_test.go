@@ -25,21 +25,14 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/client/test"
 	"github.com/atomix/atomix-go-client/pkg/client/value"
 	"github.com/atomix/atomix-go-local/pkg/atomix/local"
-	_ "github.com/atomix/atomix-go-node/pkg/atomix/counter"
-	_ "github.com/atomix/atomix-go-node/pkg/atomix/election"
-	_ "github.com/atomix/atomix-go-node/pkg/atomix/list"
-	_ "github.com/atomix/atomix-go-node/pkg/atomix/lock"
-	_ "github.com/atomix/atomix-go-node/pkg/atomix/map"
-	_ "github.com/atomix/atomix-go-node/pkg/atomix/primitive"
-	_ "github.com/atomix/atomix-go-node/pkg/atomix/set"
-	_ "github.com/atomix/atomix-go-node/pkg/atomix/value"
+	"github.com/atomix/atomix-go-node/pkg/atomix/registry"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestClient(t *testing.T) {
-	controller := local.NewController(5679)
+	controller := local.NewController(5679, registry.Registry)
 	err := controller.Start()
 	assert.NoError(t, err)
 	defer controller.Stop()

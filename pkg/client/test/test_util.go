@@ -17,6 +17,7 @@ package test
 import (
 	"context"
 	"github.com/atomix/atomix-go-local/pkg/atomix/local"
+	"github.com/atomix/atomix-go-node/pkg/atomix/registry"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
 	"net"
@@ -37,7 +38,7 @@ func StartTestPartitions(partitions int) ([]*grpc.ClientConn, []chan struct{}) {
 // startTestPartition starts a single local partition
 func startTestPartition() (*grpc.ClientConn, chan struct{}) {
 	lis := bufconn.Listen(1024 * 1024)
-	node := local.NewNode(lis)
+	node := local.NewNode(lis, registry.Registry)
 	node.Start()
 
 	dialer := func(ctx context.Context, address string) (net.Conn, error) {
