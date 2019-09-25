@@ -167,7 +167,6 @@ func (c *Client) newGroup(groupProto *controllerapi.PartitionGroup) (*PartitionG
 			grpc.WithStreamInterceptor(grpc_retry.StreamClientInterceptor(
 				grpc_retry.WithMax(100),
 				grpc_retry.WithBackoff(grpc_retry.BackoffExponential(10*time.Millisecond)),
-				grpc_retry.WithPerRetryTimeout(5*time.Second),
 				grpc_retry.WithCodes(codes.Unavailable))))
 		if err != nil {
 			return nil, err
