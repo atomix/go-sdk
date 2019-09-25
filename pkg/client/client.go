@@ -32,7 +32,9 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/client/value"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
+	"github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"sort"
 	"time"
 )
@@ -150,11 +152,23 @@ func (c *Client) newGroup(groupProto *controllerapi.PartitionGroup) (*PartitionG
 		return partitionProtos[i].PartitionID < partitionProtos[j].PartitionID
 	})
 
-	// Iterate through the partitions and create gRPC client connections for each partitino.
+	// Iterate through the partitions and create gRPC client connections for each partition.
 	partitions := make([]*grpc.ClientConn, len(groupProto.Partitions))
 	for i, partitionProto := range partitionProtos {
 		ep := partitionProto.Endpoints[0]
-		conn, err := grpc.Dial(fmt.Sprintf("%s:%d", ep.Host, ep.Port), grpc.WithInsecure())
+		conn, err := grpc.Dial(
+			fmt.Sprintf("%s:%d", ep.Host, ep.Port),
+			grpc.WithInsecure(),
+			grpc.WithUnaryInterceptor(grpc_retry.UnaryClientInterceptor(
+				grpc_retry.WithMax(100),
+				grpc_retry.WithBackoff(grpc_retry.BackoffExponential(10*time.Millisecond)),
+				grpc_retry.WithPerRetryTimeout(5*time.Second),
+				grpc_retry.WithCodes(codes.Unavailable))),
+			grpc.WithStreamInterceptor(grpc_retry.StreamClientInterceptor(
+				grpc_retry.WithMax(100),
+				grpc_retry.WithBackoff(grpc_retry.BackoffExponential(10*time.Millisecond)),
+				grpc_retry.WithPerRetryTimeout(5*time.Second),
+				grpc_retry.WithCodes(codes.Unavailable))))
 		if err != nil {
 			return nil, err
 		}
