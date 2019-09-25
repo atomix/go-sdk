@@ -288,6 +288,8 @@ func (l *list) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption)
 		opt.beforeWatch(request)
 	}
 
+	stream := l.session.NewStream(request.Header.RequestID)
+
 	events, err := l.client.Events(ctx, request)
 	if err != nil {
 		return err
@@ -295,18 +297,16 @@ func (l *list) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption)
 
 	go func() {
 		defer close(ch)
-		var stream *session.Stream
 		for {
 			response, err := events.Recv()
 			if err == io.EOF {
-				if stream != nil {
-					stream.Close()
-				}
+				stream.Close()
 				break
 			}
 
 			if err != nil {
 				glog.Error("Failed to receive event stream", err)
+				stream.Close()
 				break
 			}
 
@@ -316,11 +316,6 @@ func (l *list) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption)
 
 			// Record the response header
 			l.session.RecordResponse(request.Header, response.Header)
-
-			// Initialize the session stream if necessary.
-			if stream == nil {
-				stream = l.session.NewStream(response.Header.StreamID)
-			}
 
 			// Attempt to serialize the response to the stream and skip the response if serialization failed.
 			if !stream.Serialize(response.Header) {

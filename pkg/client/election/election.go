@@ -220,6 +220,9 @@ func (e *election) Watch(ctx context.Context, ch chan<- *Event) error {
 	request := &api.EventRequest{
 		Header: e.session.NextRequest(),
 	}
+
+	stream := e.session.NewStream(request.Header.RequestID)
+
 	events, err := e.client.Events(ctx, request)
 	if err != nil {
 		return err
@@ -227,28 +230,21 @@ func (e *election) Watch(ctx context.Context, ch chan<- *Event) error {
 
 	go func() {
 		defer close(ch)
-		var stream *session.Stream
 		for {
 			response, err := events.Recv()
 			if err == io.EOF {
-				if stream != nil {
-					stream.Close()
-				}
+				stream.Close()
 				break
 			}
 
 			if err != nil {
 				glog.Error("Failed to receive event stream", err)
+				stream.Close()
 				break
 			}
 
 			// Record the response header
 			e.session.RecordResponse(request.Header, response.Header)
-
-			// Initialize the session stream if necessary.
-			if stream == nil {
-				stream = e.session.NewStream(response.Header.StreamID)
-			}
 
 			// Attempt to serialize the response to the stream and skip the response if serialization failed.
 			if !stream.Serialize(response.Header) {
