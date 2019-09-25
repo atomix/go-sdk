@@ -224,12 +224,16 @@ func (m *mapPartition) Watch(ctx context.Context, ch chan<- *Event, opts ...Watc
 		Header: m.session.NextRequest(),
 	}
 
+	// Create a stream to ensure the stream is kept open by the client
+	stream := m.session.NewStream(request.Header.RequestID)
+
 	for _, opt := range opts {
 		opt.beforeWatch(request)
 	}
 
 	events, err := m.client.Events(ctx, request)
 	if err != nil {
+		stream.Close()
 		return err
 	}
 
@@ -239,18 +243,16 @@ func (m *mapPartition) Watch(ctx context.Context, ch chan<- *Event, opts ...Watc
 		}()
 		defer close(ch)
 
-		var stream *session.Stream
 		for {
 			response, err := events.Recv()
 			if err == io.EOF {
-				if stream != nil {
-					stream.Close()
-				}
+				stream.Close()
 				break
 			}
 
 			if err != nil {
 				glog.Error("Failed to receive event stream", err)
+				stream.Close()
 				break
 			}
 
@@ -260,11 +262,6 @@ func (m *mapPartition) Watch(ctx context.Context, ch chan<- *Event, opts ...Watc
 
 			// Record the response header
 			m.session.RecordResponse(request.Header, response.Header)
-
-			// Initialize the session stream if necessary.
-			if stream == nil {
-				stream = m.session.NewStream(response.Header.StreamID)
-			}
 
 			// Attempt to serialize the response to the stream and skip the response if serialization failed.
 			if !stream.Serialize(response.Header) {
