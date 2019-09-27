@@ -108,7 +108,7 @@ func TestSession(t *testing.T) {
 		StreamID:   uint64(1),
 	})
 
-	stream := session.NewStream(uint64(1))
+	stream, header := session.NextStream()
 	assert.True(t, stream.Serialize(&headers.ResponseHeader{
 		SessionID:  uint64(1),
 		Index:      uint64(11),
@@ -140,12 +140,17 @@ func TestSession(t *testing.T) {
 		StreamID:   uint64(1),
 	}))
 
+	session.RecordResponse(header, &headers.ResponseHeader{
+		SessionID:  uint64(1),
+		Index:      uint64(12),
+		ResponseID: stream.ID,
+	})
 	header = session.GetState()
 	assert.Equal(t, "c", header.Name.Namespace)
 	assert.Equal(t, "d", header.Name.Name)
-	assert.Equal(t, uint64(11), header.Index)
+	assert.Equal(t, uint64(12), header.Index)
 	assert.Equal(t, uint64(1), header.SessionID)
-	assert.Equal(t, uint64(1), header.RequestID)
+	assert.Equal(t, uint64(2), header.RequestID)
 	assert.Len(t, header.Streams, 1)
 	assert.Equal(t, uint64(4), header.Streams[0].ResponseID)
 

@@ -49,8 +49,11 @@ func (m *mapPartition) Name() primitive.Name {
 }
 
 func (m *mapPartition) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*KeyValue, error) {
+	stream, header := m.session.NextStream()
+	defer stream.Close()
+
 	request := &api.PutRequest{
-		Header: m.session.NextRequest(),
+		Header: header,
 		Key:    key,
 		Value:  value,
 	}
@@ -121,8 +124,11 @@ func (m *mapPartition) Get(ctx context.Context, key string, opts ...GetOption) (
 }
 
 func (m *mapPartition) Remove(ctx context.Context, key string, opts ...RemoveOption) (*KeyValue, error) {
+	stream, header := m.session.NextStream()
+	defer stream.Close()
+
 	request := &api.RemoveRequest{
-		Header: m.session.NextRequest(),
+		Header: header,
 		Key:    key,
 	}
 
@@ -171,8 +177,11 @@ func (m *mapPartition) Len(ctx context.Context) (int, error) {
 }
 
 func (m *mapPartition) Clear(ctx context.Context) error {
+	stream, header := m.session.NextStream()
+	defer stream.Close()
+
 	request := &api.ClearRequest{
-		Header: m.session.NextRequest(),
+		Header: header,
 	}
 
 	response, err := m.client.Clear(ctx, request)
@@ -220,12 +229,11 @@ func (m *mapPartition) Entries(ctx context.Context, ch chan<- *KeyValue) error {
 }
 
 func (m *mapPartition) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error {
-	request := &api.EventRequest{
-		Header: m.session.NextRequest(),
-	}
+	stream, header := m.session.NextStream()
 
-	// Create a stream to ensure the stream is kept open by the client
-	stream := m.session.NewStream(request.Header.RequestID)
+	request := &api.EventRequest{
+		Header: header,
+	}
 
 	for _, opt := range opts {
 		opt.beforeWatch(request)

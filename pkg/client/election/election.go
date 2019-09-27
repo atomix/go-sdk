@@ -142,8 +142,11 @@ func (e *election) GetTerm(ctx context.Context) (*Term, error) {
 }
 
 func (e *election) Enter(ctx context.Context) (*Term, error) {
+	stream, header := e.session.NextStream()
+	defer stream.Close()
+
 	request := &api.EnterRequest{
-		Header:      e.session.NextRequest(),
+		Header:      header,
 		CandidateID: e.id,
 	}
 
@@ -157,8 +160,11 @@ func (e *election) Enter(ctx context.Context) (*Term, error) {
 }
 
 func (e *election) Leave(ctx context.Context) (*Term, error) {
+	stream, header := e.session.NextStream()
+	defer stream.Close()
+
 	request := &api.WithdrawRequest{
-		Header:      e.session.NextRequest(),
+		Header:      header,
 		CandidateID: e.id,
 	}
 
@@ -172,8 +178,11 @@ func (e *election) Leave(ctx context.Context) (*Term, error) {
 }
 
 func (e *election) Anoint(ctx context.Context, id string) (*Term, error) {
+	stream, header := e.session.NextStream()
+	defer stream.Close()
+
 	request := &api.AnointRequest{
-		Header:      e.session.NextRequest(),
+		Header:      header,
 		CandidateID: id,
 	}
 
@@ -187,8 +196,11 @@ func (e *election) Anoint(ctx context.Context, id string) (*Term, error) {
 }
 
 func (e *election) Promote(ctx context.Context, id string) (*Term, error) {
+	stream, header := e.session.NextStream()
+	defer stream.Close()
+
 	request := &api.PromoteRequest{
-		Header:      e.session.NextRequest(),
+		Header:      header,
 		CandidateID: id,
 	}
 
@@ -202,8 +214,11 @@ func (e *election) Promote(ctx context.Context, id string) (*Term, error) {
 }
 
 func (e *election) Evict(ctx context.Context, id string) (*Term, error) {
+	stream, header := e.session.NextStream()
+	defer stream.Close()
+
 	request := &api.EvictRequest{
-		Header:      e.session.NextRequest(),
+		Header:      header,
 		CandidateID: id,
 	}
 
@@ -217,11 +232,11 @@ func (e *election) Evict(ctx context.Context, id string) (*Term, error) {
 }
 
 func (e *election) Watch(ctx context.Context, ch chan<- *Event) error {
-	request := &api.EventRequest{
-		Header: e.session.NextRequest(),
-	}
+	stream, header := e.session.NextStream()
 
-	stream := e.session.NewStream(request.Header.RequestID)
+	request := &api.EventRequest{
+		Header: header,
+	}
 
 	events, err := e.client.Events(ctx, request)
 	if err != nil {

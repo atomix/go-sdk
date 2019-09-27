@@ -82,8 +82,11 @@ func (l *lock) Name() primitive.Name {
 }
 
 func (l *lock) Lock(ctx context.Context, opts ...LockOption) (uint64, error) {
+	stream, header := l.session.NextStream()
+	defer stream.Close()
+
 	request := &api.LockRequest{
-		Header: l.session.NextRequest(),
+		Header: header,
 	}
 
 	for _, opt := range opts {
@@ -104,8 +107,11 @@ func (l *lock) Lock(ctx context.Context, opts ...LockOption) (uint64, error) {
 }
 
 func (l *lock) Unlock(ctx context.Context, opts ...UnlockOption) (bool, error) {
+	stream, header := l.session.NextStream()
+	defer stream.Close()
+
 	request := &api.UnlockRequest{
-		Header: l.session.NextRequest(),
+		Header: header,
 	}
 
 	for i := range opts {

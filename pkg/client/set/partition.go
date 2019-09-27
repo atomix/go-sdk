@@ -49,8 +49,11 @@ func (s *setPartition) Name() primitive.Name {
 }
 
 func (s *setPartition) Add(ctx context.Context, value string) (bool, error) {
+	stream, header := s.session.NextStream()
+	defer stream.Close()
+
 	request := &api.AddRequest{
-		Header: s.session.NextRequest(),
+		Header: header,
 		Value:  value,
 	}
 
@@ -68,8 +71,11 @@ func (s *setPartition) Add(ctx context.Context, value string) (bool, error) {
 }
 
 func (s *setPartition) Remove(ctx context.Context, value string) (bool, error) {
+	stream, header := s.session.NextStream()
+	defer stream.Close()
+
 	request := &api.RemoveRequest{
-		Header: s.session.NextRequest(),
+		Header: header,
 		Value:  value,
 	}
 
@@ -116,8 +122,11 @@ func (s *setPartition) Len(ctx context.Context) (int, error) {
 }
 
 func (s *setPartition) Clear(ctx context.Context) error {
+	stream, header := s.session.NextStream()
+	defer stream.Close()
+
 	request := &api.ClearRequest{
-		Header: s.session.NextRequest(),
+		Header: header,
 	}
 
 	response, err := s.client.Clear(ctx, request)
@@ -161,15 +170,15 @@ func (s *setPartition) Elements(ctx context.Context, ch chan<- string) error {
 }
 
 func (s *setPartition) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error {
+	stream, header := s.session.NextStream()
+
 	request := &api.EventRequest{
-		Header: s.session.NextRequest(),
+		Header: header,
 	}
 
 	for _, opt := range opts {
 		opt.beforeWatch(request)
 	}
-
-	stream := s.session.NewStream(request.Header.RequestID)
 
 	events, err := s.client.Events(ctx, request)
 	if err != nil {

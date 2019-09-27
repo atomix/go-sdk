@@ -105,8 +105,11 @@ func (v *value) Name() primitive.Name {
 }
 
 func (v *value) Set(ctx context.Context, value []byte, opts ...SetOption) (uint64, error) {
+	stream, header := v.session.NextStream()
+	defer stream.Close()
+
 	request := &api.SetRequest{
-		Header: v.session.NextRequest(),
+		Header: header,
 		Value:  value,
 	}
 
@@ -150,11 +153,11 @@ func (v *value) Get(ctx context.Context) ([]byte, uint64, error) {
 }
 
 func (v *value) Watch(ctx context.Context, ch chan<- *Event) error {
-	request := &api.EventRequest{
-		Header: v.session.NextRequest(),
-	}
+	stream, header := v.session.NextStream()
 
-	stream := v.session.NewStream(request.Header.RequestID)
+	request := &api.EventRequest{
+		Header: header,
+	}
 
 	events, err := v.client.Events(ctx, request)
 	if err != nil {

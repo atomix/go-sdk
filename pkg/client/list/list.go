@@ -134,8 +134,11 @@ func (l *list) Name() primitive.Name {
 }
 
 func (l *list) Append(ctx context.Context, value string) error {
+	stream, header := l.session.NextStream()
+	defer stream.Close()
+
 	request := &api.AppendRequest{
-		Header: l.session.NextRequest(),
+		Header: header,
 		Value:  value,
 	}
 
@@ -149,8 +152,11 @@ func (l *list) Append(ctx context.Context, value string) error {
 }
 
 func (l *list) Insert(ctx context.Context, index int, value string) error {
+	stream, header := l.session.NextStream()
+	defer stream.Close()
+
 	request := &api.InsertRequest{
-		Header: l.session.NextRequest(),
+		Header: header,
 		Index:  uint32(index),
 		Value:  value,
 	}
@@ -171,8 +177,11 @@ func (l *list) Insert(ctx context.Context, index int, value string) error {
 }
 
 func (l *list) Set(ctx context.Context, index int, value string) error {
+	stream, header := l.session.NextStream()
+	defer stream.Close()
+
 	request := &api.SetRequest{
-		Header: l.session.NextRequest(),
+		Header: header,
 		Index:  uint32(index),
 		Value:  value,
 	}
@@ -214,8 +223,11 @@ func (l *list) Get(ctx context.Context, index int) (string, error) {
 }
 
 func (l *list) Remove(ctx context.Context, index int) (string, error) {
+	stream, header := l.session.NextStream()
+	defer stream.Close()
+
 	request := &api.RemoveRequest{
-		Header: l.session.NextRequest(),
+		Header: header,
 		Index:  uint32(index),
 	}
 
@@ -280,15 +292,15 @@ func (l *list) Items(ctx context.Context, ch chan<- string) error {
 }
 
 func (l *list) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error {
+	stream, header := l.session.NextStream()
+
 	request := &api.EventRequest{
-		Header: l.session.NextRequest(),
+		Header: header,
 	}
 
 	for _, opt := range opts {
 		opt.beforeWatch(request)
 	}
-
-	stream := l.session.NewStream(request.Header.RequestID)
 
 	events, err := l.client.Events(ctx, request)
 	if err != nil {
@@ -343,8 +355,11 @@ func (l *list) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption)
 }
 
 func (l *list) Clear(ctx context.Context) error {
+	stream, header := l.session.NextStream()
+	defer stream.Close()
+
 	request := &api.ClearRequest{
-		Header: l.session.NextRequest(),
+		Header: header,
 	}
 
 	response, err := l.client.Clear(ctx, request)

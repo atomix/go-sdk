@@ -159,12 +159,32 @@ func (s *Session) NextRequest() *headers.RequestHeader {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.requestID = s.requestID + 1
-	return &headers.RequestHeader{
+	header := &headers.RequestHeader{
 		Name:      s.Name,
 		SessionID: s.SessionID,
 		Index:     s.lastIndex,
 		RequestID: s.requestID,
 	}
+	return header
+}
+
+// NextStream returns the next write stream and header
+func (s *Session) NextStream() (*Stream, *headers.RequestHeader) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.requestID = s.requestID + 1
+	stream := &Stream{
+		ID:      s.requestID,
+		session: s,
+	}
+	s.streams[s.requestID] = stream
+	header := &headers.RequestHeader{
+		Name:      s.Name,
+		SessionID: s.SessionID,
+		Index:     s.lastIndex,
+		RequestID: s.requestID,
+	}
+	return stream, header
 }
 
 // RecordResponse records the index in a response header
@@ -192,18 +212,6 @@ func (s *Session) RecordResponse(requestHeader *headers.RequestHeader, responseH
 	}
 }
 
-// NewStream creates a new stream
-func (s *Session) NewStream(streamID uint64) *Stream {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	stream := &Stream{
-		ID:      streamID,
-		session: s,
-	}
-	s.streams[streamID] = stream
-	return stream
-}
-
 // deleteStream deletes the given stream from the session
 func (s *Session) deleteStream(streamID uint64) {
 	s.mu.Lock()
@@ -215,7 +223,9 @@ func (s *Session) deleteStream(streamID uint64) {
 func (s *Session) getStreamHeaders() []*headers.StreamHeader {
 	result := make([]*headers.StreamHeader, 0, len(s.streams))
 	for _, stream := range s.streams {
-		result = append(result, stream.getHeader())
+		if stream.ID <= s.responseID {
+			result = append(result, stream.getHeader())
+		}
 	}
 	return result
 }
