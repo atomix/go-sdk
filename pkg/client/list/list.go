@@ -16,6 +16,7 @@ package list
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	api "github.com/atomix/atomix-api/proto/atomix/list"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
@@ -42,27 +43,36 @@ type List interface {
 	primitive.Primitive
 
 	// Append pushes a value on to the end of the list
-	Append(ctx context.Context, value string) error
+	Append(ctx context.Context, value []byte) error
 
 	// Insert inserts a value at the given index
-	Insert(ctx context.Context, index int, value string) error
+	Insert(ctx context.Context, index int, value []byte) error
 
 	// Set sets the value at the given index
-	Set(ctx context.Context, index int, value string) error
+	Set(ctx context.Context, index int, value []byte) error
 
 	// Get gets the value at the given index
-	Get(ctx context.Context, index int) (string, error)
+	Get(ctx context.Context, index int) ([]byte, error)
 
 	// Remove removes and returns the value at the given index
-	Remove(ctx context.Context, index int) (string, error)
+	Remove(ctx context.Context, index int) ([]byte, error)
 
 	// Len gets the length of the list
 	Len(ctx context.Context) (int, error)
 
+	// Slice returns a slice of the list from the given start index to the given end index
+	Slice(ctx context.Context, from int, to int) (List, error)
+
+	// SliceFrom returns a slice of the list from the given index
+	SliceFrom(ctx context.Context, from int) (List, error)
+
+	// SliceTo returns a slice of the list to the given index
+	SliceTo(ctx context.Context, to int) (List, error)
+
 	// Items iterates through the values in the list
 	// This is a non-blocking method. If the method returns without error, values will be pushed on to the
 	// given channel and the channel will be closed once all values have been read from the list.
-	Items(ctx context.Context, ch chan<- string) error
+	Items(ctx context.Context, ch chan<- []byte) error
 
 	// Watch watches the list for changes
 	// This is a non-blocking method. If the method returns without error, list events will be pushed onto
@@ -96,7 +106,7 @@ type Event struct {
 	Index int
 
 	// Value is the value that was changed
-	Value string
+	Value []byte
 }
 
 // New creates a new list primitive
@@ -133,13 +143,13 @@ func (l *list) Name() primitive.Name {
 	return l.name
 }
 
-func (l *list) Append(ctx context.Context, value string) error {
+func (l *list) Append(ctx context.Context, value []byte) error {
 	stream, header := l.session.NextStream()
 	defer stream.Close()
 
 	request := &api.AppendRequest{
 		Header: header,
-		Value:  value,
+		Value:  base64.StdEncoding.EncodeToString(value),
 	}
 
 	response, err := l.client.Append(ctx, request)
@@ -151,14 +161,14 @@ func (l *list) Append(ctx context.Context, value string) error {
 	return err
 }
 
-func (l *list) Insert(ctx context.Context, index int, value string) error {
+func (l *list) Insert(ctx context.Context, index int, value []byte) error {
 	stream, header := l.session.NextStream()
 	defer stream.Close()
 
 	request := &api.InsertRequest{
 		Header: header,
 		Index:  uint32(index),
-		Value:  value,
+		Value:  base64.StdEncoding.EncodeToString(value),
 	}
 
 	response, err := l.client.Insert(ctx, request)
@@ -176,14 +186,14 @@ func (l *list) Insert(ctx context.Context, index int, value string) error {
 	}
 }
 
-func (l *list) Set(ctx context.Context, index int, value string) error {
+func (l *list) Set(ctx context.Context, index int, value []byte) error {
 	stream, header := l.session.NextStream()
 	defer stream.Close()
 
 	request := &api.SetRequest{
 		Header: header,
 		Index:  uint32(index),
-		Value:  value,
+		Value:  base64.StdEncoding.EncodeToString(value),
 	}
 
 	response, err := l.client.Set(ctx, request)
@@ -201,7 +211,7 @@ func (l *list) Set(ctx context.Context, index int, value string) error {
 	}
 }
 
-func (l *list) Get(ctx context.Context, index int) (string, error) {
+func (l *list) Get(ctx context.Context, index int) ([]byte, error) {
 	request := &api.GetRequest{
 		Header: l.session.GetRequest(),
 		Index:  uint32(index),
@@ -209,20 +219,20 @@ func (l *list) Get(ctx context.Context, index int) (string, error) {
 
 	response, err := l.client.Get(ctx, request)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	l.session.RecordResponse(request.Header, response.Header)
 
 	switch response.Status {
 	case api.ResponseStatus_OUT_OF_BOUNDS:
-		return "", errors.New("index out of bounds")
+		return nil, errors.New("index out of bounds")
 	default:
-		return response.Value, nil
+		return base64.StdEncoding.DecodeString(response.Value)
 	}
 }
 
-func (l *list) Remove(ctx context.Context, index int) (string, error) {
+func (l *list) Remove(ctx context.Context, index int) ([]byte, error) {
 	stream, header := l.session.NextStream()
 	defer stream.Close()
 
@@ -233,16 +243,16 @@ func (l *list) Remove(ctx context.Context, index int) (string, error) {
 
 	response, err := l.client.Remove(ctx, request)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	l.session.RecordResponse(request.Header, response.Header)
 
 	switch response.Status {
 	case api.ResponseStatus_OUT_OF_BOUNDS:
-		return "", errors.New("index out of bounds")
+		return nil, errors.New("index out of bounds")
 	default:
-		return response.Value, nil
+		return base64.StdEncoding.DecodeString(response.Value)
 	}
 }
 
@@ -260,7 +270,7 @@ func (l *list) Len(ctx context.Context) (int, error) {
 	return int(response.Size_), nil
 }
 
-func (l *list) Items(ctx context.Context, ch chan<- string) error {
+func (l *list) Items(ctx context.Context, ch chan<- []byte) error {
 	request := &api.IterateRequest{
 		Header: l.session.GetRequest(),
 	}
@@ -285,7 +295,9 @@ func (l *list) Items(ctx context.Context, ch chan<- string) error {
 			// Record the response header
 			l.session.RecordResponse(request.Header, response.Header)
 
-			ch <- response.Value
+			if bytes, err := base64.StdEncoding.DecodeString(response.Value); err == nil {
+				ch <- bytes
+			}
 		}
 	}()
 	return nil
@@ -344,14 +356,38 @@ func (l *list) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption)
 				t = EventRemoved
 			}
 
-			ch <- &Event{
-				Type:  t,
-				Index: int(response.Index),
-				Value: response.Value,
+			if bytes, err := base64.StdEncoding.DecodeString(response.Value); err == nil {
+				ch <- &Event{
+					Type:  t,
+					Index: int(response.Index),
+					Value: bytes,
+				}
 			}
 		}
 	}()
 	return nil
+}
+
+func (l *list) Slice(ctx context.Context, from int, to int) (List, error) {
+	return &slicedList{
+		from: &from,
+		to:   &to,
+		list: l,
+	}, nil
+}
+
+func (l *list) SliceFrom(ctx context.Context, from int) (List, error) {
+	return &slicedList{
+		from: &from,
+		list: l,
+	}, nil
+}
+
+func (l *list) SliceTo(ctx context.Context, to int) (List, error) {
+	return &slicedList{
+		to:   &to,
+		list: l,
+	}, nil
 }
 
 func (l *list) Clear(ctx context.Context) error {
