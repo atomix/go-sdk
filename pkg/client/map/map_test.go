@@ -130,17 +130,17 @@ func TestMapStreams(t *testing.T) {
 	latch := make(chan struct{})
 	go func() {
 		e := <-c
-		assert.Equal(t, "foo", e.Key)
-		assert.Equal(t, byte(2), e.Value[0])
+		assert.Equal(t, "foo", e.Entry.Key)
+		assert.Equal(t, byte(2), e.Entry.Value[0])
 		e = <-c
-		assert.Equal(t, "bar", e.Key)
-		assert.Equal(t, byte(3), e.Value[0])
+		assert.Equal(t, "bar", e.Entry.Key)
+		assert.Equal(t, byte(3), e.Entry.Value[0])
 		e = <-c
-		assert.Equal(t, "baz", e.Key)
-		assert.Equal(t, byte(4), e.Value[0])
+		assert.Equal(t, "baz", e.Entry.Key)
+		assert.Equal(t, byte(4), e.Entry.Value[0])
 		e = <-c
-		assert.Equal(t, "foo", e.Key)
-		assert.Equal(t, byte(5), e.Value[0])
+		assert.Equal(t, "foo", e.Entry.Key)
+		assert.Equal(t, byte(5), e.Entry.Value[0])
 		latch <- struct{}{}
 	}()
 
