@@ -48,7 +48,7 @@ func (m *mapPartition) Name() primitive.Name {
 	return m.name
 }
 
-func (m *mapPartition) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*KeyValue, error) {
+func (m *mapPartition) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*Entry, error) {
 	stream, header := m.session.NextStream()
 	defer stream.Close()
 
@@ -74,7 +74,7 @@ func (m *mapPartition) Put(ctx context.Context, key string, value []byte, opts .
 	m.session.RecordResponse(request.Header, response.Header)
 
 	if response.Status == api.ResponseStatus_OK {
-		return &KeyValue{
+		return &Entry{
 			Key:     key,
 			Value:   value,
 			Version: int64(response.Header.Index),
@@ -84,15 +84,17 @@ func (m *mapPartition) Put(ctx context.Context, key string, value []byte, opts .
 	} else if response.Status == api.ResponseStatus_WRITE_LOCK {
 		return nil, errors.New("write lock failed")
 	} else {
-		return &KeyValue{
+		return &Entry{
 			Key:     key,
 			Value:   value,
 			Version: int64(response.PreviousVersion),
+			Created: response.Created,
+			Updated: response.Updated,
 		}, nil
 	}
 }
 
-func (m *mapPartition) Get(ctx context.Context, key string, opts ...GetOption) (*KeyValue, error) {
+func (m *mapPartition) Get(ctx context.Context, key string, opts ...GetOption) (*Entry, error) {
 	request := &api.GetRequest{
 		Header: m.session.GetRequest(),
 		Key:    key,
@@ -114,16 +116,18 @@ func (m *mapPartition) Get(ctx context.Context, key string, opts ...GetOption) (
 	m.session.RecordResponse(request.Header, response.Header)
 
 	if response.Version != 0 {
-		return &KeyValue{
+		return &Entry{
 			Key:     key,
 			Value:   response.Value,
 			Version: response.Version,
+			Created: response.Created,
+			Updated: response.Updated,
 		}, nil
 	}
 	return nil, nil
 }
 
-func (m *mapPartition) Remove(ctx context.Context, key string, opts ...RemoveOption) (*KeyValue, error) {
+func (m *mapPartition) Remove(ctx context.Context, key string, opts ...RemoveOption) (*Entry, error) {
 	stream, header := m.session.NextStream()
 	defer stream.Close()
 
@@ -148,7 +152,7 @@ func (m *mapPartition) Remove(ctx context.Context, key string, opts ...RemoveOpt
 	m.session.RecordResponse(request.Header, response.Header)
 
 	if response.Status == api.ResponseStatus_OK {
-		return &KeyValue{
+		return &Entry{
 			Key:     key,
 			Value:   response.PreviousValue,
 			Version: response.PreviousVersion,
@@ -193,7 +197,7 @@ func (m *mapPartition) Clear(ctx context.Context) error {
 	return nil
 }
 
-func (m *mapPartition) Entries(ctx context.Context, ch chan<- *KeyValue) error {
+func (m *mapPartition) Entries(ctx context.Context, ch chan<- *Entry) error {
 	request := &api.EntriesRequest{
 		Header: m.session.GetRequest(),
 	}
@@ -218,10 +222,12 @@ func (m *mapPartition) Entries(ctx context.Context, ch chan<- *KeyValue) error {
 			// Record the response header
 			m.session.RecordResponse(request.Header, response.Header)
 
-			ch <- &KeyValue{
+			ch <- &Entry{
 				Key:     response.Key,
 				Value:   response.Value,
 				Version: response.Version,
+				Created: response.Created,
+				Updated: response.Updated,
 			}
 		}
 	}()
@@ -279,31 +285,47 @@ func (m *mapPartition) Watch(ctx context.Context, ch chan<- *Event, opts ...Watc
 			switch response.Type {
 			case api.EventResponse_NONE:
 				ch <- &Event{
-					Type:    EventNone,
-					Key:     response.Key,
-					Value:   response.NewValue,
-					Version: response.NewVersion,
+					Type: EventNone,
+					Entry: &Entry{
+						Key:     response.Key,
+						Value:   response.Value,
+						Version: response.Version,
+						Created: response.Created,
+						Updated: response.Updated,
+					},
 				}
 			case api.EventResponse_INSERTED:
 				ch <- &Event{
-					Type:    EventInserted,
-					Key:     response.Key,
-					Value:   response.NewValue,
-					Version: response.NewVersion,
+					Type: EventInserted,
+					Entry: &Entry{
+						Key:     response.Key,
+						Value:   response.Value,
+						Version: response.Version,
+						Created: response.Created,
+						Updated: response.Updated,
+					},
 				}
 			case api.EventResponse_UPDATED:
 				ch <- &Event{
-					Type:    EventUpdated,
-					Key:     response.Key,
-					Value:   response.NewValue,
-					Version: response.NewVersion,
+					Type: EventUpdated,
+					Entry: &Entry{
+						Key:     response.Key,
+						Value:   response.Value,
+						Version: response.Version,
+						Created: response.Created,
+						Updated: response.Updated,
+					},
 				}
 			case api.EventResponse_REMOVED:
 				ch <- &Event{
-					Type:    EventRemoved,
-					Key:     response.Key,
-					Value:   response.OldValue,
-					Version: response.OldVersion,
+					Type: EventRemoved,
+					Entry: &Entry{
+						Key:     response.Key,
+						Value:   response.Value,
+						Version: response.Version,
+						Created: response.Created,
+						Updated: response.Updated,
+					},
 				}
 			}
 		}

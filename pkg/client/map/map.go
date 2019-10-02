@@ -22,6 +22,7 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/client/util"
 	"google.golang.org/grpc"
 	"sync"
+	"time"
 )
 
 // Type is the map type
@@ -38,13 +39,13 @@ type Map interface {
 	primitive.Primitive
 
 	// Put sets a key/value pair in the map
-	Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*KeyValue, error)
+	Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*Entry, error)
 
 	// Get gets the value of the given key
-	Get(ctx context.Context, key string, opts ...GetOption) (*KeyValue, error)
+	Get(ctx context.Context, key string, opts ...GetOption) (*Entry, error)
 
 	// Remove removes a key from the map
-	Remove(ctx context.Context, key string, opts ...RemoveOption) (*KeyValue, error)
+	Remove(ctx context.Context, key string, opts ...RemoveOption) (*Entry, error)
 
 	// Len returns the number of entries in the map
 	Len(ctx context.Context) (int, error)
@@ -55,7 +56,7 @@ type Map interface {
 	// Entries lists the entries in the map
 	// This is a non-blocking method. If the method returns without error, key/value paids will be pushed on to the
 	// given channel and the channel will be closed once all entries have been read from the map.
-	Entries(ctx context.Context, ch chan<- *KeyValue) error
+	Entries(ctx context.Context, ch chan<- *Entry) error
 
 	// Watch watches the map for changes
 	// This is a non-blocking method. If the method returns without error, map events will be pushed onto
@@ -63,8 +64,8 @@ type Map interface {
 	Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error
 }
 
-// KeyValue is a versioned key/value pair
-type KeyValue struct {
+// Entry is a versioned key/value pair
+type Entry struct {
 	// Version is the unique, monotonically increasing version number for the key/value pair. The version is
 	// suitable for use in optimistic locking.
 	Version int64
@@ -74,9 +75,15 @@ type KeyValue struct {
 
 	// Value is the value of the pair
 	Value []byte
+
+	// Created is the time at which the key was created
+	Created time.Time
+
+	// Updated is the time at which the key was last updated
+	Updated time.Time
 }
 
-func (kv KeyValue) String() string {
+func (kv Entry) String() string {
 	return fmt.Sprintf("key: %s\nvalue: %s\nversion: %d", kv.Key, string(kv.Value), kv.Version)
 }
 
@@ -102,14 +109,8 @@ type Event struct {
 	// Type indicates the change event type
 	Type EventType
 
-	// Key is the key that changed
-	Key string
-
-	// Value is the new value
-	Value []byte
-
-	// Version is the new version
-	Version int64
+	// Entry is the event entry
+	Entry *Entry
 }
 
 // New creates a new partitioned Map
@@ -150,7 +151,7 @@ func (m *_map) getPartition(key string) (Map, error) {
 	return m.partitions[i], nil
 }
 
-func (m *_map) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*KeyValue, error) {
+func (m *_map) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*Entry, error) {
 	session, err := m.getPartition(key)
 	if err != nil {
 		return nil, err
@@ -158,7 +159,7 @@ func (m *_map) Put(ctx context.Context, key string, value []byte, opts ...PutOpt
 	return session.Put(ctx, key, value, opts...)
 }
 
-func (m *_map) Get(ctx context.Context, key string, opts ...GetOption) (*KeyValue, error) {
+func (m *_map) Get(ctx context.Context, key string, opts ...GetOption) (*Entry, error) {
 	session, err := m.getPartition(key)
 	if err != nil {
 		return nil, err
@@ -166,7 +167,7 @@ func (m *_map) Get(ctx context.Context, key string, opts ...GetOption) (*KeyValu
 	return session.Get(ctx, key, opts...)
 }
 
-func (m *_map) Remove(ctx context.Context, key string, opts ...RemoveOption) (*KeyValue, error) {
+func (m *_map) Remove(ctx context.Context, key string, opts ...RemoveOption) (*Entry, error) {
 	session, err := m.getPartition(key)
 	if err != nil {
 		return nil, err
@@ -189,7 +190,7 @@ func (m *_map) Len(ctx context.Context) (int, error) {
 	return total, nil
 }
 
-func (m *_map) Entries(ctx context.Context, ch chan<- *KeyValue) error {
+func (m *_map) Entries(ctx context.Context, ch chan<- *Entry) error {
 	n := len(m.partitions)
 	wg := sync.WaitGroup{}
 	wg.Add(n)
@@ -200,7 +201,7 @@ func (m *_map) Entries(ctx context.Context, ch chan<- *KeyValue) error {
 	}()
 
 	return util.IterAsync(n, func(i int) error {
-		c := make(chan *KeyValue)
+		c := make(chan *Entry)
 		go func() {
 			for kv := range c {
 				ch <- kv
