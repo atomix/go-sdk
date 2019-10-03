@@ -58,6 +58,23 @@ func (o VersionOption) afterRemove(response *api.RemoveResponse) {
 
 }
 
+// IfNotSet sets the value if the entry is not yet set
+func IfNotSet() PutOption {
+	return &NotSetOption{}
+}
+
+// NotSetOption is a PutOption that sets the value only if it's not already set
+type NotSetOption struct {
+}
+
+func (o NotSetOption) beforePut(request *api.PutRequest) {
+	request.Version = -1
+}
+
+func (o NotSetOption) afterPut(response *api.PutResponse) {
+
+}
+
 // GetOption is an option for the Get method
 type GetOption interface {
 	beforeGet(request *api.GetRequest)
