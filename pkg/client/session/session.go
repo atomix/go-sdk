@@ -19,6 +19,7 @@ import (
 	"github.com/atomix/atomix-api/proto/atomix/headers"
 	api "github.com/atomix/atomix-api/proto/atomix/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
+	"github.com/google/uuid"
 	"sync"
 	"time"
 )
@@ -26,6 +27,19 @@ import (
 // Option implements a session option
 type Option interface {
 	prepare(options *options)
+}
+
+// WithID returns a session Option to set the human-readable session ID
+func WithID(id string) Option {
+	return idOption{id: id}
+}
+
+type idOption struct {
+	id string
+}
+
+func (o idOption) prepare(options *options) {
+	options.id = o.id
 }
 
 // WithTimeout returns a session Option to configure the session timeout
@@ -42,6 +56,7 @@ func (o timeoutOption) prepare(options *options) {
 }
 
 type options struct {
+	id      string
 	timeout time.Duration
 }
 
@@ -64,12 +79,15 @@ type Handler interface {
 // name is the name of the primitive
 // handler is the primitive's session handler
 func New(ctx context.Context, name primitive.Name, handler Handler, opts ...Option) (*Session, error) {
-	options := &options{}
-	WithTimeout(30 * time.Second).prepare(options)
+	options := &options{
+		id:      uuid.New().String(),
+		timeout: 30 * time.Second,
+	}
 	for i := range opts {
 		opts[i].prepare(options)
 	}
 	session := &Session{
+		ID: options.id,
 		Name: &api.Name{
 			Namespace: name.Application,
 			Name:      name.Name,
@@ -88,6 +106,7 @@ func New(ctx context.Context, name primitive.Name, handler Handler, opts ...Opti
 
 // Session maintains the session for a primitive
 type Session struct {
+	ID         string
 	Name       *api.Name
 	Timeout    time.Duration
 	SessionID  uint64

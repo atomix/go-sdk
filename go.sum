@@ -26,6 +26,7 @@ github.com/atomix/atomix-go-node v0.0.0-20190830183721-649263a17223/go.mod h1:KJ
 github.com/atomix/atomix-go-node v0.0.0-20190830183818-a5b5157566f6 h1:rxmMkW6vJOGYSRiqdsim5szVT9N4deSTCvlclPJwHN4=
 github.com/atomix/atomix-go-node v0.0.0-20190830183818-a5b5157566f6/go.mod h1:398EUMrz8gNaqdsNDMXW2OlSp6nNPZLcC7b/QsXzl80=
 github.com/atomix/atomix-go-node v0.0.0-20190917012211-d4866b018ab6/go.mod h1:fQ/oMxUHpVMugRSWfBhS2z1l8TXyXOoNlLdq43eVAOU=
+github.com/atomix/atomix-go-node v0.0.0-20191002230317-dabfbb700511 h1:njY6QOjKA661GARaHY6jgIjZlArTR0P1l0TJvWjQHjw=
 github.com/atomix/atomix-go-node v0.0.0-20191002230317-dabfbb700511/go.mod h1:qkkk2Kd2UvftwukgjqLNJtaXjYJl+WIvDCm+HjkjLKg=
 github.com/cenkalti/backoff v2.2.1+incompatible h1:tNowT99t7UNflLxfYYSlKYsBpXdEet03Pg2g16Swow4=
 github.com/cenkalti/backoff v2.2.1+incompatible/go.mod h1:90ReRw6GdpyfrHakVjL/QHaoyV4aDUVVkXQJJJ3NXXM=

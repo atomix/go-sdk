@@ -21,7 +21,6 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/util"
 	"github.com/golang/glog"
-	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"io"
 )
@@ -107,7 +106,6 @@ func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn
 		name:    name,
 		client:  client,
 		session: sess,
-		id:      uuid.New().String(),
 	}, nil
 }
 
@@ -116,7 +114,6 @@ type election struct {
 	name    primitive.Name
 	client  api.LeaderElectionServiceClient
 	session *session.Session
-	id      string
 }
 
 func (e *election) Name() primitive.Name {
@@ -124,7 +121,7 @@ func (e *election) Name() primitive.Name {
 }
 
 func (e *election) ID() string {
-	return e.id
+	return e.session.ID
 }
 
 func (e *election) GetTerm(ctx context.Context) (*Term, error) {
@@ -147,7 +144,7 @@ func (e *election) Enter(ctx context.Context) (*Term, error) {
 
 	request := &api.EnterRequest{
 		Header:      header,
-		CandidateID: e.id,
+		CandidateID: e.ID(),
 	}
 
 	response, err := e.client.Enter(ctx, request)
@@ -165,7 +162,7 @@ func (e *election) Leave(ctx context.Context) (*Term, error) {
 
 	request := &api.WithdrawRequest{
 		Header:      header,
-		CandidateID: e.id,
+		CandidateID: e.ID(),
 	}
 
 	response, err := e.client.Withdraw(ctx, request)
