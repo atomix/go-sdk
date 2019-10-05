@@ -182,9 +182,45 @@ func TestElectionOperations(t *testing.T) {
 	assert.Len(t, event.Term.Candidates, 1)
 	assert.Equal(t, election1.ID(), event.Term.Candidates[0])
 
-	err = election1.Close()
+	term, err = election2.Enter(context.TODO())
 	assert.NoError(t, err)
+	assert.Equal(t, uint64(5), term.ID)
+	assert.Equal(t, election1.ID(), term.Leader)
+	assert.Len(t, term.Candidates, 2)
+	assert.Equal(t, election1.ID(), term.Candidates[0])
+
+	event = <-ch
+	assert.Equal(t, EventChanged, event.Type)
+	assert.Equal(t, uint64(5), event.Term.ID)
+	assert.Equal(t, election1.ID(), event.Term.Leader)
+	assert.Len(t, event.Term.Candidates, 2)
+	assert.Equal(t, election1.ID(), event.Term.Candidates[0])
+
+	term, err = election1.Anoint(context.TODO(), election2.ID())
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(6), term.ID)
+	assert.Equal(t, election2.ID(), term.Leader)
+	assert.Len(t, term.Candidates, 2)
+	assert.Equal(t, election2.ID(), term.Candidates[0])
+
+	event = <-ch
+	assert.Equal(t, EventChanged, event.Type)
+	assert.Equal(t, uint64(6), event.Term.ID)
+	assert.Equal(t, election2.ID(), event.Term.Leader)
+	assert.Len(t, event.Term.Candidates, 2)
+	assert.Equal(t, election2.ID(), event.Term.Candidates[0])
+
 	err = election2.Close()
+	assert.NoError(t, err)
+
+	event = <-ch
+	assert.Equal(t, EventChanged, event.Type)
+	assert.Equal(t, uint64(7), event.Term.ID)
+	assert.Equal(t, election1.ID(), event.Term.Leader)
+	assert.Len(t, event.Term.Candidates, 1)
+	assert.Equal(t, election1.ID(), event.Term.Candidates[0])
+
+	err = election1.Close()
 	assert.NoError(t, err)
 	err = election3.Close()
 	assert.NoError(t, err)
@@ -197,9 +233,9 @@ func TestElectionOperations(t *testing.T) {
 
 	term, err = election1.GetTerm(context.TODO())
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(5), term.ID)
-	assert.NotEqual(t, "", term.Leader)
-	assert.Len(t, term.Candidates, 1)
+	assert.Equal(t, uint64(7), term.ID)
+	assert.Equal(t, "", term.Leader)
+	assert.Len(t, term.Candidates, 0)
 
 	err = election1.Close()
 	assert.NoError(t, err)

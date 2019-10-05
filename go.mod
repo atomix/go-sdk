@@ -2,8 +2,8 @@ module github.com/atomix/atomix-go-client
 
 require (
 	github.com/atomix/atomix-api v0.0.0-20191002225141-1ee9c98c7dfd
-	github.com/atomix/atomix-go-local v0.0.0-20191002230335-39d2b157c446
-	github.com/atomix/atomix-go-node v0.0.0-20191002230317-dabfbb700511
+	github.com/atomix/atomix-go-local v0.0.0-20191005003901-db289b16a432
+	github.com/atomix/atomix-go-node v0.0.0-20191005003820-945ff0afee33
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/gogo/protobuf v1.2.1
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
