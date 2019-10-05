@@ -23,6 +23,7 @@ import (
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
 	"io"
+	"time"
 )
 
 func newPartition(ctx context.Context, conn *grpc.ClientConn, name primitive.Name, opts ...session.Option) (Map, error) {
@@ -251,21 +252,30 @@ func (m *mapPartition) Watch(ctx context.Context, ch chan<- *Event, opts ...Watc
 		return err
 	}
 
+	openCh := make(chan error)
 	go func() {
 		defer func() {
 			_ = recover()
 		}()
 		defer close(ch)
 
+		open := false
 		for {
 			response, err := events.Recv()
 			if err == io.EOF {
+				if !open {
+					close(openCh)
+				}
 				stream.Close()
 				break
 			}
 
 			if err != nil {
 				glog.Error("Failed to receive event stream", err)
+				if !open {
+					openCh <- err
+					close(openCh)
+				}
 				stream.Close()
 				break
 			}
@@ -282,43 +292,27 @@ func (m *mapPartition) Watch(ctx context.Context, ch chan<- *Event, opts ...Watc
 				continue
 			}
 
-			switch response.Type {
-			case api.EventResponse_NONE:
-				ch <- &Event{
-					Type: EventNone,
-					Entry: &Entry{
-						Key:     response.Key,
-						Value:   response.Value,
-						Version: response.Version,
-						Created: response.Created,
-						Updated: response.Updated,
-					},
+			// Return the Watch call if possible
+			if !open {
+				close(openCh)
+				open = true
+			}
+
+			// If this is a normal event (not a handshake response), write the event to the watch channel
+			if response.Type != api.EventResponse_OPEN {
+				var t EventType
+				switch response.Type {
+				case api.EventResponse_NONE:
+					t = EventNone
+				case api.EventResponse_INSERTED:
+					t = EventInserted
+				case api.EventResponse_UPDATED:
+					t = EventUpdated
+				case api.EventResponse_REMOVED:
+					t = EventRemoved
 				}
-			case api.EventResponse_INSERTED:
 				ch <- &Event{
-					Type: EventInserted,
-					Entry: &Entry{
-						Key:     response.Key,
-						Value:   response.Value,
-						Version: response.Version,
-						Created: response.Created,
-						Updated: response.Updated,
-					},
-				}
-			case api.EventResponse_UPDATED:
-				ch <- &Event{
-					Type: EventUpdated,
-					Entry: &Entry{
-						Key:     response.Key,
-						Value:   response.Value,
-						Version: response.Version,
-						Created: response.Created,
-						Updated: response.Updated,
-					},
-				}
-			case api.EventResponse_REMOVED:
-				ch <- &Event{
-					Type: EventRemoved,
+					Type: t,
 					Entry: &Entry{
 						Key:     response.Key,
 						Value:   response.Value,
@@ -330,7 +324,14 @@ func (m *mapPartition) Watch(ctx context.Context, ch chan<- *Event, opts ...Watc
 			}
 		}
 	}()
-	return nil
+
+	// Block the Watch until the handshake is complete or times out
+	select {
+	case err := <-openCh:
+		return err
+	case <-time.After(15 * time.Second):
+		return errors.New("handshake timed out")
+	}
 }
 
 func (m *mapPartition) Close() error {

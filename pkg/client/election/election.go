@@ -16,6 +16,7 @@ package election
 
 import (
 	"context"
+	"errors"
 	api "github.com/atomix/atomix-api/proto/atomix/election"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
@@ -23,6 +24,7 @@ import (
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
 	"io"
+	"time"
 )
 
 // Type is the election type
@@ -240,17 +242,26 @@ func (e *election) Watch(ctx context.Context, ch chan<- *Event) error {
 		return err
 	}
 
+	openCh := make(chan error)
 	go func() {
 		defer close(ch)
+		open := false
 		for {
 			response, err := events.Recv()
 			if err == io.EOF {
+				if !open {
+					close(openCh)
+				}
 				stream.Close()
 				break
 			}
 
 			if err != nil {
 				glog.Error("Failed to receive event stream", err)
+				if !open {
+					openCh <- err
+					close(openCh)
+				}
 				stream.Close()
 				break
 			}
@@ -263,13 +274,29 @@ func (e *election) Watch(ctx context.Context, ch chan<- *Event) error {
 				continue
 			}
 
-			ch <- &Event{
-				Type: EventChanged,
-				Term: *newTerm(response.Term),
+			// Return the Watch call if possible
+			if !open {
+				close(openCh)
+				open = true
+			}
+
+			// If this is a normal event (not a handshake response), write the event to the watch channel
+			if response.Type != api.EventResponse_OPEN {
+				ch <- &Event{
+					Type: EventChanged,
+					Term: *newTerm(response.Term),
+				}
 			}
 		}
 	}()
-	return nil
+
+	// Block the Watch until the handshake is complete or times out
+	select {
+	case err := <-openCh:
+		return err
+	case <-time.After(15 * time.Second):
+		return errors.New("handshake timed out")
+	}
 }
 
 func (e *election) Close() error {

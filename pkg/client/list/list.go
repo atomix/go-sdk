@@ -25,6 +25,7 @@ import (
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
 	"io"
+	"time"
 )
 
 // Type is the list type
@@ -319,17 +320,26 @@ func (l *list) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption)
 		return err
 	}
 
+	openCh := make(chan error)
 	go func() {
 		defer close(ch)
+		open := false
 		for {
 			response, err := events.Recv()
 			if err == io.EOF {
+				if !open {
+					close(openCh)
+				}
 				stream.Close()
 				break
 			}
 
 			if err != nil {
 				glog.Error("Failed to receive event stream", err)
+				if !open {
+					openCh <- err
+					close(openCh)
+				}
 				stream.Close()
 				break
 			}
@@ -346,26 +356,42 @@ func (l *list) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption)
 				continue
 			}
 
-			var t EventType
-			switch response.Type {
-			case api.EventResponse_NONE:
-				t = EventNone
-			case api.EventResponse_ADDED:
-				t = EventInserted
-			case api.EventResponse_REMOVED:
-				t = EventRemoved
+			// Return the Watch call if possible
+			if !open {
+				close(openCh)
+				open = true
 			}
 
-			if bytes, err := base64.StdEncoding.DecodeString(response.Value); err == nil {
-				ch <- &Event{
-					Type:  t,
-					Index: int(response.Index),
-					Value: bytes,
+			// If this is a normal event (not a handshake response), write the event to the watch channel
+			if response.Type != api.EventResponse_OPEN {
+				var t EventType
+				switch response.Type {
+				case api.EventResponse_NONE:
+					t = EventNone
+				case api.EventResponse_ADDED:
+					t = EventInserted
+				case api.EventResponse_REMOVED:
+					t = EventRemoved
+				}
+
+				if bytes, err := base64.StdEncoding.DecodeString(response.Value); err == nil {
+					ch <- &Event{
+						Type:  t,
+						Index: int(response.Index),
+						Value: bytes,
+					}
 				}
 			}
 		}
 	}()
-	return nil
+
+	// Block the Watch until the handshake is complete or times out
+	select {
+	case err := <-openCh:
+		return err
+	case <-time.After(15 * time.Second):
+		return errors.New("handshake timed out")
+	}
 }
 
 func (l *list) Slice(ctx context.Context, from int, to int) (List, error) {
