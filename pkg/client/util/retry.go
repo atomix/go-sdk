@@ -21,6 +21,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"io"
 	"sync"
 	"time"
 )
@@ -111,6 +112,9 @@ func (s *retryingClientStream) SendMsg(m interface{}) error {
 
 func (s *retryingClientStream) RecvMsg(m interface{}) error {
 	if err := s.getStream().RecvMsg(m); err != nil {
+		if err == io.EOF {
+			return err
+		}
 		return backoff.Retry(func() error {
 			if err := s.retryStream(); err != nil {
 				if isRetryable(err) {
