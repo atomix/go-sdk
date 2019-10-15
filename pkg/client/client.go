@@ -22,6 +22,7 @@ import (
 	primitiveapi "github.com/atomix/atomix-api/proto/atomix/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/counter"
 	"github.com/atomix/atomix-go-client/pkg/client/election"
+	"github.com/atomix/atomix-go-client/pkg/client/indexedmap"
 	"github.com/atomix/atomix-go-client/pkg/client/list"
 	"github.com/atomix/atomix-go-client/pkg/client/lock"
 	"github.com/atomix/atomix-go-client/pkg/client/map"
@@ -279,6 +280,11 @@ func (g *PartitionGroup) GetCounter(ctx context.Context, name string, opts ...se
 // GetElection gets or creates an Election with the given name
 func (g *PartitionGroup) GetElection(ctx context.Context, name string, opts ...session.Option) (election.Election, error) {
 	return election.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.partitions, opts...)
+}
+
+// GetIndexedMap gets or creates a Map with the given name
+func (g *PartitionGroup) GetIndexedMap(ctx context.Context, name string, opts ...session.Option) (indexedmap.IndexedMap, error) {
+	return indexedmap.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.partitions, opts...)
 }
 
 // GetList gets or creates a List with the given name

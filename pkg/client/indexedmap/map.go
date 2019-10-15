@@ -28,8 +28,8 @@ import (
 	"time"
 )
 
-// Type is the map type
-const Type primitive.Type = "map"
+// Type is the indexedmap type
+const Type primitive.Type = "indexedmap"
 
 // Index is the index of an entry
 type Index uint64

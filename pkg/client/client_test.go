@@ -18,6 +18,7 @@ import (
 	"context"
 	"github.com/atomix/atomix-go-client/pkg/client/counter"
 	"github.com/atomix/atomix-go-client/pkg/client/election"
+	"github.com/atomix/atomix-go-client/pkg/client/indexedmap"
 	"github.com/atomix/atomix-go-client/pkg/client/list"
 	"github.com/atomix/atomix-go-client/pkg/client/lock"
 	"github.com/atomix/atomix-go-client/pkg/client/map"
@@ -133,12 +134,23 @@ func TestPartitionGroup(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 1)
 
-	_, err = group.GetList(context.TODO(), "list")
+	_, err = group.GetIndexedMap(context.TODO(), "indexedmap")
 	assert.NoError(t, err)
 
 	primitives, err = group.GetPrimitives(context.TODO())
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 3)
+
+	primitives, err = group.GetPrimitives(context.TODO(), indexedmap.Type)
+	assert.NoError(t, err)
+	assert.Len(t, primitives, 1)
+
+	_, err = group.GetList(context.TODO(), "list")
+	assert.NoError(t, err)
+
+	primitives, err = group.GetPrimitives(context.TODO())
+	assert.NoError(t, err)
+	assert.Len(t, primitives, 4)
 
 	primitives, err = group.GetPrimitives(context.TODO(), list.Type)
 	assert.NoError(t, err)
@@ -149,7 +161,7 @@ func TestPartitionGroup(t *testing.T) {
 
 	primitives, err = group.GetPrimitives(context.TODO())
 	assert.NoError(t, err)
-	assert.Len(t, primitives, 4)
+	assert.Len(t, primitives, 5)
 
 	primitives, err = group.GetPrimitives(context.TODO(), lock.Type)
 	assert.NoError(t, err)
@@ -160,7 +172,7 @@ func TestPartitionGroup(t *testing.T) {
 
 	primitives, err = group.GetPrimitives(context.TODO())
 	assert.NoError(t, err)
-	assert.Len(t, primitives, 5)
+	assert.Len(t, primitives, 6)
 
 	primitives, err = group.GetPrimitives(context.TODO(), _map.Type)
 	assert.NoError(t, err)
@@ -171,7 +183,7 @@ func TestPartitionGroup(t *testing.T) {
 
 	primitives, err = group.GetPrimitives(context.TODO())
 	assert.NoError(t, err)
-	assert.Len(t, primitives, 6)
+	assert.Len(t, primitives, 7)
 
 	primitives, err = group.GetPrimitives(context.TODO(), set.Type)
 	assert.NoError(t, err)
@@ -182,7 +194,7 @@ func TestPartitionGroup(t *testing.T) {
 
 	primitives, err = group.GetPrimitives(context.TODO())
 	assert.NoError(t, err)
-	assert.Len(t, primitives, 7)
+	assert.Len(t, primitives, 8)
 
 	primitives, err = group.GetPrimitives(context.TODO(), value.Type)
 	assert.NoError(t, err)
