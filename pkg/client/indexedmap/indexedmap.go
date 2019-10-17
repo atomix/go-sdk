@@ -56,6 +56,30 @@ type IndexedMap interface {
 	// GetIndex gets the entry at the given index
 	GetIndex(ctx context.Context, index Index, opts ...GetOption) (*Entry, error)
 
+	// FirstIndex gets the first index in the map
+	FirstIndex(ctx context.Context) (Index, error)
+
+	// LastIndex gets the last index in the map
+	LastIndex(ctx context.Context) (Index, error)
+
+	// PrevIndex gets the index before the given index
+	PrevIndex(ctx context.Context, index Index) (Index, error)
+
+	// NextIndex gets the index after the given index
+	NextIndex(ctx context.Context, index Index) (Index, error)
+
+	// FirstEntry gets the first entry in the map
+	FirstEntry(ctx context.Context) (*Entry, error)
+
+	// LastEntry gets the last entry in the map
+	LastEntry(ctx context.Context) (*Entry, error)
+
+	// PrevEntry gets the entry before the given index
+	PrevEntry(ctx context.Context, index Index) (*Entry, error)
+
+	// NextEntry gets the entry after the given index
+	NextEntry(ctx context.Context, index Index) (*Entry, error)
+
 	// Replace replaces the given key with the given value
 	Replace(ctx context.Context, key string, value []byte, opts ...ReplaceOption) (*Entry, error)
 
@@ -286,6 +310,182 @@ func (m *indexedMap) GetIndex(ctx context.Context, index Index, opts ...GetOptio
 		}, nil
 	}
 	return nil, nil
+}
+
+func (m *indexedMap) FirstIndex(ctx context.Context) (Index, error) {
+	request := &api.FirstEntryRequest{
+		Header: m.session.GetRequest(),
+	}
+
+	response, err := m.client.FirstEntry(ctx, request)
+	if err != nil {
+		return 0, err
+	}
+
+	m.session.RecordResponse(request.Header, response.Header)
+
+	if response.Version != 0 {
+		return Index(response.Index), nil
+	}
+	return 0, nil
+}
+
+func (m *indexedMap) LastIndex(ctx context.Context) (Index, error) {
+	request := &api.LastEntryRequest{
+		Header: m.session.GetRequest(),
+	}
+
+	response, err := m.client.LastEntry(ctx, request)
+	if err != nil {
+		return 0, err
+	}
+
+	m.session.RecordResponse(request.Header, response.Header)
+
+	if response.Version != 0 {
+		return Index(response.Index), nil
+	}
+	return 0, nil
+}
+
+func (m *indexedMap) PrevIndex(ctx context.Context, index Index) (Index, error) {
+	request := &api.PrevEntryRequest{
+		Header: m.session.GetRequest(),
+		Index:  int64(index),
+	}
+
+	response, err := m.client.PrevEntry(ctx, request)
+	if err != nil {
+		return 0, err
+	}
+
+	m.session.RecordResponse(request.Header, response.Header)
+
+	if response.Version != 0 {
+		return Index(response.Index), nil
+	}
+	return 0, nil
+}
+
+func (m *indexedMap) NextIndex(ctx context.Context, index Index) (Index, error) {
+	request := &api.NextEntryRequest{
+		Header: m.session.GetRequest(),
+		Index:  int64(index),
+	}
+
+	response, err := m.client.NextEntry(ctx, request)
+	if err != nil {
+		return 0, err
+	}
+
+	m.session.RecordResponse(request.Header, response.Header)
+
+	if response.Version != 0 {
+		return Index(response.Index), nil
+	}
+	return 0, nil
+}
+
+func (m *indexedMap) FirstEntry(ctx context.Context) (*Entry, error) {
+	request := &api.FirstEntryRequest{
+		Header: m.session.GetRequest(),
+	}
+
+	response, err := m.client.FirstEntry(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+
+	m.session.RecordResponse(request.Header, response.Header)
+
+	if response.Version != 0 {
+		return &Entry{
+			Index:   Index(response.Index),
+			Key:     response.Key,
+			Value:   response.Value,
+			Version: Version(response.Version),
+			Created: response.Created,
+			Updated: response.Updated,
+		}, nil
+	}
+	return nil, err
+}
+
+func (m *indexedMap) LastEntry(ctx context.Context) (*Entry, error) {
+	request := &api.LastEntryRequest{
+		Header: m.session.GetRequest(),
+	}
+
+	response, err := m.client.LastEntry(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+
+	m.session.RecordResponse(request.Header, response.Header)
+
+	if response.Version != 0 {
+		return &Entry{
+			Index:   Index(response.Index),
+			Key:     response.Key,
+			Value:   response.Value,
+			Version: Version(response.Version),
+			Created: response.Created,
+			Updated: response.Updated,
+		}, nil
+	}
+	return nil, err
+}
+
+func (m *indexedMap) PrevEntry(ctx context.Context, index Index) (*Entry, error) {
+	request := &api.PrevEntryRequest{
+		Header: m.session.GetRequest(),
+		Index:  int64(index),
+	}
+
+	response, err := m.client.PrevEntry(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+
+	m.session.RecordResponse(request.Header, response.Header)
+
+	if response.Version != 0 {
+		return &Entry{
+			Index:   Index(response.Index),
+			Key:     response.Key,
+			Value:   response.Value,
+			Version: Version(response.Version),
+			Created: response.Created,
+			Updated: response.Updated,
+		}, nil
+	}
+	return nil, err
+}
+
+func (m *indexedMap) NextEntry(ctx context.Context, index Index) (*Entry, error) {
+	request := &api.NextEntryRequest{
+		Header: m.session.GetRequest(),
+		Index:  int64(index),
+	}
+
+	response, err := m.client.NextEntry(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+
+	m.session.RecordResponse(request.Header, response.Header)
+
+	if response.Version != 0 {
+		return &Entry{
+			Index:   Index(response.Index),
+			Key:     response.Key,
+			Value:   response.Value,
+			Version: Version(response.Version),
+			Created: response.Created,
+			Updated: response.Updated,
+		}, nil
+	}
+	return nil, err
 }
 
 func (m *indexedMap) Replace(ctx context.Context, key string, value []byte, opts ...ReplaceOption) (*Entry, error) {

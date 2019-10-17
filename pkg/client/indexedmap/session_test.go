@@ -113,6 +113,22 @@ func (c *testMapServiceClient) Get(ctx context.Context, in *api.GetRequest, opts
 	panic("implement me")
 }
 
+func (c *testMapServiceClient) FirstEntry(ctx context.Context, in *api.FirstEntryRequest, opts ...grpc.CallOption) (*api.FirstEntryResponse, error) {
+	panic("implement me")
+}
+
+func (c *testMapServiceClient) LastEntry(ctx context.Context, in *api.LastEntryRequest, opts ...grpc.CallOption) (*api.LastEntryResponse, error) {
+	panic("implement me")
+}
+
+func (c *testMapServiceClient) PrevEntry(ctx context.Context, in *api.PrevEntryRequest, opts ...grpc.CallOption) (*api.PrevEntryResponse, error) {
+	panic("implement me")
+}
+
+func (c *testMapServiceClient) NextEntry(ctx context.Context, in *api.NextEntryRequest, opts ...grpc.CallOption) (*api.NextEntryResponse, error) {
+	panic("implement me")
+}
+
 func (c *testMapServiceClient) Remove(ctx context.Context, in *api.RemoveRequest, opts ...grpc.CallOption) (*api.RemoveResponse, error) {
 	panic("implement me")
 }

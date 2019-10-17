@@ -98,6 +98,46 @@ func TestIndexedMapOperations(t *testing.T) {
 	assert.Equal(t, Index(2), kv.Index)
 	assert.Equal(t, "baz", string(kv.Value))
 
+	index, err := _map.FirstIndex(context.Background())
+	assert.NoError(t, err)
+	assert.Equal(t, Index(2), index)
+
+	index, err = _map.LastIndex(context.Background())
+	assert.NoError(t, err)
+	assert.Equal(t, Index(3), index)
+
+	index, err = _map.PrevIndex(context.Background(), Index(3))
+	assert.NoError(t, err)
+	assert.Equal(t, Index(2), index)
+
+	index, err = _map.NextIndex(context.Background(), Index(1))
+	assert.NoError(t, err)
+	assert.Equal(t, Index(2), index)
+
+	kv, err = _map.FirstEntry(context.Background())
+	assert.NoError(t, err)
+	assert.Equal(t, Index(2), kv.Index)
+
+	kv, err = _map.LastEntry(context.Background())
+	assert.NoError(t, err)
+	assert.Equal(t, Index(3), kv.Index)
+
+	kv, err = _map.PrevEntry(context.Background(), Index(3))
+	assert.NoError(t, err)
+	assert.Equal(t, Index(2), kv.Index)
+
+	kv, err = _map.NextEntry(context.Background(), Index(2))
+	assert.NoError(t, err)
+	assert.Equal(t, Index(3), kv.Index)
+
+	kv, err = _map.PrevEntry(context.Background(), Index(2))
+	assert.NoError(t, err)
+	assert.Nil(t, kv)
+
+	kv, err = _map.NextEntry(context.Background(), Index(3))
+	assert.NoError(t, err)
+	assert.Nil(t, kv)
+
 	kv, err = _map.RemoveIndex(context.Background(), 3)
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
