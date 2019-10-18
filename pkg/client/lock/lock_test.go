@@ -48,7 +48,7 @@ func TestLock(t *testing.T) {
 	var v2 uint64
 	c := make(chan struct{})
 	go func() {
-		v2, err = l2.Lock(context.Background())
+		_, err := l2.Lock(context.Background())
 		assert.NoError(t, err)
 		c <- struct{}{}
 	}()
