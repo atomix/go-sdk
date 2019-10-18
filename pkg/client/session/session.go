@@ -209,9 +209,10 @@ func (s *Session) NextStream() (*Stream, *headers.RequestHeader) {
 // RecordResponse records the index in a response header
 func (s *Session) RecordResponse(requestHeader *headers.RequestHeader, responseHeader *headers.ResponseHeader) {
 	// Use a double-checked lock to avoid locking when multiple responses are received for an index.
+	s.mu.RLock()
 	if responseHeader.Index > s.lastIndex {
+		s.mu.RUnlock()
 		s.mu.Lock()
-		defer s.mu.Unlock()
 
 		// If the session ID is set, ensure the session is initialized
 		if responseHeader.SessionID > s.SessionID {
@@ -228,6 +229,9 @@ func (s *Session) RecordResponse(requestHeader *headers.RequestHeader, responseH
 		if responseHeader.Index > s.lastIndex {
 			s.lastIndex = responseHeader.Index
 		}
+		s.mu.Unlock()
+	} else {
+		s.mu.RUnlock()
 	}
 }
 
