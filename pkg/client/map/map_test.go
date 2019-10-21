@@ -147,11 +147,22 @@ func TestMapStreams(t *testing.T) {
 	err = _map.Watch(context.Background(), c)
 	assert.NoError(t, err)
 
+	keyCh := make(chan *Event)
+	err = _map.Watch(context.Background(), keyCh, WithFilter(Filter{
+		Key: "foo",
+	}))
+	assert.NoError(t, err)
+
 	kv, err = _map.Put(context.Background(), "foo", []byte{2})
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "foo", kv.Key)
 	assert.Equal(t, byte(2), kv.Value[0])
+
+	event := <-keyCh
+	assert.NotNil(t, event)
+	assert.Equal(t, "foo", event.Entry.Key)
+	assert.Equal(t, kv.Version, event.Entry.Version)
 
 	kv, err = _map.Put(context.Background(), "bar", []byte{3})
 	assert.NoError(t, err)
@@ -170,6 +181,11 @@ func TestMapStreams(t *testing.T) {
 	assert.NotNil(t, kv)
 	assert.Equal(t, "foo", kv.Key)
 	assert.Equal(t, byte(5), kv.Value[0])
+
+	event = <-keyCh
+	assert.NotNil(t, event)
+	assert.Equal(t, "foo", event.Entry.Key)
+	assert.Equal(t, kv.Version, event.Entry.Version)
 
 	<-latch
 

@@ -134,3 +134,30 @@ func (o replayOption) beforeWatch(request *api.EventRequest) {
 func (o replayOption) afterWatch(response *api.EventResponse) {
 
 }
+
+type filterOption struct {
+	filter Filter
+}
+
+func (o filterOption) beforeWatch(request *api.EventRequest) {
+	if o.filter.Key != "" {
+		request.Key = o.filter.Key
+	}
+	if o.filter.Index > 0 {
+		request.Index = int64(o.filter.Index)
+	}
+}
+
+func (o filterOption) afterWatch(response *api.EventResponse) {
+}
+
+// WithFilter returns a watch option that filters the watch events
+func WithFilter(filter Filter) WatchOption {
+	return filterOption{filter: filter}
+}
+
+// Filter is a watch filter configuration
+type Filter struct {
+	Key   string
+	Index Index
+}
