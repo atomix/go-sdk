@@ -202,7 +202,7 @@ func (m *mapPartition) Entries(ctx context.Context, ch chan<- *Entry) error {
 	request := &api.EntriesRequest{
 		Header: m.session.GetRequest(),
 	}
-	entries, err := m.client.Entries(ctx, request)
+	entries, err := m.client.Entries(context.Background(), request)
 	if err != nil {
 		return err
 	}
@@ -231,6 +231,13 @@ func (m *mapPartition) Entries(ctx context.Context, ch chan<- *Entry) error {
 				Updated: response.Updated,
 			}
 		}
+	}()
+
+	// Close the stream once the context is cancelled
+	closeCh := ctx.Done()
+	go func() {
+		<-closeCh
+		_ = entries.CloseSend()
 	}()
 	return nil
 }

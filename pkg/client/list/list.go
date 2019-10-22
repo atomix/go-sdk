@@ -275,7 +275,7 @@ func (l *list) Items(ctx context.Context, ch chan<- []byte) error {
 	request := &api.IterateRequest{
 		Header: l.session.GetRequest(),
 	}
-	entries, err := l.client.Iterate(ctx, request)
+	entries, err := l.client.Iterate(context.Background(), request)
 	if err != nil {
 		return err
 	}
@@ -300,6 +300,13 @@ func (l *list) Items(ctx context.Context, ch chan<- []byte) error {
 				ch <- bytes
 			}
 		}
+	}()
+
+	// Close the stream once the context is cancelled
+	closeCh := ctx.Done()
+	go func() {
+		<-closeCh
+		_ = entries.CloseSend()
 	}()
 	return nil
 }

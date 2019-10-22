@@ -143,7 +143,7 @@ func (s *setPartition) Elements(ctx context.Context, ch chan<- string) error {
 	request := &api.IterateRequest{
 		Header: s.session.GetRequest(),
 	}
-	entries, err := s.client.Iterate(ctx, request)
+	entries, err := s.client.Iterate(context.Background(), request)
 	if err != nil {
 		return err
 	}
@@ -166,6 +166,13 @@ func (s *setPartition) Elements(ctx context.Context, ch chan<- string) error {
 
 			ch <- response.Value
 		}
+	}()
+
+	// Close the stream once the context is cancelled
+	closeCh := ctx.Done()
+	go func() {
+		<-closeCh
+		_ = entries.CloseSend()
 	}()
 	return nil
 }
