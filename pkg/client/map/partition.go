@@ -246,7 +246,7 @@ func (m *mapPartition) Watch(ctx context.Context, ch chan<- *Event, opts ...Watc
 		opt.beforeWatch(request)
 	}
 
-	events, err := m.client.Events(ctx, request)
+	events, err := m.client.Events(context.Background(), request)
 	if err != nil {
 		stream.Close()
 		return err
@@ -325,11 +325,19 @@ func (m *mapPartition) Watch(ctx context.Context, ch chan<- *Event, opts ...Watc
 		}
 	}()
 
+	// Close the stream once the context is cancelled
+	closeCh := ctx.Done()
+	go func() {
+		<-closeCh
+		_ = events.CloseSend()
+	}()
+
 	// Block the Watch until the handshake is complete or times out
 	select {
 	case err := <-openCh:
 		return err
 	case <-time.After(15 * time.Second):
+		_ = events.CloseSend()
 		return errors.New("handshake timed out")
 	}
 }

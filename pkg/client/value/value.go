@@ -160,7 +160,7 @@ func (v *value) Watch(ctx context.Context, ch chan<- *Event) error {
 		Header: header,
 	}
 
-	events, err := v.client.Events(ctx, request)
+	events, err := v.client.Events(context.Background(), request)
 	if err != nil {
 		return err
 	}
@@ -214,11 +214,19 @@ func (v *value) Watch(ctx context.Context, ch chan<- *Event) error {
 		}
 	}()
 
+	// Close the stream once the context is cancelled
+	closeCh := ctx.Done()
+	go func() {
+		<-closeCh
+		_ = events.CloseSend()
+	}()
+
 	// Block the Watch until the handshake is complete or times out
 	select {
 	case err := <-openCh:
 		return err
 	case <-time.After(15 * time.Second):
+		_ = events.CloseSend()
 		return errors.New("handshake timed out")
 	}
 }

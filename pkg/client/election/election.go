@@ -39,13 +39,29 @@ type Client interface {
 // Election provides distributed leader election
 type Election interface {
 	primitive.Primitive
+
+	// ID returns the ID of the instance of the election
 	ID() string
+
+	// GetTerm gets the current election term
 	GetTerm(ctx context.Context) (*Term, error)
+
+	// Enter enters the instance into the election
 	Enter(ctx context.Context) (*Term, error)
+
+	// Leave removes the instance from the election
 	Leave(ctx context.Context) (*Term, error)
+
+	// Anoint assigns leadership to the instance with the given ID
 	Anoint(ctx context.Context, id string) (*Term, error)
+
+	// Promote increases the priority of the instance with the given ID in the election queue
 	Promote(ctx context.Context, id string) (*Term, error)
+
+	// Evict removes the instance with the given ID from the election
 	Evict(ctx context.Context, id string) (*Term, error)
+
+	// Watch watches the election for changes
 	Watch(ctx context.Context, c chan<- *Event) error
 }
 
@@ -237,7 +253,7 @@ func (e *election) Watch(ctx context.Context, ch chan<- *Event) error {
 		Header: header,
 	}
 
-	events, err := e.client.Events(ctx, request)
+	events, err := e.client.Events(context.Background(), request)
 	if err != nil {
 		return err
 	}
@@ -290,11 +306,19 @@ func (e *election) Watch(ctx context.Context, ch chan<- *Event) error {
 		}
 	}()
 
+	// Close the stream once the context is cancelled
+	closeCh := ctx.Done()
+	go func() {
+		<-closeCh
+		_ = events.CloseSend()
+	}()
+
 	// Block the Watch until the handshake is complete or times out
 	select {
 	case err := <-openCh:
 		return err
 	case <-time.After(15 * time.Second):
+		_ = events.CloseSend()
 		return errors.New("handshake timed out")
 	}
 }

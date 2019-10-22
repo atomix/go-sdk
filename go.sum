@@ -50,6 +50,8 @@ github.com/atomix/atomix-go-local v0.0.0-20191018192811-4de2cabe75ef h1:7wyosCMW
 github.com/atomix/atomix-go-local v0.0.0-20191018192811-4de2cabe75ef/go.mod h1:L+GH0tZ1TrF+T/KrzgIKL1evb5x+V+ABBEYeHFcxEZ8=
 github.com/atomix/atomix-go-local v0.0.0-20191021232932-07b79d0af4b6 h1:5L1w6CQ1uuUri8eevyfvK85M3aCSqYHeqA28Je5sw2c=
 github.com/atomix/atomix-go-local v0.0.0-20191021232932-07b79d0af4b6/go.mod h1:AjQrUv53c+O6Ma457OHdzgQcGkVfRrA3MFwVznlBP3c=
+github.com/atomix/atomix-go-local v0.0.0-20191021234710-cca1c26bf4d8 h1:22STT0uRZt409miwAlGghoQhSpKIYT5KvdLk4cG/2L8=
+github.com/atomix/atomix-go-local v0.0.0-20191021234710-cca1c26bf4d8/go.mod h1:oRfnzGG5NU/uAQclc6chtLQ97/7WC5u+4t8lDouZIIE=
 github.com/atomix/atomix-go-node v0.0.0-20190827191929-2d3dc9c550d9 h1:tQjW5rVM63dDw+gajRyqcbkRn97nNgJiF7/xTFqcZp8=
 github.com/atomix/atomix-go-node v0.0.0-20190827191929-2d3dc9c550d9/go.mod h1:PL1T5R78itch1QC1CN4JmbRL/2XQlg4R95R14822C6Q=
 github.com/atomix/atomix-go-node v0.0.0-20190828183436-fc30340cd8db/go.mod h1:dyh8Bb50qKfMlpqDE6X+dQ1tZ399WKEABa3ntDYImnA=
@@ -81,6 +83,8 @@ github.com/atomix/atomix-go-node v0.0.0-20191018192345-6fbb86e5f5ef h1:Vvwg2Q7ro
 github.com/atomix/atomix-go-node v0.0.0-20191018192345-6fbb86e5f5ef/go.mod h1:SmM+sWPwscnx6AIqGbu9Y2EqCGdUlyHTnrJa/A3XqWA=
 github.com/atomix/atomix-go-node v0.0.0-20191021232909-930498392f0f h1:G5kXu5UV840Jg28/xoyaGYmJz0+JjHx/nojvlNoE2qk=
 github.com/atomix/atomix-go-node v0.0.0-20191021232909-930498392f0f/go.mod h1:wLJ9+8FK7p8R8tz3bXPQ6GTvpwhkwjyPomkL9ok5AzM=
+github.com/atomix/atomix-go-node v0.0.0-20191021234659-c841a97bec89 h1:Xe8eyruUnCkTRlZbg+BWXGICFgMB0+82bcmIgHY1S+s=
+github.com/atomix/atomix-go-node v0.0.0-20191021234659-c841a97bec89/go.mod h1:wLJ9+8FK7p8R8tz3bXPQ6GTvpwhkwjyPomkL9ok5AzM=
 github.com/cenkalti/backoff v2.2.1+incompatible h1:tNowT99t7UNflLxfYYSlKYsBpXdEet03Pg2g16Swow4=
 github.com/cenkalti/backoff v2.2.1+incompatible/go.mod h1:90ReRw6GdpyfrHakVjL/QHaoyV4aDUVVkXQJJJ3NXXM=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
