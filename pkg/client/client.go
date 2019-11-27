@@ -172,7 +172,6 @@ func (c *Client) newGroup(groupProto *controllerapi.PartitionGroup) (*PartitionG
 		Name:          groupProto.ID.Name,
 		Partitions:    int(groupProto.Spec.Partitions),
 		PartitionSize: int(groupProto.Spec.PartitionSize),
-		Protocol:      groupProto.Spec.Protocol.TypeUrl,
 		application:   c.application,
 		partitions:    partitions,
 	}, nil
@@ -213,7 +212,6 @@ type PartitionGroup struct {
 	Name          string
 	Partitions    int
 	PartitionSize int
-	Protocol      string
 
 	application string
 	partitions  []*grpc.ClientConn
