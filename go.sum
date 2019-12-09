@@ -16,6 +16,8 @@ github.com/atomix/atomix-api v0.0.0-20191017192115-4d6a4f8e87a3 h1:iKZxEUGEJ1ZfW
 github.com/atomix/atomix-api v0.0.0-20191017192115-4d6a4f8e87a3/go.mod h1:joWKUd0zIeYbAQ0vmYHGsnV03ZgRalhceHgnJ3EN0mI=
 github.com/atomix/atomix-api v0.0.0-20191021183656-837bfda65c82 h1:jqTiJj5KfEADMgkVd06NhUC0DxSLwrWE56KghT9vGgw=
 github.com/atomix/atomix-api v0.0.0-20191021183656-837bfda65c82/go.mod h1:joWKUd0zIeYbAQ0vmYHGsnV03ZgRalhceHgnJ3EN0mI=
+github.com/atomix/atomix-api v0.0.0-20191209194225-84215659356a h1:p/gwVJ7OEnapzrruBVzeoPG/XjozyQCFmLvUZSsrAio=
+github.com/atomix/atomix-api v0.0.0-20191209194225-84215659356a/go.mod h1:joWKUd0zIeYbAQ0vmYHGsnV03ZgRalhceHgnJ3EN0mI=
 github.com/atomix/atomix-go-client v0.0.0-20190827234201-188602d4e780/go.mod h1:/UAIApUE5+Ghzu8oBVcYUoz6nCosrRPa0eUlluBtKz0=
 github.com/atomix/atomix-go-client v0.0.0-20191002230120-837d618e27c5/go.mod h1:MoPkrAL33saKe2GbTi+NJgLzW7ejCwrrLDrYIwGYNcE=
 github.com/atomix/atomix-go-client v0.0.0-20191015003555-98ae5ccbe7bd/go.mod h1:jV1V8j+zo30xhC+hufKM/1XIiJKA3ODjwuMA/rBHu8g=
@@ -52,6 +54,8 @@ github.com/atomix/atomix-go-local v0.0.0-20191021232932-07b79d0af4b6 h1:5L1w6CQ1
 github.com/atomix/atomix-go-local v0.0.0-20191021232932-07b79d0af4b6/go.mod h1:AjQrUv53c+O6Ma457OHdzgQcGkVfRrA3MFwVznlBP3c=
 github.com/atomix/atomix-go-local v0.0.0-20191021234710-cca1c26bf4d8 h1:22STT0uRZt409miwAlGghoQhSpKIYT5KvdLk4cG/2L8=
 github.com/atomix/atomix-go-local v0.0.0-20191021234710-cca1c26bf4d8/go.mod h1:oRfnzGG5NU/uAQclc6chtLQ97/7WC5u+4t8lDouZIIE=
+github.com/atomix/atomix-go-local v0.0.0-20191209195801-389d9aea52c6 h1:NLyJR5OdkP2AZhn7wcp73Rpjy3JcvN/Zs7oCpX3R+j0=
+github.com/atomix/atomix-go-local v0.0.0-20191209195801-389d9aea52c6/go.mod h1:31DKxijJL/q0eHm9FQd/Bl12F29m9Fzq9g/tUMTWjVw=
 github.com/atomix/atomix-go-node v0.0.0-20190827191929-2d3dc9c550d9 h1:tQjW5rVM63dDw+gajRyqcbkRn97nNgJiF7/xTFqcZp8=
 github.com/atomix/atomix-go-node v0.0.0-20190827191929-2d3dc9c550d9/go.mod h1:PL1T5R78itch1QC1CN4JmbRL/2XQlg4R95R14822C6Q=
 github.com/atomix/atomix-go-node v0.0.0-20190828183436-fc30340cd8db/go.mod h1:dyh8Bb50qKfMlpqDE6X+dQ1tZ399WKEABa3ntDYImnA=
@@ -85,6 +89,8 @@ github.com/atomix/atomix-go-node v0.0.0-20191021232909-930498392f0f h1:G5kXu5UV8
 github.com/atomix/atomix-go-node v0.0.0-20191021232909-930498392f0f/go.mod h1:wLJ9+8FK7p8R8tz3bXPQ6GTvpwhkwjyPomkL9ok5AzM=
 github.com/atomix/atomix-go-node v0.0.0-20191021234659-c841a97bec89 h1:Xe8eyruUnCkTRlZbg+BWXGICFgMB0+82bcmIgHY1S+s=
 github.com/atomix/atomix-go-node v0.0.0-20191021234659-c841a97bec89/go.mod h1:wLJ9+8FK7p8R8tz3bXPQ6GTvpwhkwjyPomkL9ok5AzM=
+github.com/atomix/atomix-go-node v0.0.0-20191209195626-c07a42492857 h1:5wMb3Ea/pde5R6TTBoApDqfAmvpWeB+2SPNIySD4M0I=
+github.com/atomix/atomix-go-node v0.0.0-20191209195626-c07a42492857/go.mod h1:QRc5Thcgx8t1PtkgxYLEa8M0tyyHvqds6306dW+DuTM=
 github.com/cenkalti/backoff v2.2.1+incompatible h1:tNowT99t7UNflLxfYYSlKYsBpXdEet03Pg2g16Swow4=
 github.com/cenkalti/backoff v2.2.1+incompatible/go.mod h1:90ReRw6GdpyfrHakVjL/QHaoyV4aDUVVkXQJJJ3NXXM=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
@@ -94,6 +100,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/gogo/protobuf v1.2.1 h1:/s5zKNz0uPFCZ5hddgPdo2TK2TVrUNMn0OOX8/aZMTE=
 github.com/gogo/protobuf v1.2.1/go.mod h1:hp+jE20tsWTFYpLwKvXlhS1hjn+gTNwPg2I6zVXpSg4=
+github.com/gogo/protobuf v1.3.1 h1:DqDEcV5aeaTmdFBePNpYsp3FlcVH/2ISVVM9Qf8PSls=
+github.com/gogo/protobuf v1.3.1/go.mod h1:SlYgWuQ5SjCEi6WLHjHCa1yvBfUnHcTbrrZtXPKa29o=
 github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b h1:VKtxabqXZkF25pY9ekfRL6a582T4P37/31XEstQ5p58=
 github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b/go.mod h1:SBH7ygxi8pfUlaOkMMuAQtPIUF8ecWP5IEl/CR7VP2Q=
 github.com/golang/mock v1.1.1/go.mod h1:oTYuIxOrZwtPieC+H1uAHpcLFnEyAGVDL/k47Jfbm0A=
@@ -124,6 +132,7 @@ github.com/hashicorp/golang-lru v0.5.1/go.mod h1:/m3WP610KZHVQ1SGc6re/UDhFvYD7pJ
 github.com/hashicorp/golang-lru v0.5.3/go.mod h1:iADmTwqILo4mZ8BN3D2Q6+9jd8WM5uGBxy+E8yxSoD4=
 github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024/go.mod h1:6v2b51hI/fHJwM22ozAgKL4VKDeJcHhJFhtBdhmNjmU=
 github.com/kisielk/errcheck v1.1.0/go.mod h1:EZBBE59ingxPouuu3KfxchcWSUPOHkagtvWXihfKN4Q=
+github.com/kisielk/errcheck v1.2.0/go.mod h1:/BMXB+zMLi60iA8Vv6Ksmxu/1UDYcXs4uQLJ+jE2L00=
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
 github.com/konsorten/go-windows-terminal-sequences v1.0.1/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=
 github.com/konsorten/go-windows-terminal-sequences v1.0.2 h1:DB17ag19krx9CFsz4o3enTrPXyIXCl+2iCXH/aMAp9s=
@@ -211,6 +220,7 @@ golang.org/x/time v0.0.0-20181108054448-85acf8d2951c/go.mod h1:tRJNPiyCQ0inRvYxb
 golang.org/x/time v0.0.0-20190308202827-9d24e82272b4/go.mod h1:tRJNPiyCQ0inRvYxbN9jk5I+vvW/OXSQhTDSoE431IQ=
 golang.org/x/tools v0.0.0-20180221164845-07fd8470d635/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
 golang.org/x/tools v0.0.0-20180917221912-90fa682c2a6e/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
+golang.org/x/tools v0.0.0-20181030221726-6c7e314b6563/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
 golang.org/x/tools v0.0.0-20190114222345-bf090417da8b/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
 golang.org/x/tools v0.0.0-20190226205152-f727befe758c/go.mod h1:9Yl7xja0Znq3iFh3HoIrodX9oNMXvdceNzlUR8zjMvY=
 golang.org/x/tools v0.0.0-20190311212946-11955173bddd/go.mod h1:LCzVGOaR6xXOjkQ3onu1FJEFr0SW1gC7cKk1uF8kGRs=

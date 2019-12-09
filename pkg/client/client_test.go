@@ -103,7 +103,6 @@ func TestPartitionGroup(t *testing.T) {
 		Name:          "test",
 		Partitions:    len(conns),
 		PartitionSize: 1,
-		Protocol:      "local",
 		application:   "default",
 		partitions:    conns,
 	}

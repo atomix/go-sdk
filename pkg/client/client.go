@@ -23,6 +23,7 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/client/counter"
 	"github.com/atomix/atomix-go-client/pkg/client/election"
 	"github.com/atomix/atomix-go-client/pkg/client/indexedmap"
+	"github.com/atomix/atomix-go-client/pkg/client/leader"
 	"github.com/atomix/atomix-go-client/pkg/client/list"
 	"github.com/atomix/atomix-go-client/pkg/client/lock"
 	"github.com/atomix/atomix-go-client/pkg/client/map"
@@ -283,6 +284,11 @@ func (g *PartitionGroup) GetElection(ctx context.Context, name string, opts ...s
 // GetIndexedMap gets or creates a Map with the given name
 func (g *PartitionGroup) GetIndexedMap(ctx context.Context, name string, opts ...session.Option) (indexedmap.IndexedMap, error) {
 	return indexedmap.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.partitions, opts...)
+}
+
+// GetLeaderLatch gets or creates a LeaderLatch with the given name
+func (g *PartitionGroup) GetLeaderLatch(ctx context.Context, name string, opts ...session.Option) (leader.Latch, error) {
+	return leader.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.partitions, opts...)
 }
 
 // GetList gets or creates a List with the given name
