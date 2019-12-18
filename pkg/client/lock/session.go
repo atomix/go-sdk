@@ -16,52 +16,68 @@ package lock
 
 import (
 	"context"
+	"github.com/atomix/atomix-api/proto/atomix/headers"
 	api "github.com/atomix/atomix-api/proto/atomix/lock"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
+	"google.golang.org/grpc"
 )
 
-type sessionHandler struct {
-	client api.LockServiceClient
-}
+type sessionHandler struct{}
 
 func (h *sessionHandler) Create(ctx context.Context, s *session.Session) error {
-	request := &api.CreateRequest{
-		Header:  s.GetState(),
-		Timeout: &s.Timeout,
-	}
-
-	response, err := h.client.Create(ctx, request)
-	if err != nil {
-		return err
-	}
-	s.RecordResponse(request.Header, response.Header)
-	return nil
+	return s.DoCreate(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		request := &api.CreateRequest{
+			Header:  header,
+			Timeout: &s.Timeout,
+		}
+		client := api.NewLockServiceClient(conn)
+		response, err := client.Create(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 }
 
 func (h *sessionHandler) KeepAlive(ctx context.Context, s *session.Session) error {
-	request := &api.KeepAliveRequest{
-		Header: s.GetState(),
-	}
-
-	if _, err := h.client.KeepAlive(ctx, request); err != nil {
-		return err
-	}
-	return nil
+	return s.DoKeepAlive(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		request := &api.KeepAliveRequest{
+			Header: header,
+		}
+		client := api.NewLockServiceClient(conn)
+		response, err := client.KeepAlive(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 }
 
 func (h *sessionHandler) Close(ctx context.Context, s *session.Session) error {
-	request := &api.CloseRequest{
-		Header: s.GetState(),
-	}
-	_, err := h.client.Close(ctx, request)
-	return err
+	return s.DoClose(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		request := &api.CloseRequest{
+			Header: header,
+		}
+		client := api.NewLockServiceClient(conn)
+		response, err := client.Close(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 }
 
 func (h *sessionHandler) Delete(ctx context.Context, s *session.Session) error {
-	request := &api.CloseRequest{
-		Header: s.GetState(),
-		Delete: true,
-	}
-	_, err := h.client.Close(ctx, request)
-	return err
+	return s.DoClose(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		request := &api.CloseRequest{
+			Header: header,
+			Delete: true,
+		}
+		client := api.NewLockServiceClient(conn)
+		response, err := client.Close(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 }

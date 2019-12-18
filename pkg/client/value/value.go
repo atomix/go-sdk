@@ -17,13 +17,14 @@ package value
 import (
 	"context"
 	"errors"
+	"fmt"
+	"github.com/atomix/atomix-api/proto/atomix/headers"
 	api "github.com/atomix/atomix-api/proto/atomix/value"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/util"
-	"github.com/golang/glog"
+	"github.com/atomix/atomix-go-client/pkg/client/util/net"
 	"google.golang.org/grpc"
-	"io"
 	"time"
 )
 
@@ -72,7 +73,7 @@ type Event struct {
 
 // New creates a new Lock primitive for the given partitions
 // The value will be created in one of the given partitions.
-func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.Option) (Value, error) {
+func New(ctx context.Context, name primitive.Name, partitions []net.Address, opts ...session.Option) (Value, error) {
 	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
 		return nil, err
@@ -81,15 +82,13 @@ func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn
 }
 
 // newValue creates a new Value primitive for the given partition
-func newValue(ctx context.Context, name primitive.Name, conn *grpc.ClientConn, opts ...session.Option) (*value, error) {
-	client := api.NewValueServiceClient(conn)
-	sess, err := session.New(ctx, name, &sessionHandler{client: client}, opts...)
+func newValue(ctx context.Context, name primitive.Name, address net.Address, opts ...session.Option) (*value, error) {
+	sess, err := session.New(ctx, name, address, &sessionHandler{}, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return &value{
 		name:    name,
-		client:  client,
 		session: sess,
 	}, nil
 }
@@ -97,7 +96,6 @@ func newValue(ctx context.Context, name primitive.Name, conn *grpc.ClientConn, o
 // value is the single partition implementation of Lock
 type value struct {
 	name    primitive.Name
-	client  api.ValueServiceClient
 	session *session.Session
 }
 
@@ -106,29 +104,34 @@ func (v *value) Name() primitive.Name {
 }
 
 func (v *value) Set(ctx context.Context, value []byte, opts ...SetOption) (uint64, error) {
-	stream, header := v.session.NextStream()
-	defer stream.Close()
-
-	request := &api.SetRequest{
-		Header: header,
-		Value:  value,
+	request := &api.SetRequest{}
+	for i := range opts {
+		opts[i].beforeSet(request)
 	}
 
-	for _, opt := range opts {
-		opt.beforeSet(request)
-	}
-
-	response, err := v.client.Set(ctx, request)
+	r, err := v.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewValueServiceClient(conn)
+		request := &api.SetRequest{
+			Header: header,
+			Value:  value,
+		}
+		for i := range opts {
+			opts[i].beforeSet(request)
+		}
+		response, err := client.Set(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		for i := range opts {
+			opts[i].afterSet(response)
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return 0, err
 	}
 
-	for _, opt := range opts {
-		opt.afterSet(response)
-	}
-
-	v.session.RecordResponse(request.Header, response.Header)
-
+	response := r.(*api.SetResponse)
 	if !response.Succeeded {
 		if request.ExpectVersion > 0 {
 			return 0, errors.New("version mismatch")
@@ -140,69 +143,60 @@ func (v *value) Set(ctx context.Context, value []byte, opts ...SetOption) (uint6
 }
 
 func (v *value) Get(ctx context.Context) ([]byte, uint64, error) {
-	request := &api.GetRequest{
-		Header: v.session.GetRequest(),
-	}
-
-	response, err := v.client.Get(ctx, request)
+	r, err := v.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewValueServiceClient(conn)
+		request := &api.GetRequest{
+			Header: header,
+		}
+		response, err := client.Get(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return nil, 0, err
 	}
 
-	v.session.RecordResponse(request.Header, response.Header)
+	response := r.(*api.GetResponse)
 	return response.Value, response.Version, nil
 }
 
 func (v *value) Watch(ctx context.Context, ch chan<- *Event) error {
-	stream, header := v.session.NextStream()
-
-	request := &api.EventRequest{
-		Header: header,
-	}
-
-	events, err := v.client.Events(context.Background(), request)
+	stream, err := v.session.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
+		client := api.NewValueServiceClient(conn)
+		request := &api.EventRequest{
+			Header: header,
+		}
+		return client.Events(ctx, request)
+	}, func(responses interface{}) (*headers.ResponseHeader, interface{}, error) {
+		response, err := responses.(api.ValueService_EventsClient).Recv()
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return err
 	}
 
-	openCh := make(chan error)
+	select {
+	case event, ok := <-stream:
+		if !ok {
+			return errors.New("watch handshake failed")
+		}
+		response := event.(*api.EventResponse)
+		if response.Type != api.EventResponse_OPEN {
+			return fmt.Errorf("expected handshake response, received %v", response)
+		}
+	case <-time.After(15 * time.Second):
+		return errors.New("handshake timed out")
+	}
+
 	go func() {
 		defer close(ch)
-		open := false
-		for {
-			response, err := events.Recv()
-			if err == io.EOF {
-				if !open {
-					close(openCh)
-				}
-				stream.Close()
-				break
-			}
-
-			if err != nil {
-				glog.Error("Failed to receive event stream", err)
-				if !open {
-					openCh <- err
-					close(openCh)
-				}
-				stream.Close()
-				break
-			}
-
-			// Record the response header
-			v.session.RecordResponse(request.Header, response.Header)
-
-			// Attempt to serialize the response to the stream and skip the response if serialization failed.
-			if !stream.Serialize(response.Header) {
-				continue
-			}
-
-			// Return the Watch call if possible
-			if !open {
-				close(openCh)
-				open = true
-			}
-
+		for event := range stream {
+			response := event.(*api.EventResponse)
 			// If this is a normal event (not a handshake response), write the event to the watch channel
 			if response.Type != api.EventResponse_OPEN {
 				ch <- &Event{
@@ -213,22 +207,7 @@ func (v *value) Watch(ctx context.Context, ch chan<- *Event) error {
 			}
 		}
 	}()
-
-	// Close the stream once the context is cancelled
-	closeCh := ctx.Done()
-	go func() {
-		<-closeCh
-		_ = events.CloseSend()
-	}()
-
-	// Block the Watch until the handshake is complete or times out
-	select {
-	case err := <-openCh:
-		return err
-	case <-time.After(15 * time.Second):
-		_ = events.CloseSend()
-		return errors.New("handshake timed out")
-	}
+	return nil
 }
 
 func (v *value) Close() error {

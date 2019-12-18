@@ -153,8 +153,8 @@ func (s *Session) Delete() error {
 	return err
 }
 
-// GetState gets the header for the current state of the session
-func (s *Session) GetState() *headers.RequestHeader {
+// getState gets the header for the current state of the session
+func (s *Session) getState() *headers.RequestHeader {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return &headers.RequestHeader{
@@ -166,8 +166,8 @@ func (s *Session) GetState() *headers.RequestHeader {
 	}
 }
 
-// GetRequest gets the current read header
-func (s *Session) GetRequest() *headers.RequestHeader {
+// getQueryHeader gets the current read header
+func (s *Session) getQueryHeader() *headers.RequestHeader {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return &headers.RequestHeader{
@@ -178,8 +178,8 @@ func (s *Session) GetRequest() *headers.RequestHeader {
 	}
 }
 
-// NextRequest returns the next write header
-func (s *Session) NextRequest() *headers.RequestHeader {
+// nextCommandHeader returns the next write header
+func (s *Session) nextCommandHeader() *headers.RequestHeader {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.requestID = s.requestID + 1
@@ -192,8 +192,8 @@ func (s *Session) NextRequest() *headers.RequestHeader {
 	return header
 }
 
-// NextStream returns the next write stream and header
-func (s *Session) NextStream() (*Stream, *headers.RequestHeader) {
+// nextStreamHeader returns the next write stream and header
+func (s *Session) nextStreamHeader() (*Stream, *headers.RequestHeader) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.requestID = s.requestID + 1
@@ -211,35 +211,40 @@ func (s *Session) NextStream() (*Stream, *headers.RequestHeader) {
 	return stream, header
 }
 
+// DoCreate sends a create session request
 func (s *Session) DoCreate(ctx context.Context, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
 	return s.doSession(ctx, f)
 }
 
+// DoKeepAlive sends a session keep-alive request
 func (s *Session) DoKeepAlive(ctx context.Context, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
 	return s.doSession(ctx, f)
 }
 
+// DoClose sends a session close request
 func (s *Session) DoClose(ctx context.Context, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
 	return s.doSession(ctx, f)
 }
 
 func (s *Session) doSession(ctx context.Context, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
-	header := s.GetState()
+	header := s.getState()
 	_, err := s.doRequest(header, func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error) {
 		return f(ctx, conn, header)
 	})
 	return err
 }
 
+// DoQuery sends a session query request
 func (s *Session) DoQuery(ctx context.Context, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) (interface{}, error) {
-	header := s.GetRequest()
+	header := s.getQueryHeader()
 	return s.doRequest(header, func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error) {
 		return f(ctx, conn, header)
 	})
 }
 
+// DoCommand sends a session command request
 func (s *Session) DoCommand(ctx context.Context, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) (interface{}, error) {
-	stream, header := s.NextStream()
+	stream, header := s.nextStreamHeader()
 	defer stream.Close()
 	return s.doRequest(header, func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error) {
 		return f(ctx, conn, header)
@@ -267,6 +272,7 @@ func (s *Session) doRequest(requestHeader *headers.RequestHeader, f func(conn *g
 	}
 }
 
+// DoQueryStream sends a session query stream request
 func (s *Session) DoQueryStream(
 	ctx context.Context,
 	f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error),
@@ -276,7 +282,7 @@ func (s *Session) DoQueryStream(
 		return nil, err
 	}
 
-	requestHeader := s.GetRequest()
+	requestHeader := s.getQueryHeader()
 	responses, err := f(ctx, conn, requestHeader)
 	if err != nil {
 		return nil, err
@@ -327,6 +333,7 @@ func (s *Session) queryStream(
 	}
 }
 
+// DoCommandStream sends a session command stream request
 func (s *Session) DoCommandStream(
 	ctx context.Context,
 	f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error),
@@ -336,7 +343,7 @@ func (s *Session) DoCommandStream(
 		return nil, err
 	}
 
-	stream, requestHeader := s.NextStream()
+	stream, requestHeader := s.nextStreamHeader()
 	responses, err := f(ctx, conn, requestHeader)
 	if err != nil {
 		stream.Close()

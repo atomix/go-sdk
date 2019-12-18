@@ -273,11 +273,7 @@ func (m *mapPartition) Watch(ctx context.Context, ch chan<- *Event, opts ...Watc
 	}
 
 	go func() {
-		defer func() {
-			_ = recover()
-		}()
 		defer close(ch)
-
 		for event := range stream {
 			response := event.(*api.EventResponse)
 

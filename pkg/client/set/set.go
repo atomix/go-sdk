@@ -19,7 +19,7 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/util"
-	"google.golang.org/grpc"
+	"github.com/atomix/atomix-go-client/pkg/client/util/net"
 	"sync"
 )
 
@@ -87,7 +87,7 @@ type Event struct {
 }
 
 // New creates a new partitioned set primitive
-func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.Option) (Set, error) {
+func New(ctx context.Context, name primitive.Name, partitions []net.Address, opts ...session.Option) (Set, error) {
 	results, err := util.ExecuteOrderedAsync(len(partitions), func(i int) (interface{}, error) {
 		return newPartition(ctx, partitions[i], name, opts...)
 	})

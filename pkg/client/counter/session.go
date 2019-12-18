@@ -17,23 +17,25 @@ package counter
 import (
 	"context"
 	api "github.com/atomix/atomix-api/proto/atomix/counter"
+	"github.com/atomix/atomix-api/proto/atomix/headers"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
+	"google.golang.org/grpc"
 )
 
-type sessionHandler struct {
-	client api.CounterServiceClient
-}
+type sessionHandler struct{}
 
 func (m *sessionHandler) Create(ctx context.Context, s *session.Session) error {
-	request := &api.CreateRequest{
-		Header: s.GetState(),
-	}
-	response, err := m.client.Create(ctx, request)
-	if err != nil {
-		return err
-	}
-	s.RecordResponse(request.Header, response.Header)
-	return nil
+	return s.DoCreate(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		request := &api.CreateRequest{
+			Header: header,
+		}
+		client := api.NewCounterServiceClient(conn)
+		response, err := client.Create(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 }
 
 func (m *sessionHandler) KeepAlive(ctx context.Context, s *session.Session) error {
@@ -41,18 +43,30 @@ func (m *sessionHandler) KeepAlive(ctx context.Context, s *session.Session) erro
 }
 
 func (m *sessionHandler) Close(ctx context.Context, s *session.Session) error {
-	request := &api.CloseRequest{
-		Header: s.GetState(),
-	}
-	_, err := m.client.Close(ctx, request)
-	return err
+	return s.DoClose(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		request := &api.CloseRequest{
+			Header: header,
+		}
+		client := api.NewCounterServiceClient(conn)
+		response, err := client.Close(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 }
 
 func (m *sessionHandler) Delete(ctx context.Context, s *session.Session) error {
-	request := &api.CloseRequest{
-		Header: s.GetState(),
-		Delete: true,
-	}
-	_, err := m.client.Close(ctx, request)
-	return err
+	return s.DoClose(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		request := &api.CloseRequest{
+			Header: header,
+			Delete: true,
+		}
+		client := api.NewCounterServiceClient(conn)
+		response, err := client.Close(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 }

@@ -17,13 +17,14 @@ package leader
 import (
 	"context"
 	"errors"
+	"fmt"
+	"github.com/atomix/atomix-api/proto/atomix/headers"
 	api "github.com/atomix/atomix-api/proto/atomix/leader"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/util"
-	"github.com/golang/glog"
+	"github.com/atomix/atomix-go-client/pkg/client/util/net"
 	"google.golang.org/grpc"
-	"io"
 	"time"
 )
 
@@ -99,21 +100,19 @@ type Event struct {
 }
 
 // New creates a new latch primitive
-func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.Option) (Latch, error) {
+func New(ctx context.Context, name primitive.Name, partitions []net.Address, opts ...session.Option) (Latch, error) {
 	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
 		return nil, err
 	}
 
-	client := api.NewLeaderLatchServiceClient(partitions[i])
-	sess, err := session.New(ctx, name, &sessionHandler{client: client}, opts...)
+	sess, err := session.New(ctx, name, partitions[i], &sessionHandler{}, opts...)
 	if err != nil {
 		return nil, err
 	}
 
 	return &latch{
 		name:    name,
-		client:  client,
 		session: sess,
 	}, nil
 }
@@ -121,7 +120,6 @@ func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn
 // latch is the default single-partition implementation of Latch
 type latch struct {
 	name    primitive.Name
-	client  api.LeaderLatchServiceClient
 	session *session.Session
 }
 
@@ -134,35 +132,40 @@ func (e *latch) ID() string {
 }
 
 func (e *latch) Get(ctx context.Context) (*Leadership, error) {
-	request := &api.GetRequest{
-		Header: e.session.GetRequest(),
-	}
-
-	response, err := e.client.Get(ctx, request)
+	response, err := e.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewLeaderLatchServiceClient(conn)
+		request := &api.GetRequest{
+			Header: header,
+		}
+		response, err := client.Get(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	e.session.RecordResponse(request.Header, response.Header)
-	return newLeadership(response.Latch), nil
+	return newLeadership(response.(*api.GetResponse).Latch), nil
 }
 
 func (e *latch) Join(ctx context.Context) (*Leadership, error) {
-	stream, header := e.session.NextStream()
-	defer stream.Close()
-
-	request := &api.LatchRequest{
-		Header:        header,
-		ParticipantID: e.ID(),
-	}
-
-	response, err := e.client.Latch(ctx, request)
+	response, err := e.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewLeaderLatchServiceClient(conn)
+		request := &api.LatchRequest{
+			Header:        header,
+			ParticipantID: e.ID(),
+		}
+		response, err := client.Latch(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	e.session.RecordResponse(request.Header, response.Header)
-	return newLeadership(response.Latch), nil
+	return newLeadership(response.(*api.LatchResponse).Latch), nil
 }
 
 func (e *latch) Latch(ctx context.Context) (*Leadership, error) {
@@ -187,55 +190,40 @@ func (e *latch) Latch(ctx context.Context) (*Leadership, error) {
 }
 
 func (e *latch) Watch(ctx context.Context, ch chan<- *Event) error {
-	stream, header := e.session.NextStream()
-
-	request := &api.EventRequest{
-		Header: header,
-	}
-
-	events, err := e.client.Events(context.Background(), request)
+	stream, err := e.session.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
+		client := api.NewLeaderLatchServiceClient(conn)
+		request := &api.EventRequest{
+			Header: header,
+		}
+		return client.Events(ctx, request)
+	}, func(responses interface{}) (*headers.ResponseHeader, interface{}, error) {
+		response, err := responses.(api.LeaderLatchService_EventsClient).Recv()
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return err
 	}
 
-	openCh := make(chan error)
+	select {
+	case event, ok := <-stream:
+		if !ok {
+			return errors.New("watch handshake failed")
+		}
+		response := event.(*api.EventResponse)
+		if response.Type != api.EventResponse_OPEN {
+			return fmt.Errorf("expected handshake response, received %v", response)
+		}
+	case <-time.After(15 * time.Second):
+		return errors.New("handshake timed out")
+	}
+
 	go func() {
 		defer close(ch)
-		open := false
-		for {
-			response, err := events.Recv()
-			if err == io.EOF {
-				if !open {
-					close(openCh)
-				}
-				stream.Close()
-				break
-			}
-
-			if err != nil {
-				glog.Error("Failed to receive event stream", err)
-				if !open {
-					openCh <- err
-					close(openCh)
-				}
-				stream.Close()
-				break
-			}
-
-			// Record the response header
-			e.session.RecordResponse(request.Header, response.Header)
-
-			// Attempt to serialize the response to the stream and skip the response if serialization failed.
-			if !stream.Serialize(response.Header) {
-				continue
-			}
-
-			// Return the Watch call if possible
-			if !open {
-				close(openCh)
-				open = true
-			}
-
+		for event := range stream {
+			response := event.(*api.EventResponse)
 			// If this is a normal event (not a handshake response), write the event to the watch channel
 			if response.Type != api.EventResponse_OPEN {
 				ch <- &Event{
@@ -245,22 +233,7 @@ func (e *latch) Watch(ctx context.Context, ch chan<- *Event) error {
 			}
 		}
 	}()
-
-	// Close the stream once the context is cancelled
-	closeCh := ctx.Done()
-	go func() {
-		<-closeCh
-		_ = events.CloseSend()
-	}()
-
-	// Block the Watch until the handshake is complete or times out
-	select {
-	case err := <-openCh:
-		return err
-	case <-time.After(15 * time.Second):
-		_ = events.CloseSend()
-		return errors.New("handshake timed out")
-	}
+	return nil
 }
 
 func (e *latch) Close() error {

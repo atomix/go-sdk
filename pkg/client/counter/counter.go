@@ -17,9 +17,11 @@ package counter
 import (
 	"context"
 	api "github.com/atomix/atomix-api/proto/atomix/counter"
+	"github.com/atomix/atomix-api/proto/atomix/headers"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/util"
+	"github.com/atomix/atomix-go-client/pkg/client/util/net"
 	"google.golang.org/grpc"
 )
 
@@ -50,21 +52,19 @@ type Counter interface {
 }
 
 // New creates a new counter for the given partitions
-func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.Option) (Counter, error) {
+func New(ctx context.Context, name primitive.Name, partitions []net.Address, opts ...session.Option) (Counter, error) {
 	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
 		return nil, err
 	}
 
-	client := api.NewCounterServiceClient(partitions[i])
-	sess, err := session.New(ctx, name, &sessionHandler{client: client}, opts...)
+	sess, err := session.New(ctx, name, partitions[i], &sessionHandler{}, opts...)
 	if err != nil {
 		return nil, err
 	}
 
 	return &counter{
 		name:    name,
-		client:  client,
 		session: sess,
 	}, nil
 }
@@ -72,7 +72,6 @@ func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn
 // counter is the single partition implementation of Counter
 type counter struct {
 	name    primitive.Name
-	client  api.CounterServiceClient
 	session *session.Session
 }
 
@@ -81,62 +80,75 @@ func (c *counter) Name() primitive.Name {
 }
 
 func (c *counter) Get(ctx context.Context) (int64, error) {
-	request := &api.GetRequest{
-		Header: c.session.GetRequest(),
-	}
-
-	response, err := c.client.Get(ctx, request)
+	response, err := c.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewCounterServiceClient(conn)
+		request := &api.GetRequest{
+			Header: header,
+		}
+		response, err := client.Get(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return 0, err
 	}
-
-	c.session.RecordResponse(request.Header, response.Header)
-	return response.Value, nil
+	return response.(*api.GetResponse).Value, nil
 }
 
 func (c *counter) Set(ctx context.Context, value int64) error {
-	request := &api.SetRequest{
-		Header: c.session.NextRequest(),
-		Value:  value,
-	}
-
-	response, err := c.client.Set(ctx, request)
-	if err != nil {
-		return err
-	}
-
-	c.session.RecordResponse(request.Header, response.Header)
-	return nil
+	_, err := c.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewCounterServiceClient(conn)
+		request := &api.SetRequest{
+			Header: header,
+			Value:  value,
+		}
+		response, err := client.Set(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
+	return err
 }
 
 func (c *counter) Increment(ctx context.Context, delta int64) (int64, error) {
-	request := &api.IncrementRequest{
-		Header: c.session.NextRequest(),
-		Delta:  delta,
-	}
-
-	response, err := c.client.Increment(ctx, request)
+	response, err := c.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewCounterServiceClient(conn)
+		request := &api.IncrementRequest{
+			Header: header,
+			Delta:  delta,
+		}
+		response, err := client.Increment(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return 0, err
 	}
-
-	c.session.RecordResponse(request.Header, response.Header)
-	return response.NextValue, nil
+	return response.(*api.IncrementResponse).NextValue, nil
 }
 
 func (c *counter) Decrement(ctx context.Context, delta int64) (int64, error) {
-	request := &api.DecrementRequest{
-		Header: c.session.NextRequest(),
-		Delta:  delta,
-	}
-
-	response, err := c.client.Decrement(ctx, request)
+	response, err := c.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewCounterServiceClient(conn)
+		request := &api.DecrementRequest{
+			Header: header,
+			Delta:  delta,
+		}
+		response, err := client.Decrement(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return 0, err
 	}
-
-	c.session.RecordResponse(request.Header, response.Header)
-	return response.NextValue, nil
+	return response.(*api.DecrementResponse).NextValue, nil
 }
 
 func (c *counter) Close() error {

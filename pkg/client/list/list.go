@@ -18,13 +18,14 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
+	"github.com/atomix/atomix-api/proto/atomix/headers"
 	api "github.com/atomix/atomix-api/proto/atomix/list"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/util"
-	"github.com/golang/glog"
+	"github.com/atomix/atomix-go-client/pkg/client/util/net"
 	"google.golang.org/grpc"
-	"io"
 	"time"
 )
 
@@ -111,7 +112,7 @@ type Event struct {
 }
 
 // New creates a new list primitive
-func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.Option) (List, error) {
+func New(ctx context.Context, name primitive.Name, partitions []net.Address, opts ...session.Option) (List, error) {
 	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
 		return nil, err
@@ -120,15 +121,13 @@ func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn
 }
 
 // newList creates a new list for the given partition
-func newList(ctx context.Context, name primitive.Name, conn *grpc.ClientConn, opts ...session.Option) (*list, error) {
-	client := api.NewListServiceClient(conn)
-	sess, err := session.New(ctx, name, &sessionHandler{client: client}, opts...)
+func newList(ctx context.Context, name primitive.Name, address net.Address, opts ...session.Option) (*list, error) {
+	sess, err := session.New(ctx, name, address, &sessionHandler{}, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return &list{
 		name:    name,
-		client:  client,
 		session: sess,
 	}, nil
 }
@@ -136,7 +135,6 @@ func newList(ctx context.Context, name primitive.Name, conn *grpc.ClientConn, op
 // list is the single partition implementation of List
 type list struct {
 	name    primitive.Name
-	client  api.ListServiceClient
 	session *session.Session
 }
 
@@ -145,41 +143,40 @@ func (l *list) Name() primitive.Name {
 }
 
 func (l *list) Append(ctx context.Context, value []byte) error {
-	stream, header := l.session.NextStream()
-	defer stream.Close()
-
-	request := &api.AppendRequest{
-		Header: header,
-		Value:  base64.StdEncoding.EncodeToString(value),
-	}
-
-	response, err := l.client.Append(ctx, request)
-	if err != nil {
-		return err
-	}
-
-	l.session.RecordResponse(request.Header, response.Header)
+	_, err := l.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewListServiceClient(conn)
+		request := &api.AppendRequest{
+			Header: header,
+			Value:  base64.StdEncoding.EncodeToString(value),
+		}
+		response, err := client.Append(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 	return err
 }
 
 func (l *list) Insert(ctx context.Context, index int, value []byte) error {
-	stream, header := l.session.NextStream()
-	defer stream.Close()
-
-	request := &api.InsertRequest{
-		Header: header,
-		Index:  uint32(index),
-		Value:  base64.StdEncoding.EncodeToString(value),
-	}
-
-	response, err := l.client.Insert(ctx, request)
+	response, err := l.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewListServiceClient(conn)
+		request := &api.InsertRequest{
+			Header: header,
+			Index:  uint32(index),
+			Value:  base64.StdEncoding.EncodeToString(value),
+		}
+		response, err := client.Insert(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return err
 	}
 
-	l.session.RecordResponse(request.Header, response.Header)
-
-	switch response.Status {
+	switch response.(*api.InsertResponse).Status {
 	case api.ResponseStatus_OUT_OF_BOUNDS:
 		return errors.New("index out of bounds")
 	default:
@@ -188,23 +185,24 @@ func (l *list) Insert(ctx context.Context, index int, value []byte) error {
 }
 
 func (l *list) Set(ctx context.Context, index int, value []byte) error {
-	stream, header := l.session.NextStream()
-	defer stream.Close()
-
-	request := &api.SetRequest{
-		Header: header,
-		Index:  uint32(index),
-		Value:  base64.StdEncoding.EncodeToString(value),
-	}
-
-	response, err := l.client.Set(ctx, request)
+	response, err := l.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewListServiceClient(conn)
+		request := &api.SetRequest{
+			Header: header,
+			Index:  uint32(index),
+			Value:  base64.StdEncoding.EncodeToString(value),
+		}
+		response, err := client.Set(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return err
 	}
 
-	l.session.RecordResponse(request.Header, response.Header)
-
-	switch response.Status {
+	switch response.(*api.SetResponse).Status {
 	case api.ResponseStatus_OUT_OF_BOUNDS:
 		return errors.New("index out of bounds")
 	default:
@@ -213,18 +211,23 @@ func (l *list) Set(ctx context.Context, index int, value []byte) error {
 }
 
 func (l *list) Get(ctx context.Context, index int) ([]byte, error) {
-	request := &api.GetRequest{
-		Header: l.session.GetRequest(),
-		Index:  uint32(index),
-	}
-
-	response, err := l.client.Get(ctx, request)
+	r, err := l.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewListServiceClient(conn)
+		request := &api.GetRequest{
+			Header: header,
+			Index:  uint32(index),
+		}
+		response, err := client.Get(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	l.session.RecordResponse(request.Header, response.Header)
-
+	response := r.(*api.GetResponse)
 	switch response.Status {
 	case api.ResponseStatus_OUT_OF_BOUNDS:
 		return nil, errors.New("index out of bounds")
@@ -234,21 +237,23 @@ func (l *list) Get(ctx context.Context, index int) ([]byte, error) {
 }
 
 func (l *list) Remove(ctx context.Context, index int) ([]byte, error) {
-	stream, header := l.session.NextStream()
-	defer stream.Close()
-
-	request := &api.RemoveRequest{
-		Header: header,
-		Index:  uint32(index),
-	}
-
-	response, err := l.client.Remove(ctx, request)
+	r, err := l.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewListServiceClient(conn)
+		request := &api.RemoveRequest{
+			Header: header,
+			Index:  uint32(index),
+		}
+		response, err := client.Remove(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	l.session.RecordResponse(request.Header, response.Header)
-
+	response := r.(*api.RemoveResponse)
 	switch response.Status {
 	case api.ResponseStatus_OUT_OF_BOUNDS:
 		return nil, errors.New("index out of bounds")
@@ -258,117 +263,94 @@ func (l *list) Remove(ctx context.Context, index int) ([]byte, error) {
 }
 
 func (l *list) Len(ctx context.Context) (int, error) {
-	request := &api.SizeRequest{
-		Header: l.session.GetRequest(),
-	}
-
-	response, err := l.client.Size(ctx, request)
+	response, err := l.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewListServiceClient(conn)
+		request := &api.SizeRequest{
+			Header: header,
+		}
+		response, err := client.Size(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return 0, err
 	}
-
-	l.session.RecordResponse(request.Header, response.Header)
-	return int(response.Size_), nil
+	return int(response.(*api.SizeResponse).Size_), nil
 }
 
 func (l *list) Items(ctx context.Context, ch chan<- []byte) error {
-	request := &api.IterateRequest{
-		Header: l.session.GetRequest(),
-	}
-	entries, err := l.client.Iterate(context.Background(), request)
+	stream, err := l.session.DoQueryStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
+		client := api.NewListServiceClient(conn)
+		request := &api.IterateRequest{
+			Header: header,
+		}
+		return client.Iterate(ctx, request)
+	}, func(responses interface{}) (*headers.ResponseHeader, interface{}, error) {
+		response, err := responses.(api.ListService_IterateClient).Recv()
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return err
 	}
 
 	go func() {
 		defer close(ch)
-		for {
-			response, err := entries.Recv()
-			if err == io.EOF {
-				break
-			}
-
-			if err != nil {
-				glog.Error("Failed to receive items stream", err)
-				break
-			}
-
-			// Record the response header
-			l.session.RecordResponse(request.Header, response.Header)
-
+		for event := range stream {
+			response := event.(*api.IterateResponse)
 			if bytes, err := base64.StdEncoding.DecodeString(response.Value); err == nil {
 				ch <- bytes
 			}
 		}
 	}()
-
-	// Close the stream once the context is cancelled
-	closeCh := ctx.Done()
-	go func() {
-		<-closeCh
-		_ = entries.CloseSend()
-	}()
 	return nil
 }
 
 func (l *list) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error {
-	stream, header := l.session.NextStream()
-
-	request := &api.EventRequest{
-		Header: header,
-	}
-
-	for _, opt := range opts {
-		opt.beforeWatch(request)
-	}
-
-	events, err := l.client.Events(context.Background(), request)
+	stream, err := l.session.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
+		client := api.NewListServiceClient(conn)
+		request := &api.EventRequest{
+			Header: header,
+		}
+		for _, opt := range opts {
+			opt.beforeWatch(request)
+		}
+		return client.Events(ctx, request)
+	}, func(responses interface{}) (*headers.ResponseHeader, interface{}, error) {
+		response, err := responses.(api.ListService_EventsClient).Recv()
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, opt := range opts {
+			opt.afterWatch(response)
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return err
 	}
 
-	openCh := make(chan error)
+	select {
+	case event, ok := <-stream:
+		if !ok {
+			return errors.New("watch handshake failed")
+		}
+		response := event.(*api.EventResponse)
+		if response.Type != api.EventResponse_OPEN {
+			return fmt.Errorf("expected handshake response, received %v", response)
+		}
+	case <-time.After(15 * time.Second):
+		return errors.New("handshake timed out")
+	}
+
 	go func() {
 		defer close(ch)
-		open := false
-		for {
-			response, err := events.Recv()
-			if err == io.EOF {
-				if !open {
-					close(openCh)
-				}
-				stream.Close()
-				break
-			}
-
-			if err != nil {
-				glog.Error("Failed to receive event stream", err)
-				if !open {
-					openCh <- err
-					close(openCh)
-				}
-				stream.Close()
-				break
-			}
-
-			for _, opt := range opts {
-				opt.afterWatch(response)
-			}
-
-			// Record the response header
-			l.session.RecordResponse(request.Header, response.Header)
-
-			// Attempt to serialize the response to the stream and skip the response if serialization failed.
-			if !stream.Serialize(response.Header) {
-				continue
-			}
-
-			// Return the Watch call if possible
-			if !open {
-				close(openCh)
-				open = true
-			}
-
+		for event := range stream {
+			response := event.(*api.EventResponse)
 			// If this is a normal event (not a handshake response), write the event to the watch channel
 			if response.Type != api.EventResponse_OPEN {
 				var t EventType
@@ -391,22 +373,7 @@ func (l *list) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption)
 			}
 		}
 	}()
-
-	// Close the stream once the context is cancelled
-	closeCh := ctx.Done()
-	go func() {
-		<-closeCh
-		_ = events.CloseSend()
-	}()
-
-	// Block the Watch until the handshake is complete or times out
-	select {
-	case err := <-openCh:
-		return err
-	case <-time.After(15 * time.Second):
-		_ = events.CloseSend()
-		return errors.New("handshake timed out")
-	}
+	return nil
 }
 
 func (l *list) Slice(ctx context.Context, from int, to int) (List, error) {
@@ -432,20 +399,18 @@ func (l *list) SliceTo(ctx context.Context, to int) (List, error) {
 }
 
 func (l *list) Clear(ctx context.Context) error {
-	stream, header := l.session.NextStream()
-	defer stream.Close()
-
-	request := &api.ClearRequest{
-		Header: header,
-	}
-
-	response, err := l.client.Clear(ctx, request)
-	if err != nil {
-		return err
-	}
-
-	l.session.RecordResponse(request.Header, response.Header)
-	return nil
+	_, err := l.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewListServiceClient(conn)
+		request := &api.ClearRequest{
+			Header: header,
+		}
+		response, err := client.Clear(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
+	return err
 }
 
 func (l *list) Close() error {

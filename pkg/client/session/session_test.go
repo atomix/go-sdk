@@ -68,7 +68,7 @@ func (h *testHandler) Delete(ctx context.Context, session *Session) error {
 func TestSession(t *testing.T) {
 	name := primitive.NewName("a", "b", "c", "d")
 	handler := newTestHandler()
-	session, err := New(context.TODO(), name, handler, WithTimeout(5*time.Second))
+	session, err := New(context.TODO(), name, "localhost:5000", handler, WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 	assert.NotNil(t, session)
 	assert.Equal(t, "c", session.Name.Namespace)
@@ -76,7 +76,7 @@ func TestSession(t *testing.T) {
 	assert.Equal(t, 5*time.Second, session.Timeout)
 	assert.True(t, <-handler.create)
 
-	header := session.GetRequest()
+	header := session.getQueryHeader()
 	assert.Equal(t, "c", header.Name.Namespace)
 	assert.Equal(t, "d", header.Name.Name)
 	assert.Equal(t, uint64(0), header.Index)
@@ -87,14 +87,14 @@ func TestSession(t *testing.T) {
 		Index:     uint64(10),
 	})
 
-	header = session.GetRequest()
+	header = session.getQueryHeader()
 	assert.Equal(t, "c", header.Name.Namespace)
 	assert.Equal(t, "d", header.Name.Name)
 	assert.Equal(t, uint64(10), header.Index)
 	assert.Equal(t, uint64(1), header.SessionID)
 	assert.Equal(t, uint64(0), header.RequestID)
 
-	header = session.NextRequest()
+	header = session.nextCommandHeader()
 	assert.Equal(t, "c", header.Name.Namespace)
 	assert.Equal(t, "d", header.Name.Name)
 	assert.Equal(t, uint64(10), header.Index)
@@ -108,7 +108,7 @@ func TestSession(t *testing.T) {
 		StreamID:   uint64(1),
 	})
 
-	stream, header := session.NextStream()
+	stream, header := session.nextStreamHeader()
 	assert.True(t, stream.Serialize(&headers.ResponseHeader{
 		SessionID:  uint64(1),
 		Index:      uint64(11),
@@ -145,7 +145,7 @@ func TestSession(t *testing.T) {
 		Index:      uint64(12),
 		ResponseID: stream.ID,
 	})
-	header = session.GetState()
+	header = session.getState()
 	assert.Equal(t, "c", header.Name.Namespace)
 	assert.Equal(t, "d", header.Name.Name)
 	assert.Equal(t, uint64(12), header.Index)

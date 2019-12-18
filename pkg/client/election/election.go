@@ -17,13 +17,14 @@ package election
 import (
 	"context"
 	"errors"
+	"fmt"
 	api "github.com/atomix/atomix-api/proto/atomix/election"
+	"github.com/atomix/atomix-api/proto/atomix/headers"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/util"
-	"github.com/golang/glog"
+	"github.com/atomix/atomix-go-client/pkg/client/util/net"
 	"google.golang.org/grpc"
-	"io"
 	"time"
 )
 
@@ -108,21 +109,19 @@ type Event struct {
 }
 
 // New creates a new election primitive
-func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn, opts ...session.Option) (Election, error) {
+func New(ctx context.Context, name primitive.Name, partitions []net.Address, opts ...session.Option) (Election, error) {
 	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
 		return nil, err
 	}
 
-	client := api.NewLeaderElectionServiceClient(partitions[i])
-	sess, err := session.New(ctx, name, &sessionHandler{client: client}, opts...)
+	sess, err := session.New(ctx, name, partitions[i], &sessionHandler{}, opts...)
 	if err != nil {
 		return nil, err
 	}
 
 	return &election{
 		name:    name,
-		client:  client,
 		session: sess,
 	}, nil
 }
@@ -130,7 +129,6 @@ func New(ctx context.Context, name primitive.Name, partitions []*grpc.ClientConn
 // election is the default single-partition implementation of Election
 type election struct {
 	name    primitive.Name
-	client  api.LeaderElectionServiceClient
 	session *session.Session
 }
 
@@ -143,158 +141,153 @@ func (e *election) ID() string {
 }
 
 func (e *election) GetTerm(ctx context.Context) (*Term, error) {
-	request := &api.GetTermRequest{
-		Header: e.session.GetRequest(),
-	}
-
-	response, err := e.client.GetTerm(ctx, request)
+	response, err := e.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewLeaderElectionServiceClient(conn)
+		request := &api.GetTermRequest{
+			Header: header,
+		}
+		response, err := client.GetTerm(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	e.session.RecordResponse(request.Header, response.Header)
-	return newTerm(response.Term), nil
+	return newTerm(response.(*api.GetTermResponse).Term), nil
 }
 
 func (e *election) Enter(ctx context.Context) (*Term, error) {
-	stream, header := e.session.NextStream()
-	defer stream.Close()
-
-	request := &api.EnterRequest{
-		Header:      header,
-		CandidateID: e.ID(),
-	}
-
-	response, err := e.client.Enter(ctx, request)
+	response, err := e.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewLeaderElectionServiceClient(conn)
+		request := &api.EnterRequest{
+			Header:      header,
+			CandidateID: e.ID(),
+		}
+		response, err := client.Enter(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	e.session.RecordResponse(request.Header, response.Header)
-	return newTerm(response.Term), nil
+	return newTerm(response.(*api.EnterResponse).Term), nil
 }
 
 func (e *election) Leave(ctx context.Context) (*Term, error) {
-	stream, header := e.session.NextStream()
-	defer stream.Close()
-
-	request := &api.WithdrawRequest{
-		Header:      header,
-		CandidateID: e.ID(),
-	}
-
-	response, err := e.client.Withdraw(ctx, request)
+	response, err := e.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewLeaderElectionServiceClient(conn)
+		request := &api.WithdrawRequest{
+			Header:      header,
+			CandidateID: e.ID(),
+		}
+		response, err := client.Withdraw(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	e.session.RecordResponse(request.Header, response.Header)
-	return newTerm(response.Term), nil
+	return newTerm(response.(*api.WithdrawResponse).Term), nil
 }
 
 func (e *election) Anoint(ctx context.Context, id string) (*Term, error) {
-	stream, header := e.session.NextStream()
-	defer stream.Close()
-
-	request := &api.AnointRequest{
-		Header:      header,
-		CandidateID: id,
-	}
-
-	response, err := e.client.Anoint(ctx, request)
+	response, err := e.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewLeaderElectionServiceClient(conn)
+		request := &api.AnointRequest{
+			Header:      header,
+			CandidateID: id,
+		}
+		response, err := client.Anoint(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	e.session.RecordResponse(request.Header, response.Header)
-	return newTerm(response.Term), nil
+	return newTerm(response.(*api.AnointResponse).Term), nil
 }
 
 func (e *election) Promote(ctx context.Context, id string) (*Term, error) {
-	stream, header := e.session.NextStream()
-	defer stream.Close()
-
-	request := &api.PromoteRequest{
-		Header:      header,
-		CandidateID: id,
-	}
-
-	response, err := e.client.Promote(ctx, request)
+	response, err := e.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewLeaderElectionServiceClient(conn)
+		request := &api.PromoteRequest{
+			Header:      header,
+			CandidateID: id,
+		}
+		response, err := client.Promote(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	e.session.RecordResponse(request.Header, response.Header)
-	return newTerm(response.Term), nil
+	return newTerm(response.(*api.PromoteResponse).Term), nil
 }
 
 func (e *election) Evict(ctx context.Context, id string) (*Term, error) {
-	stream, header := e.session.NextStream()
-	defer stream.Close()
-
-	request := &api.EvictRequest{
-		Header:      header,
-		CandidateID: id,
-	}
-
-	response, err := e.client.Evict(ctx, request)
+	response, err := e.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewLeaderElectionServiceClient(conn)
+		request := &api.EvictRequest{
+			Header:      header,
+			CandidateID: id,
+		}
+		response, err := client.Evict(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	e.session.RecordResponse(request.Header, response.Header)
-	return newTerm(response.Term), nil
+	return newTerm(response.(*api.EvictResponse).Term), nil
 }
 
 func (e *election) Watch(ctx context.Context, ch chan<- *Event) error {
-	stream, header := e.session.NextStream()
-
-	request := &api.EventRequest{
-		Header: header,
-	}
-
-	events, err := e.client.Events(context.Background(), request)
+	stream, err := e.session.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
+		client := api.NewLeaderElectionServiceClient(conn)
+		request := &api.EventRequest{
+			Header: header,
+		}
+		return client.Events(ctx, request)
+	}, func(responses interface{}) (*headers.ResponseHeader, interface{}, error) {
+		response, err := responses.(api.LeaderElectionService_EventsClient).Recv()
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return err
 	}
 
-	openCh := make(chan error)
+	select {
+	case event, ok := <-stream:
+		if !ok {
+			return errors.New("watch handshake failed")
+		}
+		response := event.(*api.EventResponse)
+		if response.Type != api.EventResponse_OPEN {
+			return fmt.Errorf("expected handshake response, received %v", response)
+		}
+	case <-time.After(15 * time.Second):
+		return errors.New("handshake timed out")
+	}
+
 	go func() {
 		defer close(ch)
-		open := false
-		for {
-			response, err := events.Recv()
-			if err == io.EOF {
-				if !open {
-					close(openCh)
-				}
-				stream.Close()
-				break
-			}
-
-			if err != nil {
-				glog.Error("Failed to receive event stream", err)
-				if !open {
-					openCh <- err
-					close(openCh)
-				}
-				stream.Close()
-				break
-			}
-
-			// Record the response header
-			e.session.RecordResponse(request.Header, response.Header)
-
-			// Attempt to serialize the response to the stream and skip the response if serialization failed.
-			if !stream.Serialize(response.Header) {
-				continue
-			}
-
-			// Return the Watch call if possible
-			if !open {
-				close(openCh)
-				open = true
-			}
+		for event := range stream {
+			response := event.(*api.EventResponse)
 
 			// If this is a normal event (not a handshake response), write the event to the watch channel
 			if response.Type != api.EventResponse_OPEN {
@@ -305,22 +298,7 @@ func (e *election) Watch(ctx context.Context, ch chan<- *Event) error {
 			}
 		}
 	}()
-
-	// Close the stream once the context is cancelled
-	closeCh := ctx.Done()
-	go func() {
-		<-closeCh
-		_ = events.CloseSend()
-	}()
-
-	// Block the Watch until the handshake is complete or times out
-	select {
-	case err := <-openCh:
-		return err
-	case <-time.After(15 * time.Second):
-		_ = events.CloseSend()
-		return errors.New("handshake timed out")
-	}
+	return nil
 }
 
 func (e *election) Close() error {

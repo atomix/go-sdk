@@ -22,12 +22,14 @@ import (
 	"net"
 )
 
+const basePort = 5000
+
 // StartTestPartitions starts the given number of local partitions and returns client connections for them
 func StartTestPartitions(partitions int) ([]netutil.Address, []chan struct{}) {
 	addresses := make([]netutil.Address, partitions)
 	chans := make([]chan struct{}, partitions)
 	for i := 0; i < partitions; i++ {
-		address, ch := startTestPartition(i)
+		address, ch := startTestPartition()
 		addresses[i] = address
 		chans[i] = ch
 	}
@@ -35,21 +37,24 @@ func StartTestPartitions(partitions int) ([]netutil.Address, []chan struct{}) {
 }
 
 // startTestPartition starts a single local partition
-func startTestPartition(i int) (netutil.Address, chan struct{}) {
-	address := netutil.Address(fmt.Sprintf("localhost:%d", 5000+i))
-	lis, err := net.Listen("tcp", string(address))
-	if err != nil {
-		panic(err)
-	}
-	node := local.NewNode(lis, registry.Registry)
-	node.Start()
+func startTestPartition() (netutil.Address, chan struct{}) {
+	for port := basePort; port < basePort+100; port++ {
+		address := netutil.Address(fmt.Sprintf("localhost:%d", port))
+		lis, err := net.Listen("tcp", string(address))
+		if err != nil {
+			continue
+		}
+		node := local.NewNode(lis, registry.Registry)
+		node.Start()
 
-	ch := make(chan struct{})
-	go func() {
-		<-ch
-		node.Stop()
-	}()
-	return address, ch
+		ch := make(chan struct{})
+		go func() {
+			<-ch
+			node.Stop()
+		}()
+		return address, ch
+	}
+	panic("cannot find open port")
 }
 
 // StopTestPartitions stops the given test partition channels
