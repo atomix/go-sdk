@@ -15,47 +15,41 @@
 package test
 
 import (
-	"context"
+	"fmt"
+	netutil "github.com/atomix/atomix-go-client/pkg/client/util/net"
 	"github.com/atomix/atomix-go-local/pkg/atomix/local"
 	"github.com/atomix/atomix-go-node/pkg/atomix/registry"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/test/bufconn"
 	"net"
 )
 
 // StartTestPartitions starts the given number of local partitions and returns client connections for them
-func StartTestPartitions(partitions int) ([]*grpc.ClientConn, []chan struct{}) {
-	conns := make([]*grpc.ClientConn, partitions)
+func StartTestPartitions(partitions int) ([]netutil.Address, []chan struct{}) {
+	addresses := make([]netutil.Address, partitions)
 	chans := make([]chan struct{}, partitions)
 	for i := 0; i < partitions; i++ {
-		conn, ch := startTestPartition()
-		conns[i] = conn
+		address, ch := startTestPartition(i)
+		addresses[i] = address
 		chans[i] = ch
 	}
-	return conns, chans
+	return addresses, chans
 }
 
 // startTestPartition starts a single local partition
-func startTestPartition() (*grpc.ClientConn, chan struct{}) {
-	lis := bufconn.Listen(1024 * 1024)
+func startTestPartition(i int) (netutil.Address, chan struct{}) {
+	address := netutil.Address(fmt.Sprintf("localhost:%d", 5000+i))
+	lis, err := net.Listen("tcp", string(address))
+	if err != nil {
+		panic(err)
+	}
 	node := local.NewNode(lis, registry.Registry)
 	node.Start()
-
-	dialer := func(ctx context.Context, address string) (net.Conn, error) {
-		return lis.Dial()
-	}
-
-	conn, err := grpc.DialContext(context.Background(), "devices", grpc.WithContextDialer(dialer), grpc.WithInsecure())
-	if err != nil {
-		panic("Failed to dial devices")
-	}
 
 	ch := make(chan struct{})
 	go func() {
 		<-ch
 		node.Stop()
 	}()
-	return conn, ch
+	return address, ch
 }
 
 // StopTestPartitions stops the given test partition channels

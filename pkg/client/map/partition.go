@@ -17,31 +17,29 @@ package _map //nolint:golint
 import (
 	"context"
 	"errors"
+	"fmt"
+	"github.com/atomix/atomix-api/proto/atomix/headers"
 	api "github.com/atomix/atomix-api/proto/atomix/map"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
-	"github.com/golang/glog"
+	"github.com/atomix/atomix-go-client/pkg/client/util/net"
 	"google.golang.org/grpc"
-	"io"
 	"time"
 )
 
-func newPartition(ctx context.Context, conn *grpc.ClientConn, name primitive.Name, opts ...session.Option) (Map, error) {
-	client := api.NewMapServiceClient(conn)
-	sess, err := session.New(ctx, name, &sessionHandler{client: client}, opts...)
+func newPartition(ctx context.Context, address net.Address, name primitive.Name, opts ...session.Option) (Map, error) {
+	sess, err := session.New(ctx, name, address, &sessionHandler{}, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return &mapPartition{
 		name:    name,
-		client:  client,
 		session: sess,
 	}, nil
 }
 
 type mapPartition struct {
 	name    primitive.Name
-	client  api.MapServiceClient
 	session *session.Session
 }
 
@@ -50,30 +48,30 @@ func (m *mapPartition) Name() primitive.Name {
 }
 
 func (m *mapPartition) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*Entry, error) {
-	stream, header := m.session.NextStream()
-	defer stream.Close()
-
-	request := &api.PutRequest{
-		Header: header,
-		Key:    key,
-		Value:  value,
-	}
-
-	for i := range opts {
-		opts[i].beforePut(request)
-	}
-
-	response, err := m.client.Put(ctx, request)
+	r, err := m.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewMapServiceClient(conn)
+		request := &api.PutRequest{
+			Header: header,
+			Key:    key,
+			Value:  value,
+		}
+		for i := range opts {
+			opts[i].beforePut(request)
+		}
+		response, err := client.Put(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		for i := range opts {
+			opts[i].afterPut(response)
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	for i := range opts {
-		opts[i].afterPut(response)
-	}
-
-	m.session.RecordResponse(request.Header, response.Header)
-
+	response := r.(*api.PutResponse)
 	if response.Status == api.ResponseStatus_OK {
 		return &Entry{
 			Key:     key,
@@ -96,26 +94,29 @@ func (m *mapPartition) Put(ctx context.Context, key string, value []byte, opts .
 }
 
 func (m *mapPartition) Get(ctx context.Context, key string, opts ...GetOption) (*Entry, error) {
-	request := &api.GetRequest{
-		Header: m.session.GetRequest(),
-		Key:    key,
-	}
-
-	for i := range opts {
-		opts[i].beforeGet(request)
-	}
-
-	response, err := m.client.Get(ctx, request)
+	r, err := m.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewMapServiceClient(conn)
+		request := &api.GetRequest{
+			Header: header,
+			Key:    key,
+		}
+		for i := range opts {
+			opts[i].beforeGet(request)
+		}
+		response, err := client.Get(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		for i := range opts {
+			opts[i].afterGet(response)
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	for i := range opts {
-		opts[i].afterGet(response)
-	}
-
-	m.session.RecordResponse(request.Header, response.Header)
-
+	response := r.(*api.GetResponse)
 	if response.Version != 0 {
 		return &Entry{
 			Key:     key,
@@ -129,29 +130,29 @@ func (m *mapPartition) Get(ctx context.Context, key string, opts ...GetOption) (
 }
 
 func (m *mapPartition) Remove(ctx context.Context, key string, opts ...RemoveOption) (*Entry, error) {
-	stream, header := m.session.NextStream()
-	defer stream.Close()
-
-	request := &api.RemoveRequest{
-		Header: header,
-		Key:    key,
-	}
-
-	for i := range opts {
-		opts[i].beforeRemove(request)
-	}
-
-	response, err := m.client.Remove(ctx, request)
+	r, err := m.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewMapServiceClient(conn)
+		request := &api.RemoveRequest{
+			Header: header,
+			Key:    key,
+		}
+		for i := range opts {
+			opts[i].beforeRemove(request)
+		}
+		response, err := client.Remove(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		for i := range opts {
+			opts[i].afterRemove(response)
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	for i := range opts {
-		opts[i].afterRemove(response)
-	}
-
-	m.session.RecordResponse(request.Header, response.Header)
-
+	response := r.(*api.RemoveResponse)
 	if response.Status == api.ResponseStatus_OK {
 		return &Entry{
 			Key:     key,
@@ -168,61 +169,60 @@ func (m *mapPartition) Remove(ctx context.Context, key string, opts ...RemoveOpt
 }
 
 func (m *mapPartition) Len(ctx context.Context) (int, error) {
-	request := &api.SizeRequest{
-		Header: m.session.GetRequest(),
-	}
-
-	response, err := m.client.Size(ctx, request)
+	response, err := m.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewMapServiceClient(conn)
+		request := &api.SizeRequest{
+			Header: header,
+		}
+		response, err := client.Size(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return 0, err
 	}
-
-	m.session.RecordResponse(request.Header, response.Header)
-	return int(response.Size_), nil
+	return int(response.(*api.SizeResponse).Size_), nil
 }
 
 func (m *mapPartition) Clear(ctx context.Context) error {
-	stream, header := m.session.NextStream()
-	defer stream.Close()
-
-	request := &api.ClearRequest{
-		Header: header,
-	}
-
-	response, err := m.client.Clear(ctx, request)
-	if err != nil {
-		return err
-	}
-
-	m.session.RecordResponse(request.Header, response.Header)
-	return nil
+	_, err := m.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewMapServiceClient(conn)
+		request := &api.ClearRequest{
+			Header: header,
+		}
+		response, err := client.Clear(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
+	return err
 }
 
 func (m *mapPartition) Entries(ctx context.Context, ch chan<- *Entry) error {
-	request := &api.EntriesRequest{
-		Header: m.session.GetRequest(),
-	}
-	entries, err := m.client.Entries(context.Background(), request)
+	stream, err := m.session.DoQueryStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
+		client := api.NewMapServiceClient(conn)
+		request := &api.EntriesRequest{
+			Header: header,
+		}
+		return client.Entries(ctx, request)
+	}, func(responses interface{}) (*headers.ResponseHeader, interface{}, error) {
+		response, err := responses.(api.MapService_EntriesClient).Recv()
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return err
 	}
 
 	go func() {
 		defer close(ch)
-		for {
-			response, err := entries.Recv()
-			if err == io.EOF {
-				break
-			}
-
-			if err != nil {
-				glog.Error("Failed to receive entry stream", err)
-				break
-			}
-
-			// Record the response header
-			m.session.RecordResponse(request.Header, response.Header)
-
+		for event := range stream {
+			response := event.(*api.EntriesResponse)
 			ch <- &Entry{
 				Key:     response.Key,
 				Value:   response.Value,
@@ -232,78 +232,54 @@ func (m *mapPartition) Entries(ctx context.Context, ch chan<- *Entry) error {
 			}
 		}
 	}()
-
-	// Close the stream once the context is cancelled
-	closeCh := ctx.Done()
-	go func() {
-		<-closeCh
-		_ = entries.CloseSend()
-	}()
 	return nil
 }
 
 func (m *mapPartition) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error {
-	stream, header := m.session.NextStream()
-
-	request := &api.EventRequest{
-		Header: header,
-	}
-
-	for _, opt := range opts {
-		opt.beforeWatch(request)
-	}
-
-	events, err := m.client.Events(context.Background(), request)
+	stream, err := m.session.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
+		client := api.NewMapServiceClient(conn)
+		request := &api.EventRequest{
+			Header: header,
+		}
+		for _, opt := range opts {
+			opt.beforeWatch(request)
+		}
+		return client.Events(ctx, request)
+	}, func(responses interface{}) (*headers.ResponseHeader, interface{}, error) {
+		response, err := responses.(api.MapService_EventsClient).Recv()
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, opt := range opts {
+			opt.afterWatch(response)
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
-		stream.Close()
 		return err
 	}
 
-	openCh := make(chan error)
+	select {
+	case event, ok := <-stream:
+		if !ok {
+			return errors.New("watch handshake failed")
+		}
+		response := event.(*api.EventResponse)
+		if response.Type != api.EventResponse_OPEN {
+			return fmt.Errorf("expected handshake response, received %v", response)
+		}
+	case <-time.After(15 * time.Second):
+		return errors.New("handshake timed out")
+	}
+
 	go func() {
 		defer func() {
 			_ = recover()
 		}()
 		defer close(ch)
 
-		open := false
-		for {
-			response, err := events.Recv()
-			if err == io.EOF {
-				if !open {
-					close(openCh)
-				}
-				stream.Close()
-				break
-			}
-
-			if err != nil {
-				glog.Error("Failed to receive event stream", err)
-				if !open {
-					openCh <- err
-					close(openCh)
-				}
-				stream.Close()
-				break
-			}
-
-			for _, opt := range opts {
-				opt.afterWatch(response)
-			}
-
-			// Record the response header
-			m.session.RecordResponse(request.Header, response.Header)
-
-			// Attempt to serialize the response to the stream and skip the response if serialization failed.
-			if !stream.Serialize(response.Header) {
-				continue
-			}
-
-			// Return the Watch call if possible
-			if !open {
-				close(openCh)
-				open = true
-			}
+		for event := range stream {
+			response := event.(*api.EventResponse)
 
 			// If this is a normal event (not a handshake response), write the event to the watch channel
 			if response.Type != api.EventResponse_OPEN {
@@ -331,22 +307,7 @@ func (m *mapPartition) Watch(ctx context.Context, ch chan<- *Event, opts ...Watc
 			}
 		}
 	}()
-
-	// Close the stream once the context is cancelled
-	closeCh := ctx.Done()
-	go func() {
-		<-closeCh
-		_ = events.CloseSend()
-	}()
-
-	// Block the Watch until the handshake is complete or times out
-	select {
-	case err := <-openCh:
-		return err
-	case <-time.After(15 * time.Second):
-		_ = events.CloseSend()
-		return errors.New("handshake timed out")
-	}
+	return nil
 }
 
 func (m *mapPartition) Close() error {

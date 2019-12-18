@@ -31,6 +31,7 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/set"
 	"github.com/atomix/atomix-go-client/pkg/client/util"
+	"github.com/atomix/atomix-go-client/pkg/client/util/net"
 	"github.com/atomix/atomix-go-client/pkg/client/value"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
@@ -153,19 +154,10 @@ func (c *Client) newGroup(groupProto *controllerapi.PartitionGroup) (*PartitionG
 	})
 
 	// Iterate through the partitions and create gRPC client connections for each partition.
-	partitions := make([]*grpc.ClientConn, len(groupProto.Partitions))
+	partitions := make([]net.Address, len(groupProto.Partitions))
 	for i, partitionProto := range partitionProtos {
 		ep := partitionProto.Endpoints[0]
-		conn, err := grpc.Dial(
-			fmt.Sprintf("%s:%d", ep.Host, ep.Port),
-			grpc.WithInsecure(),
-			grpc.WithUnaryInterceptor(util.RetryingUnaryClientInterceptor()),
-			grpc.WithStreamInterceptor(util.RetryingStreamClientInterceptor(100*time.Millisecond)))
-		if err != nil {
-			return nil, err
-		}
-		partitions[i] = conn
-		c.conns = append(c.conns, conn)
+		partitions[i] = net.Address(fmt.Sprintf("%s:%d", ep.Host, ep.Port))
 	}
 
 	return &PartitionGroup{
@@ -215,7 +207,7 @@ type PartitionGroup struct {
 	PartitionSize int
 
 	application string
-	partitions  []*grpc.ClientConn
+	partitions  []net.Address
 }
 
 // GetPrimitives gets a list of primitives of the given types
@@ -237,8 +229,13 @@ func (g *PartitionGroup) GetPrimitives(ctx context.Context, types ...primitive.T
 
 // getPrimitives gets a list of primitives of the given type
 func (g *PartitionGroup) getPrimitives(ctx context.Context, t primitive.Type) ([]*primitiveapi.PrimitiveInfo, error) {
-	results, err := util.ExecuteAsync(len(g.partitions), func(i int) (i2 interface{}, e error) {
-		client := primitiveapi.NewPrimitiveServiceClient(g.partitions[i])
+	results, err := util.ExecuteAsync(len(g.partitions), func(i int) (interface{}, error) {
+		conn, err := net.Connect(g.partitions[i])
+		if err != nil {
+			return nil, err
+		}
+		defer conn.Close()
+		client := primitiveapi.NewPrimitiveServiceClient(conn)
 		request := &primitiveapi.GetPrimitivesRequest{
 			Type:      string(t),
 			Namespace: g.application,

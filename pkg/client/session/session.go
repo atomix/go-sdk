@@ -16,10 +16,13 @@ package session
 
 import (
 	"context"
+	"errors"
 	"github.com/atomix/atomix-api/proto/atomix/headers"
 	api "github.com/atomix/atomix-api/proto/atomix/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
+	"github.com/atomix/atomix-go-client/pkg/client/util/net"
 	"github.com/google/uuid"
+	"google.golang.org/grpc"
 	"sync"
 	"time"
 )
@@ -78,7 +81,7 @@ type Handler interface {
 // New creates a new Session for the given primitive
 // name is the name of the primitive
 // handler is the primitive's session handler
-func New(ctx context.Context, name primitive.Name, handler Handler, opts ...Option) (*Session, error) {
+func New(ctx context.Context, name primitive.Name, address net.Address, handler Handler, opts ...Option) (*Session, error) {
 	options := &options{
 		id:      uuid.New().String(),
 		timeout: 30 * time.Second,
@@ -92,6 +95,7 @@ func New(ctx context.Context, name primitive.Name, handler Handler, opts ...Opti
 			Namespace: name.Application,
 			Name:      name.Name,
 		},
+		conns:   net.NewConns(address),
 		handler: handler,
 		Timeout: options.timeout,
 		streams: make(map[uint64]*Stream),
@@ -110,6 +114,7 @@ type Session struct {
 	Name       *api.Name
 	Timeout    time.Duration
 	SessionID  uint64
+	conns      *net.Conns
 	handler    Handler
 	lastIndex  uint64
 	requestID  uint64
@@ -204,6 +209,192 @@ func (s *Session) NextStream() (*Stream, *headers.RequestHeader) {
 		RequestID: s.requestID,
 	}
 	return stream, header
+}
+
+func (s *Session) DoCreate(ctx context.Context, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
+	return s.doSession(ctx, f)
+}
+
+func (s *Session) DoKeepAlive(ctx context.Context, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
+	return s.doSession(ctx, f)
+}
+
+func (s *Session) DoClose(ctx context.Context, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
+	return s.doSession(ctx, f)
+}
+
+func (s *Session) doSession(ctx context.Context, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
+	header := s.GetState()
+	_, err := s.doRequest(header, func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error) {
+		return f(ctx, conn, header)
+	})
+	return err
+}
+
+func (s *Session) DoQuery(ctx context.Context, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) (interface{}, error) {
+	header := s.GetRequest()
+	return s.doRequest(header, func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error) {
+		return f(ctx, conn, header)
+	})
+}
+
+func (s *Session) DoCommand(ctx context.Context, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) (interface{}, error) {
+	stream, header := s.NextStream()
+	defer stream.Close()
+	return s.doRequest(header, func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error) {
+		return f(ctx, conn, header)
+	})
+}
+
+func (s *Session) doRequest(requestHeader *headers.RequestHeader, f func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error)) (interface{}, error) {
+	for {
+		conn, err := s.conns.Connect()
+		if err != nil {
+			return nil, err
+		}
+		if responseHeader, response, err := f(conn); err == nil {
+			switch responseHeader.Status {
+			case headers.ResponseStatus_OK:
+				s.RecordResponse(requestHeader, responseHeader)
+				return response, err
+			case headers.ResponseStatus_NOT_LEADER:
+				s.conns.Reconnect(net.Address(responseHeader.Leader))
+				continue
+			case headers.ResponseStatus_ERROR:
+				return nil, errors.New("an unknown error occurred")
+			}
+		}
+	}
+}
+
+func (s *Session) DoQueryStream(
+	ctx context.Context,
+	f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error),
+	responseFunc func(interface{}) (*headers.ResponseHeader, interface{}, error)) (<-chan interface{}, error) {
+	conn, err := s.conns.Connect()
+	if err != nil {
+		return nil, err
+	}
+
+	requestHeader := s.GetRequest()
+	responses, err := f(ctx, conn, requestHeader)
+	if err != nil {
+		return nil, err
+	}
+
+	ch := make(chan interface{})
+	go s.queryStream(ctx, f, responseFunc, responses, requestHeader, ch)
+	return ch, nil
+}
+
+func (s *Session) queryStream(
+	ctx context.Context,
+	f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error),
+	responseFunc func(interface{}) (*headers.ResponseHeader, interface{}, error),
+	responses interface{},
+	requestHeader *headers.RequestHeader,
+	ch chan interface{}) {
+	for {
+		responseHeader, response, err := responseFunc(responses)
+		if err != nil {
+			close(ch)
+			return
+		}
+
+		switch responseHeader.Status {
+		case headers.ResponseStatus_OK:
+			// Record the response
+			s.RecordResponse(requestHeader, responseHeader)
+			ch <- response
+		case headers.ResponseStatus_NOT_LEADER:
+			s.conns.Reconnect(net.Address(responseHeader.Leader))
+			conn, err := s.conns.Connect()
+			if err != nil {
+				close(ch)
+			} else {
+				responses, err := f(ctx, conn, requestHeader)
+				if err != nil {
+					close(ch)
+				} else {
+					go s.queryStream(ctx, f, responseFunc, responses, requestHeader, ch)
+				}
+			}
+			return
+		case headers.ResponseStatus_ERROR:
+			close(ch)
+			return
+		}
+	}
+}
+
+func (s *Session) DoCommandStream(
+	ctx context.Context,
+	f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error),
+	responseFunc func(interface{}) (*headers.ResponseHeader, interface{}, error)) (<-chan interface{}, error) {
+	conn, err := s.conns.Connect()
+	if err != nil {
+		return nil, err
+	}
+
+	stream, requestHeader := s.NextStream()
+	responses, err := f(ctx, conn, requestHeader)
+	if err != nil {
+		stream.Close()
+		return nil, err
+	}
+
+	ch := make(chan interface{})
+	go s.commandStream(ctx, f, responseFunc, responses, stream, requestHeader, ch)
+	return ch, nil
+}
+
+func (s *Session) commandStream(
+	ctx context.Context,
+	f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error),
+	responseFunc func(interface{}) (*headers.ResponseHeader, interface{}, error),
+	responses interface{},
+	stream *Stream,
+	requestHeader *headers.RequestHeader,
+	ch chan interface{}) {
+	for {
+		responseHeader, response, err := responseFunc(responses)
+		if err != nil {
+			close(ch)
+			stream.Close()
+			return
+		}
+
+		switch responseHeader.Status {
+		case headers.ResponseStatus_OK:
+			// Record the response
+			s.RecordResponse(requestHeader, responseHeader)
+
+			// Attempt to serialize the response to the stream and skip the response if serialization failed.
+			if stream.Serialize(responseHeader) {
+				ch <- response
+			}
+		case headers.ResponseStatus_NOT_LEADER:
+			s.conns.Reconnect(net.Address(responseHeader.Leader))
+			conn, err := s.conns.Connect()
+			if err != nil {
+				close(ch)
+				stream.Close()
+			} else {
+				responses, err := f(ctx, conn, requestHeader)
+				if err != nil {
+					close(ch)
+					stream.Close()
+				} else {
+					go s.commandStream(ctx, f, responseFunc, responses, stream, requestHeader, ch)
+				}
+			}
+			return
+		case headers.ResponseStatus_ERROR:
+			close(ch)
+			stream.Close()
+			return
+		}
+	}
 }
 
 // RecordResponse records the index in a response header
