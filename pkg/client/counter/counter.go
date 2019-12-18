@@ -26,7 +26,7 @@ import (
 )
 
 // Type is the counter type
-const Type primitive.Type = "counter"
+const Type primitive.Type = "Counter"
 
 // Client provides an API for creating Counters
 type Client interface {

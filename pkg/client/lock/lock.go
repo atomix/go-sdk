@@ -26,7 +26,7 @@ import (
 )
 
 // Type is the lock type
-const Type primitive.Type = "lock"
+const Type primitive.Type = "Lock"
 
 // Client provides an API for creating Locks
 type Client interface {

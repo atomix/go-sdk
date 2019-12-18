@@ -29,7 +29,7 @@ import (
 )
 
 // Type is the value type
-const Type primitive.Type = "value"
+const Type primitive.Type = "Value"
 
 // Client provides an API for creating Values
 type Client interface {

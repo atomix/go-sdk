@@ -24,7 +24,7 @@ import (
 )
 
 // Type is the set type
-const Type primitive.Type = "set"
+const Type primitive.Type = "Set"
 
 // Client provides an API for creating Sets
 type Client interface {

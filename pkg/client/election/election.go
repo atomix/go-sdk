@@ -29,7 +29,7 @@ import (
 )
 
 // Type is the election type
-const Type primitive.Type = "election"
+const Type primitive.Type = "Election"
 
 // Client provides an API for creating Elections
 type Client interface {

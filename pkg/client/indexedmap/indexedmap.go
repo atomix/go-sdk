@@ -29,7 +29,7 @@ import (
 )
 
 // Type is the indexedmap type
-const Type primitive.Type = "indexedmap"
+const Type primitive.Type = "IndexedMap"
 
 // Index is the index of an entry
 type Index uint64

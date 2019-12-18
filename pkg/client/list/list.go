@@ -30,7 +30,7 @@ import (
 )
 
 // Type is the list type
-const Type primitive.Type = "list"
+const Type primitive.Type = "List"
 
 // Client provides an API for creating Lists
 type Client interface {

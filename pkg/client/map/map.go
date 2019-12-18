@@ -26,7 +26,7 @@ import (
 )
 
 // Type is the map type
-const Type primitive.Type = "map"
+const Type primitive.Type = "Map"
 
 // Client provides an API for creating Maps
 type Client interface {

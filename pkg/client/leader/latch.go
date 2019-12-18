@@ -29,7 +29,7 @@ import (
 )
 
 // Type is the leader latch type
-const Type primitive.Type = "leaderlatch"
+const Type primitive.Type = "LeaderLatch"
 
 // Client provides an API for creating Latches
 type Client interface {
