@@ -66,7 +66,7 @@ func (c *Conns) Connect() (*grpc.ClientConn, error) {
 		return conn, nil
 	}
 
-	conn, err := Connect(c.Address)
+	conn, err := Connect(c.leader)
 	if err != nil {
 		return nil, err
 	}
