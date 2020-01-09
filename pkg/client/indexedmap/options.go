@@ -18,8 +18,8 @@ import (
 	api "github.com/atomix/atomix-api/proto/atomix/indexedmap"
 )
 
-// PutOption is an option for the Put method
-type PutOption interface {
+// SetOption is an option for the Put method
+type SetOption interface {
 	beforePut(request *api.PutRequest)
 	afterPut(response *api.PutResponse)
 }
@@ -41,9 +41,9 @@ func IfVersion(version Version) VersionOption {
 	return VersionOption{version: version}
 }
 
-// VersionOption is an implementation of PutOption and RemoveOption to specify the version for concurrency control
+// VersionOption is an implementation of SetOption and RemoveOption to specify the version for concurrency control
 type VersionOption struct {
-	PutOption
+	SetOption
 	ReplaceOption
 	RemoveOption
 	version Version
@@ -74,11 +74,11 @@ func (o VersionOption) afterRemove(response *api.RemoveResponse) {
 }
 
 // IfNotSet sets the value if the entry is not yet set
-func IfNotSet() PutOption {
+func IfNotSet() SetOption {
 	return &NotSetOption{}
 }
 
-// NotSetOption is a PutOption that sets the value only if it's not already set
+// NotSetOption is a SetOption that sets the value only if it's not already set
 type NotSetOption struct {
 }
 

@@ -47,8 +47,14 @@ type Client interface {
 type IndexedMap interface {
 	primitive.Primitive
 
-	// Put sets a key/value pair in the map
-	Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*Entry, error)
+	// Append appends the given key/value to the map
+	Append(ctx context.Context, key string, value []byte) (*Entry, error)
+
+	// Put appends the given key/value to the map
+	Put(ctx context.Context, key string, value []byte) (*Entry, error)
+
+	// Set sets the given index in the map
+	Set(ctx context.Context, index Index, key string, value []byte, opts ...SetOption) (*Entry, error)
 
 	// Get gets the value of the given key
 	Get(ctx context.Context, key string, opts ...GetOption) (*Entry, error)
@@ -193,11 +199,97 @@ func (m *indexedMap) Name() primitive.Name {
 	return m.name
 }
 
-func (m *indexedMap) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*Entry, error) {
+func (m *indexedMap) Append(ctx context.Context, key string, value []byte) (*Entry, error) {
 	r, err := m.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.PutRequest{
 			Header: header,
+			Key:    key,
+			Value:  value,
+			Version: -1,
+		}
+		response, err := client.Put(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	response := r.(*api.PutResponse)
+	if response.Status == api.ResponseStatus_OK {
+		return &Entry{
+			Index:   Index(response.Index),
+			Key:     key,
+			Value:   value,
+			Version: Version(response.Header.Index),
+		}, nil
+	} else if response.Status == api.ResponseStatus_PRECONDITION_FAILED {
+		return nil, errors.New("write condition failed")
+	} else if response.Status == api.ResponseStatus_WRITE_LOCK {
+		return nil, errors.New("write lock failed")
+	} else {
+		return &Entry{
+			Index:   Index(response.Index),
+			Key:     key,
+			Value:   value,
+			Version: Version(response.PreviousVersion),
+			Created: response.Created,
+			Updated: response.Updated,
+		}, nil
+	}
+}
+
+func (m *indexedMap) Put(ctx context.Context, key string, value []byte) (*Entry, error) {
+	r, err := m.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewIndexedMapServiceClient(conn)
+		request := &api.PutRequest{
+			Header:  header,
+			Key:     key,
+			Value:   value,
+		}
+		response, err := client.Put(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	response := r.(*api.PutResponse)
+	if response.Status == api.ResponseStatus_OK {
+		return &Entry{
+			Index:   Index(response.Index),
+			Key:     key,
+			Value:   value,
+			Version: Version(response.Header.Index),
+		}, nil
+	} else if response.Status == api.ResponseStatus_PRECONDITION_FAILED {
+		return nil, errors.New("write condition failed")
+	} else if response.Status == api.ResponseStatus_WRITE_LOCK {
+		return nil, errors.New("write lock failed")
+	} else {
+		return &Entry{
+			Index:   Index(response.Index),
+			Key:     key,
+			Value:   value,
+			Version: Version(response.PreviousVersion),
+			Created: response.Created,
+			Updated: response.Updated,
+		}, nil
+	}
+}
+
+func (m *indexedMap) Set(ctx context.Context, index Index, key string, value []byte, opts ...SetOption) (*Entry, error) {
+	r, err := m.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewIndexedMapServiceClient(conn)
+		request := &api.PutRequest{
+			Header: header,
+			Index:  int64(index),
 			Key:    key,
 			Value:  value,
 		}
