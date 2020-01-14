@@ -17,14 +17,12 @@ package set
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/atomix/atomix-api/proto/atomix/headers"
 	api "github.com/atomix/atomix-api/proto/atomix/set"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/util/net"
 	"google.golang.org/grpc"
-	"time"
 )
 
 func newPartition(ctx context.Context, address net.Address, name primitive.Name, opts ...session.Option) (Set, error) {
@@ -198,39 +196,23 @@ func (s *setPartition) Watch(ctx context.Context, ch chan<- *Event, opts ...Watc
 		return err
 	}
 
-	select {
-	case event, ok := <-stream:
-		if !ok {
-			return errors.New("watch handshake failed")
-		}
-		response := event.(*api.EventResponse)
-		if response.Type != api.EventResponse_OPEN {
-			return fmt.Errorf("expected handshake response, received %v", response)
-		}
-	case <-time.After(15 * time.Second):
-		return errors.New("handshake timed out")
-	}
-
 	go func() {
 		defer close(ch)
 		for event := range stream {
 			response := event.(*api.EventResponse)
-			// If this is a normal event (not a handshake response), write the event to the watch channel
-			if response.Type != api.EventResponse_OPEN {
-				var t EventType
-				switch response.Type {
-				case api.EventResponse_NONE:
-					t = EventNone
-				case api.EventResponse_ADDED:
-					t = EventAdded
-				case api.EventResponse_REMOVED:
-					t = EventRemoved
-				}
+			var t EventType
+			switch response.Type {
+			case api.EventResponse_NONE:
+				t = EventNone
+			case api.EventResponse_ADDED:
+				t = EventAdded
+			case api.EventResponse_REMOVED:
+				t = EventRemoved
+			}
 
-				ch <- &Event{
-					Type:  t,
-					Value: response.Value,
-				}
+			ch <- &Event{
+				Type:  t,
+				Value: response.Value,
 			}
 		}
 	}()

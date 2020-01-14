@@ -201,14 +201,14 @@ func (m *_map) Entries(ctx context.Context, ch chan<- *Entry) error {
 	}()
 
 	return util.IterAsync(n, func(i int) error {
-		c := make(chan *Entry)
+		partitionCh := make(chan *Entry)
 		go func() {
-			for kv := range c {
+			for kv := range partitionCh {
 				ch <- kv
 			}
 			wg.Done()
 		}()
-		return m.partitions[i].Entries(ctx, c)
+		return m.partitions[i].Entries(ctx, partitionCh)
 	})
 }
 
@@ -219,8 +219,24 @@ func (m *_map) Clear(ctx context.Context) error {
 }
 
 func (m *_map) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error {
-	return util.IterAsync(len(m.partitions), func(i int) error {
-		return m.partitions[i].Watch(ctx, ch, opts...)
+	n := len(m.partitions)
+	wg := &sync.WaitGroup{}
+	wg.Add(n)
+
+	go func() {
+		wg.Wait()
+		close(ch)
+	}()
+
+	return util.IterAsync(n, func(i int) error {
+		partitionCh := make(chan *Event)
+		go func() {
+			for event := range partitionCh {
+				ch <- event
+			}
+			wg.Done()
+		}()
+		return m.partitions[i].Watch(ctx, partitionCh, opts...)
 	})
 }
 

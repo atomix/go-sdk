@@ -17,7 +17,6 @@ package value
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/atomix/atomix-api/proto/atomix/headers"
 	api "github.com/atomix/atomix-api/proto/atomix/value"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
@@ -25,7 +24,6 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/client/util"
 	"github.com/atomix/atomix-go-client/pkg/client/util/net"
 	"google.golang.org/grpc"
-	"time"
 )
 
 // Type is the value type
@@ -180,30 +178,14 @@ func (v *value) Watch(ctx context.Context, ch chan<- *Event) error {
 		return err
 	}
 
-	select {
-	case event, ok := <-stream:
-		if !ok {
-			return errors.New("watch handshake failed")
-		}
-		response := event.(*api.EventResponse)
-		if response.Type != api.EventResponse_OPEN {
-			return fmt.Errorf("expected handshake response, received %v", response)
-		}
-	case <-time.After(15 * time.Second):
-		return errors.New("handshake timed out")
-	}
-
 	go func() {
 		defer close(ch)
 		for event := range stream {
 			response := event.(*api.EventResponse)
-			// If this is a normal event (not a handshake response), write the event to the watch channel
-			if response.Type != api.EventResponse_OPEN {
-				ch <- &Event{
-					Type:    EventUpdated,
-					Value:   response.NewValue,
-					Version: response.NewVersion,
-				}
+			ch <- &Event{
+				Type:    EventUpdated,
+				Value:   response.NewValue,
+				Version: response.NewVersion,
 			}
 		}
 	}()

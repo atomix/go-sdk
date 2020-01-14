@@ -160,10 +160,10 @@ func TestIndexedMapOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 
-	_, err = _map.Put(context.Background(), "foo", []byte("baz"), IfVersion(1))
+	_, err = _map.Replace(context.Background(), "foo", []byte("baz"), IfVersion(1))
 	assert.Error(t, err)
 
-	kv2, err := _map.Put(context.Background(), "foo", []byte("baz"), IfVersion(kv1.Version))
+	kv2, err := _map.Replace(context.Background(), "foo", []byte("baz"), IfVersion(kv1.Version))
 	assert.NoError(t, err)
 	assert.NotEqual(t, kv1.Version, kv2.Version)
 	assert.Equal(t, "baz", string(kv2.Value))

@@ -203,9 +203,9 @@ func (m *indexedMap) Append(ctx context.Context, key string, value []byte) (*Ent
 	r, err := m.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.PutRequest{
-			Header: header,
-			Key:    key,
-			Value:  value,
+			Header:  header,
+			Key:     key,
+			Value:   value,
 			Version: -1,
 		}
 		response, err := client.Put(ctx, request)
@@ -246,9 +246,9 @@ func (m *indexedMap) Put(ctx context.Context, key string, value []byte) (*Entry,
 	r, err := m.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.PutRequest{
-			Header:  header,
-			Key:     key,
-			Value:   value,
+			Header: header,
+			Key:    key,
+			Value:  value,
 		}
 		response, err := client.Put(ctx, request)
 		if err != nil {
@@ -877,48 +877,33 @@ func (m *indexedMap) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchO
 		return err
 	}
 
-	select {
-	case event, ok := <-stream:
-		if !ok {
-			return errors.New("watch handshake failed")
-		}
-		response := event.(*api.EventResponse)
-		if response.Type != api.EventResponse_OPEN {
-			return fmt.Errorf("expected handshake response, received %v", response)
-		}
-	case <-time.After(15 * time.Second):
-		return errors.New("handshake timed out")
-	}
-
 	go func() {
 		defer close(ch)
 		for event := range stream {
 			response := event.(*api.EventResponse)
 
 			// If this is a normal event (not a handshake response), write the event to the watch channel
-			if response.Type != api.EventResponse_OPEN {
-				var t EventType
-				switch response.Type {
-				case api.EventResponse_NONE:
-					t = EventNone
-				case api.EventResponse_INSERTED:
-					t = EventInserted
-				case api.EventResponse_UPDATED:
-					t = EventUpdated
-				case api.EventResponse_REMOVED:
-					t = EventRemoved
-				}
-				ch <- &Event{
-					Type: t,
-					Entry: &Entry{
-						Index:   Index(response.Index),
-						Key:     response.Key,
-						Value:   response.Value,
-						Version: Version(response.Version),
-						Created: response.Created,
-						Updated: response.Updated,
-					},
-				}
+			var t EventType
+			switch response.Type {
+			case api.EventResponse_NONE:
+				t = EventNone
+			case api.EventResponse_INSERTED:
+				t = EventInserted
+			case api.EventResponse_UPDATED:
+				t = EventUpdated
+			case api.EventResponse_REMOVED:
+				t = EventRemoved
+			}
+			ch <- &Event{
+				Type: t,
+				Entry: &Entry{
+					Index:   Index(response.Index),
+					Key:     response.Key,
+					Value:   response.Value,
+					Version: Version(response.Version),
+					Created: response.Created,
+					Updated: response.Updated,
+				},
 			}
 		}
 	}()
