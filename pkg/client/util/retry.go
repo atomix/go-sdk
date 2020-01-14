@@ -136,7 +136,7 @@ func (s *retryingClientStream) RecvMsg(m interface{}) error {
 
 func (s *retryingClientStream) retryStream() error {
 	return backoff.Retry(func() error {
-		stream, err := s.newStream(context.Background())
+		stream, err := s.newStream(s.ctx)
 		if err != nil {
 			return err
 		}
