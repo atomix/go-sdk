@@ -15,10 +15,8 @@
 package net
 
 import (
-	"github.com/atomix/atomix-go-client/pkg/client/util"
 	"google.golang.org/grpc"
 	"sync"
-	"time"
 )
 
 // Address is the address of a partition
@@ -28,9 +26,7 @@ type Address string
 func Connect(address Address) (*grpc.ClientConn, error) {
 	return grpc.Dial(
 		string(address),
-		grpc.WithInsecure(),
-		grpc.WithUnaryInterceptor(util.RetryingUnaryClientInterceptor()),
-		grpc.WithStreamInterceptor(util.RetryingStreamClientInterceptor(100*time.Millisecond)))
+		grpc.WithInsecure())
 }
 
 // NewConns returns a new gRPC client connection manager
