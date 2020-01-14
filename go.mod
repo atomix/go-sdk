@@ -3,8 +3,8 @@ module github.com/atomix/atomix-go-client
 require (
 	cloud.google.com/go v0.43.0 // indirect
 	github.com/atomix/atomix-api v0.0.0-20200114202737-fac5129dc110
-	github.com/atomix/atomix-go-local v0.0.0-20200114210807-673c13f860ad
-	github.com/atomix/atomix-go-node v0.0.0-20200109182801-f5c8e3518e4a
+	github.com/atomix/atomix-go-local v0.0.0-20200114211211-897c3ad6c28a
+	github.com/atomix/atomix-go-node v0.0.0-20200114212450-178a2dc70336
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/protobuf v1.3.2

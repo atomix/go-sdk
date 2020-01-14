@@ -652,8 +652,8 @@ func (m *indexedMap) Replace(ctx context.Context, key string, value []byte, opts
 		return &Entry{
 			Index:   Index(response.Index),
 			Key:     key,
-			Value:   response.PreviousValue,
-			Version: Version(response.PreviousVersion),
+			Value:   value,
+			Version: Version(response.Header.Index),
 		}, nil
 	} else if response.Status == api.ResponseStatus_PRECONDITION_FAILED {
 		return nil, errors.New("write condition failed")
