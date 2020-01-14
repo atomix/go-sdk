@@ -288,9 +288,16 @@ func (s *Session) DoQueryStream(
 		return nil, err
 	}
 
-	ch := make(chan interface{})
-	go s.queryStream(ctx, f, responseFunc, responses, requestHeader, ch)
-	return ch, nil
+	handshakeCh := make(chan struct{})
+	responseCh := make(chan interface{})
+	go s.queryStream(ctx, f, responseFunc, responses, requestHeader, handshakeCh, responseCh)
+
+	select {
+	case <-handshakeCh:
+		return responseCh, nil
+	case <-time.After(15 * time.Second):
+		return nil, errors.New("handshake timed out")
+	}
 }
 
 func (s *Session) queryStream(
@@ -299,36 +306,45 @@ func (s *Session) queryStream(
 	responseFunc func(interface{}) (*headers.ResponseHeader, interface{}, error),
 	responses interface{},
 	requestHeader *headers.RequestHeader,
-	ch chan interface{}) {
+	handshakeCh chan<- struct{},
+	responseCh chan interface{}) {
 	for {
 		responseHeader, response, err := responseFunc(responses)
 		if err != nil {
-			close(ch)
+			close(responseCh)
 			return
 		}
 
-		switch responseHeader.Status {
-		case headers.ResponseStatus_OK:
-			// Record the response
-			s.RecordResponse(requestHeader, responseHeader)
-			ch <- response
-		case headers.ResponseStatus_NOT_LEADER:
-			s.conns.Reconnect(net.Address(responseHeader.Leader))
-			conn, err := s.conns.Connect()
-			if err != nil {
-				close(ch)
-			} else {
-				responses, err := f(ctx, conn, requestHeader)
+		switch responseHeader.Type {
+		case headers.ResponseType_OPEN_STREAM:
+			close(handshakeCh)
+		case headers.ResponseType_CLOSE_STREAM:
+			close(responseCh)
+			return
+		case headers.ResponseType_RESPONSE:
+			switch responseHeader.Status {
+			case headers.ResponseStatus_OK:
+				// Record the response
+				s.RecordResponse(requestHeader, responseHeader)
+				responseCh <- response
+			case headers.ResponseStatus_NOT_LEADER:
+				s.conns.Reconnect(net.Address(responseHeader.Leader))
+				conn, err := s.conns.Connect()
 				if err != nil {
-					close(ch)
+					close(responseCh)
 				} else {
-					go s.queryStream(ctx, f, responseFunc, responses, requestHeader, ch)
+					responses, err := f(ctx, conn, requestHeader)
+					if err != nil {
+						close(responseCh)
+					} else {
+						go s.queryStream(ctx, f, responseFunc, responses, requestHeader, nil, responseCh)
+					}
 				}
+				return
+			case headers.ResponseStatus_ERROR:
+				close(responseCh)
+				return
 			}
-			return
-		case headers.ResponseStatus_ERROR:
-			close(ch)
-			return
 		}
 	}
 }
@@ -350,9 +366,23 @@ func (s *Session) DoCommandStream(
 		return nil, err
 	}
 
-	ch := make(chan interface{})
-	go s.commandStream(ctx, f, responseFunc, responses, stream, requestHeader, ch)
-	return ch, nil
+	// Create a goroutine to close the stream when the context is canceled.
+	// This will ensure that the server is notified the stream has been closed on the next keep-alive.
+	go func() {
+		<-ctx.Done()
+		stream.Close()
+	}()
+
+	handshakeCh := make(chan struct{})
+	responseCh := make(chan interface{})
+	go s.commandStream(ctx, f, responseFunc, responses, stream, requestHeader, handshakeCh, responseCh)
+
+	select {
+	case <-handshakeCh:
+		return responseCh, nil
+	case <-time.After(15 * time.Second):
+		return nil, errors.New("handshake timed out")
+	}
 }
 
 func (s *Session) commandStream(
@@ -362,44 +392,58 @@ func (s *Session) commandStream(
 	responses interface{},
 	stream *Stream,
 	requestHeader *headers.RequestHeader,
-	ch chan interface{}) {
+	handshakeCh chan<- struct{},
+	responseCh chan<- interface{}) {
 	for {
 		responseHeader, response, err := responseFunc(responses)
 		if err != nil {
-			close(ch)
+			close(responseCh)
 			stream.Close()
 			return
 		}
 
-		switch responseHeader.Status {
-		case headers.ResponseStatus_OK:
-			// Record the response
-			s.RecordResponse(requestHeader, responseHeader)
-
-			// Attempt to serialize the response to the stream and skip the response if serialization failed.
-			if stream.Serialize(responseHeader) {
-				ch <- response
+		switch responseHeader.Type {
+		case headers.ResponseType_OPEN_STREAM:
+			if stream.Serialize(responseHeader) && handshakeCh != nil {
+				close(handshakeCh)
 			}
-		case headers.ResponseStatus_NOT_LEADER:
-			s.conns.Reconnect(net.Address(responseHeader.Leader))
-			conn, err := s.conns.Connect()
-			if err != nil {
-				close(ch)
+		case headers.ResponseType_CLOSE_STREAM:
+			if stream.Serialize(responseHeader) {
+				close(responseCh)
 				stream.Close()
-			} else {
-				responses, err := f(ctx, conn, requestHeader)
+				return
+			}
+		case headers.ResponseType_RESPONSE:
+			switch responseHeader.Status {
+			case headers.ResponseStatus_OK:
+				// Record the response
+				s.RecordResponse(requestHeader, responseHeader)
+
+				// Attempt to serialize the response to the stream and skip the response if serialization failed.
+				if stream.Serialize(responseHeader) {
+					responseCh <- response
+				}
+			case headers.ResponseStatus_NOT_LEADER:
+				s.conns.Reconnect(net.Address(responseHeader.Leader))
+				conn, err := s.conns.Connect()
 				if err != nil {
-					close(ch)
+					close(responseCh)
 					stream.Close()
 				} else {
-					go s.commandStream(ctx, f, responseFunc, responses, stream, requestHeader, ch)
+					responses, err := f(ctx, conn, requestHeader)
+					if err != nil {
+						close(responseCh)
+						stream.Close()
+					} else {
+						go s.commandStream(ctx, f, responseFunc, responses, stream, requestHeader, nil, responseCh)
+					}
 				}
+				return
+			case headers.ResponseStatus_ERROR:
+				close(responseCh)
+				stream.Close()
+				return
 			}
-			return
-		case headers.ResponseStatus_ERROR:
-			close(ch)
-			stream.Close()
-			return
 		}
 	}
 }
