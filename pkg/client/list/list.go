@@ -20,10 +20,10 @@ import (
 	"errors"
 	"github.com/atomix/api/proto/atomix/headers"
 	api "github.com/atomix/api/proto/atomix/list"
-	"github.com/atomix/atomix-go-client/pkg/client/primitive"
-	"github.com/atomix/atomix-go-client/pkg/client/session"
-	"github.com/atomix/atomix-go-client/pkg/client/util"
-	"github.com/atomix/atomix-go-client/pkg/client/util/net"
+	"github.com/atomix/go-client/pkg/client/primitive"
+	"github.com/atomix/go-client/pkg/client/session"
+	"github.com/atomix/go-client/pkg/client/util"
+	"github.com/atomix/go-client/pkg/client/util/net"
 	"google.golang.org/grpc"
 )
 

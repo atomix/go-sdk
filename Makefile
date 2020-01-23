@@ -11,7 +11,7 @@ build:
 
 test: # @HELP run the unit tests and source code validation
 test: build license_check linters
-	go test github.com/atomix/atomix-go-client/pkg/...
+	go test github.com/atomix/go-client/pkg/...
 
 coverage: # @HELP generate unit test coverage data
 coverage: build linters license_check

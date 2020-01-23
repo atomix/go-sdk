@@ -1,4 +1,4 @@
-module github.com/atomix/atomix-go-client
+module github.com/atomix/go-client
 
 require (
 	cloud.google.com/go v0.43.0 // indirect

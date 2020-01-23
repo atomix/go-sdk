@@ -16,9 +16,9 @@ package value
 
 import (
 	"context"
-	"github.com/atomix/atomix-go-client/pkg/client/primitive"
-	"github.com/atomix/atomix-go-client/pkg/client/session"
-	"github.com/atomix/atomix-go-client/pkg/client/test"
+	"github.com/atomix/go-client/pkg/client/primitive"
+	"github.com/atomix/go-client/pkg/client/session"
+	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"

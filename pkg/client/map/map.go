@@ -17,10 +17,10 @@ package _map //nolint:golint
 import (
 	"context"
 	"fmt"
-	"github.com/atomix/atomix-go-client/pkg/client/primitive"
-	"github.com/atomix/atomix-go-client/pkg/client/session"
-	"github.com/atomix/atomix-go-client/pkg/client/util"
-	"github.com/atomix/atomix-go-client/pkg/client/util/net"
+	"github.com/atomix/go-client/pkg/client/primitive"
+	"github.com/atomix/go-client/pkg/client/session"
+	"github.com/atomix/go-client/pkg/client/util"
+	"github.com/atomix/go-client/pkg/client/util/net"
 	"sync"
 	"time"
 )

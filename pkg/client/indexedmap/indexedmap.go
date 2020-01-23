@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"github.com/atomix/api/proto/atomix/headers"
 	api "github.com/atomix/api/proto/atomix/indexedmap"
-	"github.com/atomix/atomix-go-client/pkg/client/primitive"
+	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/util"
 	"github.com/atomix/atomix-go-client/pkg/client/util/net"
