@@ -16,8 +16,8 @@ package counter
 
 import (
 	"context"
-	api "github.com/atomix/atomix-api/proto/atomix/counter"
-	"github.com/atomix/atomix-api/proto/atomix/headers"
+	api "github.com/atomix/api/proto/atomix/counter"
+	"github.com/atomix/api/proto/atomix/headers"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"google.golang.org/grpc"
 )

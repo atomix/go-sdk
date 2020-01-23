@@ -17,8 +17,8 @@ package session
 import (
 	"context"
 	"errors"
-	"github.com/atomix/atomix-api/proto/atomix/headers"
-	api "github.com/atomix/atomix-api/proto/atomix/primitive"
+	"github.com/atomix/api/proto/atomix/headers"
+	api "github.com/atomix/api/proto/atomix/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/util/net"
 	"github.com/google/uuid"

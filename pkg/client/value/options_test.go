@@ -15,7 +15,7 @@
 package value
 
 import (
-	api "github.com/atomix/atomix-api/proto/atomix/value"
+	api "github.com/atomix/api/proto/atomix/value"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

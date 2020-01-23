@@ -16,8 +16,8 @@ package _map //nolint:golint
 
 import (
 	"context"
-	"github.com/atomix/atomix-api/proto/atomix/headers"
-	api "github.com/atomix/atomix-api/proto/atomix/map"
+	"github.com/atomix/api/proto/atomix/headers"
+	api "github.com/atomix/api/proto/atomix/map"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"google.golang.org/grpc"
 )

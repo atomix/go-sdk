@@ -2,7 +2,7 @@ module github.com/atomix/atomix-go-client
 
 require (
 	cloud.google.com/go v0.43.0 // indirect
-	github.com/atomix/atomix-api v0.0.0-20200114202737-fac5129dc110
+	github.com/atomix/api v0.0.0-20200123231207-4e5fb1cbaf40 // indirect
 	github.com/atomix/atomix-go-local v0.0.0-20200114211211-897c3ad6c28a
 	github.com/atomix/atomix-go-node v0.0.0-20200114212450-178a2dc70336
 	github.com/cenkalti/backoff v2.2.1+incompatible

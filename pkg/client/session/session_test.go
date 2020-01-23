@@ -16,7 +16,7 @@ package session
 
 import (
 	"context"
-	"github.com/atomix/atomix-api/proto/atomix/headers"
+	"github.com/atomix/api/proto/atomix/headers"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/stretchr/testify/assert"
 	"testing"

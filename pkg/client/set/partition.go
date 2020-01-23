@@ -17,8 +17,8 @@ package set
 import (
 	"context"
 	"errors"
-	"github.com/atomix/atomix-api/proto/atomix/headers"
-	api "github.com/atomix/atomix-api/proto/atomix/set"
+	"github.com/atomix/api/proto/atomix/headers"
+	api "github.com/atomix/api/proto/atomix/set"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/util/net"

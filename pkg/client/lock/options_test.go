@@ -15,7 +15,7 @@
 package lock
 
 import (
-	api "github.com/atomix/atomix-api/proto/atomix/lock"
+	api "github.com/atomix/api/proto/atomix/lock"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"

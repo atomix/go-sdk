@@ -16,8 +16,8 @@ package election
 
 import (
 	"context"
-	api "github.com/atomix/atomix-api/proto/atomix/election"
-	"github.com/atomix/atomix-api/proto/atomix/headers"
+	api "github.com/atomix/api/proto/atomix/election"
+	"github.com/atomix/api/proto/atomix/headers"
 	"github.com/atomix/atomix-go-client/pkg/client/primitive"
 	"github.com/atomix/atomix-go-client/pkg/client/session"
 	"github.com/atomix/atomix-go-client/pkg/client/util"

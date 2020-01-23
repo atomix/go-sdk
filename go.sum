@@ -4,6 +4,8 @@ cloud.google.com/go v0.38.0/go.mod h1:990N+gfupTy94rShfmMCWGDn0LpTmnzTp2qbd1dvSR
 cloud.google.com/go v0.43.0/go.mod h1:BOSR3VbTLkk6FDC/TcffxP4NF/FFBGA5ku+jvKOP7pg=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
+github.com/atomix/api v0.0.0-20200123231207-4e5fb1cbaf40 h1:wLOZYpUQvIVrQOEhN5ND4CXq60yHHMPu7+s1wGG7yU8=
+github.com/atomix/api v0.0.0-20200123231207-4e5fb1cbaf40/go.mod h1:Ec7OEwfv1qGASdRZdXxi6TUvwmayT4IkkewDcm7pItI=
 github.com/atomix/atomix-api v0.0.0-20190826211343-dd8f4db3bf77 h1:+PUuY9wDRp+VAg/JbEguzdOMJj6ruUw6Kw/y+QYHB6s=
 github.com/atomix/atomix-api v0.0.0-20190826211343-dd8f4db3bf77/go.mod h1:joWKUd0zIeYbAQ0vmYHGsnV03ZgRalhceHgnJ3EN0mI=
 github.com/atomix/atomix-api v0.0.0-20191002225141-1ee9c98c7dfd h1:D1Gsxu6L0UyPKcXJM/WUrdDYFyXrjlUP+nj6xhVp9N8=
