@@ -16,9 +16,9 @@ package test
 
 import (
 	"fmt"
-	netutil "github.com/atomix/atomix-go-client/pkg/client/util/net"
-	"github.com/atomix/atomix-go-local/pkg/atomix/local"
-	"github.com/atomix/atomix-go-node/pkg/atomix/registry"
+	netutil "github.com/atomix/go-client/pkg/client/util/net"
+	"github.com/atomix/go-local/pkg/atomix/local"
+	"github.com/atomix/go-replica/pkg/atomix/registry"
 	"net"
 )
 

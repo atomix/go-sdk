@@ -17,7 +17,7 @@ package list
 import (
 	"context"
 	"errors"
-	"github.com/atomix/atomix-go-client/pkg/client/primitive"
+	"github.com/atomix/go-client/pkg/client/primitive"
 )
 
 // slicedList is a slice of a list

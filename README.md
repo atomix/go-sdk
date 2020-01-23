@@ -20,7 +20,7 @@ This project provides a [Go] client for [Atomix].
 3. [Partition Group Management](#managing-partition-groups)
 
 ## Client Usage
-To pull the project run `go get -u github.com/atomix/atomix-go`
+To pull the project run `go get -u github.com/atomix/go-client`
 
 The `client` package provides the primary APIs to managing Atomix partitions and primitives.
 Connect to the Atomix controller by creating a new client and providing the controller address:
@@ -566,5 +566,5 @@ if err != nil {
 
 [go]: https://golang.org
 [atomix]: https://atomix.io
-[k8s-controller]: https://github.com/atomix/atomix-k8s-controller
+[k8s-controller]: https://github.com/atomix/k8s-controller
 [Raft]: https://raft.github.io/
