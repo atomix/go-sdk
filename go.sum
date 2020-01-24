@@ -26,6 +26,7 @@ github.com/atomix/atomix-go-client v0.0.0-20190827234201-188602d4e780/go.mod h1:
 github.com/atomix/atomix-go-client v0.0.0-20191002230120-837d618e27c5/go.mod h1:MoPkrAL33saKe2GbTi+NJgLzW7ejCwrrLDrYIwGYNcE=
 github.com/atomix/atomix-go-client v0.0.0-20191015003555-98ae5ccbe7bd/go.mod h1:jV1V8j+zo30xhC+hufKM/1XIiJKA3ODjwuMA/rBHu8g=
 github.com/atomix/atomix-go-client v0.0.0-20191018192841-3644d110cbec/go.mod h1:bM51i8VXdxw3+vN5spPJWllkfsfpakHYo2bOkNj1xC4=
+github.com/atomix/atomix-go-client v0.0.0-20200114212658-58c359bc47b1/go.mod h1:STv1xDq3qpFABP1zE+9/R2kYuFamQWSGH18w6sfXNE4=
 github.com/atomix/atomix-go-local v0.0.0-20190827233944-938e35b06834 h1:4ddTmYmAaP3WrafV/X76Jq4qNir2jezMQwKgouqNdIU=
 github.com/atomix/atomix-go-local v0.0.0-20190827233944-938e35b06834/go.mod h1:qLBTOiVKoEqzYOjgxIgWFa+Hfa3SR+VexA6jGBcv0HA=
 github.com/atomix/atomix-go-local v0.0.0-20190828183508-3db728c0fc3b h1:iXo/X9AO4U9Kd1t2SkKDw/edL9mtMGRp/5FtzEtU78Q=
@@ -74,6 +75,11 @@ github.com/atomix/atomix-go-node v0.0.0-20200114210733-967537ba5e31 h1:nBeULoeO9
 github.com/atomix/atomix-go-node v0.0.0-20200114210733-967537ba5e31/go.mod h1:95XzgeBRaJ88X7LkIfo7wqOUaGuRKBVNMwVI/BYXRzs=
 github.com/atomix/atomix-go-node v0.0.0-20200114212450-178a2dc70336 h1:zYRXcjiegwDnQNapCmqnAlUrH5x3je730Jof0nKLJkQ=
 github.com/atomix/atomix-go-node v0.0.0-20200114212450-178a2dc70336/go.mod h1:DIYsaWqOiBkyE+vUgHFMM3+vCq07RUskEWN4W5cEtyE=
+github.com/atomix/go-framework v0.0.0-20200123235029-e29fc7d6e104/go.mod h1:Dn7tjt5LIRA/qr5afQZDh9hdtvK82uQpMrADYIlVtfQ=
+github.com/atomix/go-framework v0.0.0-20200124003840-f24758b13aa2 h1:4a6UlvCmvIWf+L9UIcHkR5jxtWIwr1A2PP/xcnulzIs=
+github.com/atomix/go-framework v0.0.0-20200124003840-f24758b13aa2/go.mod h1:vo5K/v+rc5mohoZIw9vbyj+Y/EGGaEdF6XVkEvM9CSM=
+github.com/atomix/go-local v0.0.0-20200124003802-357f6682b2f4 h1:acDXXOuqzbqfOYDTMvz4dhckHfmH0DMfXSQE+gLFGOA=
+github.com/atomix/go-local v0.0.0-20200124003802-357f6682b2f4/go.mod h1:MabPkX/j2bN399GVAYGigyvDaAslu7omZoujEfzdKDg=
 github.com/cenkalti/backoff v2.2.1+incompatible h1:tNowT99t7UNflLxfYYSlKYsBpXdEet03Pg2g16Swow4=
 github.com/cenkalti/backoff v2.2.1+incompatible/go.mod h1:90ReRw6GdpyfrHakVjL/QHaoyV4aDUVVkXQJJJ3NXXM=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=

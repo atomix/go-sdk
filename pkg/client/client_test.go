@@ -26,7 +26,7 @@ import (
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/atomix/go-client/pkg/client/value"
 	"github.com/atomix/go-local/pkg/atomix/local"
-	"github.com/atomix/go-replica/pkg/atomix/registry"
+	"github.com/atomix/atomix/go-framework/pkg/atomix/registry"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/stretchr/testify/assert"
 	"testing"
