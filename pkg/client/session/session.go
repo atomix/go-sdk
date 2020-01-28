@@ -81,7 +81,7 @@ type Handler interface {
 // New creates a new Session for the given primitive
 // name is the name of the primitive
 // handler is the primitive's session handler
-func New(ctx context.Context, name primitive.Name, address net.Address, handler Handler, opts ...Option) (*Session, error) {
+func New(ctx context.Context, name primitive.Name, partition primitive.Partition, handler Handler, opts ...Option) (*Session, error) {
 	options := &options{
 		id:      uuid.New().String(),
 		timeout: 30 * time.Second,
@@ -90,12 +90,13 @@ func New(ctx context.Context, name primitive.Name, address net.Address, handler 
 		opts[i].prepare(options)
 	}
 	session := &Session{
-		ID: options.id,
+		ID:        options.id,
+		Partition: partition.ID,
 		Name: &api.Name{
 			Namespace: name.Application,
 			Name:      name.Name,
 		},
-		conns:   net.NewConns(address),
+		conns:   net.NewConns(partition.Address),
 		handler: handler,
 		Timeout: options.timeout,
 		streams: make(map[uint64]*Stream),
@@ -111,6 +112,7 @@ func New(ctx context.Context, name primitive.Name, address net.Address, handler 
 // Session maintains the session for a primitive
 type Session struct {
 	ID         string
+	Partition  int
 	Name       *api.Name
 	Timeout    time.Duration
 	SessionID  uint64
@@ -159,6 +161,7 @@ func (s *Session) getState() *headers.RequestHeader {
 	defer s.mu.RUnlock()
 	return &headers.RequestHeader{
 		Name:      s.Name,
+		Partition: int32(s.Partition),
 		SessionID: s.SessionID,
 		Index:     s.lastIndex,
 		RequestID: s.responseID,
@@ -172,6 +175,7 @@ func (s *Session) getQueryHeader() *headers.RequestHeader {
 	defer s.mu.RUnlock()
 	return &headers.RequestHeader{
 		Name:      s.Name,
+		Partition: int32(s.Partition),
 		SessionID: s.SessionID,
 		Index:     s.lastIndex,
 		RequestID: s.requestID,
@@ -185,6 +189,7 @@ func (s *Session) nextCommandHeader() *headers.RequestHeader {
 	s.requestID = s.requestID + 1
 	header := &headers.RequestHeader{
 		Name:      s.Name,
+		Partition: int32(s.Partition),
 		SessionID: s.SessionID,
 		Index:     s.lastIndex,
 		RequestID: s.requestID,
@@ -204,6 +209,7 @@ func (s *Session) nextStreamHeader() (*Stream, *headers.RequestHeader) {
 	s.streams[s.requestID] = stream
 	header := &headers.RequestHeader{
 		Name:      s.Name,
+		Partition: int32(s.Partition),
 		SessionID: s.SessionID,
 		Index:     s.lastIndex,
 		RequestID: s.requestID,

@@ -22,7 +22,6 @@ import (
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/session"
 	"github.com/atomix/go-client/pkg/client/util"
-	"github.com/atomix/go-client/pkg/client/util/net"
 	"google.golang.org/grpc"
 )
 
@@ -71,7 +70,7 @@ type Event struct {
 
 // New creates a new Lock primitive for the given partitions
 // The value will be created in one of the given partitions.
-func New(ctx context.Context, name primitive.Name, partitions []net.Address, opts ...session.Option) (Value, error) {
+func New(ctx context.Context, name primitive.Name, partitions []primitive.Partition, opts ...session.Option) (Value, error) {
 	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
 		return nil, err
@@ -80,8 +79,8 @@ func New(ctx context.Context, name primitive.Name, partitions []net.Address, opt
 }
 
 // newValue creates a new Value primitive for the given partition
-func newValue(ctx context.Context, name primitive.Name, address net.Address, opts ...session.Option) (*value, error) {
-	sess, err := session.New(ctx, name, address, &sessionHandler{}, opts...)
+func newValue(ctx context.Context, name primitive.Name, partition primitive.Partition, opts ...session.Option) (*value, error) {
+	sess, err := session.New(ctx, name, partition, &sessionHandler{}, opts...)
 	if err != nil {
 		return nil, err
 	}

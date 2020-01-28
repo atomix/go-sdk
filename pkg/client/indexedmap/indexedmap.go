@@ -23,7 +23,6 @@ import (
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/session"
 	"github.com/atomix/go-client/pkg/client/util"
-	"github.com/atomix/go-client/pkg/client/util/net"
 	"google.golang.org/grpc"
 	"time"
 )
@@ -169,7 +168,7 @@ type Event struct {
 }
 
 // New creates a new IndexedMap primitive
-func New(ctx context.Context, name primitive.Name, partitions []net.Address, opts ...session.Option) (IndexedMap, error) {
+func New(ctx context.Context, name primitive.Name, partitions []primitive.Partition, opts ...session.Option) (IndexedMap, error) {
 	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
 		return nil, err
@@ -178,8 +177,8 @@ func New(ctx context.Context, name primitive.Name, partitions []net.Address, opt
 }
 
 // newIndexedMap creates a new IndexedMap for the given partition
-func newIndexedMap(ctx context.Context, name primitive.Name, address net.Address, opts ...session.Option) (*indexedMap, error) {
-	sess, err := session.New(ctx, name, address, &sessionHandler{}, opts...)
+func newIndexedMap(ctx context.Context, name primitive.Name, partition primitive.Partition, opts ...session.Option) (*indexedMap, error) {
+	sess, err := session.New(ctx, name, partition, &sessionHandler{}, opts...)
 	if err != nil {
 		return nil, err
 	}

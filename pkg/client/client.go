@@ -154,10 +154,13 @@ func (c *Client) newGroup(groupProto *controllerapi.PartitionGroup) (*PartitionG
 	})
 
 	// Iterate through the partitions and create gRPC client connections for each partition.
-	partitions := make([]net.Address, len(groupProto.Partitions))
+	partitions := make([]primitive.Partition, len(groupProto.Partitions))
 	for i, partitionProto := range partitionProtos {
 		ep := partitionProto.Endpoints[0]
-		partitions[i] = net.Address(fmt.Sprintf("%s:%d", ep.Host, ep.Port))
+		partitions[i] = primitive.Partition{
+			ID:      int(partitionProto.PartitionID),
+			Address: net.Address(fmt.Sprintf("%s:%d", ep.Host, ep.Port)),
+		}
 	}
 
 	return &PartitionGroup{
@@ -207,7 +210,7 @@ type PartitionGroup struct {
 	PartitionSize int
 
 	application string
-	partitions  []net.Address
+	partitions  []primitive.Partition
 }
 
 // GetPrimitives gets a list of primitives of the given types
@@ -230,7 +233,7 @@ func (g *PartitionGroup) GetPrimitives(ctx context.Context, types ...primitive.T
 // getPrimitives gets a list of primitives of the given type
 func (g *PartitionGroup) getPrimitives(ctx context.Context, t primitive.Type) ([]*primitiveapi.PrimitiveInfo, error) {
 	results, err := util.ExecuteAsync(len(g.partitions), func(i int) (interface{}, error) {
-		conn, err := net.Connect(g.partitions[i])
+		conn, err := net.Connect(g.partitions[i].Address)
 		if err != nil {
 			return nil, err
 		}

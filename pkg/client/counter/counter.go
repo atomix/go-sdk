@@ -21,7 +21,6 @@ import (
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/session"
 	"github.com/atomix/go-client/pkg/client/util"
-	"github.com/atomix/go-client/pkg/client/util/net"
 	"google.golang.org/grpc"
 )
 
@@ -52,7 +51,7 @@ type Counter interface {
 }
 
 // New creates a new counter for the given partitions
-func New(ctx context.Context, name primitive.Name, partitions []net.Address, opts ...session.Option) (Counter, error) {
+func New(ctx context.Context, name primitive.Name, partitions []primitive.Partition, opts ...session.Option) (Counter, error) {
 	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
 		return nil, err

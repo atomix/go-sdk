@@ -21,12 +21,11 @@ import (
 	api "github.com/atomix/api/proto/atomix/map"
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/session"
-	"github.com/atomix/go-client/pkg/client/util/net"
 	"google.golang.org/grpc"
 )
 
-func newPartition(ctx context.Context, address net.Address, name primitive.Name, opts ...session.Option) (Map, error) {
-	sess, err := session.New(ctx, name, address, &sessionHandler{}, opts...)
+func newPartition(ctx context.Context, name primitive.Name, partition primitive.Partition, opts ...session.Option) (Map, error) {
+	sess, err := session.New(ctx, name, partition, &sessionHandler{}, opts...)
 	if err != nil {
 		return nil, err
 	}

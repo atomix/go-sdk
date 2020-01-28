@@ -23,7 +23,6 @@ import (
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/session"
 	"github.com/atomix/go-client/pkg/client/util"
-	"github.com/atomix/go-client/pkg/client/util/net"
 	"google.golang.org/grpc"
 )
 
@@ -110,7 +109,7 @@ type Event struct {
 }
 
 // New creates a new list primitive
-func New(ctx context.Context, name primitive.Name, partitions []net.Address, opts ...session.Option) (List, error) {
+func New(ctx context.Context, name primitive.Name, partitions []primitive.Partition, opts ...session.Option) (List, error) {
 	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
 		return nil, err
@@ -119,8 +118,8 @@ func New(ctx context.Context, name primitive.Name, partitions []net.Address, opt
 }
 
 // newList creates a new list for the given partition
-func newList(ctx context.Context, name primitive.Name, address net.Address, opts ...session.Option) (*list, error) {
-	sess, err := session.New(ctx, name, address, &sessionHandler{}, opts...)
+func newList(ctx context.Context, name primitive.Name, partition primitive.Partition, opts ...session.Option) (*list, error) {
+	sess, err := session.New(ctx, name, partition, &sessionHandler{}, opts...)
 	if err != nil {
 		return nil, err
 	}

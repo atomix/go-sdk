@@ -14,7 +14,10 @@
 
 package primitive
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/atomix/go-client/pkg/client/util/net"
+)
 
 // Type is the type of a primitive
 type Type string
@@ -55,4 +58,13 @@ type Primitive interface {
 
 	// Delete deletes the primitive state from the cluster
 	Delete() error
+}
+
+// Partition is the ID and address for a partition
+type Partition struct {
+	// ID is the partition identifier
+	ID int
+
+	// Address is the partition address
+	Address net.Address
 }

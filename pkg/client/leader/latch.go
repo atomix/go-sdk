@@ -22,7 +22,6 @@ import (
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/session"
 	"github.com/atomix/go-client/pkg/client/util"
-	"github.com/atomix/go-client/pkg/client/util/net"
 	"google.golang.org/grpc"
 )
 
@@ -98,7 +97,7 @@ type Event struct {
 }
 
 // New creates a new latch primitive
-func New(ctx context.Context, name primitive.Name, partitions []net.Address, opts ...session.Option) (Latch, error) {
+func New(ctx context.Context, name primitive.Name, partitions []primitive.Partition, opts ...session.Option) (Latch, error) {
 	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
 		return nil, err
