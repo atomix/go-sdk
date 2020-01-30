@@ -66,7 +66,63 @@ type Client struct {
 	conns       []*grpc.ClientConn
 }
 
+// GetDatabases returns a list of all databases in the client's namespace
+func (c *Client) GetDatabases(ctx context.Context) ([]*Database, error) {
+	client := controllerapi.NewControllerServiceClient(c.conn)
+	request := &controllerapi.GetDatabasesRequest{
+		ID: &controllerapi.DatabaseId{
+			Namespace: c.namespace,
+		},
+	}
+
+	response, err := client.GetDatabases(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+
+	databases := make([]*Database, len(response.Databases))
+	for i, databaseProto := range response.Databases {
+		database, err := c.newDatabase(databaseProto)
+		if err != nil {
+			return nil, err
+		}
+		databases[i] = database
+	}
+	return databases, nil
+}
+
+// GetDatabase gets a database client by name from the client's namespace
+func (c *Client) GetDatabase(ctx context.Context, name string) {
+
+}
+
+func (c *Client) newDatabase(databaseProto *controllerapi.Database) (*Database, error) {
+	// Ensure the partitions are sorted in case the controller sent them out of order.
+	partitionProtos := databaseProto.Partitions
+	sort.Slice(partitionProtos, func(i, j int) bool {
+		return partitionProtos[i].PartitionID < partitionProtos[j].PartitionID
+	})
+
+	// Iterate through the partitions and create gRPC client connections for each partition.
+	partitions := make([]primitive.Partition, len(databaseProto.Partitions))
+	for i, partitionProto := range partitionProtos {
+		ep := partitionProto.Endpoints[0]
+		partitions[i] = primitive.Partition{
+			ID:      int(partitionProto.PartitionID),
+			Address: net.Address(fmt.Sprintf("%s:%d", ep.Host, ep.Port)),
+		}
+	}
+
+	return &Database{
+		Namespace:   databaseProto.ID.Namespace,
+		Name:        databaseProto.ID.Name,
+		application: c.application,
+		partitions:  partitions,
+	}, nil
+}
+
 // CreateGroup creates a new partition group
+// Deprecated: Groups have been replaced with Databases and can only be modified by the controller
 func (c *Client) CreateGroup(ctx context.Context, name string, partitions int, partitionSize int, protocol proto.Message) (*PartitionGroup, error) {
 	client := controllerapi.NewControllerServiceClient(c.conn)
 
@@ -99,6 +155,7 @@ func (c *Client) CreateGroup(ctx context.Context, name string, partitions int, p
 }
 
 // GetGroups returns a list of all partition group in the client's namespace
+// Deprecated: Groups have been replaced with Databases. Use GetDatabases instead.
 func (c *Client) GetGroups(ctx context.Context) ([]*PartitionGroup, error) {
 	client := controllerapi.NewControllerServiceClient(c.conn)
 	request := &controllerapi.GetPartitionGroupsRequest{
@@ -124,6 +181,7 @@ func (c *Client) GetGroups(ctx context.Context) ([]*PartitionGroup, error) {
 }
 
 // GetGroup returns a partition group primitive client
+// Deprecated: Groups have been replaced with Databases. Use GetDatabase instead.
 func (c *Client) GetGroup(ctx context.Context, name string) (*PartitionGroup, error) {
 	client := controllerapi.NewControllerServiceClient(c.conn)
 	request := &controllerapi.GetPartitionGroupsRequest{
@@ -174,6 +232,7 @@ func (c *Client) newGroup(groupProto *controllerapi.PartitionGroup) (*PartitionG
 }
 
 // DeleteGroup deletes a partition group via the controller
+// Deprecated: Groups have been replaced with Databases and can only be modified by the controller
 func (c *Client) DeleteGroup(ctx context.Context, name string) error {
 	client := controllerapi.NewControllerServiceClient(c.conn)
 	request := &controllerapi.DeletePartitionGroupRequest{
@@ -202,7 +261,120 @@ func (c *Client) Close() error {
 	return result
 }
 
+// Database manages the primitives in a set of partitions
+type Database struct {
+	Namespace string
+	Name      string
+
+	application string
+	partitions  []primitive.Partition
+}
+
+// GetPrimitives gets a list of primitives of the given types
+func (d *Database) GetPrimitives(ctx context.Context, types ...primitive.Type) ([]*primitiveapi.PrimitiveInfo, error) {
+	if len(types) == 0 {
+		return d.getPrimitives(ctx, "")
+	}
+
+	primitives := []*primitiveapi.PrimitiveInfo{}
+	for _, t := range types {
+		typePrimitives, err := d.getPrimitives(ctx, t)
+		if err != nil {
+			return nil, err
+		}
+		primitives = append(primitives, typePrimitives...)
+	}
+	return primitives, nil
+}
+
+// getPrimitives gets a list of primitives of the given type
+func (d *Database) getPrimitives(ctx context.Context, t primitive.Type) ([]*primitiveapi.PrimitiveInfo, error) {
+	results, err := util.ExecuteAsync(len(d.partitions), func(i int) (interface{}, error) {
+		conn, err := net.Connect(d.partitions[i].Address)
+		if err != nil {
+			return nil, err
+		}
+		defer conn.Close()
+		client := primitiveapi.NewPrimitiveServiceClient(conn)
+		request := &primitiveapi.GetPrimitivesRequest{
+			Type:      string(t),
+			Namespace: d.application,
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		response, err := client.GetPrimitives(ctx, request)
+		if err != nil {
+			return nil, err
+		}
+		return response.Primitives, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	primitiveResults := make(map[string]*primitiveapi.PrimitiveInfo)
+	for _, result := range results {
+		primitives := result.([]*primitiveapi.PrimitiveInfo)
+		for _, info := range primitives {
+			primitiveResults[info.Name.String()] = info
+		}
+	}
+
+	primitives := make([]*primitiveapi.PrimitiveInfo, 0, len(primitiveResults))
+	for _, info := range primitiveResults {
+		primitives = append(primitives, info)
+	}
+	return primitives, nil
+}
+
+// GetCounter gets or creates a Counter with the given name
+func (d *Database) GetCounter(ctx context.Context, name string, opts ...session.Option) (counter.Counter, error) {
+	return counter.New(ctx, primitive.NewName(d.Namespace, d.Name, d.application, name), d.partitions, opts...)
+}
+
+// GetElection gets or creates an Election with the given name
+func (d *Database) GetElection(ctx context.Context, name string, opts ...session.Option) (election.Election, error) {
+	return election.New(ctx, primitive.NewName(d.Namespace, d.Name, d.application, name), d.partitions, opts...)
+}
+
+// GetIndexedMap gets or creates a Map with the given name
+func (d *Database) GetIndexedMap(ctx context.Context, name string, opts ...session.Option) (indexedmap.IndexedMap, error) {
+	return indexedmap.New(ctx, primitive.NewName(d.Namespace, d.Name, d.application, name), d.partitions, opts...)
+}
+
+// GetLeaderLatch gets or creates a LeaderLatch with the given name
+func (d *Database) GetLeaderLatch(ctx context.Context, name string, opts ...session.Option) (leader.Latch, error) {
+	return leader.New(ctx, primitive.NewName(d.Namespace, d.Name, d.application, name), d.partitions, opts...)
+}
+
+// GetList gets or creates a List with the given name
+func (d *Database) GetList(ctx context.Context, name string, opts ...session.Option) (list.List, error) {
+	return list.New(ctx, primitive.NewName(d.Namespace, d.Name, d.application, name), d.partitions, opts...)
+}
+
+// GetLock gets or creates a Lock with the given name
+func (d *Database) GetLock(ctx context.Context, name string, opts ...session.Option) (lock.Lock, error) {
+	return lock.New(ctx, primitive.NewName(d.Namespace, d.Name, d.application, name), d.partitions, opts...)
+}
+
+// GetMap gets or creates a Map with the given name
+func (d *Database) GetMap(ctx context.Context, name string, opts ...session.Option) (_map.Map, error) {
+	return _map.New(ctx, primitive.NewName(d.Namespace, d.Name, d.application, name), d.partitions, opts...)
+}
+
+// GetSet gets or creates a Set with the given name
+func (d *Database) GetSet(ctx context.Context, name string, opts ...session.Option) (set.Set, error) {
+	return set.New(ctx, primitive.NewName(d.Namespace, d.Name, d.application, name), d.partitions, opts...)
+}
+
+// GetValue gets or creates a Value with the given name
+func (d *Database) GetValue(ctx context.Context, name string, opts ...session.Option) (value.Value, error) {
+	return value.New(ctx, primitive.NewName(d.Namespace, d.Name, d.application, name), d.partitions, opts...)
+}
+
 // PartitionGroup manages the primitives in a partition group
+// Deprecated: PartitionGroup has been replaced by the Database abstraction
 type PartitionGroup struct {
 	Namespace     string
 	Name          string
