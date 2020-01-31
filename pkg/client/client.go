@@ -92,8 +92,26 @@ func (c *Client) GetDatabases(ctx context.Context) ([]*Database, error) {
 }
 
 // GetDatabase gets a database client by name from the client's namespace
-func (c *Client) GetDatabase(ctx context.Context, name string) {
+func (c *Client) GetDatabase(ctx context.Context, name string) (*Database, error) {
+	client := controllerapi.NewControllerServiceClient(c.conn)
+	request := &controllerapi.GetDatabasesRequest{
+		ID: &controllerapi.DatabaseId{
+			Name:      name,
+			Namespace: c.namespace,
+		},
+	}
 
+	response, err := client.GetDatabases(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(response.Databases) == 0 {
+		return nil, errors.New("unknown database " + name)
+	} else if len(response.Databases) > 1 {
+		return nil, errors.New("database " + name + " is ambiguous")
+	}
+	return c.newDatabase(response.Databases[0])
 }
 
 func (c *Client) newDatabase(databaseProto *controllerapi.Database) (*Database, error) {
