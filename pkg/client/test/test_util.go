@@ -16,6 +16,8 @@ package test
 
 import (
 	"fmt"
+	"github.com/atomix/api/proto/atomix/controller"
+	"github.com/atomix/go-client/pkg/client/primitive"
 	netutil "github.com/atomix/go-client/pkg/client/util/net"
 	"github.com/atomix/go-framework/pkg/atomix/registry"
 	"github.com/atomix/go-local/pkg/atomix/local"
@@ -25,12 +27,15 @@ import (
 const basePort = 5000
 
 // StartTestPartitions starts the given number of local partitions and returns client connections for them
-func StartTestPartitions(partitions int) ([]netutil.Address, []chan struct{}) {
-	addresses := make([]netutil.Address, partitions)
+func StartTestPartitions(partitions int) ([]primitive.Partition, []chan struct{}) {
+	addresses := make([]primitive.Partition, partitions)
 	chans := make([]chan struct{}, partitions)
 	for i := 0; i < partitions; i++ {
 		address, ch := startTestPartition()
-		addresses[i] = address
+		addresses[i] = primitive.Partition{
+			ID:      i + 1,
+			Address: address,
+		}
 		chans[i] = ch
 	}
 	return addresses, chans
@@ -44,7 +49,7 @@ func startTestPartition() (netutil.Address, chan struct{}) {
 		if err != nil {
 			continue
 		}
-		node := local.NewNode(lis, registry.Registry)
+		node := local.NewNode(lis, registry.Registry, []*controller.PartitionId{{Partition: 1}})
 		node.Start()
 
 		ch := make(chan struct{})
