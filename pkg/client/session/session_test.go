@@ -68,7 +68,7 @@ func (h *testHandler) Delete(ctx context.Context, session *Session) error {
 func TestSession(t *testing.T) {
 	name := primitive.NewName("a", "b", "c", "d")
 	handler := newTestHandler()
-	session, err := New(context.TODO(), name, "localhost:5000", handler, WithTimeout(5*time.Second))
+	session, err := New(context.TODO(), name, primitive.Partition{ID: 1, Address: "localhost:5000"}, handler, WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 	assert.NotNil(t, session)
 	assert.Equal(t, "c", session.Name.Namespace)

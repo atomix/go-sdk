@@ -141,6 +141,7 @@ func (c *Client) newDatabase(databaseProto *controllerapi.Database) (*Database, 
 
 // CreateGroup creates a new partition group
 // Deprecated: Groups have been replaced with Databases and can only be modified by the controller
+//nolint:staticcheck
 func (c *Client) CreateGroup(ctx context.Context, name string, partitions int, partitionSize int, protocol proto.Message) (*PartitionGroup, error) {
 	client := controllerapi.NewControllerServiceClient(c.conn)
 
@@ -174,6 +175,7 @@ func (c *Client) CreateGroup(ctx context.Context, name string, partitions int, p
 
 // GetGroups returns a list of all partition group in the client's namespace
 // Deprecated: Groups have been replaced with Databases. Use GetDatabases instead.
+//nolint:staticcheck
 func (c *Client) GetGroups(ctx context.Context) ([]*PartitionGroup, error) {
 	client := controllerapi.NewControllerServiceClient(c.conn)
 	request := &controllerapi.GetPartitionGroupsRequest{
@@ -200,6 +202,7 @@ func (c *Client) GetGroups(ctx context.Context) ([]*PartitionGroup, error) {
 
 // GetGroup returns a partition group primitive client
 // Deprecated: Groups have been replaced with Databases. Use GetDatabase instead.
+//nolint:staticcheck
 func (c *Client) GetGroup(ctx context.Context, name string) (*PartitionGroup, error) {
 	client := controllerapi.NewControllerServiceClient(c.conn)
 	request := &controllerapi.GetPartitionGroupsRequest{
@@ -222,6 +225,7 @@ func (c *Client) GetGroup(ctx context.Context, name string) (*PartitionGroup, er
 	return c.newGroup(response.Groups[0])
 }
 
+//nolint:staticcheck
 func (c *Client) newGroup(groupProto *controllerapi.PartitionGroup) (*PartitionGroup, error) {
 	// Ensure the partitions are sorted in case the controller sent them out of order.
 	partitionProtos := groupProto.Partitions
@@ -251,6 +255,7 @@ func (c *Client) newGroup(groupProto *controllerapi.PartitionGroup) (*PartitionG
 
 // DeleteGroup deletes a partition group via the controller
 // Deprecated: Groups have been replaced with Databases and can only be modified by the controller
+//nolint:staticcheck
 func (c *Client) DeleteGroup(ctx context.Context, name string) error {
 	client := controllerapi.NewControllerServiceClient(c.conn)
 	request := &controllerapi.DeletePartitionGroupRequest{
@@ -315,6 +320,7 @@ func (d *Database) getPrimitives(ctx context.Context, t primitive.Type) ([]*prim
 		defer conn.Close()
 		client := primitiveapi.NewPrimitiveServiceClient(conn)
 		request := &primitiveapi.GetPrimitivesRequest{
+			Partition: uint64(d.partitions[i].ID),
 			Type:      string(t),
 			Namespace: d.application,
 		}

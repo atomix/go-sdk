@@ -25,177 +25,109 @@ import (
 	"github.com/atomix/go-client/pkg/client/set"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/atomix/go-client/pkg/client/value"
-	"github.com/atomix/go-framework/pkg/atomix/registry"
-	"github.com/atomix/go-local/pkg/atomix/local"
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
-func TestClient(t *testing.T) {
-	controller := local.NewController(5679, registry.Registry)
-	err := controller.Start()
-	assert.NoError(t, err)
-	defer controller.Stop()
-
-	client, err := NewClient("localhost:5679", WithNamespace("default"), WithApplication("test"))
-	assert.NoError(t, err)
-	assert.NotNil(t, client)
-
-	groups, err := client.GetGroups(context.TODO())
-	assert.NoError(t, err)
-	assert.Len(t, groups, 0)
-
-	_, err = client.GetGroup(context.TODO(), "none")
-	assert.EqualError(t, err, "unknown partition group none")
-
-	group, err := client.CreateGroup(context.TODO(), "test", 3, 1, &empty.Empty{})
-	assert.NoError(t, err)
-	assert.NotNil(t, group)
-	assert.Equal(t, "default", group.Namespace)
-	assert.Equal(t, "test", group.Name)
-	assert.Equal(t, 3, group.Partitions)
-	assert.Equal(t, 1, group.PartitionSize)
-
-	group, err = client.GetGroup(context.TODO(), "test")
-	assert.NoError(t, err)
-	assert.NotNil(t, group)
-	assert.Equal(t, "default", group.Namespace)
-	assert.Equal(t, "test", group.Name)
-	assert.Equal(t, 3, group.Partitions)
-	assert.Equal(t, 1, group.PartitionSize)
-
-	groups, err = client.GetGroups(context.TODO())
-	assert.NoError(t, err)
-	assert.Len(t, groups, 1)
-	group = groups[0]
-	assert.Equal(t, "default", group.Namespace)
-	assert.Equal(t, "test", group.Name)
-	assert.Equal(t, 3, group.Partitions)
-	assert.Equal(t, 1, group.PartitionSize)
-
-	val, err := group.GetValue(context.TODO(), "foo")
-	assert.NoError(t, err)
-	assert.NotNil(t, val)
-	_, err = val.Set(context.TODO(), []byte("bar"))
-	assert.NoError(t, err)
-	_, _, err = val.Get(context.TODO())
-	assert.NoError(t, err)
-
-	err = client.DeleteGroup(context.TODO(), "test")
-	assert.NoError(t, err)
-
-	_, err = client.GetGroup(context.TODO(), "test")
-	assert.EqualError(t, err, "unknown partition group test")
-
-	groups, err = client.GetGroups(context.TODO())
-	assert.NoError(t, err)
-	assert.Len(t, groups, 0)
-
-	client.Close()
-}
-
-func TestPartitionGroup(t *testing.T) {
+func TestDatabase(t *testing.T) {
 	conns, partitions := test.StartTestPartitions(3)
 
-	group := &PartitionGroup{
-		Namespace:     "default",
-		Name:          "test",
-		Partitions:    len(conns),
-		PartitionSize: 1,
-		application:   "default",
-		partitions:    conns,
+	database := &Database{
+		Namespace:   "default",
+		Name:        "test",
+		application: "default",
+		partitions:  conns,
 	}
 
-	primitives, err := group.GetPrimitives(context.TODO())
+	primitives, err := database.GetPrimitives(context.TODO())
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 0)
 
-	_, err = group.GetCounter(context.TODO(), "counter")
+	_, err = database.GetCounter(context.TODO(), "counter")
 	assert.NoError(t, err)
 
-	primitives, err = group.GetPrimitives(context.TODO())
-	assert.NoError(t, err)
-	assert.Len(t, primitives, 1)
-
-	primitives, err = group.GetPrimitives(context.TODO(), counter.Type)
+	primitives, err = database.GetPrimitives(context.TODO())
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 1)
 
-	_, err = group.GetElection(context.TODO(), "election")
+	primitives, err = database.GetPrimitives(context.TODO(), counter.Type)
+	assert.NoError(t, err)
+	assert.Len(t, primitives, 1)
+
+	_, err = database.GetElection(context.TODO(), "election")
 	assert.NoError(t, err)
 
-	primitives, err = group.GetPrimitives(context.TODO())
+	primitives, err = database.GetPrimitives(context.TODO())
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 2)
 
-	primitives, err = group.GetPrimitives(context.TODO(), election.Type)
+	primitives, err = database.GetPrimitives(context.TODO(), election.Type)
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 1)
 
-	_, err = group.GetIndexedMap(context.TODO(), "indexedmap")
+	_, err = database.GetIndexedMap(context.TODO(), "indexedmap")
 	assert.NoError(t, err)
 
-	primitives, err = group.GetPrimitives(context.TODO())
+	primitives, err = database.GetPrimitives(context.TODO())
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 3)
 
-	primitives, err = group.GetPrimitives(context.TODO(), indexedmap.Type)
+	primitives, err = database.GetPrimitives(context.TODO(), indexedmap.Type)
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 1)
 
-	_, err = group.GetList(context.TODO(), "list")
+	_, err = database.GetList(context.TODO(), "list")
 	assert.NoError(t, err)
 
-	primitives, err = group.GetPrimitives(context.TODO())
+	primitives, err = database.GetPrimitives(context.TODO())
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 4)
 
-	primitives, err = group.GetPrimitives(context.TODO(), list.Type)
+	primitives, err = database.GetPrimitives(context.TODO(), list.Type)
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 1)
 
-	_, err = group.GetLock(context.TODO(), "lock")
+	_, err = database.GetLock(context.TODO(), "lock")
 	assert.NoError(t, err)
 
-	primitives, err = group.GetPrimitives(context.TODO())
+	primitives, err = database.GetPrimitives(context.TODO())
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 5)
 
-	primitives, err = group.GetPrimitives(context.TODO(), lock.Type)
+	primitives, err = database.GetPrimitives(context.TODO(), lock.Type)
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 1)
 
-	_, err = group.GetMap(context.TODO(), "map")
+	_, err = database.GetMap(context.TODO(), "map")
 	assert.NoError(t, err)
 
-	primitives, err = group.GetPrimitives(context.TODO())
+	primitives, err = database.GetPrimitives(context.TODO())
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 6)
 
-	primitives, err = group.GetPrimitives(context.TODO(), _map.Type)
+	primitives, err = database.GetPrimitives(context.TODO(), _map.Type)
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 1)
 
-	_, err = group.GetSet(context.TODO(), "set")
+	_, err = database.GetSet(context.TODO(), "set")
 	assert.NoError(t, err)
 
-	primitives, err = group.GetPrimitives(context.TODO())
+	primitives, err = database.GetPrimitives(context.TODO())
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 7)
 
-	primitives, err = group.GetPrimitives(context.TODO(), set.Type)
+	primitives, err = database.GetPrimitives(context.TODO(), set.Type)
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 1)
 
-	_, err = group.GetValue(context.TODO(), "value")
+	_, err = database.GetValue(context.TODO(), "value")
 	assert.NoError(t, err)
 
-	primitives, err = group.GetPrimitives(context.TODO())
+	primitives, err = database.GetPrimitives(context.TODO())
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 8)
 
-	primitives, err = group.GetPrimitives(context.TODO(), value.Type)
+	primitives, err = database.GetPrimitives(context.TODO(), value.Type)
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 1)
 

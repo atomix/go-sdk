@@ -31,9 +31,10 @@ func StartTestPartitions(partitions int) ([]primitive.Partition, []chan struct{}
 	addresses := make([]primitive.Partition, partitions)
 	chans := make([]chan struct{}, partitions)
 	for i := 0; i < partitions; i++ {
-		address, ch := startTestPartition()
+		partitionID := i + 1
+		address, ch := startTestPartition(partitionID)
 		addresses[i] = primitive.Partition{
-			ID:      i + 1,
+			ID:      partitionID,
 			Address: address,
 		}
 		chans[i] = ch
@@ -42,14 +43,14 @@ func StartTestPartitions(partitions int) ([]primitive.Partition, []chan struct{}
 }
 
 // startTestPartition starts a single local partition
-func startTestPartition() (netutil.Address, chan struct{}) {
+func startTestPartition(partitionID int) (netutil.Address, chan struct{}) {
 	for port := basePort; port < basePort+100; port++ {
 		address := netutil.Address(fmt.Sprintf("localhost:%d", port))
 		lis, err := net.Listen("tcp", string(address))
 		if err != nil {
 			continue
 		}
-		node := local.NewNode(lis, registry.Registry, []*controller.PartitionId{{Partition: 1}})
+		node := local.NewNode(lis, registry.Registry, []*controller.PartitionId{{Partition: int32(partitionID)}})
 		node.Start()
 
 		ch := make(chan struct{})
