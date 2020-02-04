@@ -60,10 +60,20 @@ func TestLogOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "bar", string(kv.Value))
 
+	// Gets the first index
+	firstIndex, err := _log.FirstIndex(context.Background())
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(0x1), uint64(firstIndex))
+
 	// Gets the last entry in the log
 	kv, err = _log.LastEntry(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, "baz", string(kv.Value))
+
+	// Gets the last index
+	lastIndex, err := _log.LastIndex(context.Background())
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(0x2), uint64(lastIndex))
 
 	// Gets the next entry of the given index in the log
 	kv, err = _log.NextEntry(context.Background(), 1)
