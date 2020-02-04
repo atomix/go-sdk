@@ -30,34 +30,6 @@ type RemoveOption interface {
 	afterRemove(response *api.RemoveResponse)
 }
 
-// IfVersion sets the required version for optimistic concurrency control
-func IfVersion(version Version) VersionOption {
-	return VersionOption{version: version}
-}
-
-// VersionOption is an implementation of SetOption and RemoveOption to specify the version for concurrency control
-type VersionOption struct {
-	SetOption
-	RemoveOption
-	version Version
-}
-
-func (o VersionOption) beforePut(request *api.AppendRequest) {
-	request.Version = int64(o.version)
-}
-
-func (o VersionOption) afterPut(response *api.AppendResponse) {
-
-}
-
-func (o VersionOption) beforeRemove(request *api.RemoveRequest) {
-	request.Version = int64(o.version)
-}
-
-func (o VersionOption) afterRemove(response *api.RemoveResponse) {
-
-}
-
 // IfNotSet sets the value if the entry is not yet set
 func IfNotSet() SetOption {
 	return &NotSetOption{}
@@ -68,7 +40,6 @@ type NotSetOption struct {
 }
 
 func (o NotSetOption) beforePut(request *api.AppendRequest) {
-	request.Version = -1
 }
 
 func (o NotSetOption) afterPut(response *api.AppendResponse) {
@@ -94,9 +65,8 @@ func (o defaultOption) beforeGet(request *api.GetRequest) {
 }
 
 func (o defaultOption) afterGet(response *api.GetResponse) {
-	if response.Version == 0 {
-		response.Value = o.def
-	}
+	response.Value = o.def
+
 }
 
 // WatchOption is an option for the Watch method

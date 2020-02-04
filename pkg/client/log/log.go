@@ -34,9 +34,6 @@ const Type primitive.Type = "Log"
 // Index is the index of an entry
 type Index uint64
 
-// Version is the version of an entry
-type Version uint64
-
 // Client provides an API for creating IndexedMaps
 type Client interface {
 	// GetLog gets the log instance of the given name
@@ -80,8 +77,8 @@ type Log interface {
 	// Remove removes an entry from the log
 	Remove(ctx context.Context, index int64, opts ...RemoveOption) (*Entry, error)
 
-	// Len returns the number of entries in the log
-	Len(ctx context.Context) (int, error)
+	// Size returns the number of entries in the log
+	Size(ctx context.Context) (int, error)
 
 	// Clear removes all entries from the log
 	Clear(ctx context.Context) error
@@ -98,10 +95,6 @@ type Entry struct {
 	// for the lifetime of a key.
 	Index Index
 
-	// Version is the unique, monotonically increasing version number for the key/value pair. The version is
-	// suitable for use in optimistic locking.
-	Version Version
-
 	// Value is the value of the pair
 	Value []byte
 
@@ -110,7 +103,7 @@ type Entry struct {
 }
 
 func (kv Entry) String() string {
-	return fmt.Sprintf("index: %d\nvalue: %s\nversion: %d", kv.Index, string(kv.Value), kv.Version)
+	return fmt.Sprintf("index: %d\nvalue: %s\n", kv.Index, string(kv.Value))
 }
 
 // EventType is the type of a log event
@@ -171,9 +164,8 @@ func (l *log) Append(ctx context.Context, value []byte) (*Entry, error) {
 	r, err := l.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLogServiceClient(conn)
 		request := &api.AppendRequest{
-			Header:  header,
-			Value:   value,
-			Version: -1,
+			Header: header,
+			Value:  value,
 		}
 		response, err := client.Append(ctx, request)
 		if err != nil {
@@ -188,9 +180,8 @@ func (l *log) Append(ctx context.Context, value []byte) (*Entry, error) {
 	response := r.(*api.AppendResponse)
 	if response.Status == api.ResponseStatus_OK {
 		return &Entry{
-			Index:   Index(response.Index),
-			Value:   value,
-			Version: Version(response.Header.Index),
+			Index: Index(response.Index),
+			Value: value,
 		}, nil
 	} else if response.Status == api.ResponseStatus_PRECONDITION_FAILED {
 		return nil, errors.New("write condition failed")
@@ -200,7 +191,6 @@ func (l *log) Append(ctx context.Context, value []byte) (*Entry, error) {
 		return &Entry{
 			Index:     Index(response.Index),
 			Value:     value,
-			Version:   Version(response.PreviousVersion),
 			Timestamp: response.Timestamp,
 		}, nil
 	}
@@ -230,15 +220,13 @@ func (l *log) Get(ctx context.Context, index int64, opts ...GetOption) (*Entry, 
 	}
 
 	response := r.(*api.GetResponse)
-	if response.Version != 0 {
-		return &Entry{
-			Index:     Index(response.Index),
-			Value:     response.Value,
-			Version:   Version(response.Version),
-			Timestamp: response.Timestamp,
-		}, nil
-	}
-	return nil, nil
+
+	return &Entry{
+		Index:     Index(response.Index),
+		Value:     response.Value,
+		Timestamp: response.Timestamp,
+	}, nil
+
 }
 
 func (l *log) GetIndex(ctx context.Context, index Index, opts ...GetOption) (*Entry, error) {
@@ -265,15 +253,12 @@ func (l *log) GetIndex(ctx context.Context, index Index, opts ...GetOption) (*En
 	}
 
 	response := r.(*api.GetResponse)
-	if response.Version != 0 {
-		return &Entry{
-			Index:     Index(response.Index),
-			Value:     response.Value,
-			Version:   Version(response.Version),
-			Timestamp: response.Timestamp,
-		}, nil
-	}
-	return nil, nil
+	return &Entry{
+		Index:     Index(response.Index),
+		Value:     response.Value,
+		Timestamp: response.Timestamp,
+	}, nil
+
 }
 
 func (l *log) FirstIndex(ctx context.Context) (Index, error) {
@@ -293,10 +278,7 @@ func (l *log) FirstIndex(ctx context.Context) (Index, error) {
 	}
 
 	response := r.(*api.FirstEntryResponse)
-	if response.Version != 0 {
-		return Index(response.Index), nil
-	}
-	return 0, nil
+	return Index(response.Index), nil
 }
 
 func (l *log) LastIndex(ctx context.Context) (Index, error) {
@@ -316,10 +298,8 @@ func (l *log) LastIndex(ctx context.Context) (Index, error) {
 	}
 
 	response := r.(*api.LastEntryResponse)
-	if response.Version != 0 {
-		return Index(response.Index), nil
-	}
-	return 0, nil
+	return Index(response.Index), nil
+
 }
 
 func (l *log) PrevIndex(ctx context.Context, index Index) (Index, error) {
@@ -340,10 +320,8 @@ func (l *log) PrevIndex(ctx context.Context, index Index) (Index, error) {
 	}
 
 	response := r.(*api.PrevEntryResponse)
-	if response.Version != 0 {
-		return Index(response.Index), nil
-	}
-	return 0, nil
+	return Index(response.Index), nil
+
 }
 
 func (l *log) NextIndex(ctx context.Context, index Index) (Index, error) {
@@ -364,10 +342,7 @@ func (l *log) NextIndex(ctx context.Context, index Index) (Index, error) {
 	}
 
 	response := r.(*api.NextEntryResponse)
-	if response.Version != 0 {
-		return Index(response.Index), nil
-	}
-	return 0, nil
+	return Index(response.Index), nil
 }
 
 func (l *log) FirstEntry(ctx context.Context) (*Entry, error) {
@@ -387,15 +362,13 @@ func (l *log) FirstEntry(ctx context.Context) (*Entry, error) {
 	}
 
 	response := r.(*api.FirstEntryResponse)
-	if response.Version != 0 {
-		return &Entry{
-			Index:     Index(response.Index),
-			Value:     response.Value,
-			Version:   Version(response.Version),
-			Timestamp: response.Timestamp,
-		}, nil
-	}
-	return nil, err
+
+	return &Entry{
+		Index:     Index(response.Index),
+		Value:     response.Value,
+		Timestamp: response.Timestamp,
+	}, nil
+
 }
 
 func (l *log) LastEntry(ctx context.Context) (*Entry, error) {
@@ -415,15 +388,13 @@ func (l *log) LastEntry(ctx context.Context) (*Entry, error) {
 	}
 
 	response := r.(*api.LastEntryResponse)
-	if response.Version != 0 {
-		return &Entry{
-			Index:     Index(response.Index),
-			Value:     response.Value,
-			Version:   Version(response.Version),
-			Timestamp: response.Timestamp,
-		}, nil
-	}
-	return nil, err
+
+	return &Entry{
+		Index:     Index(response.Index),
+		Value:     response.Value,
+		Timestamp: response.Timestamp,
+	}, nil
+
 }
 
 func (l *log) PrevEntry(ctx context.Context, index Index) (*Entry, error) {
@@ -444,14 +415,11 @@ func (l *log) PrevEntry(ctx context.Context, index Index) (*Entry, error) {
 	}
 
 	response := r.(*api.PrevEntryResponse)
-	if response.Version != 0 {
-		return &Entry{
-			Index:   Index(response.Index),
-			Value:   response.Value,
-			Version: Version(response.Version),
-		}, nil
-	}
-	return nil, err
+	return &Entry{
+		Index: Index(response.Index),
+		Value: response.Value,
+	}, nil
+
 }
 
 func (l *log) NextEntry(ctx context.Context, index Index) (*Entry, error) {
@@ -472,15 +440,11 @@ func (l *log) NextEntry(ctx context.Context, index Index) (*Entry, error) {
 	}
 
 	response := r.(*api.NextEntryResponse)
-	if response.Version != 0 {
-		return &Entry{
-			Index:     Index(response.Index),
-			Value:     response.Value,
-			Version:   Version(response.Version),
-			Timestamp: response.Timestamp,
-		}, nil
-	}
-	return nil, err
+	return &Entry{
+		Index:     Index(response.Index),
+		Value:     response.Value,
+		Timestamp: response.Timestamp,
+	}, nil
 }
 
 func (l *log) Remove(ctx context.Context, index int64, opts ...RemoveOption) (*Entry, error) {
@@ -509,9 +473,8 @@ func (l *log) Remove(ctx context.Context, index int64, opts ...RemoveOption) (*E
 	response := r.(*api.RemoveResponse)
 	if response.Status == api.ResponseStatus_OK {
 		return &Entry{
-			Index:   Index(response.Index),
-			Value:   response.PreviousValue,
-			Version: Version(response.PreviousVersion),
+			Index: Index(response.Index),
+			Value: response.PreviousValue,
 		}, nil
 	} else if response.Status == api.ResponseStatus_PRECONDITION_FAILED {
 		return nil, errors.New("write condition failed")
@@ -522,7 +485,7 @@ func (l *log) Remove(ctx context.Context, index int64, opts ...RemoveOption) (*E
 	}
 }
 
-func (l *log) Len(ctx context.Context) (int, error) {
+func (l *log) Size(ctx context.Context) (int, error) {
 	response, err := l.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLogServiceClient(conn)
 		request := &api.SizeRequest{
@@ -599,7 +562,6 @@ func (l *log) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) 
 				Entry: &Entry{
 					Index:     Index(response.Index),
 					Value:     response.Value,
-					Version:   Version(response.Version),
 					Timestamp: response.Timestamp,
 				},
 			}

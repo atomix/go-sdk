@@ -36,10 +36,10 @@ func TestLogOperations(t *testing.T) {
 	// Gets the log entry at index 0
 	kv, err := _log.Get(context.Background(), 0)
 	assert.NoError(t, err)
-	assert.Nil(t, kv)
+	assert.NotNil(t, kv)
 
 	// Checks the size of log primitive
-	size, err := _log.Len(context.Background())
+	size, err := _log.Size(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, 0, size)
 
@@ -92,7 +92,7 @@ func TestLogOperations(t *testing.T) {
 	assert.Equal(t, "bar", string(kv.Value))
 
 	// Gets the size of the log primitive
-	size, err = _log.Len(context.Background())
+	size, err = _log.Size(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, 2, size)
 
@@ -106,8 +106,8 @@ func TestLogOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "baz", string(kv.Value))
 
-	// Checks the length of the log primitive
-	size, err = _log.Len(context.Background())
+	// Checks the size of the log primitive
+	size, err = _log.Size(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, 0, size)
 
@@ -175,7 +175,7 @@ func TestLogStreams(t *testing.T) {
 	log2, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 
-	size, err := log1.Len(context.TODO())
+	size, err := log1.Size(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, 5, size)
 
@@ -191,7 +191,7 @@ func TestLogStreams(t *testing.T) {
 	_log, err = New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
 	assert.NoError(t, err)
 
-	size, err = _log.Len(context.TODO())
+	size, err = _log.Size(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, 0, size)
 
