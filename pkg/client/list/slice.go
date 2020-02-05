@@ -164,10 +164,10 @@ func (l *slicedList) Clear(ctx context.Context) error {
 	return errors.New("cannot clear list slice")
 }
 
-func (l *slicedList) Close() error {
-	return l.list.Close()
+func (l *slicedList) Close(ctx context.Context) error {
+	return l.list.Close(ctx)
 }
 
-func (l *slicedList) Delete() error {
+func (l *slicedList) Delete(ctx context.Context) error {
 	return errors.New("cannot delete list slice")
 }

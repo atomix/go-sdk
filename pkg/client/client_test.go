@@ -36,7 +36,7 @@ func TestDatabase(t *testing.T) {
 		Namespace:   "default",
 		Name:        "test",
 		application: "default",
-		partitions:  conns,
+		sessions:    conns,
 	}
 
 	primitives, err := database.GetPrimitives(context.TODO())

@@ -19,7 +19,6 @@ import (
 	api "github.com/atomix/api/proto/atomix/counter"
 	"github.com/atomix/api/proto/atomix/headers"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/session"
 	"github.com/atomix/go-client/pkg/client/util"
 	"google.golang.org/grpc"
 )
@@ -30,7 +29,7 @@ const Type primitive.Type = "Counter"
 // Client provides an API for creating Counters
 type Client interface {
 	// GetCounter gets the Counter instance of the given name
-	GetCounter(ctx context.Context, name string, opts ...session.Option) (Counter, error)
+	GetCounter(ctx context.Context, name string) (Counter, error)
 }
 
 // Counter provides a distributed atomic counter
@@ -51,27 +50,27 @@ type Counter interface {
 }
 
 // New creates a new counter for the given partitions
-func New(ctx context.Context, name primitive.Name, partitions []primitive.Partition, opts ...session.Option) (Counter, error) {
+func New(ctx context.Context, name primitive.Name, partitions []*primitive.Session) (Counter, error) {
 	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
 		return nil, err
 	}
 
-	sess, err := session.New(ctx, name, partitions[i], &sessionHandler{}, opts...)
+	instance, err := primitive.NewInstance(ctx, name, partitions[i], &primitiveHandler{})
 	if err != nil {
 		return nil, err
 	}
 
 	return &counter{
-		name:    name,
-		session: sess,
+		name:     name,
+		instance: instance,
 	}, nil
 }
 
 // counter is the single partition implementation of Counter
 type counter struct {
-	name    primitive.Name
-	session *session.Session
+	name     primitive.Name
+	instance *primitive.Instance
 }
 
 func (c *counter) Name() primitive.Name {
@@ -79,7 +78,7 @@ func (c *counter) Name() primitive.Name {
 }
 
 func (c *counter) Get(ctx context.Context) (int64, error) {
-	response, err := c.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := c.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewCounterServiceClient(conn)
 		request := &api.GetRequest{
 			Header: header,
@@ -97,7 +96,7 @@ func (c *counter) Get(ctx context.Context) (int64, error) {
 }
 
 func (c *counter) Set(ctx context.Context, value int64) error {
-	_, err := c.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	_, err := c.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewCounterServiceClient(conn)
 		request := &api.SetRequest{
 			Header: header,
@@ -113,7 +112,7 @@ func (c *counter) Set(ctx context.Context, value int64) error {
 }
 
 func (c *counter) Increment(ctx context.Context, delta int64) (int64, error) {
-	response, err := c.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := c.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewCounterServiceClient(conn)
 		request := &api.IncrementRequest{
 			Header: header,
@@ -132,7 +131,7 @@ func (c *counter) Increment(ctx context.Context, delta int64) (int64, error) {
 }
 
 func (c *counter) Decrement(ctx context.Context, delta int64) (int64, error) {
-	response, err := c.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := c.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewCounterServiceClient(conn)
 		request := &api.DecrementRequest{
 			Header: header,
@@ -150,10 +149,10 @@ func (c *counter) Decrement(ctx context.Context, delta int64) (int64, error) {
 	return response.(*api.DecrementResponse).NextValue, nil
 }
 
-func (c *counter) Close() error {
-	return c.session.Close()
+func (c *counter) Close(ctx context.Context) error {
+	return c.instance.Close(ctx)
 }
 
-func (c *counter) Delete() error {
-	return c.session.Delete()
+func (c *counter) Delete(ctx context.Context) error {
+	return c.instance.Delete(ctx)
 }

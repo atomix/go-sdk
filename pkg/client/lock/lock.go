@@ -19,7 +19,6 @@ import (
 	"github.com/atomix/api/proto/atomix/headers"
 	api "github.com/atomix/api/proto/atomix/lock"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/session"
 	"github.com/atomix/go-client/pkg/client/util"
 	"google.golang.org/grpc"
 )
@@ -30,7 +29,7 @@ const Type primitive.Type = "Lock"
 // Client provides an API for creating Locks
 type Client interface {
 	// GetLock gets the Lock instance of the given name
-	GetLock(ctx context.Context, name string, opts ...session.Option) (Lock, error)
+	GetLock(ctx context.Context, name string) (Lock, error)
 }
 
 // Lock provides distributed concurrency control
@@ -49,30 +48,30 @@ type Lock interface {
 
 // New creates a new Lock primitive for the given partitions
 // The lock will be created in one of the given partitions.
-func New(ctx context.Context, name primitive.Name, partitions []primitive.Partition, opts ...session.Option) (Lock, error) {
+func New(ctx context.Context, name primitive.Name, partitions []*primitive.Session) (Lock, error) {
 	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
 		return nil, err
 	}
-	return newLock(ctx, name, partitions[i], opts...)
+	return newLock(ctx, name, partitions[i])
 }
 
 // newLock creates a new Lock primitive for the given partition
-func newLock(ctx context.Context, name primitive.Name, partition primitive.Partition, opts ...session.Option) (*lock, error) {
-	sess, err := session.New(ctx, name, partition, &sessionHandler{}, opts...)
+func newLock(ctx context.Context, name primitive.Name, partition *primitive.Session) (*lock, error) {
+	instance, err := primitive.NewInstance(ctx, name, partition, &primitiveHandler{})
 	if err != nil {
 		return nil, err
 	}
 	return &lock{
-		name:    name,
-		session: sess,
+		name:     name,
+		instance: instance,
 	}, nil
 }
 
 // lock is the single partition implementation of Lock
 type lock struct {
-	name    primitive.Name
-	session *session.Session
+	name     primitive.Name
+	instance *primitive.Instance
 }
 
 func (l *lock) Name() primitive.Name {
@@ -80,7 +79,7 @@ func (l *lock) Name() primitive.Name {
 }
 
 func (l *lock) Lock(ctx context.Context, opts ...LockOption) (uint64, error) {
-	response, err := l.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := l.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLockServiceClient(conn)
 		request := &api.LockRequest{
 			Header: header,
@@ -104,7 +103,7 @@ func (l *lock) Lock(ctx context.Context, opts ...LockOption) (uint64, error) {
 }
 
 func (l *lock) Unlock(ctx context.Context, opts ...UnlockOption) (bool, error) {
-	response, err := l.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := l.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLockServiceClient(conn)
 		request := &api.UnlockRequest{
 			Header: header,
@@ -128,7 +127,7 @@ func (l *lock) Unlock(ctx context.Context, opts ...UnlockOption) (bool, error) {
 }
 
 func (l *lock) IsLocked(ctx context.Context, opts ...IsLockedOption) (bool, error) {
-	response, err := l.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := l.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLockServiceClient(conn)
 		request := &api.IsLockedRequest{
 			Header: header,
@@ -151,10 +150,10 @@ func (l *lock) IsLocked(ctx context.Context, opts ...IsLockedOption) (bool, erro
 	return response.(*api.IsLockedResponse).IsLocked, nil
 }
 
-func (l *lock) Close() error {
-	return l.session.Close()
+func (l *lock) Close(ctx context.Context) error {
+	return l.instance.Close(ctx)
 }
 
-func (l *lock) Delete() error {
-	return l.session.Delete()
+func (l *lock) Delete(ctx context.Context) error {
+	return l.instance.Delete(ctx)
 }

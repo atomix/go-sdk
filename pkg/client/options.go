@@ -14,12 +14,16 @@
 
 package client
 
-import "os"
+import (
+	"os"
+	"time"
+)
 
 func applyOptions(opts ...Option) *options {
 	options := &options{
-		namespace:   os.Getenv("ATOMIX_NAMESPACE"),
-		application: os.Getenv("ATOMIX_APP"),
+		namespace:      os.Getenv("ATOMIX_NAMESPACE"),
+		application:    os.Getenv("ATOMIX_APP"),
+		sessionTimeout: 1 * time.Minute,
 	}
 	for _, opt := range opts {
 		opt.apply(options)
@@ -28,8 +32,9 @@ func applyOptions(opts ...Option) *options {
 }
 
 type options struct {
-	application string
-	namespace   string
+	application    string
+	namespace      string
+	sessionTimeout time.Duration
 }
 
 // Option provides a client option
@@ -61,4 +66,19 @@ func (o *namespaceOption) apply(options *options) {
 // WithNamespace configures the client's partition group namespace
 func WithNamespace(namespace string) Option {
 	return &namespaceOption{namespace: namespace}
+}
+
+type sessionTimeoutOption struct {
+	timeout time.Duration
+}
+
+func (s *sessionTimeoutOption) apply(options *options) {
+	options.sessionTimeout = s.timeout
+}
+
+// WithSessionTimeout sets the session timeout for the client
+func WithSessionTimeout(timeout time.Duration) Option {
+	return &sessionTimeoutOption{
+		timeout: timeout,
+	}
 }

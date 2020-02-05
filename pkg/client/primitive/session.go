@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package session
+package primitive
 
 import (
 	"context"
 	"errors"
 	"github.com/atomix/api/proto/atomix/headers"
-	api "github.com/atomix/api/proto/atomix/primitive"
-	"github.com/atomix/go-client/pkg/client/primitive"
+	primitiveapi "github.com/atomix/api/proto/atomix/primitive"
+	api "github.com/atomix/api/proto/atomix/session"
 	"github.com/atomix/go-client/pkg/client/util/net"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
@@ -27,62 +27,34 @@ import (
 	"time"
 )
 
-// Option implements a session option
-type Option interface {
-	prepare(options *options)
+// SessionOption implements a session option
+type SessionOption interface {
+	prepare(options *sessionOptions)
 }
 
-// WithID returns a session Option to set the human-readable session ID
-func WithID(id string) Option {
-	return idOption{id: id}
+// WithSessionTimeout returns a session SessionOption to configure the session timeout
+func WithSessionTimeout(timeout time.Duration) SessionOption {
+	return sessionTimeoutOption{timeout: timeout}
 }
 
-type idOption struct {
-	id string
-}
-
-func (o idOption) prepare(options *options) {
-	options.id = o.id
-}
-
-// WithTimeout returns a session Option to configure the session timeout
-func WithTimeout(timeout time.Duration) Option {
-	return timeoutOption{timeout: timeout}
-}
-
-type timeoutOption struct {
+type sessionTimeoutOption struct {
 	timeout time.Duration
 }
 
-func (o timeoutOption) prepare(options *options) {
+func (o sessionTimeoutOption) prepare(options *sessionOptions) {
 	options.timeout = o.timeout
 }
 
-type options struct {
+type sessionOptions struct {
 	id      string
 	timeout time.Duration
 }
 
-// Handler provides session management for a primitive implementation
-type Handler interface {
-	// Create is called to create the session
-	Create(ctx context.Context, session *Session) error
-
-	// KeepAlive is called periodically to keep the session alive
-	KeepAlive(ctx context.Context, session *Session) error
-
-	// Close is called to close the session
-	Close(ctx context.Context, session *Session) error
-
-	// Delete is called to delete the primitive
-	Delete(ctx context.Context, session *Session) error
-}
-
-// New creates a new Session for the given primitive
+// NewSession creates a new Session for the given partition
 // name is the name of the primitive
 // handler is the primitive's session handler
-func New(ctx context.Context, name primitive.Name, partition primitive.Partition, handler Handler, opts ...Option) (*Session, error) {
-	options := &options{
+func NewSession(ctx context.Context, partition Partition, opts ...SessionOption) (*Session, error) {
+	options := &sessionOptions{
 		id:      uuid.New().String(),
 		timeout: 30 * time.Second,
 	}
@@ -90,20 +62,14 @@ func New(ctx context.Context, name primitive.Name, partition primitive.Partition
 		opts[i].prepare(options)
 	}
 	session := &Session{
-		ID:        options.id,
 		Partition: partition.ID,
-		Name: &api.Name{
-			Namespace: name.Application,
-			Name:      name.Name,
-		},
-		conns:   net.NewConns(partition.Address),
-		handler: handler,
-		Timeout: options.timeout,
-		streams: make(map[uint64]*Stream),
-		mu:      sync.RWMutex{},
-		ticker:  time.NewTicker(options.timeout / 2),
+		conns:     net.NewConns(partition.Address),
+		Timeout:   options.timeout,
+		streams:   make(map[uint64]*Stream),
+		mu:        sync.RWMutex{},
+		ticker:    time.NewTicker(options.timeout / 2),
 	}
-	if err := session.start(ctx); err != nil {
+	if err := session.open(ctx); err != nil {
 		return nil, err
 	}
 	return session, nil
@@ -111,13 +77,10 @@ func New(ctx context.Context, name primitive.Name, partition primitive.Partition
 
 // Session maintains the session for a primitive
 type Session struct {
-	ID         string
 	Partition  int
-	Name       *api.Name
 	Timeout    time.Duration
 	SessionID  uint64
 	conns      *net.Conns
-	handler    Handler
 	lastIndex  uint64
 	requestID  uint64
 	responseID uint64
@@ -126,41 +89,82 @@ type Session struct {
 	ticker     *time.Ticker
 }
 
-// start creates the session and begins keep-alives
-func (s *Session) start(ctx context.Context) error {
-	err := s.handler.Create(ctx, s)
+// open creates the session and begins keep-alives
+func (s *Session) open(ctx context.Context) error {
+	err := s.doSession(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		request := &api.OpenSessionRequest{
+			Header:  header,
+			Timeout: &s.Timeout,
+		}
+		client := api.NewSessionServiceClient(conn)
+		response, err := client.OpenSession(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
 	if err != nil {
 		return err
 	}
 
 	go func() {
 		for range s.ticker.C {
-			_ = s.handler.KeepAlive(context.TODO(), s)
+			_ = s.keepAlive(context.TODO())
 		}
 	}()
 	return nil
 }
 
+// keepAlive keeps the session alive
+func (s *Session) keepAlive(ctx context.Context) error {
+	return s.doSession(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		request := &api.KeepAliveRequest{
+			Header: header,
+		}
+		client := api.NewSessionServiceClient(conn)
+		response, err := client.KeepAlive(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
+}
+
 // Close closes the session
 func (s *Session) Close() error {
-	err := s.handler.Close(context.TODO(), s)
+	err := s.close(context.TODO())
 	s.ticker.Stop()
 	return err
 }
 
-// Delete closes the session and deletes the primitive
-func (s *Session) Delete() error {
-	err := s.handler.Delete(context.TODO(), s)
-	s.ticker.Stop()
-	return err
+// close closes the session
+func (s *Session) close(ctx context.Context) error {
+	return s.doSession(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		request := &api.CloseSessionRequest{
+			Header: header,
+		}
+		client := api.NewSessionServiceClient(conn)
+		response, err := client.CloseSession(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
+}
+
+func getName(name Name) *primitiveapi.Name {
+	return &primitiveapi.Name{
+		Name:      name.Name,
+		Namespace: name.Namespace,
+	}
 }
 
 // getState gets the header for the current state of the session
-func (s *Session) getState() *headers.RequestHeader {
+func (s *Session) getState(name *primitiveapi.Name) *headers.RequestHeader {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return &headers.RequestHeader{
-		Name:      s.Name,
+		Name:      name,
 		Partition: int32(s.Partition),
 		SessionID: s.SessionID,
 		Index:     s.lastIndex,
@@ -170,11 +174,11 @@ func (s *Session) getState() *headers.RequestHeader {
 }
 
 // getQueryHeader gets the current read header
-func (s *Session) getQueryHeader() *headers.RequestHeader {
+func (s *Session) getQueryHeader(name *primitiveapi.Name) *headers.RequestHeader {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return &headers.RequestHeader{
-		Name:      s.Name,
+		Name:      name,
 		Partition: int32(s.Partition),
 		SessionID: s.SessionID,
 		Index:     s.lastIndex,
@@ -183,12 +187,12 @@ func (s *Session) getQueryHeader() *headers.RequestHeader {
 }
 
 // nextCommandHeader returns the next write header
-func (s *Session) nextCommandHeader() *headers.RequestHeader {
+func (s *Session) nextCommandHeader(name *primitiveapi.Name) *headers.RequestHeader {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.requestID = s.requestID + 1
 	header := &headers.RequestHeader{
-		Name:      s.Name,
+		Name:      name,
 		Partition: int32(s.Partition),
 		SessionID: s.SessionID,
 		Index:     s.lastIndex,
@@ -198,7 +202,7 @@ func (s *Session) nextCommandHeader() *headers.RequestHeader {
 }
 
 // nextStreamHeader returns the next write stream and header
-func (s *Session) nextStreamHeader() (*Stream, *headers.RequestHeader) {
+func (s *Session) nextStreamHeader(name *primitiveapi.Name) (*Stream, *headers.RequestHeader) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.requestID = s.requestID + 1
@@ -208,7 +212,7 @@ func (s *Session) nextStreamHeader() (*Stream, *headers.RequestHeader) {
 	}
 	s.streams[s.requestID] = stream
 	header := &headers.RequestHeader{
-		Name:      s.Name,
+		Name:      name,
 		Partition: int32(s.Partition),
 		SessionID: s.SessionID,
 		Index:     s.lastIndex,
@@ -217,40 +221,47 @@ func (s *Session) nextStreamHeader() (*Stream, *headers.RequestHeader) {
 	return stream, header
 }
 
-// DoCreate sends a create session request
-func (s *Session) DoCreate(ctx context.Context, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
-	return s.doSession(ctx, f)
-}
-
-// DoKeepAlive sends a session keep-alive request
-func (s *Session) DoKeepAlive(ctx context.Context, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
-	return s.doSession(ctx, f)
-}
-
-// DoClose sends a session close request
-func (s *Session) DoClose(ctx context.Context, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
-	return s.doSession(ctx, f)
-}
-
 func (s *Session) doSession(ctx context.Context, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
-	header := s.getState()
+	header := s.getState(nil)
 	_, err := s.doRequest(header, func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error) {
 		return f(ctx, conn, header)
 	})
 	return err
 }
 
-// DoQuery sends a session query request
-func (s *Session) DoQuery(ctx context.Context, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) (interface{}, error) {
-	header := s.getQueryHeader()
+// doCreate sends a create session request
+func (s *Session) doCreate(ctx context.Context, name Name, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
+	return s.doPrimitive(ctx, name, f)
+}
+
+// doClose sends a session close request
+func (s *Session) doClose(ctx context.Context, name Name, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
+	return s.doPrimitive(ctx, name, f)
+}
+
+// doPrimitive sends a primitive request
+func (s *Session) doPrimitive(ctx context.Context, name Name, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
+	header := s.getState(&primitiveapi.Name{
+		Name:      name.Name,
+		Namespace: name.Namespace,
+	})
+	_, err := s.doRequest(header, func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error) {
+		return f(ctx, conn, header)
+	})
+	return err
+}
+
+// doQuery sends a session query request
+func (s *Session) doQuery(ctx context.Context, name Name, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) (interface{}, error) {
+	header := s.getQueryHeader(getName(name))
 	return s.doRequest(header, func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error) {
 		return f(ctx, conn, header)
 	})
 }
 
-// DoCommand sends a session command request
-func (s *Session) DoCommand(ctx context.Context, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) (interface{}, error) {
-	stream, header := s.nextStreamHeader()
+// doCommand sends a session command request
+func (s *Session) doCommand(ctx context.Context, name Name, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) (interface{}, error) {
+	stream, header := s.nextStreamHeader(getName(name))
 	defer stream.Close()
 	return s.doRequest(header, func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error) {
 		return f(ctx, conn, header)
@@ -266,7 +277,7 @@ func (s *Session) doRequest(requestHeader *headers.RequestHeader, f func(conn *g
 		if responseHeader, response, err := f(conn); err == nil {
 			switch responseHeader.Status {
 			case headers.ResponseStatus_OK:
-				s.RecordResponse(requestHeader, responseHeader)
+				s.recordResponse(requestHeader, responseHeader)
 				return response, err
 			case headers.ResponseStatus_NOT_LEADER:
 				s.conns.Reconnect(net.Address(responseHeader.Leader))
@@ -278,9 +289,10 @@ func (s *Session) doRequest(requestHeader *headers.RequestHeader, f func(conn *g
 	}
 }
 
-// DoQueryStream sends a session query stream request
-func (s *Session) DoQueryStream(
+// doQueryStream sends a session query stream request
+func (s *Session) doQueryStream(
 	ctx context.Context,
+	name Name,
 	f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error),
 	responseFunc func(interface{}) (*headers.ResponseHeader, interface{}, error)) (<-chan interface{}, error) {
 	conn, err := s.conns.Connect()
@@ -288,7 +300,7 @@ func (s *Session) DoQueryStream(
 		return nil, err
 	}
 
-	requestHeader := s.getQueryHeader()
+	requestHeader := s.getQueryHeader(getName(name))
 	responses, err := f(ctx, conn, requestHeader)
 	if err != nil {
 		return nil, err
@@ -331,7 +343,7 @@ func (s *Session) queryStream(
 			switch responseHeader.Status {
 			case headers.ResponseStatus_OK:
 				// Record the response
-				s.RecordResponse(requestHeader, responseHeader)
+				s.recordResponse(requestHeader, responseHeader)
 				responseCh <- response
 			case headers.ResponseStatus_NOT_LEADER:
 				s.conns.Reconnect(net.Address(responseHeader.Leader))
@@ -355,9 +367,10 @@ func (s *Session) queryStream(
 	}
 }
 
-// DoCommandStream sends a session command stream request
-func (s *Session) DoCommandStream(
+// doCommandStream sends a session command stream request
+func (s *Session) doCommandStream(
 	ctx context.Context,
+	name Name,
 	f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error),
 	responseFunc func(interface{}) (*headers.ResponseHeader, interface{}, error)) (<-chan interface{}, error) {
 	conn, err := s.conns.Connect()
@@ -365,7 +378,7 @@ func (s *Session) DoCommandStream(
 		return nil, err
 	}
 
-	stream, requestHeader := s.nextStreamHeader()
+	stream, requestHeader := s.nextStreamHeader(getName(name))
 	responses, err := f(ctx, conn, requestHeader)
 	if err != nil {
 		stream.Close()
@@ -423,7 +436,7 @@ func (s *Session) commandStream(
 			switch responseHeader.Status {
 			case headers.ResponseStatus_OK:
 				// Record the response
-				s.RecordResponse(requestHeader, responseHeader)
+				s.recordResponse(requestHeader, responseHeader)
 
 				// Attempt to serialize the response to the stream and skip the response if serialization failed.
 				if stream.Serialize(responseHeader) {
@@ -454,8 +467,8 @@ func (s *Session) commandStream(
 	}
 }
 
-// RecordResponse records the index in a response header
-func (s *Session) RecordResponse(requestHeader *headers.RequestHeader, responseHeader *headers.ResponseHeader) {
+// recordResponse records the index in a response header
+func (s *Session) recordResponse(requestHeader *headers.RequestHeader, responseHeader *headers.ResponseHeader) {
 	// Use a double-checked lock to avoid locking when multiple responses are received for an index.
 	s.mu.RLock()
 	if responseHeader.Index > s.lastIndex {

@@ -20,24 +20,23 @@ import (
 	"github.com/atomix/api/proto/atomix/headers"
 	api "github.com/atomix/api/proto/atomix/set"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/session"
 	"google.golang.org/grpc"
 )
 
-func newPartition(ctx context.Context, name primitive.Name, partition primitive.Partition, opts ...session.Option) (Set, error) {
-	sess, err := session.New(ctx, name, partition, &sessionHandler{}, opts...)
+func newPartition(ctx context.Context, name primitive.Name, session *primitive.Session) (Set, error) {
+	sess, err := primitive.NewInstance(ctx, name, session, &primitiveHandler{})
 	if err != nil {
 		return nil, err
 	}
 	return &setPartition{
-		name:    name,
-		session: sess,
+		name:     name,
+		instance: sess,
 	}, nil
 }
 
 type setPartition struct {
-	name    primitive.Name
-	session *session.Session
+	name     primitive.Name
+	instance *primitive.Instance
 }
 
 func (s *setPartition) Name() primitive.Name {
@@ -45,7 +44,7 @@ func (s *setPartition) Name() primitive.Name {
 }
 
 func (s *setPartition) Add(ctx context.Context, value string) (bool, error) {
-	r, err := s.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := s.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewSetServiceClient(conn)
 		request := &api.AddRequest{
 			Header: header,
@@ -69,7 +68,7 @@ func (s *setPartition) Add(ctx context.Context, value string) (bool, error) {
 }
 
 func (s *setPartition) Remove(ctx context.Context, value string) (bool, error) {
-	r, err := s.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := s.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewSetServiceClient(conn)
 		request := &api.RemoveRequest{
 			Header: header,
@@ -93,7 +92,7 @@ func (s *setPartition) Remove(ctx context.Context, value string) (bool, error) {
 }
 
 func (s *setPartition) Contains(ctx context.Context, value string) (bool, error) {
-	response, err := s.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := s.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewSetServiceClient(conn)
 		request := &api.ContainsRequest{
 			Header: header,
@@ -112,7 +111,7 @@ func (s *setPartition) Contains(ctx context.Context, value string) (bool, error)
 }
 
 func (s *setPartition) Len(ctx context.Context) (int, error) {
-	response, err := s.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := s.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewSetServiceClient(conn)
 		request := &api.SizeRequest{
 			Header: header,
@@ -130,7 +129,7 @@ func (s *setPartition) Len(ctx context.Context) (int, error) {
 }
 
 func (s *setPartition) Clear(ctx context.Context) error {
-	_, err := s.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	_, err := s.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewSetServiceClient(conn)
 		request := &api.ClearRequest{
 			Header: header,
@@ -145,7 +144,7 @@ func (s *setPartition) Clear(ctx context.Context) error {
 }
 
 func (s *setPartition) Elements(ctx context.Context, ch chan<- string) error {
-	stream, err := s.session.DoQueryStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
+	stream, err := s.instance.DoQueryStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
 		client := api.NewSetServiceClient(conn)
 		request := &api.IterateRequest{
 			Header: header,
@@ -172,7 +171,7 @@ func (s *setPartition) Elements(ctx context.Context, ch chan<- string) error {
 }
 
 func (s *setPartition) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error {
-	stream, err := s.session.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
+	stream, err := s.instance.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
 		client := api.NewSetServiceClient(conn)
 		request := &api.EventRequest{
 			Header: header,
@@ -218,10 +217,10 @@ func (s *setPartition) Watch(ctx context.Context, ch chan<- *Event, opts ...Watc
 	return nil
 }
 
-func (s *setPartition) Close() error {
-	return s.session.Close()
+func (s *setPartition) Close(ctx context.Context) error {
+	return s.instance.Close(ctx)
 }
 
-func (s *setPartition) Delete() error {
-	return s.session.Delete()
+func (s *setPartition) Delete(ctx context.Context) error {
+	return s.instance.Delete(ctx)
 }

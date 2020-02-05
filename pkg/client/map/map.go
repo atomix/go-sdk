@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/session"
 	"github.com/atomix/go-client/pkg/client/util"
 	"sync"
 	"time"
@@ -30,7 +29,7 @@ const Type primitive.Type = "Map"
 // Client provides an API for creating Maps
 type Client interface {
 	// GetMap gets the Map instance of the given name
-	GetMap(ctx context.Context, name string, opts ...session.Option) (Map, error)
+	GetMap(ctx context.Context, name string) (Map, error)
 }
 
 // Map is a distributed set of keys and values
@@ -113,9 +112,9 @@ type Event struct {
 }
 
 // New creates a new partitioned Map
-func New(ctx context.Context, name primitive.Name, partitions []primitive.Partition, opts ...session.Option) (Map, error) {
-	results, err := util.ExecuteOrderedAsync(len(partitions), func(i int) (interface{}, error) {
-		return newPartition(ctx, name, partitions[i], opts...)
+func New(ctx context.Context, name primitive.Name, sessions []*primitive.Session) (Map, error) {
+	results, err := util.ExecuteOrderedAsync(len(sessions), func(i int) (interface{}, error) {
+		return newPartition(ctx, name, sessions[i])
 	})
 	if err != nil {
 		return nil, err
@@ -239,14 +238,14 @@ func (m *_map) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption)
 	})
 }
 
-func (m *_map) Close() error {
+func (m *_map) Close(ctx context.Context) error {
 	return util.IterAsync(len(m.partitions), func(i int) error {
-		return m.partitions[i].Close()
+		return m.partitions[i].Close(ctx)
 	})
 }
 
-func (m *_map) Delete() error {
+func (m *_map) Delete(ctx context.Context) error {
 	return util.IterAsync(len(m.partitions), func(i int) error {
-		return m.partitions[i].Delete()
+		return m.partitions[i].Delete(ctx)
 	})
 }

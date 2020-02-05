@@ -19,10 +19,36 @@ import (
 	api "github.com/atomix/api/proto/atomix/election"
 	"github.com/atomix/api/proto/atomix/headers"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/session"
 	"github.com/atomix/go-client/pkg/client/util"
+	"github.com/google/uuid"
 	"google.golang.org/grpc"
 )
+
+// Option is an election option
+type Option interface {
+	apply(options *options)
+}
+
+// options is election options
+type options struct {
+	id string
+}
+
+// idOption is an identifier option
+type idOption struct {
+	id string
+}
+
+func (o *idOption) apply(options *options) {
+	options.id = o.id
+}
+
+// WithID sets the election instance identifier
+func WithID(id string) Option {
+	return &idOption{
+		id: id,
+	}
+}
 
 // Type is the election type
 const Type primitive.Type = "Election"
@@ -30,7 +56,7 @@ const Type primitive.Type = "Election"
 // Client provides an API for creating Elections
 type Client interface {
 	// GetElection gets the Election instance of the given name
-	GetElection(ctx context.Context, name string, opts ...session.Option) (Election, error)
+	GetElection(ctx context.Context, name string, opts ...Option) (Election, error)
 }
 
 // Election provides distributed leader election
@@ -105,27 +131,36 @@ type Event struct {
 }
 
 // New creates a new election primitive
-func New(ctx context.Context, name primitive.Name, partitions []primitive.Partition, opts ...session.Option) (Election, error) {
+func New(ctx context.Context, name primitive.Name, partitions []*primitive.Session, opts ...Option) (Election, error) {
+	options := &options{
+		id: uuid.New().String(),
+	}
+	for _, opt := range opts {
+		opt.apply(options)
+	}
+
 	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
 		return nil, err
 	}
 
-	sess, err := session.New(ctx, name, partitions[i], &sessionHandler{}, opts...)
+	instance, err := primitive.NewInstance(ctx, name, partitions[i], &primitiveHandler{})
 	if err != nil {
 		return nil, err
 	}
 
 	return &election{
-		name:    name,
-		session: sess,
+		id:       options.id,
+		name:     name,
+		instance: instance,
 	}, nil
 }
 
 // election is the default single-partition implementation of Election
 type election struct {
-	name    primitive.Name
-	session *session.Session
+	id       string
+	name     primitive.Name
+	instance *primitive.Instance
 }
 
 func (e *election) Name() primitive.Name {
@@ -133,11 +168,11 @@ func (e *election) Name() primitive.Name {
 }
 
 func (e *election) ID() string {
-	return e.session.ID
+	return e.id
 }
 
 func (e *election) GetTerm(ctx context.Context) (*Term, error) {
-	response, err := e.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := e.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLeaderElectionServiceClient(conn)
 		request := &api.GetTermRequest{
 			Header: header,
@@ -155,7 +190,7 @@ func (e *election) GetTerm(ctx context.Context) (*Term, error) {
 }
 
 func (e *election) Enter(ctx context.Context) (*Term, error) {
-	response, err := e.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := e.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLeaderElectionServiceClient(conn)
 		request := &api.EnterRequest{
 			Header:      header,
@@ -174,7 +209,7 @@ func (e *election) Enter(ctx context.Context) (*Term, error) {
 }
 
 func (e *election) Leave(ctx context.Context) (*Term, error) {
-	response, err := e.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := e.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLeaderElectionServiceClient(conn)
 		request := &api.WithdrawRequest{
 			Header:      header,
@@ -193,7 +228,7 @@ func (e *election) Leave(ctx context.Context) (*Term, error) {
 }
 
 func (e *election) Anoint(ctx context.Context, id string) (*Term, error) {
-	response, err := e.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := e.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLeaderElectionServiceClient(conn)
 		request := &api.AnointRequest{
 			Header:      header,
@@ -212,7 +247,7 @@ func (e *election) Anoint(ctx context.Context, id string) (*Term, error) {
 }
 
 func (e *election) Promote(ctx context.Context, id string) (*Term, error) {
-	response, err := e.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := e.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLeaderElectionServiceClient(conn)
 		request := &api.PromoteRequest{
 			Header:      header,
@@ -231,7 +266,7 @@ func (e *election) Promote(ctx context.Context, id string) (*Term, error) {
 }
 
 func (e *election) Evict(ctx context.Context, id string) (*Term, error) {
-	response, err := e.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := e.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLeaderElectionServiceClient(conn)
 		request := &api.EvictRequest{
 			Header:      header,
@@ -250,7 +285,7 @@ func (e *election) Evict(ctx context.Context, id string) (*Term, error) {
 }
 
 func (e *election) Watch(ctx context.Context, ch chan<- *Event) error {
-	stream, err := e.session.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
+	stream, err := e.instance.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
 		client := api.NewLeaderElectionServiceClient(conn)
 		request := &api.EventRequest{
 			Header: header,
@@ -280,10 +315,10 @@ func (e *election) Watch(ctx context.Context, ch chan<- *Event) error {
 	return nil
 }
 
-func (e *election) Close() error {
-	return e.session.Close()
+func (e *election) Close(ctx context.Context) error {
+	return e.instance.Close(ctx)
 }
 
-func (e *election) Delete() error {
-	return e.session.Delete()
+func (e *election) Delete(ctx context.Context) error {
+	return e.instance.Delete(ctx)
 }

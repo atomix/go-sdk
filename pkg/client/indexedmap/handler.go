@@ -12,25 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package _map //nolint:golint
+package indexedmap
 
 import (
 	"context"
 	"github.com/atomix/api/proto/atomix/headers"
-	api "github.com/atomix/api/proto/atomix/map"
-	"github.com/atomix/go-client/pkg/client/session"
+	api "github.com/atomix/api/proto/atomix/indexedmap"
+	"github.com/atomix/go-client/pkg/client/primitive"
 	"google.golang.org/grpc"
 )
 
-type sessionHandler struct{}
+type primitiveHandler struct{}
 
-func (m *sessionHandler) Create(ctx context.Context, s *session.Session) error {
+func (m *primitiveHandler) Create(ctx context.Context, s *primitive.Instance) error {
 	return s.DoCreate(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		request := &api.CreateRequest{
-			Header:  header,
-			Timeout: &s.Timeout,
+			Header: header,
 		}
-		client := api.NewMapServiceClient(conn)
+		client := api.NewIndexedMapServiceClient(conn)
 		response, err := client.Create(ctx, request)
 		if err != nil {
 			return nil, nil, err
@@ -39,26 +38,12 @@ func (m *sessionHandler) Create(ctx context.Context, s *session.Session) error {
 	})
 }
 
-func (m *sessionHandler) KeepAlive(ctx context.Context, s *session.Session) error {
-	return s.DoKeepAlive(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		request := &api.KeepAliveRequest{
-			Header: header,
-		}
-		client := api.NewMapServiceClient(conn)
-		response, err := client.KeepAlive(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		return response.Header, response, nil
-	})
-}
-
-func (m *sessionHandler) Close(ctx context.Context, s *session.Session) error {
+func (m *primitiveHandler) Close(ctx context.Context, s *primitive.Instance) error {
 	return s.DoClose(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		request := &api.CloseRequest{
 			Header: header,
 		}
-		client := api.NewMapServiceClient(conn)
+		client := api.NewIndexedMapServiceClient(conn)
 		response, err := client.Close(ctx, request)
 		if err != nil {
 			return nil, nil, err
@@ -67,13 +52,13 @@ func (m *sessionHandler) Close(ctx context.Context, s *session.Session) error {
 	})
 }
 
-func (m *sessionHandler) Delete(ctx context.Context, s *session.Session) error {
+func (m *primitiveHandler) Delete(ctx context.Context, s *primitive.Instance) error {
 	return s.DoClose(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		request := &api.CloseRequest{
 			Header: header,
 			Delete: true,
 		}
-		client := api.NewMapServiceClient(conn)
+		client := api.NewIndexedMapServiceClient(conn)
 		response, err := client.Close(ctx, request)
 		if err != nil {
 			return nil, nil, err

@@ -20,7 +20,6 @@ import (
 	"github.com/atomix/api/proto/atomix/headers"
 	api "github.com/atomix/api/proto/atomix/value"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/session"
 	"github.com/atomix/go-client/pkg/client/util"
 	"google.golang.org/grpc"
 )
@@ -31,7 +30,7 @@ const Type primitive.Type = "Value"
 // Client provides an API for creating Values
 type Client interface {
 	// GetValue gets the Value instance of the given name
-	GetValue(ctx context.Context, name string, opts ...session.Option) (Value, error)
+	GetValue(ctx context.Context, name string) (Value, error)
 }
 
 // Value provides a simple atomic value
@@ -70,30 +69,30 @@ type Event struct {
 
 // New creates a new Lock primitive for the given partitions
 // The value will be created in one of the given partitions.
-func New(ctx context.Context, name primitive.Name, partitions []primitive.Partition, opts ...session.Option) (Value, error) {
+func New(ctx context.Context, name primitive.Name, partitions []*primitive.Session) (Value, error) {
 	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
 		return nil, err
 	}
-	return newValue(ctx, name, partitions[i], opts...)
+	return newValue(ctx, name, partitions[i])
 }
 
 // newValue creates a new Value primitive for the given partition
-func newValue(ctx context.Context, name primitive.Name, partition primitive.Partition, opts ...session.Option) (*value, error) {
-	sess, err := session.New(ctx, name, partition, &sessionHandler{}, opts...)
+func newValue(ctx context.Context, name primitive.Name, session *primitive.Session) (*value, error) {
+	instance, err := primitive.NewInstance(ctx, name, session, &primitiveHandler{})
 	if err != nil {
 		return nil, err
 	}
 	return &value{
-		name:    name,
-		session: sess,
+		name:     name,
+		instance: instance,
 	}, nil
 }
 
 // value is the single partition implementation of Lock
 type value struct {
-	name    primitive.Name
-	session *session.Session
+	name     primitive.Name
+	instance *primitive.Instance
 }
 
 func (v *value) Name() primitive.Name {
@@ -106,7 +105,7 @@ func (v *value) Set(ctx context.Context, value []byte, opts ...SetOption) (uint6
 		opts[i].beforeSet(request)
 	}
 
-	r, err := v.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := v.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewValueServiceClient(conn)
 		request := &api.SetRequest{
 			Header: header,
@@ -140,7 +139,7 @@ func (v *value) Set(ctx context.Context, value []byte, opts ...SetOption) (uint6
 }
 
 func (v *value) Get(ctx context.Context) ([]byte, uint64, error) {
-	r, err := v.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := v.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewValueServiceClient(conn)
 		request := &api.GetRequest{
 			Header: header,
@@ -160,7 +159,7 @@ func (v *value) Get(ctx context.Context) ([]byte, uint64, error) {
 }
 
 func (v *value) Watch(ctx context.Context, ch chan<- *Event) error {
-	stream, err := v.session.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
+	stream, err := v.instance.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
 		client := api.NewValueServiceClient(conn)
 		request := &api.EventRequest{
 			Header: header,
@@ -191,10 +190,10 @@ func (v *value) Watch(ctx context.Context, ch chan<- *Event) error {
 	return nil
 }
 
-func (v *value) Close() error {
-	return v.session.Close()
+func (v *value) Close(ctx context.Context) error {
+	return v.instance.Close(ctx)
 }
 
-func (v *value) Delete() error {
-	return v.session.Delete()
+func (v *value) Delete(ctx context.Context) error {
+	return v.instance.Delete(ctx)
 }

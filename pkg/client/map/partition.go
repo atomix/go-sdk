@@ -20,24 +20,23 @@ import (
 	"github.com/atomix/api/proto/atomix/headers"
 	api "github.com/atomix/api/proto/atomix/map"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/session"
 	"google.golang.org/grpc"
 )
 
-func newPartition(ctx context.Context, name primitive.Name, partition primitive.Partition, opts ...session.Option) (Map, error) {
-	sess, err := session.New(ctx, name, partition, &sessionHandler{}, opts...)
+func newPartition(ctx context.Context, name primitive.Name, session *primitive.Session) (Map, error) {
+	instance, err := primitive.NewInstance(ctx, name, session, &primitiveHandler{})
 	if err != nil {
 		return nil, err
 	}
 	return &mapPartition{
-		name:    name,
-		session: sess,
+		name:     name,
+		instance: instance,
 	}, nil
 }
 
 type mapPartition struct {
-	name    primitive.Name
-	session *session.Session
+	name     primitive.Name
+	instance *primitive.Instance
 }
 
 func (m *mapPartition) Name() primitive.Name {
@@ -45,7 +44,7 @@ func (m *mapPartition) Name() primitive.Name {
 }
 
 func (m *mapPartition) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*Entry, error) {
-	r, err := m.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := m.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewMapServiceClient(conn)
 		request := &api.PutRequest{
 			Header: header,
@@ -91,7 +90,7 @@ func (m *mapPartition) Put(ctx context.Context, key string, value []byte, opts .
 }
 
 func (m *mapPartition) Get(ctx context.Context, key string, opts ...GetOption) (*Entry, error) {
-	r, err := m.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := m.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewMapServiceClient(conn)
 		request := &api.GetRequest{
 			Header: header,
@@ -127,7 +126,7 @@ func (m *mapPartition) Get(ctx context.Context, key string, opts ...GetOption) (
 }
 
 func (m *mapPartition) Remove(ctx context.Context, key string, opts ...RemoveOption) (*Entry, error) {
-	r, err := m.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := m.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewMapServiceClient(conn)
 		request := &api.RemoveRequest{
 			Header: header,
@@ -166,7 +165,7 @@ func (m *mapPartition) Remove(ctx context.Context, key string, opts ...RemoveOpt
 }
 
 func (m *mapPartition) Len(ctx context.Context) (int, error) {
-	response, err := m.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := m.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewMapServiceClient(conn)
 		request := &api.SizeRequest{
 			Header: header,
@@ -184,7 +183,7 @@ func (m *mapPartition) Len(ctx context.Context) (int, error) {
 }
 
 func (m *mapPartition) Clear(ctx context.Context) error {
-	_, err := m.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	_, err := m.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewMapServiceClient(conn)
 		request := &api.ClearRequest{
 			Header: header,
@@ -199,7 +198,7 @@ func (m *mapPartition) Clear(ctx context.Context) error {
 }
 
 func (m *mapPartition) Entries(ctx context.Context, ch chan<- *Entry) error {
-	stream, err := m.session.DoQueryStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
+	stream, err := m.instance.DoQueryStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
 		client := api.NewMapServiceClient(conn)
 		request := &api.EntriesRequest{
 			Header: header,
@@ -233,7 +232,7 @@ func (m *mapPartition) Entries(ctx context.Context, ch chan<- *Entry) error {
 }
 
 func (m *mapPartition) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error {
-	stream, err := m.session.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
+	stream, err := m.instance.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
 		client := api.NewMapServiceClient(conn)
 		request := &api.EventRequest{
 			Header: header,
@@ -286,10 +285,10 @@ func (m *mapPartition) Watch(ctx context.Context, ch chan<- *Event, opts ...Watc
 	return nil
 }
 
-func (m *mapPartition) Close() error {
-	return m.session.Close()
+func (m *mapPartition) Close(ctx context.Context) error {
+	return m.instance.Close(ctx)
 }
 
-func (m *mapPartition) Delete() error {
-	return m.session.Delete()
+func (m *mapPartition) Delete(ctx context.Context) error {
+	return m.instance.Delete(ctx)
 }

@@ -20,10 +20,36 @@ import (
 	"github.com/atomix/api/proto/atomix/headers"
 	api "github.com/atomix/api/proto/atomix/leader"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/session"
 	"github.com/atomix/go-client/pkg/client/util"
+	"github.com/google/uuid"
 	"google.golang.org/grpc"
 )
+
+// Option is a leader latch option
+type Option interface {
+	apply(options *options)
+}
+
+// options is leader latch options
+type options struct {
+	id string
+}
+
+// idOption is an identifier option
+type idOption struct {
+	id string
+}
+
+func (o *idOption) apply(options *options) {
+	options.id = o.id
+}
+
+// WithID sets the leader latch instance identifier
+func WithID(id string) Option {
+	return &idOption{
+		id: id,
+	}
+}
 
 // Type is the leader latch type
 const Type primitive.Type = "LeaderLatch"
@@ -31,7 +57,7 @@ const Type primitive.Type = "LeaderLatch"
 // Client provides an API for creating Latches
 type Client interface {
 	// GetLatch gets the Latch instance of the given name
-	GetLatch(ctx context.Context, name string, opts ...session.Option) (Latch, error)
+	GetLatch(ctx context.Context, name string, opts ...Option) (Latch, error)
 }
 
 // Latch provides distributed leader latch
@@ -97,39 +123,48 @@ type Event struct {
 }
 
 // New creates a new latch primitive
-func New(ctx context.Context, name primitive.Name, partitions []primitive.Partition, opts ...session.Option) (Latch, error) {
+func New(ctx context.Context, name primitive.Name, partitions []*primitive.Session, opts ...Option) (Latch, error) {
+	options := &options{
+		id: uuid.New().String(),
+	}
+	for _, opt := range opts {
+		opt.apply(options)
+	}
+
 	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
 		return nil, err
 	}
 
-	sess, err := session.New(ctx, name, partitions[i], &sessionHandler{}, opts...)
+	instance, err := primitive.NewInstance(ctx, name, partitions[i], &primitiveHandler{})
 	if err != nil {
 		return nil, err
 	}
 
 	return &latch{
-		name:    name,
-		session: sess,
+		id:       options.id,
+		name:     name,
+		instance: instance,
 	}, nil
 }
 
 // latch is the default single-partition implementation of Latch
 type latch struct {
-	name    primitive.Name
-	session *session.Session
+	id       string
+	name     primitive.Name
+	instance *primitive.Instance
 }
 
-func (e *latch) Name() primitive.Name {
-	return e.name
+func (l *latch) Name() primitive.Name {
+	return l.name
 }
 
-func (e *latch) ID() string {
-	return e.session.ID
+func (l *latch) ID() string {
+	return l.id
 }
 
-func (e *latch) Get(ctx context.Context) (*Leadership, error) {
-	response, err := e.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+func (l *latch) Get(ctx context.Context) (*Leadership, error) {
+	response, err := l.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLeaderLatchServiceClient(conn)
 		request := &api.GetRequest{
 			Header: header,
@@ -146,12 +181,12 @@ func (e *latch) Get(ctx context.Context) (*Leadership, error) {
 	return newLeadership(response.(*api.GetResponse).Latch), nil
 }
 
-func (e *latch) Join(ctx context.Context) (*Leadership, error) {
-	response, err := e.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+func (l *latch) Join(ctx context.Context) (*Leadership, error) {
+	response, err := l.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLeaderLatchServiceClient(conn)
 		request := &api.LatchRequest{
 			Header:        header,
-			ParticipantID: e.ID(),
+			ParticipantID: l.ID(),
 		}
 		response, err := client.Latch(ctx, request)
 		if err != nil {
@@ -165,29 +200,29 @@ func (e *latch) Join(ctx context.Context) (*Leadership, error) {
 	return newLeadership(response.(*api.LatchResponse).Latch), nil
 }
 
-func (e *latch) Latch(ctx context.Context) (*Leadership, error) {
-	leadership, err := e.Join(ctx)
+func (l *latch) Latch(ctx context.Context) (*Leadership, error) {
+	leadership, err := l.Join(ctx)
 	if err != nil {
 		return nil, err
-	} else if leadership.Leader == e.ID() {
+	} else if leadership.Leader == l.ID() {
 		return leadership, nil
 	}
 
 	ch := make(chan *Event)
-	if err := e.Watch(ctx, ch); err != nil {
+	if err := l.Watch(ctx, ch); err != nil {
 		return nil, err
 	}
 
 	for event := range ch {
-		if event.Leadership.Leader == e.ID() {
+		if event.Leadership.Leader == l.ID() {
 			return &event.Leadership, nil
 		}
 	}
 	return nil, errors.New("failed to acquire latch")
 }
 
-func (e *latch) Watch(ctx context.Context, ch chan<- *Event) error {
-	stream, err := e.session.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
+func (l *latch) Watch(ctx context.Context, ch chan<- *Event) error {
+	stream, err := l.instance.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
 		client := api.NewLeaderLatchServiceClient(conn)
 		request := &api.EventRequest{
 			Header: header,
@@ -217,10 +252,10 @@ func (e *latch) Watch(ctx context.Context, ch chan<- *Event) error {
 	return nil
 }
 
-func (e *latch) Close() error {
-	return e.session.Close()
+func (l *latch) Close(ctx context.Context) error {
+	return l.instance.Close(ctx)
 }
 
-func (e *latch) Delete() error {
-	return e.session.Delete()
+func (l *latch) Delete(ctx context.Context) error {
+	return l.instance.Delete(ctx)
 }

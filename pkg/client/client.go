@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	controllerapi "github.com/atomix/api/proto/atomix/controller"
-	primitiveapi "github.com/atomix/api/proto/atomix/primitive"
 	"github.com/atomix/go-client/pkg/client/counter"
 	"github.com/atomix/go-client/pkg/client/election"
 	"github.com/atomix/go-client/pkg/client/indexedmap"
@@ -28,9 +27,7 @@ import (
 	"github.com/atomix/go-client/pkg/client/lock"
 	"github.com/atomix/go-client/pkg/client/map"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/session"
 	"github.com/atomix/go-client/pkg/client/set"
-	"github.com/atomix/go-client/pkg/client/util"
 	"github.com/atomix/go-client/pkg/client/util/net"
 	"github.com/atomix/go-client/pkg/client/value"
 	"github.com/gogo/protobuf/proto"
@@ -51,19 +48,21 @@ func NewClient(address string, opts ...Option) (*Client, error) {
 	}
 
 	return &Client{
-		conn:        conn,
-		application: options.application,
-		namespace:   options.namespace,
-		conns:       []*grpc.ClientConn{},
+		conn:           conn,
+		application:    options.application,
+		namespace:      options.namespace,
+		sessionTimeout: options.sessionTimeout,
+		conns:          []*grpc.ClientConn{},
 	}, nil
 }
 
 // Client is an Atomix client
 type Client struct {
-	application string
-	namespace   string
-	conn        *grpc.ClientConn
-	conns       []*grpc.ClientConn
+	application    string
+	namespace      string
+	sessionTimeout time.Duration
+	conn           *grpc.ClientConn
+	conns          []*grpc.ClientConn
 }
 
 // GetDatabases returns a list of all databases in the client's namespace
@@ -82,7 +81,7 @@ func (c *Client) GetDatabases(ctx context.Context) ([]*Database, error) {
 
 	databases := make([]*Database, len(response.Databases))
 	for i, databaseProto := range response.Databases {
-		database, err := c.newDatabase(databaseProto)
+		database, err := c.newDatabase(ctx, databaseProto)
 		if err != nil {
 			return nil, err
 		}
@@ -111,10 +110,10 @@ func (c *Client) GetDatabase(ctx context.Context, name string) (*Database, error
 	} else if len(response.Databases) > 1 {
 		return nil, errors.New("database " + name + " is ambiguous")
 	}
-	return c.newDatabase(response.Databases[0])
+	return c.newDatabase(ctx, response.Databases[0])
 }
 
-func (c *Client) newDatabase(databaseProto *controllerapi.Database) (*Database, error) {
+func (c *Client) newDatabase(ctx context.Context, databaseProto *controllerapi.Database) (*Database, error) {
 	// Ensure the partitions are sorted in case the controller sent them out of order.
 	partitionProtos := databaseProto.Partitions
 	sort.Slice(partitionProtos, func(i, j int) bool {
@@ -131,11 +130,21 @@ func (c *Client) newDatabase(databaseProto *controllerapi.Database) (*Database, 
 		}
 	}
 
+	// Iterate through partitions and open sessions
+	sessions := make([]*primitive.Session, 0, len(partitions))
+	for i, partition := range partitions {
+		session, err := primitive.NewSession(ctx, partition, primitive.WithSessionTimeout(c.sessionTimeout))
+		if err != nil {
+			return nil, err
+		}
+		sessions[i] = session
+	}
+
 	return &Database{
 		Namespace:   databaseProto.ID.Namespace,
 		Name:        databaseProto.ID.Name,
 		application: c.application,
-		partitions:  partitions,
+		sessions:    sessions,
 	}, nil
 }
 
@@ -191,7 +200,7 @@ func (c *Client) GetGroups(ctx context.Context) ([]*PartitionGroup, error) {
 
 	groups := make([]*PartitionGroup, len(response.Groups))
 	for i, groupProto := range response.Groups {
-		group, err := c.newGroup(groupProto)
+		group, err := c.newGroup(ctx, groupProto)
 		if err != nil {
 			return nil, err
 		}
@@ -222,11 +231,11 @@ func (c *Client) GetGroup(ctx context.Context, name string) (*PartitionGroup, er
 	} else if len(response.Groups) > 1 {
 		return nil, errors.New("partition group " + name + " is ambiguous")
 	}
-	return c.newGroup(response.Groups[0])
+	return c.newGroup(ctx, response.Groups[0])
 }
 
 //nolint:staticcheck
-func (c *Client) newGroup(groupProto *controllerapi.PartitionGroup) (*PartitionGroup, error) {
+func (c *Client) newGroup(ctx context.Context, groupProto *controllerapi.PartitionGroup) (*PartitionGroup, error) {
 	// Ensure the partitions are sorted in case the controller sent them out of order.
 	partitionProtos := groupProto.Partitions
 	sort.Slice(partitionProtos, func(i, j int) bool {
@@ -243,13 +252,23 @@ func (c *Client) newGroup(groupProto *controllerapi.PartitionGroup) (*PartitionG
 		}
 	}
 
+	// Iterate through partitions and open sessions
+	sessions := make([]*primitive.Session, 0, len(partitions))
+	for i, partition := range partitions {
+		session, err := primitive.NewSession(ctx, partition, primitive.WithSessionTimeout(c.sessionTimeout))
+		if err != nil {
+			return nil, err
+		}
+		sessions[i] = session
+	}
+
 	return &PartitionGroup{
 		Namespace:     groupProto.ID.Namespace,
 		Name:          groupProto.ID.Name,
 		Partitions:    int(groupProto.Spec.Partitions),
 		PartitionSize: int(groupProto.Spec.PartitionSize),
 		application:   c.application,
-		partitions:    partitions,
+		sessions:      sessions,
 	}, nil
 }
 
@@ -290,111 +309,52 @@ type Database struct {
 	Name      string
 
 	application string
-	partitions  []primitive.Partition
-}
-
-// GetPrimitives gets a list of primitives of the given types
-func (d *Database) GetPrimitives(ctx context.Context, types ...primitive.Type) ([]*primitiveapi.PrimitiveInfo, error) {
-	if len(types) == 0 {
-		return d.getPrimitives(ctx, "")
-	}
-
-	primitives := []*primitiveapi.PrimitiveInfo{}
-	for _, t := range types {
-		typePrimitives, err := d.getPrimitives(ctx, t)
-		if err != nil {
-			return nil, err
-		}
-		primitives = append(primitives, typePrimitives...)
-	}
-	return primitives, nil
-}
-
-// getPrimitives gets a list of primitives of the given type
-func (d *Database) getPrimitives(ctx context.Context, t primitive.Type) ([]*primitiveapi.PrimitiveInfo, error) {
-	results, err := util.ExecuteAsync(len(d.partitions), func(i int) (interface{}, error) {
-		conn, err := net.Connect(d.partitions[i].Address)
-		if err != nil {
-			return nil, err
-		}
-		defer conn.Close()
-		client := primitiveapi.NewPrimitiveServiceClient(conn)
-		request := &primitiveapi.GetPrimitivesRequest{
-			Partition: uint64(d.partitions[i].ID),
-			Type:      string(t),
-			Namespace: d.application,
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		response, err := client.GetPrimitives(ctx, request)
-		if err != nil {
-			return nil, err
-		}
-		return response.Primitives, nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	primitiveResults := make(map[string]*primitiveapi.PrimitiveInfo)
-	for _, result := range results {
-		primitives := result.([]*primitiveapi.PrimitiveInfo)
-		for _, info := range primitives {
-			primitiveResults[info.Name.String()] = info
-		}
-	}
-
-	primitives := make([]*primitiveapi.PrimitiveInfo, 0, len(primitiveResults))
-	for _, info := range primitiveResults {
-		primitives = append(primitives, info)
-	}
-	return primitives, nil
+	sessions    []*primitive.Session
 }
 
 // GetCounter gets or creates a Counter with the given name
-func (d *Database) GetCounter(ctx context.Context, name string, opts ...session.Option) (counter.Counter, error) {
-	return counter.New(ctx, primitive.NewName(d.Namespace, d.Name, d.application, name), d.partitions, opts...)
+func (d *Database) GetCounter(ctx context.Context, name string) (counter.Counter, error) {
+	return counter.New(ctx, primitive.NewName(d.Namespace, d.Name, d.application, name), d.sessions)
 }
 
 // GetElection gets or creates an Election with the given name
-func (d *Database) GetElection(ctx context.Context, name string, opts ...session.Option) (election.Election, error) {
-	return election.New(ctx, primitive.NewName(d.Namespace, d.Name, d.application, name), d.partitions, opts...)
+func (d *Database) GetElection(ctx context.Context, name string, opts ...election.Option) (election.Election, error) {
+	return election.New(ctx, primitive.NewName(d.Namespace, d.Name, d.application, name), d.sessions)
 }
 
 // GetIndexedMap gets or creates a Map with the given name
-func (d *Database) GetIndexedMap(ctx context.Context, name string, opts ...session.Option) (indexedmap.IndexedMap, error) {
-	return indexedmap.New(ctx, primitive.NewName(d.Namespace, d.Name, d.application, name), d.partitions, opts...)
+func (d *Database) GetIndexedMap(ctx context.Context, name string) (indexedmap.IndexedMap, error) {
+	return indexedmap.New(ctx, primitive.NewName(d.Namespace, d.Name, d.application, name), d.sessions)
 }
 
 // GetLeaderLatch gets or creates a LeaderLatch with the given name
-func (d *Database) GetLeaderLatch(ctx context.Context, name string, opts ...session.Option) (leader.Latch, error) {
-	return leader.New(ctx, primitive.NewName(d.Namespace, d.Name, d.application, name), d.partitions, opts...)
+func (d *Database) GetLeaderLatch(ctx context.Context, name string, opts ...leader.Option) (leader.Latch, error) {
+	return leader.New(ctx, primitive.NewName(d.Namespace, d.Name, d.application, name), d.sessions)
 }
 
 // GetList gets or creates a List with the given name
-func (d *Database) GetList(ctx context.Context, name string, opts ...session.Option) (list.List, error) {
-	return list.New(ctx, primitive.NewName(d.Namespace, d.Name, d.application, name), d.partitions, opts...)
+func (d *Database) GetList(ctx context.Context, name string) (list.List, error) {
+	return list.New(ctx, primitive.NewName(d.Namespace, d.Name, d.application, name), d.sessions)
 }
 
 // GetLock gets or creates a Lock with the given name
-func (d *Database) GetLock(ctx context.Context, name string, opts ...session.Option) (lock.Lock, error) {
-	return lock.New(ctx, primitive.NewName(d.Namespace, d.Name, d.application, name), d.partitions, opts...)
+func (d *Database) GetLock(ctx context.Context, name string) (lock.Lock, error) {
+	return lock.New(ctx, primitive.NewName(d.Namespace, d.Name, d.application, name), d.sessions)
 }
 
 // GetMap gets or creates a Map with the given name
-func (d *Database) GetMap(ctx context.Context, name string, opts ...session.Option) (_map.Map, error) {
-	return _map.New(ctx, primitive.NewName(d.Namespace, d.Name, d.application, name), d.partitions, opts...)
+func (d *Database) GetMap(ctx context.Context, name string) (_map.Map, error) {
+	return _map.New(ctx, primitive.NewName(d.Namespace, d.Name, d.application, name), d.sessions)
 }
 
 // GetSet gets or creates a Set with the given name
-func (d *Database) GetSet(ctx context.Context, name string, opts ...session.Option) (set.Set, error) {
-	return set.New(ctx, primitive.NewName(d.Namespace, d.Name, d.application, name), d.partitions, opts...)
+func (d *Database) GetSet(ctx context.Context, name string) (set.Set, error) {
+	return set.New(ctx, primitive.NewName(d.Namespace, d.Name, d.application, name), d.sessions)
 }
 
 // GetValue gets or creates a Value with the given name
-func (d *Database) GetValue(ctx context.Context, name string, opts ...session.Option) (value.Value, error) {
-	return value.New(ctx, primitive.NewName(d.Namespace, d.Name, d.application, name), d.partitions, opts...)
+func (d *Database) GetValue(ctx context.Context, name string) (value.Value, error) {
+	return value.New(ctx, primitive.NewName(d.Namespace, d.Name, d.application, name), d.sessions)
 }
 
 // PartitionGroup manages the primitives in a partition group
@@ -406,108 +366,50 @@ type PartitionGroup struct {
 	PartitionSize int
 
 	application string
-	partitions  []primitive.Partition
-}
-
-// GetPrimitives gets a list of primitives of the given types
-func (g *PartitionGroup) GetPrimitives(ctx context.Context, types ...primitive.Type) ([]*primitiveapi.PrimitiveInfo, error) {
-	if len(types) == 0 {
-		return g.getPrimitives(ctx, "")
-	}
-
-	primitives := []*primitiveapi.PrimitiveInfo{}
-	for _, t := range types {
-		typePrimitives, err := g.getPrimitives(ctx, t)
-		if err != nil {
-			return nil, err
-		}
-		primitives = append(primitives, typePrimitives...)
-	}
-	return primitives, nil
-}
-
-// getPrimitives gets a list of primitives of the given type
-func (g *PartitionGroup) getPrimitives(ctx context.Context, t primitive.Type) ([]*primitiveapi.PrimitiveInfo, error) {
-	results, err := util.ExecuteAsync(len(g.partitions), func(i int) (interface{}, error) {
-		conn, err := net.Connect(g.partitions[i].Address)
-		if err != nil {
-			return nil, err
-		}
-		defer conn.Close()
-		client := primitiveapi.NewPrimitiveServiceClient(conn)
-		request := &primitiveapi.GetPrimitivesRequest{
-			Type:      string(t),
-			Namespace: g.application,
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		response, err := client.GetPrimitives(ctx, request)
-		if err != nil {
-			return nil, err
-		}
-		return response.Primitives, nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	primitiveResults := make(map[string]*primitiveapi.PrimitiveInfo)
-	for _, result := range results {
-		primitives := result.([]*primitiveapi.PrimitiveInfo)
-		for _, info := range primitives {
-			primitiveResults[info.Name.String()] = info
-		}
-	}
-
-	primitives := make([]*primitiveapi.PrimitiveInfo, 0, len(primitiveResults))
-	for _, info := range primitiveResults {
-		primitives = append(primitives, info)
-	}
-	return primitives, nil
+	sessions    []*primitive.Session
 }
 
 // GetCounter gets or creates a Counter with the given name
-func (g *PartitionGroup) GetCounter(ctx context.Context, name string, opts ...session.Option) (counter.Counter, error) {
-	return counter.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.partitions, opts...)
+func (g *PartitionGroup) GetCounter(ctx context.Context, name string) (counter.Counter, error) {
+	return counter.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.sessions)
 }
 
 // GetElection gets or creates an Election with the given name
-func (g *PartitionGroup) GetElection(ctx context.Context, name string, opts ...session.Option) (election.Election, error) {
-	return election.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.partitions, opts...)
+func (g *PartitionGroup) GetElection(ctx context.Context, name string, opts ...election.Option) (election.Election, error) {
+	return election.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.sessions)
 }
 
 // GetIndexedMap gets or creates a Map with the given name
-func (g *PartitionGroup) GetIndexedMap(ctx context.Context, name string, opts ...session.Option) (indexedmap.IndexedMap, error) {
-	return indexedmap.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.partitions, opts...)
+func (g *PartitionGroup) GetIndexedMap(ctx context.Context, name string) (indexedmap.IndexedMap, error) {
+	return indexedmap.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.sessions)
 }
 
 // GetLeaderLatch gets or creates a LeaderLatch with the given name
-func (g *PartitionGroup) GetLeaderLatch(ctx context.Context, name string, opts ...session.Option) (leader.Latch, error) {
-	return leader.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.partitions, opts...)
+func (g *PartitionGroup) GetLeaderLatch(ctx context.Context, name string, opts ...leader.Option) (leader.Latch, error) {
+	return leader.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.sessions)
 }
 
 // GetList gets or creates a List with the given name
-func (g *PartitionGroup) GetList(ctx context.Context, name string, opts ...session.Option) (list.List, error) {
-	return list.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.partitions, opts...)
+func (g *PartitionGroup) GetList(ctx context.Context, name string) (list.List, error) {
+	return list.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.sessions)
 }
 
 // GetLock gets or creates a Lock with the given name
-func (g *PartitionGroup) GetLock(ctx context.Context, name string, opts ...session.Option) (lock.Lock, error) {
-	return lock.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.partitions, opts...)
+func (g *PartitionGroup) GetLock(ctx context.Context, name string) (lock.Lock, error) {
+	return lock.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.sessions)
 }
 
 // GetMap gets or creates a Map with the given name
-func (g *PartitionGroup) GetMap(ctx context.Context, name string, opts ...session.Option) (_map.Map, error) {
-	return _map.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.partitions, opts...)
+func (g *PartitionGroup) GetMap(ctx context.Context, name string) (_map.Map, error) {
+	return _map.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.sessions)
 }
 
 // GetSet gets or creates a Set with the given name
-func (g *PartitionGroup) GetSet(ctx context.Context, name string, opts ...session.Option) (set.Set, error) {
-	return set.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.partitions, opts...)
+func (g *PartitionGroup) GetSet(ctx context.Context, name string) (set.Set, error) {
+	return set.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.sessions)
 }
 
 // GetValue gets or creates a Value with the given name
-func (g *PartitionGroup) GetValue(ctx context.Context, name string, opts ...session.Option) (value.Value, error) {
-	return value.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.partitions, opts...)
+func (g *PartitionGroup) GetValue(ctx context.Context, name string) (value.Value, error) {
+	return value.New(ctx, primitive.NewName(g.Namespace, g.Name, g.application, name), g.sessions)
 }

@@ -17,7 +17,6 @@ package set
 import (
 	"context"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/session"
 	"github.com/atomix/go-client/pkg/client/util"
 	"sync"
 )
@@ -28,7 +27,7 @@ const Type primitive.Type = "Set"
 // Client provides an API for creating Sets
 type Client interface {
 	// GetSet gets the Set instance of the given name
-	GetSet(ctx context.Context, name string, opts ...session.Option) (Set, error)
+	GetSet(ctx context.Context, name string) (Set, error)
 }
 
 // Set provides a distributed set data structure
@@ -86,9 +85,9 @@ type Event struct {
 }
 
 // New creates a new partitioned set primitive
-func New(ctx context.Context, name primitive.Name, partitions []primitive.Partition, opts ...session.Option) (Set, error) {
+func New(ctx context.Context, name primitive.Name, partitions []*primitive.Session) (Set, error) {
 	results, err := util.ExecuteOrderedAsync(len(partitions), func(i int) (interface{}, error) {
-		return newPartition(ctx, name, partitions[i], opts...)
+		return newPartition(ctx, name, partitions[i])
 	})
 	if err != nil {
 		return nil, err
@@ -212,14 +211,14 @@ func (s *set) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) 
 	})
 }
 
-func (s *set) Close() error {
+func (s *set) Close(ctx context.Context) error {
 	return util.IterAsync(len(s.partitions), func(i int) error {
-		return s.partitions[i].Close()
+		return s.partitions[i].Close(ctx)
 	})
 }
 
-func (s *set) Delete() error {
+func (s *set) Delete(ctx context.Context) error {
 	return util.IterAsync(len(s.partitions), func(i int) error {
-		return s.partitions[i].Delete()
+		return s.partitions[i].Delete(ctx)
 	})
 }

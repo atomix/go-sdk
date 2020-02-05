@@ -15,6 +15,7 @@
 package primitive
 
 import (
+	"context"
 	"fmt"
 	"github.com/atomix/go-client/pkg/client/util/net"
 )
@@ -54,10 +55,10 @@ type Primitive interface {
 	Name() Name
 
 	// Close closes the primitive
-	Close() error
+	Close(ctx context.Context) error
 
 	// Delete deletes the primitive state from the cluster
-	Delete() error
+	Delete(ctx context.Context) error
 }
 
 // Partition is the ID and address for a partition
