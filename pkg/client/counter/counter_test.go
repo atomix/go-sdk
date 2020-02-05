@@ -17,18 +17,16 @@ package counter
 import (
 	"context"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/session"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
-	"time"
 )
 
 func TestCounterOperations(t *testing.T) {
 	conns, partitions := test.StartTestPartitions(3)
 
 	name := primitive.NewName("default", "test", "default", "test")
-	counter, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	counter, err := New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 	assert.NotNil(t, counter)
 
@@ -66,29 +64,29 @@ func TestCounterOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, int64(10), value)
 
-	err = counter.Close()
+	err = counter.Close(context.Background())
 	assert.NoError(t, err)
 
-	counter1, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	counter1, err := New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 
-	counter2, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	counter2, err := New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 
 	value, err = counter1.Get(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, int64(10), value)
 
-	err = counter1.Close()
+	err = counter1.Close(context.Background())
 	assert.NoError(t, err)
 
-	err = counter1.Delete()
+	err = counter1.Delete(context.Background())
 	assert.NoError(t, err)
 
-	err = counter2.Delete()
+	err = counter2.Delete(context.Background())
 	assert.NoError(t, err)
 
-	counter, err = New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	counter, err = New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 
 	value, err = counter.Get(context.TODO())

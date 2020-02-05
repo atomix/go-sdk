@@ -17,18 +17,16 @@ package set
 import (
 	"context"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/session"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
-	"time"
 )
 
 func TestSetOperations(t *testing.T) {
 	conns, partitions := test.StartTestPartitions(1)
 
 	name := primitive.NewName("default", "test", "default", "test")
-	set, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	set, err := New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 	assert.NotNil(t, set)
 
@@ -144,29 +142,29 @@ func TestSetOperations(t *testing.T) {
 
 	<-done
 
-	err = set.Close()
+	err = set.Close(context.Background())
 	assert.NoError(t, err)
 
-	set1, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	set1, err := New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 
-	set2, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	set2, err := New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 
 	size, err = set1.Len(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, 4, size)
 
-	err = set1.Close()
+	err = set1.Close(context.Background())
 	assert.NoError(t, err)
 
-	err = set1.Delete()
+	err = set1.Delete(context.Background())
 	assert.NoError(t, err)
 
-	err = set2.Delete()
+	err = set2.Delete(context.Background())
 	assert.NoError(t, err)
 
-	set, err = New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	set, err = New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 
 	size, err = set.Len(context.TODO())

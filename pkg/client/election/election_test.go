@@ -17,26 +17,24 @@ package election
 import (
 	"context"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/session"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
-	"time"
 )
 
 func TestElectionOperations(t *testing.T) {
 	conns, partitions := test.StartTestPartitions(1)
 
 	name := primitive.NewName("default", "test", "default", "test")
-	election1, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	election1, err := New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 	assert.NotNil(t, election1)
 
-	election2, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	election2, err := New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 	assert.NotNil(t, election2)
 
-	election3, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	election3, err := New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 	assert.NotNil(t, election3)
 
@@ -210,7 +208,7 @@ func TestElectionOperations(t *testing.T) {
 	assert.Len(t, event.Term.Candidates, 2)
 	assert.Equal(t, election2.ID(), event.Term.Candidates[0])
 
-	err = election2.Close()
+	err = election2.Close(context.Background())
 	assert.NoError(t, err)
 
 	event = <-ch
@@ -220,15 +218,15 @@ func TestElectionOperations(t *testing.T) {
 	assert.Len(t, event.Term.Candidates, 1)
 	assert.Equal(t, election1.ID(), event.Term.Candidates[0])
 
-	err = election1.Close()
+	err = election1.Close(context.Background())
 	assert.NoError(t, err)
-	err = election3.Close()
-	assert.NoError(t, err)
-
-	election1, err = New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	err = election3.Close(context.Background())
 	assert.NoError(t, err)
 
-	election2, err = New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	election1, err = New(context.TODO(), name, conns)
+	assert.NoError(t, err)
+
+	election2, err = New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 
 	term, err = election1.GetTerm(context.TODO())
@@ -237,16 +235,16 @@ func TestElectionOperations(t *testing.T) {
 	assert.Equal(t, "", term.Leader)
 	assert.Len(t, term.Candidates, 0)
 
-	err = election1.Close()
+	err = election1.Close(context.Background())
 	assert.NoError(t, err)
 
-	err = election1.Delete()
+	err = election1.Delete(context.Background())
 	assert.NoError(t, err)
 
-	err = election2.Delete()
+	err = election2.Delete(context.Background())
 	assert.NoError(t, err)
 
-	election, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	election, err := New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 
 	term, err = election.GetTerm(context.TODO())

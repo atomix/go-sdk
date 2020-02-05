@@ -15,6 +15,7 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"github.com/atomix/api/proto/atomix/controller"
 	"github.com/atomix/go-client/pkg/client/primitive"
@@ -22,24 +23,32 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/registry"
 	"github.com/atomix/go-local/pkg/atomix/local"
 	"net"
+	"time"
 )
 
 const basePort = 5000
 
 // StartTestPartitions starts the given number of local partitions and returns client connections for them
-func StartTestPartitions(partitions int) ([]primitive.Partition, []chan struct{}) {
-	addresses := make([]primitive.Partition, partitions)
+func StartTestPartitions(partitions int) ([]*primitive.Session, []chan struct{}) {
+	sessions := make([]*primitive.Session, partitions)
 	chans := make([]chan struct{}, partitions)
 	for i := 0; i < partitions; i++ {
 		partitionID := i + 1
 		address, ch := startTestPartition(partitionID)
-		addresses[i] = primitive.Partition{
+		partition := primitive.Partition{
 			ID:      partitionID,
 			Address: address,
 		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		session, err := primitive.NewSession(ctx, partition, primitive.WithSessionTimeout(5*time.Second))
+		if err != nil {
+			panic(err)
+		}
+		cancel()
+		sessions[i] = session
 		chans[i] = ch
 	}
-	return addresses, chans
+	return sessions, chans
 }
 
 // startTestPartition starts a single local partition

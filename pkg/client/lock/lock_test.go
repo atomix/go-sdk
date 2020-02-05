@@ -17,7 +17,6 @@ package lock
 import (
 	"context"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/session"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -28,9 +27,9 @@ func TestLock(t *testing.T) {
 	conns, partitions := test.StartTestPartitions(3)
 
 	name := primitive.NewName("default", "test", "default", "test")
-	l1, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	l1, err := New(context.TODO(), name, conns)
 	assert.NoError(t, err)
-	l2, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	l2, err := New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 
 	v1, err := l1.Lock(context.Background())
@@ -77,16 +76,16 @@ func TestLock(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(0), v2)
 
-	err = l1.Close()
+	err = l1.Close(context.Background())
 	assert.NoError(t, err)
 
-	err = l1.Delete()
+	err = l1.Delete(context.Background())
 	assert.NoError(t, err)
 
-	err = l2.Delete()
+	err = l2.Delete(context.Background())
 	assert.NoError(t, err)
 
-	l, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	l, err := New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 
 	locked, err = l.IsLocked(context.TODO())

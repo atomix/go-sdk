@@ -17,18 +17,16 @@ package indexedmap
 import (
 	"context"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/session"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
-	"time"
 )
 
 func TestIndexedMapOperations(t *testing.T) {
 	conns, partitions := test.StartTestPartitions(3)
 
 	name := primitive.NewName("default", "test", "default", "test")
-	_map, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	_map, err := New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 
 	kv, err := _map.Get(context.Background(), "foo")
@@ -183,7 +181,7 @@ func TestIndexedMapStreams(t *testing.T) {
 	conns, partitions := test.StartTestPartitions(3)
 
 	name := primitive.NewName("default", "test", "default", "test")
-	_map, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	_map, err := New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 
 	kv, err := _map.Put(context.Background(), "foo", []byte{1})
@@ -264,29 +262,29 @@ func TestIndexedMapStreams(t *testing.T) {
 
 	<-latch
 
-	err = _map.Close()
+	err = _map.Close(context.Background())
 	assert.NoError(t, err)
 
-	map1, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	map1, err := New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 
-	map2, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	map2, err := New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 
 	size, err := map1.Len(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, 3, size)
 
-	err = map1.Close()
+	err = map1.Close(context.Background())
 	assert.NoError(t, err)
 
-	err = map1.Delete()
+	err = map1.Delete(context.Background())
 	assert.NoError(t, err)
 
-	err = map2.Delete()
+	err = map2.Delete(context.Background())
 	assert.NoError(t, err)
 
-	_map, err = New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	_map, err = New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 
 	size, err = _map.Len(context.TODO())

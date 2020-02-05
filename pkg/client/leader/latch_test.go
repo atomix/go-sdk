@@ -17,26 +17,24 @@ package leader
 import (
 	"context"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/session"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
-	"time"
 )
 
 func TestLatchOperations(t *testing.T) {
 	conns, partitions := test.StartTestPartitions(1)
 
 	name := primitive.NewName("default", "test", "default", "test")
-	latch1, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	latch1, err := New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 	assert.NotNil(t, latch1)
 
-	latch2, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	latch2, err := New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 	assert.NotNil(t, latch2)
 
-	latch3, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	latch3, err := New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 	assert.NotNil(t, latch3)
 
@@ -98,7 +96,7 @@ func TestLatchOperations(t *testing.T) {
 	assert.Equal(t, latch2.ID(), event.Leadership.Participants[1])
 	assert.Equal(t, latch3.ID(), event.Leadership.Participants[2])
 
-	err = latch1.Close()
+	err = latch1.Close(context.Background())
 	assert.NoError(t, err)
 
 	event = <-ch
@@ -109,15 +107,15 @@ func TestLatchOperations(t *testing.T) {
 	assert.Equal(t, latch2.ID(), event.Leadership.Participants[0])
 	assert.Equal(t, latch3.ID(), event.Leadership.Participants[1])
 
-	err = latch2.Close()
+	err = latch2.Close(context.Background())
 	assert.NoError(t, err)
-	err = latch3.Close()
-	assert.NoError(t, err)
-
-	latch1, err = New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	err = latch3.Close(context.Background())
 	assert.NoError(t, err)
 
-	latch2, err = New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	latch1, err = New(context.TODO(), name, conns)
+	assert.NoError(t, err)
+
+	latch2, err = New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 
 	term, err = latch1.Get(context.TODO())
@@ -126,16 +124,16 @@ func TestLatchOperations(t *testing.T) {
 	assert.Equal(t, "", term.Leader)
 	assert.Len(t, term.Participants, 0)
 
-	err = latch1.Close()
+	err = latch1.Close(context.Background())
 	assert.NoError(t, err)
 
-	err = latch1.Delete()
+	err = latch1.Delete(context.Background())
 	assert.NoError(t, err)
 
-	err = latch2.Delete()
+	err = latch2.Delete(context.Background())
 	assert.NoError(t, err)
 
-	latch, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	latch, err := New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 
 	term, err = latch.Get(context.TODO())

@@ -261,8 +261,7 @@ func (s *Session) doQuery(ctx context.Context, name Name, f func(ctx context.Con
 
 // doCommand sends a session command request
 func (s *Session) doCommand(ctx context.Context, name Name, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) (interface{}, error) {
-	stream, header := s.nextStreamHeader(getName(name))
-	defer stream.Close()
+	header := s.nextCommandHeader(getName(name))
 	return s.doRequest(header, func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error) {
 		return f(ctx, conn, header)
 	})

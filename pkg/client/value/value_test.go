@@ -17,18 +17,16 @@ package value
 import (
 	"context"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/session"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
-	"time"
 )
 
 func TestValue(t *testing.T) {
 	conns, partitions := test.StartTestPartitions(3)
 
 	name := primitive.NewName("default", "test", "default", "test")
-	value, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	value, err := New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 	assert.NotNil(t, value)
 
@@ -93,29 +91,29 @@ func TestValue(t *testing.T) {
 	assert.Equal(t, uint64(3), event.Version)
 	assert.Equal(t, "baz", string(event.Value))
 
-	err = value.Close()
+	err = value.Close(context.Background())
 	assert.NoError(t, err)
 
-	value1, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	value1, err := New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 
-	value2, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	value2, err := New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 
 	val, _, err = value1.Get(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, "baz", string(val))
 
-	err = value1.Close()
+	err = value1.Close(context.Background())
 	assert.NoError(t, err)
 
-	err = value1.Delete()
+	err = value1.Delete(context.Background())
 	assert.NoError(t, err)
 
-	err = value2.Delete()
+	err = value2.Delete(context.Background())
 	assert.NoError(t, err)
 
-	value, err = New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	value, err = New(context.TODO(), name, conns)
 	assert.NoError(t, err)
 
 	val, _, err = value.Get(context.TODO())
