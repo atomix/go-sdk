@@ -24,6 +24,7 @@ import (
 	"github.com/atomix/go-client/pkg/client/util/net"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
+	"math"
 	"sync"
 	"time"
 )
@@ -266,6 +267,7 @@ func (s *Session) doCommand(ctx context.Context, name Name, f func(ctx context.C
 }
 
 func (s *Session) doRequest(requestHeader *headers.RequestHeader, f func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error)) (interface{}, error) {
+	i := 0
 	for {
 		conn, err := s.conns.Connect()
 		if err != nil {
@@ -285,6 +287,8 @@ func (s *Session) doRequest(requestHeader *headers.RequestHeader, f func(conn *g
 			}
 		} else {
 			fmt.Println(err)
+			i++
+			time.Sleep(time.Duration(math.Max(math.Pow(float64(i), 2), 1000)) * time.Millisecond)
 		}
 	}
 }

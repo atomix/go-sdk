@@ -131,7 +131,7 @@ func (c *Client) newDatabase(ctx context.Context, databaseProto *controllerapi.D
 	}
 
 	// Iterate through partitions and open sessions
-	sessions := make([]*primitive.Session, 0, len(partitions))
+	sessions := make([]*primitive.Session, len(partitions))
 	for i, partition := range partitions {
 		session, err := primitive.NewSession(ctx, partition, primitive.WithSessionTimeout(c.sessionTimeout))
 		if err != nil {
@@ -253,7 +253,7 @@ func (c *Client) newGroup(ctx context.Context, groupProto *controllerapi.Partiti
 	}
 
 	// Iterate through partitions and open sessions
-	sessions := make([]*primitive.Session, 0, len(partitions))
+	sessions := make([]*primitive.Session, len(partitions))
 	for i, partition := range partitions {
 		session, err := primitive.NewSession(ctx, partition, primitive.WithSessionTimeout(c.sessionTimeout))
 		if err != nil {
