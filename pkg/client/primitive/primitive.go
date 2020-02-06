@@ -27,18 +27,18 @@ type Type string
 func NewName(namespace string, group string, application string, name string) Name {
 	return Name{
 		Namespace:   namespace,
-		Group:       group,
+		Database:    group,
 		Application: application,
 		Name:        name,
 	}
 }
 
-// Name is a qualified primitive name consisting of Namespace, Group, Application, and Name
+// Name is a qualified primitive name consisting of Namespace, Database, Application, and Name
 type Name struct {
-	// Namespace is the namespace within which the partition group is stored
+	// Namespace is the namespace within which the database is stored
 	Namespace string
-	// Group is the partition group in which the primitive is stored
-	Group string
+	// Database is the database in which the primitive is stored
+	Database string
 	// Application is the name of the application that owns the primitive
 	Application string
 	// Name is the simple name of the primitive
@@ -46,7 +46,7 @@ type Name struct {
 }
 
 func (n Name) String() string {
-	return fmt.Sprintf("%s.%s.%s.%s", n.Namespace, n.Group, n.Application, n.Name)
+	return fmt.Sprintf("%s.%s.%s.%s", n.Namespace, n.Database, n.Application, n.Name)
 }
 
 // Primitive is the base interface for primitives
@@ -68,4 +68,13 @@ type Partition struct {
 
 	// Address is the partition address
 	Address net.Address
+}
+
+// Metadata is primitive metadata
+type Metadata struct {
+	// Type is the primitive type
+	Type Type
+
+	// Name is the primitive name
+	Name Name
 }

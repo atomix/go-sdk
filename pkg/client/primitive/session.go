@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/atomix/api/proto/atomix/headers"
+	"github.com/atomix/api/proto/atomix/metadata"
 	primitiveapi "github.com/atomix/api/proto/atomix/primitive"
 	api "github.com/atomix/api/proto/atomix/session"
 	"github.com/atomix/go-client/pkg/client/util/net"
@@ -50,6 +51,46 @@ func (o sessionTimeoutOption) prepare(options *sessionOptions) {
 type sessionOptions struct {
 	id      string
 	timeout time.Duration
+}
+
+// MetadataOption implements a session metadata option
+type MetadataOption interface {
+	apply(options *metadataOptions)
+}
+
+// WithNamespace returns a metadata option limiting a query by namespace
+func WithNamespace(namespace string) MetadataOption {
+	return &metadataNamespaceOption{
+		namespace: namespace,
+	}
+}
+
+type metadataNamespaceOption struct {
+	namespace string
+}
+
+func (o *metadataNamespaceOption) apply(options *metadataOptions) {
+	options.namespace = o.namespace
+}
+
+// WithPrimitiveType returns a metadata option limiting a query by primitive type
+func WithPrimitiveType(primitiveType Type) MetadataOption {
+	return &metadataPrimitiveTypeOption{
+		primitiveType: primitiveType,
+	}
+}
+
+type metadataPrimitiveTypeOption struct {
+	primitiveType Type
+}
+
+func (o *metadataPrimitiveTypeOption) apply(options *metadataOptions) {
+	options.primitiveType = o.primitiveType
+}
+
+type metadataOptions struct {
+	namespace     string
+	primitiveType Type
 }
 
 // NewSession creates a new Session for the given partition
@@ -248,6 +289,95 @@ func (s *Session) doPrimitive(ctx context.Context, name Name, f func(ctx context
 		return f(ctx, conn, header)
 	})
 	return err
+}
+
+// GetPrimitives gets a list of primitives in the partition
+func (s *Session) GetPrimitives(ctx context.Context, opts ...MetadataOption) ([]Metadata, error) {
+	options := &metadataOptions{}
+	for _, opt := range opts {
+		opt.apply(options)
+	}
+
+	header := s.getQueryHeader(nil)
+	iresponse, err := s.doRequest(header, func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error) {
+		var primitiveType primitiveapi.PrimitiveType
+		switch options.primitiveType {
+		case "Counter":
+			primitiveType = primitiveapi.PrimitiveType_COUNTER
+		case "Election":
+			primitiveType = primitiveapi.PrimitiveType_ELECTION
+		case "IndexedMap":
+			primitiveType = primitiveapi.PrimitiveType_INDEXED_MAP
+		case "LeaderLatch":
+			primitiveType = primitiveapi.PrimitiveType_LEADER_LATCH
+		case "List":
+			primitiveType = primitiveapi.PrimitiveType_LIST
+		case "Lock":
+			primitiveType = primitiveapi.PrimitiveType_LOCK
+		case "Log":
+			primitiveType = primitiveapi.PrimitiveType_LOG
+		case "Map":
+			primitiveType = primitiveapi.PrimitiveType_MAP
+		case "Set":
+			primitiveType = primitiveapi.PrimitiveType_SET
+		case "Value":
+			primitiveType = primitiveapi.PrimitiveType_VALUE
+		}
+
+		request := &metadata.GetPrimitivesRequest{
+			Header:    header,
+			Namespace: options.namespace,
+			Type:      primitiveType,
+		}
+
+		client := metadata.NewMetadataServiceClient(conn)
+		response, err := client.GetPrimitives(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	response := iresponse.(*metadata.GetPrimitivesResponse)
+	primitives := make([]Metadata, len(response.Primitives))
+	for i, primitive := range response.Primitives {
+		var primitiveType Type
+		switch primitive.Type {
+		case primitiveapi.PrimitiveType_COUNTER:
+			primitiveType = "Counter"
+		case primitiveapi.PrimitiveType_ELECTION:
+			primitiveType = "Election"
+		case primitiveapi.PrimitiveType_INDEXED_MAP:
+			primitiveType = "IndexedMap"
+		case primitiveapi.PrimitiveType_LEADER_LATCH:
+			primitiveType = "LeaderLatch"
+		case primitiveapi.PrimitiveType_LIST:
+			primitiveType = "List"
+		case primitiveapi.PrimitiveType_LOCK:
+			primitiveType = "Lock"
+		case primitiveapi.PrimitiveType_LOG:
+			primitiveType = "Log"
+		case primitiveapi.PrimitiveType_MAP:
+			primitiveType = "Map"
+		case primitiveapi.PrimitiveType_SET:
+			primitiveType = "Set"
+		case primitiveapi.PrimitiveType_VALUE:
+			primitiveType = "Value"
+		default:
+			primitiveType = "Unknown"
+		}
+		primitives[i] = Metadata{
+			Type: primitiveType,
+			Name: Name{
+				Application: primitive.Name.Namespace,
+				Name:        primitive.Name.Name,
+			},
+		}
+	}
+	return primitives, nil
 }
 
 // doQuery sends a session query request

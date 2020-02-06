@@ -28,6 +28,7 @@ import (
 	"github.com/atomix/go-client/pkg/client/map"
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/set"
+	"github.com/atomix/go-client/pkg/client/util"
 	"github.com/atomix/go-client/pkg/client/util/net"
 	"github.com/atomix/go-client/pkg/client/value"
 	"github.com/gogo/protobuf/proto"
@@ -310,6 +311,29 @@ type Database struct {
 
 	application string
 	sessions    []*primitive.Session
+}
+
+// GetPrimitives gets a list of primitives in the database
+func (d *Database) GetPrimitives(ctx context.Context, opts ...primitive.MetadataOption) ([]primitive.Metadata, error) {
+	dupPrimitives, err := util.ExecuteAsync(len(d.sessions), func(i int) (interface{}, error) {
+		return d.sessions[i].GetPrimitives(ctx, opts...)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	dedupPrimitives := make(map[string]primitive.Metadata)
+	for _, partPrimitives := range dupPrimitives {
+		for _, partPrimitive := range partPrimitives.([]primitive.Metadata) {
+			dedupPrimitives[partPrimitive.Name.String()] = partPrimitive
+		}
+	}
+
+	primitives := make([]primitive.Metadata, 0, len(dedupPrimitives))
+	for _, primitive := range dedupPrimitives {
+		primitives = append(primitives, primitive)
+	}
+	return primitives, nil
 }
 
 // GetCounter gets or creates a Counter with the given name
