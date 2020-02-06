@@ -17,6 +17,7 @@ package primitive
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/atomix/api/proto/atomix/headers"
 	primitiveapi "github.com/atomix/api/proto/atomix/primitive"
 	api "github.com/atomix/api/proto/atomix/session"
@@ -241,10 +242,7 @@ func (s *Session) doClose(ctx context.Context, name Name, f func(ctx context.Con
 
 // doPrimitive sends a primitive request
 func (s *Session) doPrimitive(ctx context.Context, name Name, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
-	header := s.getState(&primitiveapi.Name{
-		Name:      name.Name,
-		Namespace: name.Namespace,
-	})
+	header := s.nextCommandHeader(getName(name))
 	_, err := s.doRequest(header, func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error) {
 		return f(ctx, conn, header)
 	})
@@ -273,7 +271,8 @@ func (s *Session) doRequest(requestHeader *headers.RequestHeader, f func(conn *g
 		if err != nil {
 			return nil, err
 		}
-		if responseHeader, response, err := f(conn); err == nil {
+		responseHeader, response, err := f(conn)
+		if err == nil {
 			switch responseHeader.Status {
 			case headers.ResponseStatus_OK:
 				s.recordResponse(requestHeader, responseHeader)
@@ -284,6 +283,8 @@ func (s *Session) doRequest(requestHeader *headers.RequestHeader, f func(conn *g
 			case headers.ResponseStatus_ERROR:
 				return nil, errors.New("an unknown error occurred")
 			}
+		} else {
+			fmt.Println(err)
 		}
 	}
 }

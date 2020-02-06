@@ -23,10 +23,15 @@ import (
 )
 
 func TestListOperations(t *testing.T) {
-	conns, partitions := test.StartTestPartitions(3)
+	partitions, closers := test.StartTestPartitions(3)
+	defer test.StopTestPartitions(closers)
+
+	sessions, err := test.OpenSessions(partitions)
+	assert.NoError(t, err)
+	defer test.CloseSessions(sessions)
 
 	name := primitive.NewName("default", "test", "default", "test")
-	list, err := New(context.TODO(), name, conns)
+	list, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 	assert.NotNil(t, list)
 
@@ -131,10 +136,10 @@ func TestListOperations(t *testing.T) {
 	err = list.Close(context.Background())
 	assert.NoError(t, err)
 
-	list1, err := New(context.TODO(), name, conns)
+	list1, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
-	list2, err := New(context.TODO(), name, conns)
+	list2, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
 	size, err = list1.Len(context.TODO())
@@ -150,7 +155,7 @@ func TestListOperations(t *testing.T) {
 	err = list2.Delete(context.Background())
 	assert.NoError(t, err)
 
-	list, err = New(context.TODO(), name, conns)
+	list, err = New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
 	size, err = list.Len(context.TODO())
@@ -211,6 +216,4 @@ func TestListOperations(t *testing.T) {
 
 	_, ok = <-ch
 	assert.False(t, ok)
-
-	test.StopTestPartitions(partitions)
 }

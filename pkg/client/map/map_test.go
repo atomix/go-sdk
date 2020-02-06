@@ -23,10 +23,15 @@ import (
 )
 
 func TestMapOperations(t *testing.T) {
-	conns, partitions := test.StartTestPartitions(3)
+	partitions, closers := test.StartTestPartitions(3)
+	defer test.StopTestPartitions(closers)
+
+	sessions, err := test.OpenSessions(partitions)
+	assert.NoError(t, err)
+	defer test.CloseSessions(sessions)
 
 	name := primitive.NewName("default", "test", "default", "test")
-	_map, err := New(context.TODO(), name, conns)
+	_map, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
 	kv, err := _map.Get(context.Background(), "foo")
@@ -109,15 +114,18 @@ func TestMapOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, removed)
 	assert.Equal(t, kv2.Version, removed.Version)
-
-	test.StopTestPartitions(partitions)
 }
 
 func TestMapStreams(t *testing.T) {
-	conns, partitions := test.StartTestPartitions(3)
+	partitions, closers := test.StartTestPartitions(3)
+	defer test.StopTestPartitions(closers)
+
+	sessions, err := test.OpenSessions(partitions)
+	assert.NoError(t, err)
+	defer test.CloseSessions(sessions)
 
 	name := primitive.NewName("default", "test", "default", "test")
-	_map, err := New(context.TODO(), name, conns)
+	_map, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
 	kv, err := _map.Put(context.Background(), "foo", []byte{1})
@@ -190,10 +198,10 @@ func TestMapStreams(t *testing.T) {
 	err = _map.Close(context.Background())
 	assert.NoError(t, err)
 
-	map1, err := New(context.TODO(), name, conns)
+	map1, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
-	map2, err := New(context.TODO(), name, conns)
+	map2, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
 	size, err := map1.Len(context.TODO())
@@ -209,12 +217,10 @@ func TestMapStreams(t *testing.T) {
 	err = map2.Delete(context.Background())
 	assert.NoError(t, err)
 
-	_map, err = New(context.TODO(), name, conns)
+	_map, err = New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
 	size, err = _map.Len(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, 0, size)
-
-	test.StopTestPartitions(partitions)
 }

@@ -23,10 +23,15 @@ import (
 )
 
 func TestCounterOperations(t *testing.T) {
-	conns, partitions := test.StartTestPartitions(3)
+	partitions, closers := test.StartTestPartitions(3)
+	defer test.StopTestPartitions(closers)
+
+	sessions, err := test.OpenSessions(partitions)
+	assert.NoError(t, err)
+	defer test.CloseSessions(sessions)
 
 	name := primitive.NewName("default", "test", "default", "test")
-	counter, err := New(context.TODO(), name, conns)
+	counter, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 	assert.NotNil(t, counter)
 
@@ -67,10 +72,10 @@ func TestCounterOperations(t *testing.T) {
 	err = counter.Close(context.Background())
 	assert.NoError(t, err)
 
-	counter1, err := New(context.TODO(), name, conns)
+	counter1, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
-	counter2, err := New(context.TODO(), name, conns)
+	counter2, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
 	value, err = counter1.Get(context.TODO())
@@ -86,12 +91,10 @@ func TestCounterOperations(t *testing.T) {
 	err = counter2.Delete(context.Background())
 	assert.NoError(t, err)
 
-	counter, err = New(context.TODO(), name, conns)
+	counter, err = New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
 	value, err = counter.Get(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, int64(0), value)
-
-	test.StopTestPartitions(partitions)
 }

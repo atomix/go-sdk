@@ -23,18 +23,31 @@ import (
 )
 
 func TestLatchOperations(t *testing.T) {
-	conns, partitions := test.StartTestPartitions(1)
+	partitions, closers := test.StartTestPartitions(3)
+	defer test.StopTestPartitions(closers)
+
+	sessions1, err := test.OpenSessions(partitions)
+	assert.NoError(t, err)
+	defer test.CloseSessions(sessions1)
+
+	sessions2, err := test.OpenSessions(partitions)
+	assert.NoError(t, err)
+	defer test.CloseSessions(sessions2)
+
+	sessions3, err := test.OpenSessions(partitions)
+	assert.NoError(t, err)
+	defer test.CloseSessions(sessions3)
 
 	name := primitive.NewName("default", "test", "default", "test")
-	latch1, err := New(context.TODO(), name, conns)
+	latch1, err := New(context.TODO(), name, sessions1)
 	assert.NoError(t, err)
 	assert.NotNil(t, latch1)
 
-	latch2, err := New(context.TODO(), name, conns)
+	latch2, err := New(context.TODO(), name, sessions2)
 	assert.NoError(t, err)
 	assert.NotNil(t, latch2)
 
-	latch3, err := New(context.TODO(), name, conns)
+	latch3, err := New(context.TODO(), name, sessions3)
 	assert.NoError(t, err)
 	assert.NotNil(t, latch3)
 
@@ -112,10 +125,10 @@ func TestLatchOperations(t *testing.T) {
 	err = latch3.Close(context.Background())
 	assert.NoError(t, err)
 
-	latch1, err = New(context.TODO(), name, conns)
+	latch1, err = New(context.TODO(), name, sessions1)
 	assert.NoError(t, err)
 
-	latch2, err = New(context.TODO(), name, conns)
+	latch2, err = New(context.TODO(), name, sessions2)
 	assert.NoError(t, err)
 
 	term, err = latch1.Get(context.TODO())
@@ -133,7 +146,7 @@ func TestLatchOperations(t *testing.T) {
 	err = latch2.Delete(context.Background())
 	assert.NoError(t, err)
 
-	latch, err := New(context.TODO(), name, conns)
+	latch, err := New(context.TODO(), name, sessions3)
 	assert.NoError(t, err)
 
 	term, err = latch.Get(context.TODO())
@@ -141,6 +154,4 @@ func TestLatchOperations(t *testing.T) {
 	assert.Equal(t, uint64(0), term.ID)
 	assert.Equal(t, "", term.Leader)
 	assert.Len(t, term.Participants, 0)
-
-	test.StopTestPartitions(partitions)
 }

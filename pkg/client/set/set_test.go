@@ -23,10 +23,15 @@ import (
 )
 
 func TestSetOperations(t *testing.T) {
-	conns, partitions := test.StartTestPartitions(1)
+	partitions, closers := test.StartTestPartitions(3)
+	defer test.StopTestPartitions(closers)
+
+	sessions, err := test.OpenSessions(partitions)
+	assert.NoError(t, err)
+	defer test.CloseSessions(sessions)
 
 	name := primitive.NewName("default", "test", "default", "test")
-	set, err := New(context.TODO(), name, conns)
+	set, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 	assert.NotNil(t, set)
 
@@ -145,10 +150,10 @@ func TestSetOperations(t *testing.T) {
 	err = set.Close(context.Background())
 	assert.NoError(t, err)
 
-	set1, err := New(context.TODO(), name, conns)
+	set1, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
-	set2, err := New(context.TODO(), name, conns)
+	set2, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
 	size, err = set1.Len(context.TODO())
@@ -164,12 +169,10 @@ func TestSetOperations(t *testing.T) {
 	err = set2.Delete(context.Background())
 	assert.NoError(t, err)
 
-	set, err = New(context.TODO(), name, conns)
+	set, err = New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
 	size, err = set.Len(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, 0, size)
-
-	test.StopTestPartitions(partitions)
 }

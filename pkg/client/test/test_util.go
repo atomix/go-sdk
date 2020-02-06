@@ -23,32 +23,24 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/registry"
 	"github.com/atomix/go-local/pkg/atomix/local"
 	"net"
-	"time"
 )
 
 const basePort = 5000
 
 // StartTestPartitions starts the given number of local partitions and returns client connections for them
-func StartTestPartitions(partitions int) ([]*primitive.Session, []chan struct{}) {
-	sessions := make([]*primitive.Session, partitions)
-	chans := make([]chan struct{}, partitions)
-	for i := 0; i < partitions; i++ {
+func StartTestPartitions(numPartitions int) ([]primitive.Partition, []chan struct{}) {
+	partitions := make([]primitive.Partition, numPartitions)
+	chans := make([]chan struct{}, numPartitions)
+	for i := 0; i < numPartitions; i++ {
 		partitionID := i + 1
 		address, ch := startTestPartition(partitionID)
-		partition := primitive.Partition{
+		partitions[i] = primitive.Partition{
 			ID:      partitionID,
 			Address: address,
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		session, err := primitive.NewSession(ctx, partition, primitive.WithSessionTimeout(5*time.Second))
-		if err != nil {
-			panic(err)
-		}
-		cancel()
-		sessions[i] = session
 		chans[i] = ch
 	}
-	return sessions, chans
+	return partitions, chans
 }
 
 // startTestPartition starts a single local partition
@@ -70,6 +62,26 @@ func startTestPartition(partitionID int) (netutil.Address, chan struct{}) {
 		return address, ch
 	}
 	panic("cannot find open port")
+}
+
+// OpenSessions opens sessions for the given partitions
+func OpenSessions(partitions []primitive.Partition, opts ...primitive.SessionOption) ([]*primitive.Session, error) {
+	sessions := make([]*primitive.Session, len(partitions))
+	for i, partition := range partitions {
+		session, err := primitive.NewSession(context.TODO(), partition, opts...)
+		if err != nil {
+			return nil, err
+		}
+		sessions[i] = session
+	}
+	return sessions, nil
+}
+
+// CloseSessions closes the given sessions
+func CloseSessions(sessions []*primitive.Session) {
+	for _, session := range sessions {
+		_ = session.Close()
+	}
 }
 
 // StopTestPartitions stops the given test partition channels

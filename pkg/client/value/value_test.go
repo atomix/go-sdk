@@ -23,10 +23,15 @@ import (
 )
 
 func TestValue(t *testing.T) {
-	conns, partitions := test.StartTestPartitions(3)
+	partitions, closers := test.StartTestPartitions(3)
+	defer test.StopTestPartitions(closers)
+
+	sessions, err := test.OpenSessions(partitions)
+	assert.NoError(t, err)
+	defer test.CloseSessions(sessions)
 
 	name := primitive.NewName("default", "test", "default", "test")
-	value, err := New(context.TODO(), name, conns)
+	value, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 	assert.NotNil(t, value)
 
@@ -94,10 +99,10 @@ func TestValue(t *testing.T) {
 	err = value.Close(context.Background())
 	assert.NoError(t, err)
 
-	value1, err := New(context.TODO(), name, conns)
+	value1, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
-	value2, err := New(context.TODO(), name, conns)
+	value2, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
 	val, _, err = value1.Get(context.TODO())
@@ -113,12 +118,10 @@ func TestValue(t *testing.T) {
 	err = value2.Delete(context.Background())
 	assert.NoError(t, err)
 
-	value, err = New(context.TODO(), name, conns)
+	value, err = New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
 	val, _, err = value.Get(context.TODO())
 	assert.NoError(t, err)
 	assert.Nil(t, val)
-
-	test.StopTestPartitions(partitions)
 }

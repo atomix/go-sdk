@@ -23,18 +23,31 @@ import (
 )
 
 func TestElectionOperations(t *testing.T) {
-	conns, partitions := test.StartTestPartitions(1)
+	partitions, closers := test.StartTestPartitions(3)
+	defer test.StopTestPartitions(closers)
+
+	sessions1, err := test.OpenSessions(partitions)
+	assert.NoError(t, err)
+	defer test.CloseSessions(sessions1)
+
+	sessions2, err := test.OpenSessions(partitions)
+	assert.NoError(t, err)
+	defer test.CloseSessions(sessions2)
+
+	sessions3, err := test.OpenSessions(partitions)
+	assert.NoError(t, err)
+	defer test.CloseSessions(sessions3)
 
 	name := primitive.NewName("default", "test", "default", "test")
-	election1, err := New(context.TODO(), name, conns)
+	election1, err := New(context.TODO(), name, sessions1)
 	assert.NoError(t, err)
 	assert.NotNil(t, election1)
 
-	election2, err := New(context.TODO(), name, conns)
+	election2, err := New(context.TODO(), name, sessions2)
 	assert.NoError(t, err)
 	assert.NotNil(t, election2)
 
-	election3, err := New(context.TODO(), name, conns)
+	election3, err := New(context.TODO(), name, sessions3)
 	assert.NoError(t, err)
 	assert.NotNil(t, election3)
 
@@ -223,10 +236,10 @@ func TestElectionOperations(t *testing.T) {
 	err = election3.Close(context.Background())
 	assert.NoError(t, err)
 
-	election1, err = New(context.TODO(), name, conns)
+	election1, err = New(context.TODO(), name, sessions1)
 	assert.NoError(t, err)
 
-	election2, err = New(context.TODO(), name, conns)
+	election2, err = New(context.TODO(), name, sessions2)
 	assert.NoError(t, err)
 
 	term, err = election1.GetTerm(context.TODO())
@@ -244,7 +257,7 @@ func TestElectionOperations(t *testing.T) {
 	err = election2.Delete(context.Background())
 	assert.NoError(t, err)
 
-	election, err := New(context.TODO(), name, conns)
+	election, err := New(context.TODO(), name, sessions3)
 	assert.NoError(t, err)
 
 	term, err = election.GetTerm(context.TODO())
@@ -252,6 +265,4 @@ func TestElectionOperations(t *testing.T) {
 	assert.Equal(t, uint64(0), term.ID)
 	assert.Equal(t, "", term.Leader)
 	assert.Len(t, term.Candidates, 0)
-
-	test.StopTestPartitions(partitions)
 }

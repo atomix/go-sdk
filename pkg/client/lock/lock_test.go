@@ -24,12 +24,21 @@ import (
 )
 
 func TestLock(t *testing.T) {
-	conns, partitions := test.StartTestPartitions(3)
+	partitions, closers := test.StartTestPartitions(3)
+	defer test.StopTestPartitions(closers)
+
+	sessions1, err := test.OpenSessions(partitions, primitive.WithSessionTimeout(5*time.Second))
+	assert.NoError(t, err)
+	defer test.CloseSessions(sessions1)
+
+	sessions2, err := test.OpenSessions(partitions, primitive.WithSessionTimeout(5*time.Second))
+	assert.NoError(t, err)
+	defer test.CloseSessions(sessions2)
 
 	name := primitive.NewName("default", "test", "default", "test")
-	l1, err := New(context.TODO(), name, conns)
+	l1, err := New(context.TODO(), name, sessions1)
 	assert.NoError(t, err)
-	l2, err := New(context.TODO(), name, conns)
+	l2, err := New(context.TODO(), name, sessions2)
 	assert.NoError(t, err)
 
 	v1, err := l1.Lock(context.Background())
@@ -85,12 +94,14 @@ func TestLock(t *testing.T) {
 	err = l2.Delete(context.Background())
 	assert.NoError(t, err)
 
-	l, err := New(context.TODO(), name, conns)
+	sessions, err := test.OpenSessions(partitions)
+	assert.NoError(t, err)
+	defer test.CloseSessions(sessions)
+
+	l, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
 	locked, err = l.IsLocked(context.TODO())
 	assert.NoError(t, err)
 	assert.False(t, locked)
-
-	test.StopTestPartitions(partitions)
 }
