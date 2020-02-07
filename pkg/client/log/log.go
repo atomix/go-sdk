@@ -23,7 +23,6 @@ import (
 	"github.com/atomix/api/proto/atomix/headers"
 	api "github.com/atomix/api/proto/atomix/log"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/session"
 	"github.com/atomix/go-client/pkg/client/util"
 	"google.golang.org/grpc"
 )
@@ -37,7 +36,7 @@ type Index uint64
 // Client provides an API for creating IndexedMaps
 type Client interface {
 	// GetLog gets the log instance of the given name
-	GetLog(ctx context.Context, name string, opts ...session.Option) (Log, error)
+	GetLog(ctx context.Context, name string) (Log, error)
 }
 
 // Log is a distributed log
@@ -130,30 +129,30 @@ type Event struct {
 }
 
 // New creates a new log primitive
-func New(ctx context.Context, name primitive.Name, partitions []primitive.Partition, opts ...session.Option) (Log, error) {
+func New(ctx context.Context, name primitive.Name, partitions []*primitive.Session) (Log, error) {
 	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
 		return nil, err
 	}
-	return newLog(ctx, name, partitions[i], opts...)
+	return newLog(ctx, name, partitions[i])
 }
 
 // newLog creates a new Log for the given partition
-func newLog(ctx context.Context, name primitive.Name, partition primitive.Partition, opts ...session.Option) (*log, error) {
-	sess, err := session.New(ctx, name, partition, &sessionHandler{}, opts...)
+func newLog(ctx context.Context, name primitive.Name, partition *primitive.Session) (*log, error) {
+	instance, err := primitive.NewInstance(ctx, name, partition, &primitiveHandler{})
 	if err != nil {
 		return nil, err
 	}
 	return &log{
-		name:    name,
-		session: sess,
+		name:     name,
+		instance: instance,
 	}, nil
 }
 
 // log is the default single-partition implementation of Log
 type log struct {
-	name    primitive.Name
-	session *session.Session
+	name     primitive.Name
+	instance *primitive.Instance
 }
 
 func (l *log) Name() primitive.Name {
@@ -161,7 +160,7 @@ func (l *log) Name() primitive.Name {
 }
 
 func (l *log) Append(ctx context.Context, value []byte) (*Entry, error) {
-	r, err := l.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := l.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLogServiceClient(conn)
 		request := &api.AppendRequest{
 			Header: header,
@@ -197,7 +196,7 @@ func (l *log) Append(ctx context.Context, value []byte) (*Entry, error) {
 }
 
 func (l *log) Get(ctx context.Context, index int64, opts ...GetOption) (*Entry, error) {
-	r, err := l.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := l.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLogServiceClient(conn)
 		request := &api.GetRequest{
 			Header: header,
@@ -230,7 +229,7 @@ func (l *log) Get(ctx context.Context, index int64, opts ...GetOption) (*Entry, 
 }
 
 func (l *log) GetIndex(ctx context.Context, index Index, opts ...GetOption) (*Entry, error) {
-	r, err := l.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := l.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLogServiceClient(conn)
 		request := &api.GetRequest{
 			Header: header,
@@ -262,7 +261,7 @@ func (l *log) GetIndex(ctx context.Context, index Index, opts ...GetOption) (*En
 }
 
 func (l *log) FirstIndex(ctx context.Context) (Index, error) {
-	r, err := l.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := l.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLogServiceClient(conn)
 		request := &api.FirstEntryRequest{
 			Header: header,
@@ -282,7 +281,7 @@ func (l *log) FirstIndex(ctx context.Context) (Index, error) {
 }
 
 func (l *log) LastIndex(ctx context.Context) (Index, error) {
-	r, err := l.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := l.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLogServiceClient(conn)
 		request := &api.LastEntryRequest{
 			Header: header,
@@ -303,7 +302,7 @@ func (l *log) LastIndex(ctx context.Context) (Index, error) {
 }
 
 func (l *log) PrevIndex(ctx context.Context, index Index) (Index, error) {
-	r, err := l.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := l.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLogServiceClient(conn)
 		request := &api.PrevEntryRequest{
 			Header: header,
@@ -325,7 +324,7 @@ func (l *log) PrevIndex(ctx context.Context, index Index) (Index, error) {
 }
 
 func (l *log) NextIndex(ctx context.Context, index Index) (Index, error) {
-	r, err := l.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := l.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLogServiceClient(conn)
 		request := &api.NextEntryRequest{
 			Header: header,
@@ -346,7 +345,7 @@ func (l *log) NextIndex(ctx context.Context, index Index) (Index, error) {
 }
 
 func (l *log) FirstEntry(ctx context.Context) (*Entry, error) {
-	r, err := l.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := l.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLogServiceClient(conn)
 		request := &api.FirstEntryRequest{
 			Header: header,
@@ -372,7 +371,7 @@ func (l *log) FirstEntry(ctx context.Context) (*Entry, error) {
 }
 
 func (l *log) LastEntry(ctx context.Context) (*Entry, error) {
-	r, err := l.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := l.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLogServiceClient(conn)
 		request := &api.LastEntryRequest{
 			Header: header,
@@ -398,7 +397,7 @@ func (l *log) LastEntry(ctx context.Context) (*Entry, error) {
 }
 
 func (l *log) PrevEntry(ctx context.Context, index Index) (*Entry, error) {
-	r, err := l.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := l.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLogServiceClient(conn)
 		request := &api.PrevEntryRequest{
 			Header: header,
@@ -423,7 +422,7 @@ func (l *log) PrevEntry(ctx context.Context, index Index) (*Entry, error) {
 }
 
 func (l *log) NextEntry(ctx context.Context, index Index) (*Entry, error) {
-	r, err := l.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := l.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLogServiceClient(conn)
 		request := &api.NextEntryRequest{
 			Header: header,
@@ -448,7 +447,7 @@ func (l *log) NextEntry(ctx context.Context, index Index) (*Entry, error) {
 }
 
 func (l *log) Remove(ctx context.Context, index int64, opts ...RemoveOption) (*Entry, error) {
-	r, err := l.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := l.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLogServiceClient(conn)
 		request := &api.RemoveRequest{
 			Header: header,
@@ -486,7 +485,7 @@ func (l *log) Remove(ctx context.Context, index int64, opts ...RemoveOption) (*E
 }
 
 func (l *log) Size(ctx context.Context) (int, error) {
-	response, err := l.session.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := l.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLogServiceClient(conn)
 		request := &api.SizeRequest{
 			Header: header,
@@ -504,7 +503,7 @@ func (l *log) Size(ctx context.Context) (int, error) {
 }
 
 func (l *log) Clear(ctx context.Context) error {
-	_, err := l.session.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	_, err := l.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLogServiceClient(conn)
 		request := &api.ClearRequest{
 			Header: header,
@@ -519,7 +518,7 @@ func (l *log) Clear(ctx context.Context) error {
 }
 
 func (l *log) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error {
-	stream, err := l.session.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
+	stream, err := l.instance.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
 		client := api.NewLogServiceClient(conn)
 		request := &api.EventRequest{
 			Header: header,
@@ -570,10 +569,10 @@ func (l *log) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) 
 	return nil
 }
 
-func (l *log) Close() error {
-	return l.session.Close()
+func (l *log) Close(ctx context.Context) error {
+	return l.instance.Close(ctx)
 }
 
-func (l *log) Delete() error {
-	return l.session.Delete()
+func (l *log) Delete(ctx context.Context) error {
+	return l.instance.Delete(ctx)
 }

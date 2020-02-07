@@ -19,17 +19,16 @@ import (
 
 	"github.com/atomix/api/proto/atomix/headers"
 	api "github.com/atomix/api/proto/atomix/log"
-	"github.com/atomix/go-client/pkg/client/session"
+	"github.com/atomix/go-client/pkg/client/primitive"
 	"google.golang.org/grpc"
 )
 
-type sessionHandler struct{}
+type primitiveHandler struct{}
 
-func (m *sessionHandler) Create(ctx context.Context, s *session.Session) error {
+func (m *primitiveHandler) Create(ctx context.Context, s *primitive.Instance) error {
 	return s.DoCreate(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		request := &api.CreateRequest{
-			Header:  header,
-			Timeout: &s.Timeout,
+			Header: header,
 		}
 		client := api.NewLogServiceClient(conn)
 		response, err := client.Create(ctx, request)
@@ -40,21 +39,7 @@ func (m *sessionHandler) Create(ctx context.Context, s *session.Session) error {
 	})
 }
 
-func (m *sessionHandler) KeepAlive(ctx context.Context, s *session.Session) error {
-	return s.DoKeepAlive(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		request := &api.KeepAliveRequest{
-			Header: header,
-		}
-		client := api.NewLogServiceClient(conn)
-		response, err := client.KeepAlive(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		return response.Header, response, nil
-	})
-}
-
-func (m *sessionHandler) Close(ctx context.Context, s *session.Session) error {
+func (m *primitiveHandler) Close(ctx context.Context, s *primitive.Instance) error {
 	return s.DoClose(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		request := &api.CloseRequest{
 			Header: header,
@@ -68,7 +53,7 @@ func (m *sessionHandler) Close(ctx context.Context, s *session.Session) error {
 	})
 }
 
-func (m *sessionHandler) Delete(ctx context.Context, s *session.Session) error {
+func (m *primitiveHandler) Delete(ctx context.Context, s *primitive.Instance) error {
 	return s.DoClose(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		request := &api.CloseRequest{
 			Header: header,

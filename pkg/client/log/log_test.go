@@ -17,20 +17,23 @@ package log
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/session"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestLogOperations(t *testing.T) {
-	conns, partitions := test.StartTestPartitions(3)
+	partitions, closers := test.StartTestPartitions(3)
+	defer test.StopTestPartitions(closers)
+
+	sessions, err := test.OpenSessions(partitions)
+	assert.NoError(t, err)
+	defer test.CloseSessions(sessions)
 
 	// Creates a new log primitive
 	name := primitive.NewName("default", "test", "default", "test")
-	_log, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	_log, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
 	// Gets the log entry at index 0
@@ -114,14 +117,19 @@ func TestLogOperations(t *testing.T) {
 	err = _log.Clear(context.Background())
 	assert.NoError(t, err)
 
-	test.StopTestPartitions(partitions)
 }
 
 func TestLogStreams(t *testing.T) {
-	conns, partitions := test.StartTestPartitions(3)
+	partitions, closers := test.StartTestPartitions(3)
+	defer test.StopTestPartitions(closers)
 
+	sessions, err := test.OpenSessions(partitions)
+	assert.NoError(t, err)
+	defer test.CloseSessions(sessions)
+
+	// Creates a new log primitive
 	name := primitive.NewName("default", "test", "default", "test")
-	_log, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	_log, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
 	kv, err := _log.Append(context.Background(), []byte("item1"))
@@ -166,34 +174,33 @@ func TestLogStreams(t *testing.T) {
 	assert.Equal(t, "item5", string(kv.Value))
 
 	<-latch
-	err = _log.Close()
+	err = _log.Close(context.Background())
 	assert.NoError(t, err)
 
-	log1, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	log1, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
-	log2, err := New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	log2, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
 	size, err := log1.Size(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, 5, size)
 
-	err = log1.Close()
+	err = log1.Close(context.Background())
 	assert.NoError(t, err)
 
-	err = log1.Delete()
+	err = log1.Delete(context.Background())
 	assert.NoError(t, err)
 
-	err = log2.Delete()
+	err = log2.Delete(context.Background())
 	assert.NoError(t, err)
 
-	_log, err = New(context.TODO(), name, conns, session.WithTimeout(5*time.Second))
+	_log, err = New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
 	size, err = _log.Size(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, 0, size)
 
-	test.StopTestPartitions(partitions)
 }
