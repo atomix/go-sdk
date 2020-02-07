@@ -110,6 +110,5 @@ func WithFilter(filter Filter) WatchOption {
 
 // Filter is a watch filter configuration
 type Filter struct {
-	Key   string
 	Index Index
 }
