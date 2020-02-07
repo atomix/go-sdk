@@ -25,6 +25,7 @@ import (
 	"github.com/atomix/go-client/pkg/client/leader"
 	"github.com/atomix/go-client/pkg/client/list"
 	"github.com/atomix/go-client/pkg/client/lock"
+	"github.com/atomix/go-client/pkg/client/log"
 	"github.com/atomix/go-client/pkg/client/map"
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/set"
@@ -366,6 +367,11 @@ func (d *Database) GetLock(ctx context.Context, name string) (lock.Lock, error) 
 	return lock.New(ctx, primitive.NewName(d.Namespace, d.Name, d.scope, name), d.sessions)
 }
 
+// GetList gets or creates a Log with the given name
+func (d *Database) GetLog(ctx context.Context, name string) (log.Log, error) {
+	return log.New(ctx, primitive.NewName(d.Namespace, d.Name, d.scope, name), d.sessions)
+}
+
 // GetMap gets or creates a Map with the given name
 func (d *Database) GetMap(ctx context.Context, name string) (_map.Map, error) {
 	return _map.New(ctx, primitive.NewName(d.Namespace, d.Name, d.scope, name), d.sessions)
@@ -421,6 +427,11 @@ func (g *PartitionGroup) GetList(ctx context.Context, name string) (list.List, e
 // GetLock gets or creates a Lock with the given name
 func (g *PartitionGroup) GetLock(ctx context.Context, name string) (lock.Lock, error) {
 	return lock.New(ctx, primitive.NewName(g.Namespace, g.Name, g.scope, name), g.sessions)
+}
+
+// GetList gets or creates a Log with the given name
+func (g *PartitionGroup) GetLog(ctx context.Context, name string) (log.Log, error) {
+	return log.New(ctx, primitive.NewName(g.Namespace, g.Name, g.scope, name), g.sessions)
 }
 
 // GetMap gets or creates a Map with the given name

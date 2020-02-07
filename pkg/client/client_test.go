@@ -21,6 +21,7 @@ import (
 	"github.com/atomix/go-client/pkg/client/indexedmap"
 	"github.com/atomix/go-client/pkg/client/list"
 	"github.com/atomix/go-client/pkg/client/lock"
+	"github.com/atomix/go-client/pkg/client/log"
 	"github.com/atomix/go-client/pkg/client/map"
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/set"
@@ -104,12 +105,23 @@ func TestDatabase(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 1)
 
-	_, err = database.GetMap(context.TODO(), "map")
+	_, err = database.GetLog(context.TODO(), "log")
 	assert.NoError(t, err)
 
 	primitives, err = database.GetPrimitives(context.TODO())
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 6)
+
+	primitives, err = database.GetPrimitives(context.TODO(), primitive.WithPrimitiveType(log.Type))
+	assert.NoError(t, err)
+	assert.Len(t, primitives, 1)
+
+	_, err = database.GetMap(context.TODO(), "map")
+	assert.NoError(t, err)
+
+	primitives, err = database.GetPrimitives(context.TODO())
+	assert.NoError(t, err)
+	assert.Len(t, primitives, 7)
 
 	primitives, err = database.GetPrimitives(context.TODO(), primitive.WithPrimitiveType(_map.Type))
 	assert.NoError(t, err)
@@ -120,7 +132,7 @@ func TestDatabase(t *testing.T) {
 
 	primitives, err = database.GetPrimitives(context.TODO())
 	assert.NoError(t, err)
-	assert.Len(t, primitives, 7)
+	assert.Len(t, primitives, 8)
 
 	primitives, err = database.GetPrimitives(context.TODO(), primitive.WithPrimitiveType(set.Type))
 	assert.NoError(t, err)
@@ -131,7 +143,7 @@ func TestDatabase(t *testing.T) {
 
 	primitives, err = database.GetPrimitives(context.TODO())
 	assert.NoError(t, err)
-	assert.Len(t, primitives, 8)
+	assert.Len(t, primitives, 9)
 
 	primitives, err = database.GetPrimitives(context.TODO(), primitive.WithPrimitiveType(value.Type))
 	assert.NoError(t, err)
