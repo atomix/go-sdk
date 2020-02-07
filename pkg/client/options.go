@@ -22,7 +22,7 @@ import (
 func applyOptions(opts ...Option) *options {
 	options := &options{
 		namespace:      os.Getenv("ATOMIX_NAMESPACE"),
-		application:    os.Getenv("ATOMIX_APP"),
+		scope:          os.Getenv("ATOMIX_SCOPE"),
 		sessionTimeout: 1 * time.Minute,
 	}
 	for _, opt := range opts {
@@ -32,7 +32,7 @@ func applyOptions(opts ...Option) *options {
 }
 
 type options struct {
-	application    string
+	scope          string
 	namespace      string
 	sessionTimeout time.Duration
 }
@@ -42,17 +42,23 @@ type Option interface {
 	apply(options *options)
 }
 
-type applicationOption struct {
-	application string
+type scopeOption struct {
+	scope string
 }
 
-func (o *applicationOption) apply(options *options) {
-	options.application = o.application
+func (o *scopeOption) apply(options *options) {
+	options.scope = o.scope
 }
 
 // WithApplication configures the application name for the client
+// Deprecated: Use WithScope instead
 func WithApplication(application string) Option {
-	return &applicationOption{application: application}
+	return &scopeOption{scope: application}
+}
+
+// WithScope configures the application scope for the client
+func WithScope(scope string) Option {
+	return &scopeOption{scope: scope}
 }
 
 type namespaceOption struct {

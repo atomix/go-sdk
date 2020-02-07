@@ -22,11 +22,11 @@ import (
 
 func TestOptions(t *testing.T) {
 	_ = os.Setenv("ATOMIX_NAMESPACE", "default")
-	_ = os.Setenv("ATOMIX_APP", "test")
+	_ = os.Setenv("ATOMIX_SCOPE", "test")
 	options := applyOptions()
 	assert.Equal(t, "default", options.namespace)
-	assert.Equal(t, "test", options.application)
-	options = applyOptions(WithNamespace("foo"), WithApplication("bar"))
+	assert.Equal(t, "test", options.scope)
+	options = applyOptions(WithNamespace("foo"), WithScope("bar"))
 	assert.Equal(t, "foo", options.namespace)
-	assert.Equal(t, "bar", options.application)
+	assert.Equal(t, "bar", options.scope)
 }

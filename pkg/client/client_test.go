@@ -39,10 +39,10 @@ func TestDatabase(t *testing.T) {
 	defer test.CloseSessions(sessions)
 
 	database := &Database{
-		Namespace:   "default",
-		Name:        "test",
-		application: "default",
-		sessions:    sessions,
+		Namespace: "default",
+		Name:      "test",
+		scope:     "default",
+		sessions:  sessions,
 	}
 
 	primitives, err := database.GetPrimitives(context.TODO())

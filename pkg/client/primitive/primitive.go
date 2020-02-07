@@ -24,11 +24,12 @@ import (
 type Type string
 
 // NewName returns a qualified primitive name with the given namespace, group, application, and name
-func NewName(namespace string, group string, application string, name string) Name {
+func NewName(namespace string, group string, scope string, name string) Name {
 	return Name{
 		Namespace:   namespace,
 		Database:    group,
-		Application: application,
+		Application: scope,
+		Scope:       scope,
 		Name:        name,
 	}
 }
@@ -40,13 +41,16 @@ type Name struct {
 	// Database is the database in which the primitive is stored
 	Database string
 	// Application is the name of the application that owns the primitive
+	// Deprecated: Use Scope instead
 	Application string
+	// Scope is the application scope in which the primitive is stored
+	Scope string
 	// Name is the simple name of the primitive
 	Name string
 }
 
 func (n Name) String() string {
-	return fmt.Sprintf("%s.%s.%s.%s", n.Namespace, n.Database, n.Application, n.Name)
+	return fmt.Sprintf("%s.%s.%s.%s", n.Namespace, n.Database, n.Scope, n.Name)
 }
 
 // Primitive is the base interface for primitives
