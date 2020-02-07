@@ -373,6 +373,7 @@ func (s *Session) GetPrimitives(ctx context.Context, opts ...MetadataOption) ([]
 			Type: primitiveType,
 			Name: Name{
 				Application: primitive.Name.Namespace,
+				Scope:       primitive.Name.Namespace,
 				Name:        primitive.Name.Name,
 			},
 		}
