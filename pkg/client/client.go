@@ -39,8 +39,8 @@ import (
 	"time"
 )
 
-// NewClient returns a new Atomix client
-func NewClient(address string, opts ...Option) (*Client, error) {
+// New returns a new Atomix client
+func New(address string, opts ...Option) (*Client, error) {
 	options := applyOptions(opts...)
 
 	// Set up a connection to the server.
@@ -56,6 +56,12 @@ func NewClient(address string, opts ...Option) (*Client, error) {
 		sessionTimeout: options.sessionTimeout,
 		conns:          []*grpc.ClientConn{},
 	}, nil
+}
+
+// NewClient returns a new Atomix client
+// Deprected: use New instead
+func NewClient(address string, opts ...Option) (*Client, error) {
+	return New(address, opts...)
 }
 
 // Client is an Atomix client
