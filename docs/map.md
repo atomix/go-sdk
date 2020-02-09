@@ -7,15 +7,15 @@ values as a `KeyValue` object with the following fields:
 * `Value` - the `[]byte` entry value
 * `Version` - a monotonically increasing, unique `int64` entry version suitable for use in optimistic locks
 
-To create a distributed map, get a `PartitionGroup` and call `GetMap` on the group:
+To create a distributed map, get a `Database` and call `GetMap` on the database:
 
 ```go
-group, err := client.GetGroup(context.TODO(), "raft")
+db, err := client.GetDatabase(context.TODO(), "raft")
 if err != nil {
 	...
 }
 
-_map, err := group.GetMap(context.TODO(), "my-map")
+_map, err := db.GetMap(context.TODO(), "my-map")
 if err != nil {
 	...
 }

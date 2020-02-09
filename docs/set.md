@@ -1,15 +1,15 @@
 # Set
 
 The `Set` primitive is a partitioned distributed set. Set values are stored as `strings`. To
-create a set, call `GetSet` on the group in which to create the set:
+create a set, call `GetSet` on the database in which to create the set:
 
 ```go
-group, err := client.GetGroup(context.TODO(), "raft")
+db, err := client.GetDatabase(context.TODO(), "raft")
 if err != nil {
 	...
 }
 
-set, err := group.GetSet(context.TODO(), "my-set")
+set, err := db.GetSet(context.TODO(), "my-set")
 if err != nil {
 	...
 }

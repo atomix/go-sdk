@@ -1,16 +1,16 @@
 # Counter
 
 The `Counter` primitive is a distributed counter that supports atomic increment, decrement,
-and check-and-set operations. To create a counter, call `GetCounter` on the group in which
+and check-and-set operations. To create a counter, call `GetCounter` on the database in which
 to create the counter:
 
 ```go
-group, err := client.GetGroup(context.TODO(), "raft")
+db, err := client.GetDatabase(context.TODO(), "raft")
 if err != nil {
 	...
 }
 
-counter, err := group.GetCounter(context.TODO(), "my-counter")
+counter, err := db.GetCounter(context.TODO(), "my-counter")
 if err != nil {
 	...
 }

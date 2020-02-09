@@ -37,7 +37,7 @@ The `client.Client` API cannot itself create distributed primitives. To create p
 must first get an instance of a deployed `Database`:
 
 ```go
-database, err := atomix.GetDatabase(context.TODO(), "raft")
+db, err := atomix.GetDatabase(context.TODO(), "raft")
 if err != nil {
 	panic(err)
 }
@@ -60,7 +60,7 @@ To create a distributed primitive, call the getter for the desired type, passing
 name of the primitive and any additional primitive options:
 
 ```go
-lock, err := atomix.GetLock(context.TODO(), "my-lock")
+lock, err := db.GetLock(context.TODO(), "my-lock")
 if err != nil {
 	panic(err)
 }

@@ -4,15 +4,15 @@ The `Election` primitive supports distributed leader election. Leader elections 
 using first-in-first-out, but clients can sort election priority through various operations on
 the `Election` interface.
 
-To create an `Election`, call `GetElection` on the group in which to create the election:
+To create an `Election`, call `GetElection` on the database in which to create the election:
 
 ```go
-group, err := client.GetGroup(context.TODO(), "raft")
+db, err := client.GetDatabase(context.TODO(), "raft")
 if err != nil {
 	...
 }
 
-election, err := group.GetElection(context.TODO(), "my-election")
+election, err := db.GetElection(context.TODO(), "my-election")
 if err != nil {
 	...
 }
@@ -21,10 +21,17 @@ defer election.Close(context.TODO())
 ```
 
 Each `Election` object has a globally unique node ID which is used to identify the client and
-can be read by calling `Id()`:
+can be read by calling `ID()`:
 
 ```go
-id := election.Id()
+id := election.ID()
+```
+
+The election ID is used to differentiate candidates and can be explicitly assigned by passing additional
+options to the election getter:
+
+```go
+election, err := database.GetElection(context.TODO(), "my-election", election.WithID("node-1"))
 ```
 
 The current election `Term` can be retrieved by calling `GetTerm`:

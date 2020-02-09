@@ -1,18 +1,18 @@
 # Lock
 
 The `Lock` primitive is a distributed lock that provides lock version numbers for fencing.
-To create a lock, call `GetLock` on the group in which to create the lock.
+To create a lock, call `GetLock` on the database in which to create the lock.
 
-_Note that it's recommended distributed locking be used with a strongly consistent partition 
-group that implements a protocol like `raft`.
+_Note that it's recommended distributed locking be used with a strongly consistent 
+database that implements a protocol like `raft`.
 
 ```go
-group, err := client.GetGroup(context.TODO(), "raft")
+db, err := client.GetDatabase(context.TODO(), "raft")
 if err != nil {
 	...
 }
 
-lock, err := group.GetLock(context.TODO(), "my-lock")
+lock, err := db.GetLock(context.TODO(), "my-lock")
 if err != nil {
 	...
 }
