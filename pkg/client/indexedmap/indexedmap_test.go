@@ -16,10 +16,11 @@ package indexedmap
 
 import (
 	"context"
+	"testing"
+
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestIndexedMapOperations(t *testing.T) {
@@ -267,6 +268,22 @@ func TestIndexedMapStreams(t *testing.T) {
 	assert.NotNil(t, event)
 	assert.Equal(t, "foo", event.Entry.Key)
 	assert.Equal(t, kv.Version, event.Entry.Version)
+
+	chanEntry := make(chan *Entry)
+	go func() {
+		e := <-chanEntry
+		assert.Equal(t, "foo", string(e.Key))
+		e = <-chanEntry
+		assert.Equal(t, "bar", string(e.Key))
+		e = <-chanEntry
+		assert.Equal(t, "baz", string(e.Key))
+		latch <- struct{}{}
+	}()
+
+	<-latch
+
+	err = _map.Entries(context.Background(), chanEntry)
+	assert.NoError(t, err)
 
 	<-latch
 

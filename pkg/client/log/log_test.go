@@ -33,88 +33,88 @@ func TestLogOperations(t *testing.T) {
 
 	// Creates a new log primitive
 	name := primitive.NewName("default", "test", "default", "test")
-	_log, err := New(context.TODO(), name, sessions)
+	log, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
 	// Gets the log entry at index 0
-	kv, err := _log.Get(context.Background(), 0)
+	kv, err := log.Get(context.Background(), 0)
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 
 	// Checks the size of log primitive
-	size, err := _log.Size(context.Background())
+	size, err := log.Size(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, 0, size)
 
 	// Appends  an entry to the log
-	kv, err = _log.Append(context.Background(), []byte("bar"))
+	kv, err = log.Append(context.Background(), []byte("bar"))
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "bar", string(kv.Value))
 
 	// Appends an entry to the log
-	kv, err = _log.Append(context.Background(), []byte("baz"))
+	kv, err = log.Append(context.Background(), []byte("baz"))
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "baz", string(kv.Value))
 
 	// Gets the first entry in the log
-	kv, err = _log.FirstEntry(context.Background())
+	kv, err = log.FirstEntry(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, "bar", string(kv.Value))
 
 	// Gets the first index
-	firstIndex, err := _log.FirstIndex(context.Background())
+	firstIndex, err := log.FirstIndex(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(0x1), uint64(firstIndex))
 
 	// Gets the last entry in the log
-	kv, err = _log.LastEntry(context.Background())
+	kv, err = log.LastEntry(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, "baz", string(kv.Value))
 
 	// Gets the last index
-	lastIndex, err := _log.LastIndex(context.Background())
+	lastIndex, err := log.LastIndex(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(0x2), uint64(lastIndex))
 
 	// Gets the next entry of the given index in the log
-	kv, err = _log.NextEntry(context.Background(), 1)
+	kv, err = log.NextEntry(context.Background(), 1)
 	assert.NoError(t, err)
 	assert.Equal(t, "baz", string(kv.Value))
 
 	// Gets the previous entry of the given index in the log
-	kv, err = _log.PrevEntry(context.Background(), 2)
+	kv, err = log.PrevEntry(context.Background(), 2)
 	assert.NoError(t, err)
 	assert.Equal(t, "bar", string(kv.Value))
 
 	// Gets the log entry at index 1
-	kv, err = _log.Get(context.Background(), 1)
+	kv, err = log.Get(context.Background(), 1)
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "bar", string(kv.Value))
 
 	// Gets the size of the log primitive
-	size, err = _log.Size(context.Background())
+	size, err = log.Size(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, 2, size)
 
 	// Removes the entry at index 1 from the log
-	kv, err = _log.Remove(context.Background(), 1)
+	kv, err = log.Remove(context.Background(), 1)
 	assert.NoError(t, err)
 	assert.Equal(t, "bar", string(kv.Value))
 
 	// Removes the entry at index 2 from the log
-	kv, err = _log.Remove(context.Background(), 2)
+	kv, err = log.Remove(context.Background(), 2)
 	assert.NoError(t, err)
 	assert.Equal(t, "baz", string(kv.Value))
 
 	// Checks the size of the log primitive
-	size, err = _log.Size(context.Background())
+	size, err = log.Size(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, 0, size)
 
-	err = _log.Clear(context.Background())
+	err = log.Clear(context.Background())
 	assert.NoError(t, err)
 
 }
@@ -129,10 +129,10 @@ func TestLogStreams(t *testing.T) {
 
 	// Creates a new log primitive
 	name := primitive.NewName("default", "test", "default", "test")
-	_log, err := New(context.TODO(), name, sessions)
+	log, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
-	kv, err := _log.Append(context.Background(), []byte("item1"))
+	kv, err := log.Append(context.Background(), []byte("item1"))
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 
@@ -150,31 +150,49 @@ func TestLogStreams(t *testing.T) {
 		latch <- struct{}{}
 	}()
 
-	err = _log.Watch(context.Background(), c)
+	err = log.Watch(context.Background(), c)
 	assert.NoError(t, err)
 
-	kv, err = _log.Append(context.Background(), []byte("item2"))
+	kv, err = log.Append(context.Background(), []byte("item2"))
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "item2", string(kv.Value))
 
-	kv, err = _log.Append(context.Background(), []byte("item3"))
+	kv, err = log.Append(context.Background(), []byte("item3"))
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "item3", string(kv.Value))
 
-	kv, err = _log.Append(context.Background(), []byte("item4"))
+	kv, err = log.Append(context.Background(), []byte("item4"))
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "item4", string(kv.Value))
 
-	kv, err = _log.Append(context.Background(), []byte("item5"))
+	kv, err = log.Append(context.Background(), []byte("item5"))
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "item5", string(kv.Value))
 
+	chanEntry := make(chan *Entry)
+	go func() {
+		e := <-chanEntry
+		assert.Equal(t, "item1", string(e.Value))
+		e = <-chanEntry
+		assert.Equal(t, "item2", string(e.Value))
+		e = <-chanEntry
+		assert.Equal(t, "item3", string(e.Value))
+		e = <-chanEntry
+		assert.Equal(t, "item4", string(e.Value))
+		e = <-chanEntry
+		assert.Equal(t, "item5", string(e.Value))
+		latch <- struct{}{}
+	}()
+
+	err = log.Entries(context.Background(), chanEntry)
+	assert.NoError(t, err)
+
 	<-latch
-	err = _log.Close(context.Background())
+	err = log.Close(context.Background())
 	assert.NoError(t, err)
 
 	log1, err := New(context.TODO(), name, sessions)
@@ -196,10 +214,10 @@ func TestLogStreams(t *testing.T) {
 	err = log2.Delete(context.Background())
 	assert.NoError(t, err)
 
-	_log, err = New(context.TODO(), name, sessions)
+	log, err = New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
-	size, err = _log.Size(context.TODO())
+	size, err = log.Size(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, 0, size)
 
