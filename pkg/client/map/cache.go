@@ -16,7 +16,6 @@ package _map //nolint:golint
 
 import (
 	"context"
-	"errors"
 	"github.com/hashicorp/golang-lru"
 	"sync"
 )
@@ -30,10 +29,6 @@ func newCachingMap(_map Map, size int) (Map, error) {
 	cachingMap := &cachingMap{
 		delegatingMap: newDelegatingMap(_map),
 		cache:         cache,
-		state: &cacheState{
-			waiters: make(map[int64]*sync.Cond),
-			mu:      &sync.RWMutex{},
-		},
 	}
 	if err := cachingMap.open(); err != nil {
 		return nil, err
@@ -46,16 +41,16 @@ type cachingMap struct {
 	*delegatingMap
 	cancel context.CancelFunc
 	cache  *lru.Cache
-	state  *cacheState
+	mu     sync.RWMutex
 }
 
 // open opens the map listeners
 func (m *cachingMap) open() error {
 	ch := make(chan *Event)
 	ctx, cancel := context.WithCancel(context.Background())
-	m.state.Lock()
+	m.mu.Lock()
 	m.cancel = cancel
-	m.state.Unlock()
+	m.mu.Unlock()
 	if err := m.delegatingMap.Watch(ctx, ch, WithReplay()); err != nil {
 		return err
 	}
@@ -71,9 +66,6 @@ func (m *cachingMap) open() error {
 			case EventRemoved:
 				m.cache.Remove(event.Entry.Key)
 			}
-
-			// Wake up goroutines waiting for this update
-			m.state.setMaxUpdated(event.Entry.Version)
 		}
 	}()
 	return nil
@@ -86,8 +78,14 @@ func (m *cachingMap) Put(ctx context.Context, key string, value []byte, opts ...
 		return nil, err
 	}
 
-	// If the update is successful, record the max seen version
-	m.state.setMaxSeen(entry.Version)
+	// If the entry in the cache is still older than the updated entry, update the entry
+	// This check is performed because a concurrent event could update the cached entry
+	m.mu.Lock()
+	prevEntry, ok := m.cache.Get(key)
+	if !ok || prevEntry.(*Entry).Version < entry.Version {
+		m.cache.Add(key, entry)
+	}
+	m.mu.Unlock()
 	return entry, nil
 }
 
@@ -98,143 +96,41 @@ func (m *cachingMap) Remove(ctx context.Context, key string, opts ...RemoveOptio
 		return nil, err
 	}
 
-	// If the update is successful, update the max seen version for read-your-writes consistency
-	if entry != nil {
-		m.state.setMaxSeen(entry.Version)
+	// If the entry in the cache is still older than the removed entry, remove the entry
+	// This check is performed because a concurrent event could update the cached entry
+	m.mu.Lock()
+	prevEntry, ok := m.cache.Get(key)
+	if ok && prevEntry.(*Entry).Version <= entry.Version {
+		m.cache.Remove(key)
 	}
+	m.mu.Unlock()
 	return entry, nil
 }
 
 func (m *cachingMap) Get(ctx context.Context, key string, opts ...GetOption) (*Entry, error) {
-	// Get the current cache state
-	m.state.RLock()
-	closed := m.state.closed
-	current := m.state.isCurrent()
-	m.state.RUnlock()
-
-	// If the cache is closed, return an error
-	if closed {
-		return nil, errors.New("cache closed")
+	// If the entry is already in the cache, return it
+	m.mu.RLock()
+	cachedEntry, ok := m.cache.Get(key)
+	m.mu.RUnlock()
+	if ok {
+		return cachedEntry.(*Entry), nil
 	}
 
-	// If the client write a value at a later point than the current cache point, wait for updates
-	// to be propagated to the cache
-	if !current {
-		// Acquire a write lock again (double checked lock)
-		m.state.Lock()
-
-		// Check whether the cache is closed again
-		if m.state.closed {
-			return nil, errors.New("cache closed")
-		}
-
-		// Check the current cache point again before creating a condition
-		if !m.state.isCurrent() {
-			m.state.awaitUpdate()
-		}
-
-		// Check that the cache is not closed once more - it could have been closed during a awaitUpdate() call
-		if m.state.closed {
-			return nil, errors.New("cache closed")
-		}
-
-		// Release the write lock
-		m.state.Unlock()
-	}
-
-	// If the entry is present in the cache, return it
-	if entry, ok := m.cache.Get(key); ok {
-		return entry.(*Entry), nil
-	}
-
-	// Otherwise, fetch the entry from the underlying map and cache it
+	// Otherwise, fetch the entry from the underlying map
+	// Note that we do not cache the entry here since it could have been removed, in which
+	// case we'd have to maintain tombstones in the cache to compare versions.
 	entry, err := m.delegatingMap.Get(ctx, key, opts...)
 	if err != nil {
 		return nil, err
 	}
-	m.cache.Add(key, entry)
 	return entry, nil
 }
 
 func (m *cachingMap) Close(ctx context.Context) error {
-	m.state.Lock()
+	m.mu.Lock()
 	if m.cancel != nil {
 		m.cancel()
 	}
-	m.state.closed = true
-	m.state.Unlock()
+	m.mu.Unlock()
 	return m.delegatingMap.Close(ctx)
-}
-
-// cacheState contains the state of the cache
-type cacheState struct {
-	maxSeen     int64
-	maxUpdated  int64
-	maxComplete int64
-	waiters     map[int64]*sync.Cond
-	mu          *sync.RWMutex
-	closed      bool
-}
-
-// Lock locks the cache state
-func (s *cacheState) Lock() {
-	s.mu.Lock()
-}
-
-// Unlock unlocks the cache state
-func (s *cacheState) Unlock() {
-	s.mu.Unlock()
-}
-
-// RLock read locks the cache state
-func (s *cacheState) RLock() {
-	s.mu.RLock()
-}
-
-// rUnlock read unlocks the cache state
-func (s *cacheState) RUnlock() {
-	s.mu.RUnlock()
-}
-
-// setMaxSeen sets the max seen version
-func (s *cacheState) setMaxSeen(seenVersion int64) {
-	s.mu.Lock()
-	if seenVersion > s.maxSeen {
-		s.maxSeen = seenVersion
-	}
-	s.mu.Unlock()
-}
-
-// setMaxUpdated sets the max updated version and awakens waiters waiting for the update
-func (s *cacheState) setMaxUpdated(updateVersion int64) {
-	s.mu.Lock()
-	if updateVersion > s.maxUpdated {
-		s.maxUpdated = updateVersion
-		for version := s.maxComplete; version <= updateVersion; version++ {
-			waiter, ok := s.waiters[version]
-			if ok {
-				waiter.Broadcast()
-			}
-			s.maxComplete = version
-		}
-	}
-	s.mu.Unlock()
-}
-
-// awaitUpdate waits for the cache state to be propagated
-func (s *cacheState) awaitUpdate() {
-	maxSeen := s.maxSeen
-	waiter, ok := s.waiters[maxSeen]
-	if !ok {
-		waiter = sync.NewCond(s.mu)
-		s.waiters[maxSeen] = waiter
-	}
-	for s.closed || maxSeen <= s.maxUpdated {
-		waiter.Wait()
-	}
-}
-
-// isCurrent returns a boolean indicating whether the cache is current
-func (s *cacheState) isCurrent() bool {
-	return s.maxSeen <= s.maxUpdated
 }
