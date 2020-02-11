@@ -29,7 +29,7 @@ const Type primitive.Type = "Map"
 // Client provides an API for creating Maps
 type Client interface {
 	// GetMap gets the Map instance of the given name
-	GetMap(ctx context.Context, name string) (Map, error)
+	GetMap(ctx context.Context, name string, opts ...Option) (Map, error)
 }
 
 // Map is a distributed set of keys and values
@@ -112,9 +112,9 @@ type Event struct {
 }
 
 // New creates a new partitioned Map
-func New(ctx context.Context, name primitive.Name, sessions []*primitive.Session) (Map, error) {
+func New(ctx context.Context, name primitive.Name, sessions []*primitive.Session, opts ...Option) (Map, error) {
 	results, err := util.ExecuteOrderedAsync(len(sessions), func(i int) (interface{}, error) {
-		return newPartition(ctx, name, sessions[i])
+		return newPartition(ctx, name, sessions[i], opts...)
 	})
 	if err != nil {
 		return nil, err
