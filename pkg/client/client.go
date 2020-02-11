@@ -18,6 +18,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
+	"time"
+
 	controllerapi "github.com/atomix/api/proto/atomix/controller"
 	"github.com/atomix/go-client/pkg/client/counter"
 	"github.com/atomix/go-client/pkg/client/election"
@@ -26,7 +29,7 @@ import (
 	"github.com/atomix/go-client/pkg/client/list"
 	"github.com/atomix/go-client/pkg/client/lock"
 	"github.com/atomix/go-client/pkg/client/log"
-	"github.com/atomix/go-client/pkg/client/map"
+	_map "github.com/atomix/go-client/pkg/client/map"
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/set"
 	"github.com/atomix/go-client/pkg/client/util"
@@ -35,8 +38,6 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
 	"google.golang.org/grpc"
-	"sort"
-	"time"
 )
 
 // New returns a new Atomix client
@@ -373,7 +374,7 @@ func (d *Database) GetLock(ctx context.Context, name string) (lock.Lock, error) 
 	return lock.New(ctx, primitive.NewName(d.Namespace, d.Name, d.scope, name), d.sessions)
 }
 
-// GetList gets or creates a Log with the given name
+// GetLog gets or creates a Log with the given name
 func (d *Database) GetLog(ctx context.Context, name string) (log.Log, error) {
 	return log.New(ctx, primitive.NewName(d.Namespace, d.Name, d.scope, name), d.sessions)
 }
@@ -435,7 +436,7 @@ func (g *PartitionGroup) GetLock(ctx context.Context, name string) (lock.Lock, e
 	return lock.New(ctx, primitive.NewName(g.Namespace, g.Name, g.scope, name), g.sessions)
 }
 
-// GetList gets or creates a Log with the given name
+// GetLog gets or creates a Log with the given name
 func (g *PartitionGroup) GetLog(ctx context.Context, name string) (log.Log, error) {
 	return log.New(ctx, primitive.NewName(g.Namespace, g.Name, g.scope, name), g.sessions)
 }

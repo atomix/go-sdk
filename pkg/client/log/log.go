@@ -82,6 +82,11 @@ type Log interface {
 	// Clear removes all entries from the log
 	Clear(ctx context.Context) error
 
+	// Entries lists the entries in the log
+	// This is a non-blocking method. If the method returns without error, index/value paids will be pushed on to the
+	// given channel and the channel will be closed once all entries have been read from the map.
+	Entries(ctx context.Context, ch chan<- *Entry) error
+
 	// Watch watches the log for changes
 	// This is a non-blocking method. If the method returns without error, log events will be pushed onto
 	// the given channel in the order in which they occur.
@@ -563,6 +568,38 @@ func (l *log) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) 
 					Value:     response.Value,
 					Timestamp: response.Timestamp,
 				},
+			}
+		}
+	}()
+	return nil
+}
+
+func (l *log) Entries(ctx context.Context, ch chan<- *Entry) error {
+	stream, err := l.instance.DoQueryStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
+		client := api.NewLogServiceClient(conn)
+		request := &api.EntriesRequest{
+			Header: header,
+		}
+		return client.Entries(ctx, request)
+	}, func(responses interface{}) (*headers.ResponseHeader, interface{}, error) {
+		response, err := responses.(api.LogService_EntriesClient).Recv()
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		defer close(ch)
+		for event := range stream {
+			response := event.(*api.EntriesResponse)
+			ch <- &Entry{
+				Index:     Index(response.Index),
+				Value:     response.Value,
+				Timestamp: response.Timestamp,
 			}
 		}
 	}()
