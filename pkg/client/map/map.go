@@ -113,8 +113,13 @@ type Event struct {
 
 // New creates a new partitioned Map
 func New(ctx context.Context, name primitive.Name, sessions []*primitive.Session, opts ...Option) (Map, error) {
+	options := &options{}
+	for _, opt := range opts {
+		opt.apply(options)
+	}
+
 	results, err := util.ExecuteOrderedAsync(len(sessions), func(i int) (interface{}, error) {
-		return newPartition(ctx, name, sessions[i], opts...)
+		return newPartition(ctx, name, sessions[i])
 	})
 	if err != nil {
 		return nil, err
@@ -125,10 +130,18 @@ func New(ctx context.Context, name primitive.Name, sessions []*primitive.Session
 		maps[i] = result.(Map)
 	}
 
-	return &_map{
+	var m Map = &_map{
 		name:       name,
 		partitions: maps,
-	}, nil
+	}
+	if options.cached {
+		cached, err := newCachingMap(m, options.cacheSize)
+		if err != nil {
+			return nil, err
+		}
+		m = cached
+	}
+	return m, nil
 }
 
 // _map is the default single-partition implementation of Map

@@ -23,28 +23,15 @@ import (
 	"google.golang.org/grpc"
 )
 
-func newPartition(ctx context.Context, name primitive.Name, session *primitive.Session, opts ...Option) (Map, error) {
-	options := &options{}
-	for _, opt := range opts {
-		opt.apply(options)
-	}
-
+func newPartition(ctx context.Context, name primitive.Name, session *primitive.Session) (Map, error) {
 	instance, err := primitive.NewInstance(ctx, name, session, &primitiveHandler{})
 	if err != nil {
 		return nil, err
 	}
-	var partition Map = &mapPartition{
+	return &mapPartition{
 		name:     name,
 		instance: instance,
-	}
-	if options.cached {
-		cached, err := newCachingMap(partition, options.cacheSize)
-		if err != nil {
-			return nil, err
-		}
-		partition = cached
-	}
-	return partition, nil
+	}, nil
 }
 
 type mapPartition struct {
