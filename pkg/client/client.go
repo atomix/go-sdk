@@ -380,8 +380,8 @@ func (d *Database) GetLog(ctx context.Context, name string) (log.Log, error) {
 }
 
 // GetMap gets or creates a Map with the given name
-func (d *Database) GetMap(ctx context.Context, name string) (_map.Map, error) {
-	return _map.New(ctx, primitive.NewName(d.Namespace, d.Name, d.scope, name), d.sessions)
+func (d *Database) GetMap(ctx context.Context, name string, opts ..._map.Option) (_map.Map, error) {
+	return _map.New(ctx, primitive.NewName(d.Namespace, d.Name, d.scope, name), d.sessions, opts...)
 }
 
 // GetSet gets or creates a Set with the given name
@@ -442,8 +442,8 @@ func (g *PartitionGroup) GetLog(ctx context.Context, name string) (log.Log, erro
 }
 
 // GetMap gets or creates a Map with the given name
-func (g *PartitionGroup) GetMap(ctx context.Context, name string) (_map.Map, error) {
-	return _map.New(ctx, primitive.NewName(g.Namespace, g.Name, g.scope, name), g.sessions)
+func (g *PartitionGroup) GetMap(ctx context.Context, name string, opts ..._map.Option) (_map.Map, error) {
+	return _map.New(ctx, primitive.NewName(g.Namespace, g.Name, g.scope, name), g.sessions, opts...)
 }
 
 // GetSet gets or creates a Set with the given name
