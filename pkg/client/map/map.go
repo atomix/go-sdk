@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/util"
+	"math"
 	"sync"
 	"time"
 )
@@ -119,6 +120,9 @@ func New(ctx context.Context, name primitive.Name, sessions []*primitive.Session
 	}
 
 	results, err := util.ExecuteOrderedAsync(len(sessions), func(i int) (interface{}, error) {
+		if options.cached {
+			return newPartition(ctx, name, sessions[i], WithCache(int(math.Max(float64(options.cacheSize/len(sessions)), 1))))
+		}
 		return newPartition(ctx, name, sessions[i])
 	})
 	if err != nil {
@@ -130,18 +134,10 @@ func New(ctx context.Context, name primitive.Name, sessions []*primitive.Session
 		maps[i] = result.(Map)
 	}
 
-	var m Map = &_map{
+	return &_map{
 		name:       name,
 		partitions: maps,
-	}
-	if options.cached {
-		cached, err := newCachingMap(m, options.cacheSize)
-		if err != nil {
-			return nil, err
-		}
-		m = cached
-	}
-	return m, nil
+	}, nil
 }
 
 // _map is the default single-partition implementation of Map
@@ -175,7 +171,13 @@ func (m *_map) Get(ctx context.Context, key string, opts ...GetOption) (*Entry, 
 	if err != nil {
 		return nil, err
 	}
-	return session.Get(ctx, key, opts...)
+	entry, err := session.Get(ctx, key, opts...)
+	if err != nil {
+		return nil, err
+	} else if entry.Value == nil {
+		return nil, nil
+	}
+	return entry, nil
 }
 
 func (m *_map) Remove(ctx context.Context, key string, opts ...RemoveOption) (*Entry, error) {

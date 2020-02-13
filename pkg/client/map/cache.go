@@ -28,6 +28,7 @@ func newCachingMap(_map Map, size int) (Map, error) {
 	}
 	cachingMap := &cachingMap{
 		delegatingMap: newDelegatingMap(_map),
+		pending:       make(map[string]*cachedEntry),
 		cache:         cache,
 	}
 	if err := cachingMap.open(); err != nil {
@@ -39,9 +40,11 @@ func newCachingMap(_map Map, size int) (Map, error) {
 // cachingMap is an implementation of the Map interface that caches entries
 type cachingMap struct {
 	*delegatingMap
-	cancel context.CancelFunc
-	cache  *lru.Cache
-	mu     sync.RWMutex
+	cancel       context.CancelFunc
+	pending      map[string]*cachedEntry
+	cache        *lru.Cache
+	cacheVersion int64
+	mu           sync.RWMutex
 }
 
 // open opens the map listeners
@@ -56,19 +59,104 @@ func (m *cachingMap) open() error {
 	}
 	go func() {
 		for event := range ch {
-			switch event.Type {
-			case EventNone:
-				m.cache.Add(event.Entry.Key, event.Entry)
-			case EventInserted:
-				m.cache.Add(event.Entry.Key, event.Entry)
-			case EventUpdated:
-				m.cache.Add(event.Entry.Key, event.Entry)
-			case EventRemoved:
-				m.cache.Remove(event.Entry.Key)
-			}
+			m.cacheUpdate(event.Entry, event.Type == EventRemoved)
 		}
 	}()
 	return nil
+}
+
+// cacheUpdate caches the given updated entry
+func (m *cachingMap) cacheUpdate(update *Entry, tombstone bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// If the update version is less than the cache version, the cache contains
+	// more recent updates. Ignore the update.
+	if update.Version <= m.cacheVersion {
+		return
+	}
+
+	// If the pending entry is newer than the update entry, the update can be ignored.
+	// Otherwise, remove the entry from the pending cache if present.
+	if pending, ok := m.pending[update.Key]; ok {
+		if pending.Version > update.Version {
+			return
+		}
+		delete(m.pending, update.Key)
+	}
+
+	// If the entry is a tombstone, remove it from the cache, otherwise insert it.
+	if tombstone {
+		m.cache.Remove(update.Key)
+	} else {
+		m.cache.Add(update.Key, update)
+	}
+
+	// Update the cache version.
+	m.cacheVersion = update.Version
+}
+
+// cacheRead caches the given read entry
+func (m *cachingMap) cacheRead(read *Entry, tombstone bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// If the entry version is less than the cache version, ignore the update. The entry will
+	// have been cached as an update.
+	if read.Version <= m.cacheVersion {
+		return
+	}
+
+	// The pending cache contains the most recent known state for the entry.
+	// If the read entry is newer than the pending entry for the key, update
+	// the pending cache.
+	if pending, ok := m.pending[read.Key]; !ok || read.Version > pending.Version {
+		m.pending[read.Key] = &cachedEntry{
+			Entry:     read,
+			tombstone: tombstone,
+		}
+	}
+}
+
+// getCache gets a cached entry
+func (m *cachingMap) getCache(key string) (*Entry, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	// The pending cache contains the most recent known states. If the entry is present
+	// in the pending cache, return it rather than using the LRU cache.
+	if entry, ok := m.pending[key]; ok {
+		if entry.tombstone {
+			return nil, true
+		}
+		return entry.Entry, true
+	}
+
+	// If the entry is present in the LRU cache, return it.
+	if entry, ok := m.cache.Get(key); ok {
+		return entry.(*Entry), true
+	}
+	return nil, false
+}
+
+func (m *cachingMap) Get(ctx context.Context, key string, opts ...GetOption) (*Entry, error) {
+	// If the entry is already in the cache, return it
+	if entry, ok := m.getCache(key); ok {
+		return entry, nil
+	}
+
+	// Otherwise, fetch the entry from the underlying map
+	entry, err := m.delegatingMap.Get(ctx, key, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update the cache if necessary
+	if err != nil {
+		return nil, err
+	}
+	m.cacheRead(entry, entry.Value == nil)
+	return entry, nil
 }
 
 func (m *cachingMap) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*Entry, error) {
@@ -78,14 +166,11 @@ func (m *cachingMap) Put(ctx context.Context, key string, value []byte, opts ...
 		return nil, err
 	}
 
-	// If the entry in the cache is still older than the updated entry, update the entry
-	// This check is performed because a concurrent event could update the cached entry
-	m.mu.Lock()
-	prevEntry, ok := m.cache.Get(key)
-	if !ok || prevEntry.(*Entry).Version < entry.Version {
-		m.cache.Add(key, entry)
+	// Update the cache if necessary
+	if err != nil {
+		return nil, err
 	}
-	m.mu.Unlock()
+	m.cacheRead(entry, false)
 	return entry, nil
 }
 
@@ -96,33 +181,11 @@ func (m *cachingMap) Remove(ctx context.Context, key string, opts ...RemoveOptio
 		return nil, err
 	}
 
-	// If the entry in the cache is still older than the removed entry, remove the entry
-	// This check is performed because a concurrent event could update the cached entry
-	m.mu.Lock()
-	prevEntry, ok := m.cache.Get(key)
-	if ok && prevEntry.(*Entry).Version <= entry.Version {
-		m.cache.Remove(key)
-	}
-	m.mu.Unlock()
-	return entry, nil
-}
-
-func (m *cachingMap) Get(ctx context.Context, key string, opts ...GetOption) (*Entry, error) {
-	// If the entry is already in the cache, return it
-	m.mu.RLock()
-	cachedEntry, ok := m.cache.Get(key)
-	m.mu.RUnlock()
-	if ok {
-		return cachedEntry.(*Entry), nil
-	}
-
-	// Otherwise, fetch the entry from the underlying map
-	// Note that we do not cache the entry here since it could have been removed, in which
-	// case we'd have to maintain tombstones in the cache to compare versions.
-	entry, err := m.delegatingMap.Get(ctx, key, opts...)
+	// Update the cache if necessary
 	if err != nil {
 		return nil, err
 	}
+	m.cacheRead(entry, true)
 	return entry, nil
 }
 
@@ -133,4 +196,10 @@ func (m *cachingMap) Close(ctx context.Context) error {
 	}
 	m.mu.Unlock()
 	return m.delegatingMap.Close(ctx)
+}
+
+// cachedEntry is a cached entry
+type cachedEntry struct {
+	*Entry
+	tombstone bool
 }
