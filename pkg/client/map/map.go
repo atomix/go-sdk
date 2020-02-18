@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/util"
+	"math"
 	"sync"
 	"time"
 )
@@ -29,7 +30,7 @@ const Type primitive.Type = "Map"
 // Client provides an API for creating Maps
 type Client interface {
 	// GetMap gets the Map instance of the given name
-	GetMap(ctx context.Context, name string) (Map, error)
+	GetMap(ctx context.Context, name string, opts ...Option) (Map, error)
 }
 
 // Map is a distributed set of keys and values
@@ -112,8 +113,16 @@ type Event struct {
 }
 
 // New creates a new partitioned Map
-func New(ctx context.Context, name primitive.Name, sessions []*primitive.Session) (Map, error) {
+func New(ctx context.Context, name primitive.Name, sessions []*primitive.Session, opts ...Option) (Map, error) {
+	options := &options{}
+	for _, opt := range opts {
+		opt.apply(options)
+	}
+
 	results, err := util.ExecuteOrderedAsync(len(sessions), func(i int) (interface{}, error) {
+		if options.cached {
+			return newPartition(ctx, name, sessions[i], WithCache(int(math.Max(float64(options.cacheSize/len(sessions)), 1))))
+		}
 		return newPartition(ctx, name, sessions[i])
 	})
 	if err != nil {
@@ -162,7 +171,13 @@ func (m *_map) Get(ctx context.Context, key string, opts ...GetOption) (*Entry, 
 	if err != nil {
 		return nil, err
 	}
-	return session.Get(ctx, key, opts...)
+	entry, err := session.Get(ctx, key, opts...)
+	if err != nil {
+		return nil, err
+	} else if entry.Value == nil {
+		return nil, nil
+	}
+	return entry, nil
 }
 
 func (m *_map) Remove(ctx context.Context, key string, opts ...RemoveOption) (*Entry, error) {

@@ -18,6 +18,39 @@ import (
 	api "github.com/atomix/api/proto/atomix/map"
 )
 
+// Option is an option for a Map instance
+type Option interface {
+	apply(options *options)
+}
+
+// options is a set of map options
+type options struct {
+	cached    bool
+	cacheSize int
+}
+
+// WithCache returns an option that enables caching for a Map
+func WithCache(size int) Option {
+	if size <= 0 {
+		panic("cache size must be positive")
+	}
+	return &cacheOption{
+		enabled: true,
+		size:    size,
+	}
+}
+
+// cacheOption is a cache enable option
+type cacheOption struct {
+	enabled bool
+	size    int
+}
+
+func (o *cacheOption) apply(options *options) {
+	options.cached = o.enabled
+	options.cacheSize = o.size
+}
+
 // PutOption is an option for the Put method
 type PutOption interface {
 	beforePut(request *api.PutRequest)
