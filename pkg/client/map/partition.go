@@ -86,6 +86,8 @@ func (m *mapPartition) Put(ctx context.Context, key string, value []byte, opts .
 			Key:     key,
 			Value:   value,
 			Version: int64(response.Header.Index),
+			Created: response.Created,
+			Updated: response.Updated,
 		}, nil
 	} else if response.Status == api.ResponseStatus_PRECONDITION_FAILED {
 		return nil, errors.New("write condition failed")
