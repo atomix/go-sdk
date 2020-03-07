@@ -17,7 +17,6 @@ package primitive
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/atomix/api/proto/atomix/headers"
 	"github.com/atomix/api/proto/atomix/metadata"
 	primitiveapi "github.com/atomix/api/proto/atomix/primitive"
