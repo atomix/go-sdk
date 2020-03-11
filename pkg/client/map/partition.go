@@ -23,15 +23,28 @@ import (
 	"google.golang.org/grpc"
 )
 
-func newPartition(ctx context.Context, name primitive.Name, session *primitive.Session) (Map, error) {
+func newPartition(ctx context.Context, name primitive.Name, session *primitive.Session, opts ...Option) (Map, error) {
+	options := &options{}
+	for _, opt := range opts {
+		opt.apply(options)
+	}
+
 	instance, err := primitive.NewInstance(ctx, name, session, &primitiveHandler{})
 	if err != nil {
 		return nil, err
 	}
-	return &mapPartition{
+	var partition Map = &mapPartition{
 		name:     name,
 		instance: instance,
-	}, nil
+	}
+	if options.cached {
+		cached, err := newCachingMap(partition, options.cacheSize)
+		if err != nil {
+			return nil, err
+		}
+		partition = cached
+	}
+	return partition, nil
 }
 
 type mapPartition struct {
@@ -73,6 +86,8 @@ func (m *mapPartition) Put(ctx context.Context, key string, value []byte, opts .
 			Key:     key,
 			Value:   value,
 			Version: int64(response.Header.Index),
+			Created: response.Created,
+			Updated: response.Updated,
 		}, nil
 	} else if response.Status == api.ResponseStatus_PRECONDITION_FAILED {
 		return nil, errors.New("write condition failed")
@@ -122,7 +137,12 @@ func (m *mapPartition) Get(ctx context.Context, key string, opts ...GetOption) (
 			Updated: response.Updated,
 		}, nil
 	}
-	return nil, nil
+
+	// Return a non-empty nil-value Entry when response version is 0
+	return &Entry{
+		Key:     key,
+		Version: int64(response.Header.Index),
+	}, nil
 }
 
 func (m *mapPartition) Remove(ctx context.Context, key string, opts ...RemoveOption) (*Entry, error) {
@@ -259,23 +279,28 @@ func (m *mapPartition) Watch(ctx context.Context, ch chan<- *Event, opts ...Watc
 		defer close(ch)
 		for event := range stream {
 			response := event.(*api.EventResponse)
+			var version int64
 			var t EventType
 			switch response.Type {
 			case api.EventResponse_NONE:
 				t = EventNone
+				version = response.Version
 			case api.EventResponse_INSERTED:
 				t = EventInserted
+				version = response.Version
 			case api.EventResponse_UPDATED:
 				t = EventUpdated
+				version = response.Version
 			case api.EventResponse_REMOVED:
 				t = EventRemoved
+				version = int64(response.Header.Index)
 			}
 			ch <- &Event{
 				Type: t,
 				Entry: &Entry{
 					Key:     response.Key,
 					Value:   response.Value,
-					Version: response.Version,
+					Version: version,
 					Created: response.Created,
 					Updated: response.Updated,
 				},

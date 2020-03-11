@@ -17,7 +17,6 @@ package primitive
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/atomix/api/proto/atomix/headers"
 	"github.com/atomix/api/proto/atomix/metadata"
 	primitiveapi "github.com/atomix/api/proto/atomix/primitive"
@@ -417,7 +416,6 @@ func (s *Session) doRequest(requestHeader *headers.RequestHeader, f func(conn *g
 				return nil, errors.New("an unknown error occurred")
 			}
 		} else {
-			fmt.Println(err)
 			i++
 			time.Sleep(time.Duration(math.Max(math.Pow(float64(i), 2), 1000)) * time.Millisecond)
 		}
