@@ -16,6 +16,7 @@ package counter
 
 import (
 	"context"
+
 	api "github.com/atomix/api/proto/atomix/counter"
 	"github.com/atomix/api/proto/atomix/headers"
 	"github.com/atomix/go-client/pkg/client/primitive"
@@ -47,6 +48,9 @@ type Counter interface {
 
 	// Decrement decrements the counter by the given delta
 	Decrement(ctx context.Context, delta int64) (int64, error)
+
+	// CAS checks the counter value and then updates its current value
+	CAS(ctx context.Context, expect int64, update int64) (bool, error)
 }
 
 // New creates a new counter for the given partitions
@@ -147,6 +151,26 @@ func (c *counter) Decrement(ctx context.Context, delta int64) (int64, error) {
 		return 0, err
 	}
 	return response.(*api.DecrementResponse).NextValue, nil
+}
+
+func (c *counter) CAS(ctx context.Context, expect int64, update int64) (bool, error) {
+	response, err := c.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewCounterServiceClient(conn)
+		request := &api.CheckAndSetRequest{
+			Header: header,
+			Expect: expect,
+			Update: update,
+		}
+		response, err := client.CheckAndSet(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
+	if err != nil {
+		return false, err
+	}
+	return response.(*api.CheckAndSetResponse).Succeeded, nil
 }
 
 func (c *counter) Close(ctx context.Context) error {
