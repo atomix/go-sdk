@@ -19,19 +19,24 @@ import (
 	"time"
 )
 
-func applyOptions(opts ...Option) *options {
-	options := &options{
+func applyOptions(opts ...Option) clientOptions {
+	options := &clientOptions{
 		namespace:      os.Getenv("ATOMIX_NAMESPACE"),
 		scope:          os.Getenv("ATOMIX_SCOPE"),
+		peerPort:       8080,
 		sessionTimeout: 1 * time.Minute,
 	}
 	for _, opt := range opts {
 		opt.apply(options)
 	}
-	return options
+	return *options
 }
 
-type options struct {
+type clientOptions struct {
+	memberID       string
+	peerHost       string
+	peerPort       int
+	joinTimeout    *time.Duration
 	scope          string
 	namespace      string
 	sessionTimeout time.Duration
@@ -39,21 +44,67 @@ type options struct {
 
 // Option provides a client option
 type Option interface {
-	apply(options *options)
+	apply(options *clientOptions)
+}
+
+// WithMemberID configures the client's member ID
+func WithMemberID(memberID string) Option {
+	return &memberIDOption{id: memberID}
+}
+
+type memberIDOption struct {
+	id string
+}
+
+func (o *memberIDOption) apply(options *clientOptions) {
+	options.memberID = o.id
+}
+
+// WithPeerHost configures the client's peer host
+func WithPeerHost(host string) Option {
+	return &peerHostOption{host: host}
+}
+
+type peerHostOption struct {
+	host string
+}
+
+func (o *peerHostOption) apply(options *clientOptions) {
+	options.peerHost = o.host
+}
+
+// WithPeerPort configures the client's peer port
+func WithPeerPort(port int) Option {
+	return &peerPortOption{port: port}
+}
+
+type peerPortOption struct {
+	port int
+}
+
+func (o *peerPortOption) apply(options *clientOptions) {
+	options.peerPort = o.port
+}
+
+// WithJoinTimeout configures the client's join timeout
+func WithJoinTimeout(timeout time.Duration) Option {
+	return &joinTimeoutOption{timeout: timeout}
+}
+
+type joinTimeoutOption struct {
+	timeout time.Duration
+}
+
+func (o *joinTimeoutOption) apply(options *clientOptions) {
+	options.joinTimeout = &o.timeout
 }
 
 type scopeOption struct {
 	scope string
 }
 
-func (o *scopeOption) apply(options *options) {
+func (o *scopeOption) apply(options *clientOptions) {
 	options.scope = o.scope
-}
-
-// WithApplication configures the application name for the client
-// Deprecated: Use WithScope instead
-func WithApplication(application string) Option {
-	return &scopeOption{scope: application}
 }
 
 // WithScope configures the application scope for the client
@@ -65,7 +116,7 @@ type namespaceOption struct {
 	namespace string
 }
 
-func (o *namespaceOption) apply(options *options) {
+func (o *namespaceOption) apply(options *clientOptions) {
 	options.namespace = o.namespace
 }
 
@@ -78,7 +129,7 @@ type sessionTimeoutOption struct {
 	timeout time.Duration
 }
 
-func (s *sessionTimeoutOption) apply(options *options) {
+func (s *sessionTimeoutOption) apply(options *clientOptions) {
 	options.sessionTimeout = s.timeout
 }
 
@@ -87,4 +138,51 @@ func WithSessionTimeout(timeout time.Duration) Option {
 	return &sessionTimeoutOption{
 		timeout: timeout,
 	}
+}
+
+func applyPartitionGroupOptions(opts ...PartitionGroupOption) partitionGroupOptions {
+	options := &partitionGroupOptions{
+		partitions:        1,
+		replicationFactor: 0,
+	}
+	for _, opt := range opts {
+		opt.apply(options)
+	}
+	return *options
+}
+
+type partitionGroupOptions struct {
+	partitions        int
+	replicationFactor int
+}
+
+// PartitionGroupOption provides a partition group option
+type PartitionGroupOption interface {
+	apply(options *partitionGroupOptions)
+}
+
+// WithPartitions configures the number of partitions
+func WithPartitions(partitions int) PartitionGroupOption {
+	return &partitionGroupPartitionsOption{partitions: partitions}
+}
+
+type partitionGroupPartitionsOption struct {
+	partitions int
+}
+
+func (o *partitionGroupPartitionsOption) apply(options *partitionGroupOptions) {
+	options.partitions = o.partitions
+}
+
+// WithReplicationFactor configures the replication factor
+func WithReplicationFactor(replicationFactor int) PartitionGroupOption {
+	return &partitionGroupReplicationFactorOption{replicationFactor: replicationFactor}
+}
+
+type partitionGroupReplicationFactorOption struct {
+	replicationFactor int
+}
+
+func (o *partitionGroupReplicationFactorOption) apply(options *partitionGroupOptions) {
+	options.replicationFactor = o.replicationFactor
 }
