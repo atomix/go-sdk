@@ -58,6 +58,9 @@ type memberIDOption struct {
 
 func (o *memberIDOption) apply(options *clientOptions) {
 	options.memberID = o.id
+	if options.peerHost == "" {
+		options.peerHost = o.id
+	}
 }
 
 // WithPeerHost configures the client's peer host

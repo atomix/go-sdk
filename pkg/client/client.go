@@ -55,13 +55,17 @@ func New(address string, opts ...Option) (*Client, error) {
 		partitionGroups:  make(map[string]*PartitionGroup),
 		membershipGroups: make(map[string]*MembershipGroup),
 	}
+	client.cluster = &Cluster{
+		client:   client,
+		watchers: make([]chan<- Membership, 0),
+	}
 
 	if options.joinTimeout != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), *options.joinTimeout)
-		err = client.join(ctx)
+		err = client.cluster.join(ctx)
 		cancel()
 	} else {
-		err = client.join(context.Background())
+		err = client.cluster.join(context.Background())
 	}
 	if err != nil {
 		return nil, err
@@ -80,47 +84,15 @@ type Client struct {
 	options          clientOptions
 	conn             *grpc.ClientConn
 	databases        map[string]*Database
+	cluster          *Cluster
 	partitionGroups  map[string]*PartitionGroup
 	membershipGroups map[string]*MembershipGroup
 	mu               sync.RWMutex
 }
 
-// join joins the cluster
-func (c *Client) join(ctx context.Context) error {
-	if c.options.memberID == "" {
-		return nil
-	}
-
-	client := controllerapi.NewClusterServiceClient(c.conn)
-	request := &controllerapi.JoinClusterRequest{
-		Member: controllerapi.Member{
-			ID: controllerapi.MemberId{
-				Namespace: c.options.namespace,
-				Name:      c.options.memberID,
-			},
-			Host: c.options.peerHost,
-			Port: int32(c.options.peerPort),
-		},
-		GroupID: controllerapi.MembershipGroupId{
-			Namespace: c.options.namespace,
-			Name:      c.options.scope,
-		},
-	}
-	stream, err := client.JoinCluster(ctx, request)
-	if err != nil {
-		return err
-	}
-	go func() {
-		for {
-			_, err := stream.Recv()
-			if err == io.EOF {
-				return
-			} else if err == nil {
-				// TODO: Update membership
-			}
-		}
-	}()
-	return nil
+// Cluster returns the client membership API
+func (c *Client) Membership() *Cluster {
+	return c.cluster
 }
 
 // GetDatabases returns a list of all databases in the client's namespace
@@ -229,10 +201,10 @@ func (c *Client) GetPartitionGroup(ctx context.Context, name string, opts ...Par
 	options := applyPartitionGroupOptions(opts...)
 
 	group = &PartitionGroup{
-		Name:         name,
-		Namespace:    c.options.namespace,
-		client:       c,
-		groupOptions: options,
+		Name:      name,
+		Namespace: c.options.namespace,
+		client:    c,
+		options:   options,
 	}
 	var err error
 	if c.options.joinTimeout != nil {
@@ -379,18 +351,153 @@ func (d *Database) GetValue(ctx context.Context, name string) (value.Value, erro
 	return value.New(ctx, primitive.NewName(d.Namespace, d.Name, d.scope, name), d.sessions)
 }
 
+// Cluster manages the cluster membership for a client
+type Cluster struct {
+	client     *Client
+	membership *Membership
+	watchers   []chan<- Membership
+	mu         sync.RWMutex
+}
+
+// join joins the cluster
+func (m *Cluster) join(ctx context.Context) error {
+	if m.client.options.memberID == "" {
+		return nil
+	}
+
+	client := controllerapi.NewClusterServiceClient(m.client.conn)
+	request := &controllerapi.JoinClusterRequest{
+		Member: controllerapi.Member{
+			ID: controllerapi.MemberId{
+				Namespace: m.client.options.namespace,
+				Name:      m.client.options.memberID,
+			},
+			Host: m.client.options.peerHost,
+			Port: int32(m.client.options.peerPort),
+		},
+		GroupID: controllerapi.MembershipGroupId{
+			Namespace: m.client.options.namespace,
+			Name:      m.client.options.scope,
+		},
+	}
+	stream, err := client.JoinCluster(context.Background(), request)
+	if err != nil {
+		return err
+	}
+
+	joinCh := make(chan struct{})
+	go func() {
+		joined := false
+		for {
+			response, err := stream.Recv()
+			if err == io.EOF {
+				return
+			} else if err == nil {
+				members := make([]Member, 0, len(response.Membership.Members))
+				for _, member := range response.Membership.Members {
+					members = append(members, Member{
+						ID: MemberID(member.ID.Name),
+					})
+				}
+				membership := Membership{
+					Members: members,
+				}
+
+				m.mu.Lock()
+				m.membership = &membership
+				m.mu.Unlock()
+
+				if !joined {
+					close(joinCh)
+					joined = true
+				}
+
+				m.mu.RLock()
+				for _, watcher := range m.watchers {
+					watcher <- membership
+				}
+				m.mu.RUnlock()
+			}
+		}
+	}()
+
+	select {
+	case <-joinCh:
+		return nil
+	case <-ctx.Done():
+		return errors.New("join timed out")
+	}
+}
+
+// Watch watches the membership for changes
+func (m *Cluster) Watch(ctx context.Context, ch chan<- Membership) error {
+	m.mu.Lock()
+	watcher := make(chan Membership)
+	membership := m.membership
+	go func() {
+		if membership != nil {
+			ch <- *membership
+		}
+		for membership := range watcher {
+			ch <- membership
+		}
+	}()
+	m.watchers = append(m.watchers, watcher)
+	m.mu.Unlock()
+	return nil
+}
+
+// Membership is a set of members
+type Membership struct {
+	Members []Member
+}
+
+// MemberID is a member identifier
+type MemberID string
+
+// Member is a membership group member
+type Member struct {
+	ID MemberID
+}
+
 // PartitionGroup manages the primitives in a partition group
 type PartitionGroup struct {
 	Namespace    string
 	Name         string
 	client       *Client
-	groupOptions partitionGroupOptions
+	options      partitionGroupOptions
+	partitions   []*Partition
+	partitionMap map[string]*Partition
+}
+
+func (g *PartitionGroup) Partitions() []*Partition {
+	return g.partitions
+}
+
+func (g *PartitionGroup) Partition(id PartitionID) *Partition {
+	return g.partitionMap[fmt.Sprintf("%s-%d", g.Name, id)]
 }
 
 // join joins the partition group
 func (g *PartitionGroup) join(ctx context.Context) error {
 	if g.client.options.memberID == "" {
 		return nil
+	}
+
+	g.partitions = make([]*Partition, 0, g.options.partitions)
+	g.partitionMap = make(map[string]*Partition)
+	for i := 1; i <= g.options.partitions; i++ {
+		partition := &Partition{
+			ID: PartitionID(i),
+			group: &MembershipGroup{
+				Namespace: g.Namespace,
+				Name:      fmt.Sprintf("%s-%d", g.Name, i),
+				client:    g.client,
+				watchers:  make([]chan<- GroupMembership, 0),
+			},
+		}
+		g.partitions = append(g.partitions, partition)
+		g.partitionMap[partition.group.Name] = partition
 	}
 
 	client := controllerapi.NewPartitionGroupServiceClient(g.client.conn)
@@ -403,31 +510,119 @@ func (g *PartitionGroup) join(ctx context.Context) error {
 			Namespace: g.Namespace,
 			Name:      g.Name,
 		},
-		Partitions:        uint32(g.groupOptions.partitions),
-		ReplicationFactor: uint32(g.groupOptions.replicationFactor),
+		Partitions:        uint32(g.options.partitions),
+		ReplicationFactor: uint32(g.options.replicationFactor),
 	}
 	stream, err := client.JoinPartitionGroup(ctx, request)
 	if err != nil {
 		return err
 	}
+
+	joinCh := make(chan struct{})
 	go func() {
+		joined := false
 		for {
-			_, err := stream.Recv()
+			response, err := stream.Recv()
 			if err == io.EOF {
 				return
 			} else if err == nil {
-				// TODO: Update membership
+				for _, partition := range response.Group.Partitions {
+					group, ok := g.partitionMap[partition.ID.Name]
+					if !ok {
+						continue
+					}
+					group.update(partition)
+				}
+				if !joined {
+					close(joinCh)
+					joined = true
+				}
 			}
 		}
 	}()
-	return nil
+
+	select {
+	case <-joinCh:
+		return nil
+	case <-ctx.Done():
+		return errors.New("join timed out")
+	}
+}
+
+// PartitionID is a partition identifier
+type PartitionID int
+
+// Partition manages a partition
+type Partition struct {
+	ID         PartitionID
+	group      *MembershipGroup
+	lastUpdate *controllerapi.MembershipGroup
+}
+
+func (p *Partition) update(group controllerapi.MembershipGroup) {
+	if p.lastUpdate != nil && (*p.lastUpdate).String() == group.String() {
+		return
+	}
+
+	members := make([]Member, 0, len(group.Members))
+	for _, member := range group.Members {
+		members = append(members, Member{
+			ID: MemberID(member.ID.Name),
+		})
+	}
+	var leadership *Leadership
+	if group.Leader != nil {
+		leadership = &Leadership{
+			Leader: MemberID(group.Leader.Name),
+			Term:   TermID(group.Term),
+		}
+	}
+	membership := GroupMembership{
+		Leadership: leadership,
+		Members:    members,
+	}
+
+	p.group.mu.Lock()
+	p.group.membership = &membership
+	p.group.mu.Unlock()
+
+	p.group.mu.RLock()
+	for _, watcher := range p.group.watchers {
+		watcher <- membership
+	}
+	p.group.mu.RUnlock()
+}
+
+func (p *Partition) MembershipGroup() *MembershipGroup {
+	return p.group
 }
 
 // MembershipGroup manages the primitives in a membership group
 type MembershipGroup struct {
-	Namespace string
-	Name      string
-	client    *Client
+	Namespace  string
+	Name       string
+	client     *Client
+	membership *GroupMembership
+	watchers   []chan<- GroupMembership
+	mu         sync.RWMutex
+}
+
+// Watch watches the membership for changes
+func (g *MembershipGroup) Watch(ctx context.Context, ch chan<- GroupMembership) error {
+	g.mu.Lock()
+	watcher := make(chan GroupMembership)
+	membership := g.membership
+	go func() {
+		if membership != nil {
+			ch <- *membership
+		}
+		for membership := range watcher {
+			ch <- membership
+		}
+	}()
+	g.watchers = append(g.watchers, watcher)
+	g.mu.Unlock()
+	return nil
 }
 
 // join joins the membership group
@@ -447,19 +642,74 @@ func (g *MembershipGroup) join(ctx context.Context) error {
 			Name:      g.Name,
 		},
 	}
-	stream, err := client.JoinMembershipGroup(ctx, request)
+	stream, err := client.JoinMembershipGroup(context.Background(), request)
 	if err != nil {
 		return err
 	}
+
+	joinCh := make(chan struct{})
 	go func() {
+		joined := false
 		for {
-			_, err := stream.Recv()
+			response, err := stream.Recv()
 			if err == io.EOF {
 				return
 			} else if err == nil {
-				// TODO: Update membership
+				members := make([]Member, 0, len(response.Group.Members))
+				for _, member := range response.Group.Members {
+					members = append(members, Member{
+						ID: MemberID(member.ID.Name),
+					})
+				}
+				var leadership *Leadership
+				if response.Group.Leader != nil {
+					leadership = &Leadership{
+						Leader: MemberID(response.Group.Leader.Name),
+						Term:   TermID(response.Group.Term),
+					}
+				}
+				membership := GroupMembership{
+					Leadership: leadership,
+					Members:    members,
+				}
+
+				g.mu.Lock()
+				g.membership = &membership
+				g.mu.Unlock()
+
+				if !joined {
+					close(joinCh)
+					joined = true
+				}
+
+				g.mu.RLock()
+				for _, watcher := range g.watchers {
+					watcher <- membership
+				}
+				g.mu.RUnlock()
 			}
 		}
 	}()
-	return nil
+
+	select {
+	case <-joinCh:
+		return nil
+	case <-ctx.Done():
+		return errors.New("join timed out")
+	}
+}
+
+// GroupMembership is a set of members
+type GroupMembership struct {
+	Leadership *Leadership
+	Members    []Member
+}
+
+// TermID is a leadership term
+type TermID uint64
+
+// Leadership is a group leadership
+type Leadership struct {
+	Leader MemberID
+	Term   TermID
 }
