@@ -168,10 +168,6 @@ func (c *Client) newDatabase(ctx context.Context, databaseProto *controllerapi.D
 
 // GetPartitionGroup gets a partition group by name from the client's namespace
 func (c *Client) GetPartitionGroup(ctx context.Context, name string, opts ...PartitionGroupOption) (*PartitionGroup, error) {
-	if c.options.memberID == "" {
-		return nil, errors.New("cannot join partition group: member not configured")
-	}
-
 	c.mu.RLock()
 	group, ok := c.partitionGroups[name]
 	c.mu.RUnlock()
@@ -211,10 +207,6 @@ func (c *Client) GetPartitionGroup(ctx context.Context, name string, opts ...Par
 
 // GetMembershipGroup gets a membership group by name from the client's namespace
 func (c *Client) GetMembershipGroup(ctx context.Context, name string) (*MembershipGroup, error) {
-	if c.options.memberID == "" {
-		return nil, errors.New("cannot join partition group: member not configured")
-	}
-
 	c.mu.RLock()
 	group, ok := c.membershipGroups[name]
 	c.mu.RUnlock()

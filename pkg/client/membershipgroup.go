@@ -83,16 +83,17 @@ func (g *MembershipGroup) Watch(ctx context.Context, ch chan<- Membership) error
 
 // join joins the membership group
 func (g *MembershipGroup) join(ctx context.Context) error {
-	if g.client.options.memberID == "" {
-		return nil
+	var memberID *controllerapi.MemberId
+	if g.client.options.memberID != "" {
+		memberID = &controllerapi.MemberId{
+			Namespace: g.client.options.namespace,
+			Name:      g.client.options.memberID,
+		}
 	}
 
 	client := controllerapi.NewMembershipGroupServiceClient(g.client.conn)
 	request := &controllerapi.JoinMembershipGroupRequest{
-		MemberID: controllerapi.MemberId{
-			Namespace: g.client.options.namespace,
-			Name:      g.client.options.memberID,
-		},
+		MemberID: memberID,
 		GroupID: controllerapi.MembershipGroupId{
 			Namespace: g.Namespace,
 			Name:      g.Name,

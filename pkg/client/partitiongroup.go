@@ -47,8 +47,12 @@ func (g *PartitionGroup) Partition(id PartitionID) *Partition {
 
 // join joins the partition group
 func (g *PartitionGroup) join(ctx context.Context) error {
-	if g.client.options.memberID == "" {
-		return nil
+	var memberID *controllerapi.MemberId
+	if g.client.options.memberID != "" {
+		memberID = &controllerapi.MemberId{
+			Namespace: g.client.options.namespace,
+			Name:      g.client.options.memberID,
+		}
 	}
 
 	g.partitions = make([]*Partition, 0, g.options.partitions)
@@ -69,10 +73,7 @@ func (g *PartitionGroup) join(ctx context.Context) error {
 
 	client := controllerapi.NewPartitionGroupServiceClient(g.client.conn)
 	request := &controllerapi.JoinPartitionGroupRequest{
-		MemberID: controllerapi.MemberId{
-			Namespace: g.client.options.namespace,
-			Name:      g.client.options.memberID,
-		},
+		MemberID: memberID,
 		GroupID: controllerapi.PartitionGroupId{
 			Namespace: g.Namespace,
 			Name:      g.Name,

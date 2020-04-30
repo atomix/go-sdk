@@ -45,20 +45,21 @@ func (c *Cluster) Membership() ClusterMembership {
 
 // join joins the cluster
 func (c *Cluster) join(ctx context.Context) error {
-	if c.client.options.memberID == "" {
-		return nil
-	}
-
-	client := controllerapi.NewClusterServiceClient(c.client.conn)
-	request := &controllerapi.JoinClusterRequest{
-		Member: controllerapi.Member{
+	var member *controllerapi.Member
+	if c.client.options.memberID != "" {
+		member = &controllerapi.Member{
 			ID: controllerapi.MemberId{
 				Namespace: c.client.options.namespace,
 				Name:      c.client.options.memberID,
 			},
 			Host: c.client.options.peerHost,
 			Port: int32(c.client.options.peerPort),
-		},
+		}
+	}
+
+	client := controllerapi.NewClusterServiceClient(c.client.conn)
+	request := &controllerapi.JoinClusterRequest{
+		Member: member,
 		GroupID: controllerapi.MembershipGroupId{
 			Namespace: c.client.options.namespace,
 			Name:      c.client.options.scope,
