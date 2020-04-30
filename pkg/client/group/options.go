@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package membership
+package group
 
 import (
 	"os"
 	"time"
 )
 
-func applyOptions(opts ...GroupOption) groupOptions {
+func applyOptions(opts ...MembershipGroupOption) groupOptions {
 	options := &groupOptions{
 		namespace: os.Getenv("ATOMIX_NAMESPACE"),
 		scope:     os.Getenv("ATOMIX_SCOPE"),
@@ -39,12 +39,12 @@ type groupOptions struct {
 
 // Option provides a group option
 type Option interface {
-	GroupOption
+	MembershipGroupOption
 	PartitionGroupOption
 }
 
-// GroupOption provides a membership group option
-type GroupOption interface {
+// MembershipGroupOption provides a membership group option
+type MembershipGroupOption interface {
 	applyGroup(options *groupOptions)
 }
 

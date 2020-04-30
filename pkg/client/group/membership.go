@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package membership
+package group
 
 import (
 	"context"
@@ -26,8 +26,8 @@ import (
 	"time"
 )
 
-// NewGroup creates a new MembershipGroup
-func NewGroup(name string, address string, opts ...GroupOption) (*Group, error) {
+// NewMembershipGroup creates a new MembershipGroup
+func NewMembershipGroup(name string, address string, opts ...MembershipGroupOption) (*MembershipGroup, error) {
 	options := applyOptions(opts...)
 
 	conn, err := grpc.Dial(address, grpc.WithInsecure())
@@ -35,7 +35,7 @@ func NewGroup(name string, address string, opts ...GroupOption) (*Group, error) 
 		return nil, err
 	}
 
-	group := &Group{
+	group := &MembershipGroup{
 		Namespace: options.namespace,
 		Name:      name,
 		conn:     conn,
@@ -56,8 +56,8 @@ func NewGroup(name string, address string, opts ...GroupOption) (*Group, error) 
 	return group, nil
 }
 
-// Group manages the primitives in a membership group
-type Group struct {
+// MembershipGroup manages the primitives in a membership group
+type MembershipGroup struct {
 	conn       *grpc.ClientConn
 	options    groupOptions
 	Namespace  string
@@ -70,7 +70,7 @@ type Group struct {
 }
 
 // Membership returns the current group membership
-func (g *Group) Membership() Membership {
+func (g *MembershipGroup) Membership() Membership {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	if g.membership != nil {
@@ -80,7 +80,7 @@ func (g *Group) Membership() Membership {
 }
 
 // Watch watches the membership for changes
-func (g *Group) Watch(ctx context.Context, ch chan<- Membership) error {
+func (g *MembershipGroup) Watch(ctx context.Context, ch chan<- Membership) error {
 	g.mu.Lock()
 	watcher := make(chan Membership)
 	membership := g.membership
@@ -115,7 +115,7 @@ func (g *Group) Watch(ctx context.Context, ch chan<- Membership) error {
 }
 
 // join joins the membership group
-func (g *Group) join(ctx context.Context) error {
+func (g *MembershipGroup) join(ctx context.Context) error {
 	var memberID *controllerapi.MemberId
 	if g.options.memberID != "" {
 		memberID = &controllerapi.MemberId{
@@ -202,7 +202,7 @@ func (g *Group) join(ctx context.Context) error {
 }
 
 // Close closes the membership group
-func (g *Group) Close() error {
+func (g *MembershipGroup) Close() error {
 	g.mu.RLock()
 	closer := g.closer
 	leaveCh := g.leaveCh

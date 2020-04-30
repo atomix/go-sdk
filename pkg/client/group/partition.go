@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package membership
+package group
 
 import (
 	"context"
@@ -96,7 +96,7 @@ func (g *PartitionGroup) join(ctx context.Context) error {
 		}
 		partition := &Partition{
 			ID: PartitionID(i),
-			group: &Group{
+			group: &MembershipGroup{
 				Namespace: g.Namespace,
 				Name:      fmt.Sprintf("%s-%d", g.Name, i),
 				options:   groupOptions,
@@ -193,7 +193,7 @@ type PartitionID int
 // Partition manages a partition
 type Partition struct {
 	ID         PartitionID
-	group      *Group
+	group      *MembershipGroup
 	lastUpdate *controllerapi.MembershipGroup
 }
 
@@ -231,6 +231,6 @@ func (p *Partition) update(group controllerapi.MembershipGroup) {
 	p.group.mu.RUnlock()
 }
 
-func (p *Partition) MembershipGroup() *Group {
+func (p *Partition) MembershipGroup() *MembershipGroup {
 	return p.group
 }

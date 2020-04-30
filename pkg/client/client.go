@@ -20,7 +20,7 @@ import (
 	controllerapi "github.com/atomix/api/proto/atomix/controller"
 	"github.com/atomix/go-client/pkg/client/cluster"
 	"github.com/atomix/go-client/pkg/client/database"
-	"github.com/atomix/go-client/pkg/client/membership"
+	"github.com/atomix/go-client/pkg/client/group"
 	"google.golang.org/grpc"
 	"sync"
 )
@@ -57,8 +57,8 @@ func New(address string, opts ...Option) (*Client, error) {
 		cluster:          cluster,
 		options:          options,
 		databases:        make(map[string]*database.Database),
-		partitionGroups:  make(map[string]*membership.PartitionGroup),
-		membershipGroups: make(map[string]*membership.Group),
+		partitionGroups:  make(map[string]*group.PartitionGroup),
+		membershipGroups: make(map[string]*group.MembershipGroup),
 	}
 	return client, nil
 }
@@ -70,8 +70,8 @@ type Client struct {
 	conn             *grpc.ClientConn
 	databases        map[string]*database.Database
 	cluster          *cluster.Cluster
-	partitionGroups  map[string]*membership.PartitionGroup
-	membershipGroups map[string]*membership.Group
+	partitionGroups  map[string]*group.PartitionGroup
+	membershipGroups map[string]*group.MembershipGroup
 	mu               sync.RWMutex
 }
 
@@ -138,51 +138,51 @@ func (c *Client) GetDatabase(ctx context.Context, name string, opts ...database.
 }
 
 // GetPartitionGroup gets a partition group by name from the client's namespace
-func (c *Client) GetPartitionGroup(ctx context.Context, name string, opts ...membership.PartitionGroupOption) (*membership.PartitionGroup, error) {
+func (c *Client) GetPartitionGroup(ctx context.Context, name string, opts ...group.PartitionGroupOption) (*group.PartitionGroup, error) {
 	c.mu.RLock()
-	group, ok := c.partitionGroups[name]
+	partitionGroup, ok := c.partitionGroups[name]
 	c.mu.RUnlock()
 	if ok {
-		return group, nil
+		return partitionGroup, nil
 	}
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	group, ok = c.partitionGroups[name]
+	partitionGroup, ok = c.partitionGroups[name]
 	if ok {
-		return group, nil
+		return partitionGroup, nil
 	}
 
-	group, err := membership.NewPartitionGroup(name, c.address, opts...)
+	partitionGroup, err := group.NewPartitionGroup(name, c.address, opts...)
 	if err != nil {
 		return nil, err
 	}
-	c.partitionGroups[name] = group
-	return group, nil
+	c.partitionGroups[name] = partitionGroup
+	return partitionGroup, nil
 }
 
 // GetMembershipGroup gets a membership group by name from the client's namespace
-func (c *Client) GetMembershipGroup(ctx context.Context, name string, opts ...membership.GroupOption) (*membership.Group, error) {
+func (c *Client) GetMembershipGroup(ctx context.Context, name string, opts ...group.MembershipGroupOption) (*group.MembershipGroup, error) {
 	c.mu.RLock()
-	group, ok := c.membershipGroups[name]
+	membershipGroup, ok := c.membershipGroups[name]
 	c.mu.RUnlock()
 	if ok {
-		return group, nil
+		return membershipGroup, nil
 	}
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	group, ok = c.membershipGroups[name]
+	membershipGroup, ok = c.membershipGroups[name]
 	if ok {
-		return group, nil
+		return membershipGroup, nil
 	}
 
-	group, err := membership.NewGroup(name, c.address, opts...)
+	membershipGroup, err := group.NewMembershipGroup(name, c.address, opts...)
 	if err != nil {
 		return nil, err
 	}
-	c.membershipGroups[name] = group
-	return group, nil
+	c.membershipGroups[name] = membershipGroup
+	return membershipGroup, nil
 }
 
 // Close closes the client
