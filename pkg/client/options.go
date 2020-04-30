@@ -102,6 +102,11 @@ func (o *joinTimeoutOption) apply(options *clientOptions) {
 	options.joinTimeout = &o.timeout
 }
 
+// WithScope configures the application scope for the client
+func WithScope(scope string) Option {
+	return &scopeOption{scope: scope}
+}
+
 type scopeOption struct {
 	scope string
 }
@@ -110,9 +115,9 @@ func (o *scopeOption) apply(options *clientOptions) {
 	options.scope = o.scope
 }
 
-// WithScope configures the application scope for the client
-func WithScope(scope string) Option {
-	return &scopeOption{scope: scope}
+// WithNamespace configures the client's partition group namespace
+func WithNamespace(namespace string) Option {
+	return &namespaceOption{namespace: namespace}
 }
 
 type namespaceOption struct {
@@ -123,9 +128,11 @@ func (o *namespaceOption) apply(options *clientOptions) {
 	options.namespace = o.namespace
 }
 
-// WithNamespace configures the client's partition group namespace
-func WithNamespace(namespace string) Option {
-	return &namespaceOption{namespace: namespace}
+// WithSessionTimeout sets the session timeout for the client
+func WithSessionTimeout(timeout time.Duration) Option {
+	return &sessionTimeoutOption{
+		timeout: timeout,
+	}
 }
 
 type sessionTimeoutOption struct {
@@ -134,58 +141,4 @@ type sessionTimeoutOption struct {
 
 func (s *sessionTimeoutOption) apply(options *clientOptions) {
 	options.sessionTimeout = s.timeout
-}
-
-// WithSessionTimeout sets the session timeout for the client
-func WithSessionTimeout(timeout time.Duration) Option {
-	return &sessionTimeoutOption{
-		timeout: timeout,
-	}
-}
-
-func applyPartitionGroupOptions(opts ...PartitionGroupOption) partitionGroupOptions {
-	options := &partitionGroupOptions{
-		partitions:        1,
-		replicationFactor: 0,
-	}
-	for _, opt := range opts {
-		opt.apply(options)
-	}
-	return *options
-}
-
-type partitionGroupOptions struct {
-	partitions        int
-	replicationFactor int
-}
-
-// PartitionGroupOption provides a partition group option
-type PartitionGroupOption interface {
-	apply(options *partitionGroupOptions)
-}
-
-// WithPartitions configures the number of partitions
-func WithPartitions(partitions int) PartitionGroupOption {
-	return &partitionGroupPartitionsOption{partitions: partitions}
-}
-
-type partitionGroupPartitionsOption struct {
-	partitions int
-}
-
-func (o *partitionGroupPartitionsOption) apply(options *partitionGroupOptions) {
-	options.partitions = o.partitions
-}
-
-// WithReplicationFactor configures the replication factor
-func WithReplicationFactor(replicationFactor int) PartitionGroupOption {
-	return &partitionGroupReplicationFactorOption{replicationFactor: replicationFactor}
-}
-
-type partitionGroupReplicationFactorOption struct {
-	replicationFactor int
-}
-
-func (o *partitionGroupReplicationFactorOption) apply(options *partitionGroupOptions) {
-	options.replicationFactor = o.replicationFactor
 }

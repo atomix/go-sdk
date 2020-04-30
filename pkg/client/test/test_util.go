@@ -18,7 +18,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/atomix/api/proto/atomix/controller"
-	"github.com/atomix/go-client/pkg/client/primitive"
+	"github.com/atomix/go-client/pkg/client/database/primitive"
 	netutil "github.com/atomix/go-client/pkg/client/util/net"
 	"github.com/atomix/go-framework/pkg/atomix/registry"
 	"github.com/atomix/go-local/pkg/atomix/local"

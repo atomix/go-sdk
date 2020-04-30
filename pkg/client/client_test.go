@@ -23,7 +23,7 @@ import (
 	"github.com/atomix/go-client/pkg/client/lock"
 	"github.com/atomix/go-client/pkg/client/log"
 	"github.com/atomix/go-client/pkg/client/map"
-	"github.com/atomix/go-client/pkg/client/primitive"
+	"github.com/atomix/go-client/pkg/client/database/primitive"
 	"github.com/atomix/go-client/pkg/client/set"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/atomix/go-client/pkg/client/value"

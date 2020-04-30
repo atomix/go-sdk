@@ -17,12 +17,11 @@ package client
 import (
 	"context"
 	"errors"
-	"fmt"
 	controllerapi "github.com/atomix/api/proto/atomix/controller"
-	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/util/net"
+	"github.com/atomix/go-client/pkg/client/cluster"
+	"github.com/atomix/go-client/pkg/client/database"
+	"github.com/atomix/go-client/pkg/client/membership"
 	"google.golang.org/grpc"
-	"sort"
 	"sync"
 )
 
@@ -36,55 +35,53 @@ func New(address string, opts ...Option) (*Client, error) {
 		return nil, err
 	}
 
-	client := &Client{
-		conn:             conn,
-		options:          options,
-		databases:        make(map[string]*Database),
-		partitionGroups:  make(map[string]*PartitionGroup),
-		membershipGroups: make(map[string]*MembershipGroup),
+	clusterOpts := []cluster.Option{
+		cluster.WithNamespace(options.namespace),
+		cluster.WithScope(options.scope),
+		cluster.WithMemberID(options.memberID),
+		cluster.WithPeerHost(options.peerHost),
+		cluster.WithPeerPort(options.peerPort),
 	}
-	client.cluster = &Cluster{
-		client:   client,
-		watchers: make([]chan<- ClusterMembership, 0),
+	if options.joinTimeout != nil {
+		clusterOpts = append(clusterOpts, cluster.WithJoinTimeout(*options.joinTimeout))
 	}
 
-	if options.joinTimeout != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), *options.joinTimeout)
-		err = client.cluster.join(ctx)
-		cancel()
-	} else {
-		err = client.cluster.join(context.Background())
-	}
+	cluster, err := cluster.New(address, clusterOpts...)
 	if err != nil {
 		return nil, err
+	}
+
+	client := &Client{
+		address:          address,
+		conn:             conn,
+		cluster:          cluster,
+		options:          options,
+		databases:        make(map[string]*database.Database),
+		partitionGroups:  make(map[string]*membership.PartitionGroup),
+		membershipGroups: make(map[string]*membership.Group),
 	}
 	return client, nil
 }
 
-// NewClient returns a new Atomix client
-// Deprected: use New instead
-func NewClient(address string, opts ...Option) (*Client, error) {
-	return New(address, opts...)
-}
-
 // Client is an Atomix client
 type Client struct {
+	address          string
 	options          clientOptions
 	conn             *grpc.ClientConn
-	databases        map[string]*Database
-	cluster          *Cluster
-	partitionGroups  map[string]*PartitionGroup
-	membershipGroups map[string]*MembershipGroup
+	databases        map[string]*database.Database
+	cluster          *cluster.Cluster
+	partitionGroups  map[string]*membership.PartitionGroup
+	membershipGroups map[string]*membership.Group
 	mu               sync.RWMutex
 }
 
 // Cluster returns the client membership API
-func (c *Client) Cluster() *Cluster {
+func (c *Client) Cluster() *cluster.Cluster {
 	return c.cluster
 }
 
 // GetDatabases returns a list of all databases in the client's namespace
-func (c *Client) GetDatabases(ctx context.Context) ([]*Database, error) {
+func (c *Client) GetDatabases(ctx context.Context, opts ...database.Option) ([]*database.Database, error) {
 	client := controllerapi.NewControllerServiceClient(c.conn)
 	request := &controllerapi.GetDatabasesRequest{
 		ID: &controllerapi.DatabaseId{
@@ -97,9 +94,14 @@ func (c *Client) GetDatabases(ctx context.Context) ([]*Database, error) {
 		return nil, err
 	}
 
-	databases := make([]*Database, len(response.Databases))
+	databaseOpts := []database.Option{
+		database.WithScope(c.options.scope),
+	}
+	databaseOpts = append(databaseOpts, opts...)
+
+	databases := make([]*database.Database, len(response.Databases))
 	for i, databaseProto := range response.Databases {
-		database, err := c.newDatabase(ctx, databaseProto)
+		database, err := database.New(ctx, databaseProto, databaseOpts...)
 		if err != nil {
 			return nil, err
 		}
@@ -109,7 +111,7 @@ func (c *Client) GetDatabases(ctx context.Context) ([]*Database, error) {
 }
 
 // GetDatabase gets a database client by name from the client's namespace
-func (c *Client) GetDatabase(ctx context.Context, name string) (*Database, error) {
+func (c *Client) GetDatabase(ctx context.Context, name string, opts ...database.Option) (*database.Database, error) {
 	client := controllerapi.NewControllerServiceClient(c.conn)
 	request := &controllerapi.GetDatabasesRequest{
 		ID: &controllerapi.DatabaseId{
@@ -128,46 +130,15 @@ func (c *Client) GetDatabase(ctx context.Context, name string) (*Database, error
 	} else if len(response.Databases) > 1 {
 		return nil, errors.New("database " + name + " is ambiguous")
 	}
-	return c.newDatabase(ctx, response.Databases[0])
-}
-
-func (c *Client) newDatabase(ctx context.Context, databaseProto *controllerapi.Database) (*Database, error) {
-	// Ensure the partitions are sorted in case the controller sent them out of order.
-	partitionProtos := databaseProto.Partitions
-	sort.Slice(partitionProtos, func(i, j int) bool {
-		return partitionProtos[i].PartitionID < partitionProtos[j].PartitionID
-	})
-
-	// Iterate through the partitions and create gRPC client connections for each partition.
-	partitions := make([]primitive.Partition, len(databaseProto.Partitions))
-	for i, partitionProto := range partitionProtos {
-		ep := partitionProto.Endpoints[0]
-		partitions[i] = primitive.Partition{
-			ID:      int(partitionProto.PartitionID),
-			Address: net.Address(fmt.Sprintf("%s:%d", ep.Host, ep.Port)),
-		}
+	databaseOpts := []database.Option{
+		database.WithScope(c.options.scope),
 	}
-
-	// Iterate through partitions and open sessions
-	sessions := make([]*primitive.Session, len(partitions))
-	for i, partition := range partitions {
-		session, err := primitive.NewSession(ctx, partition, primitive.WithSessionTimeout(c.options.sessionTimeout))
-		if err != nil {
-			return nil, err
-		}
-		sessions[i] = session
-	}
-
-	return &Database{
-		Namespace: databaseProto.ID.Namespace,
-		Name:      databaseProto.ID.Name,
-		scope:     c.options.scope,
-		sessions:  sessions,
-	}, nil
+	databaseOpts = append(databaseOpts, opts...)
+	return database.New(ctx, response.Databases[0], databaseOpts...)
 }
 
 // GetPartitionGroup gets a partition group by name from the client's namespace
-func (c *Client) GetPartitionGroup(ctx context.Context, name string, opts ...PartitionGroupOption) (*PartitionGroup, error) {
+func (c *Client) GetPartitionGroup(ctx context.Context, name string, opts ...membership.PartitionGroupOption) (*membership.PartitionGroup, error) {
 	c.mu.RLock()
 	group, ok := c.partitionGroups[name]
 	c.mu.RUnlock()
@@ -182,22 +153,7 @@ func (c *Client) GetPartitionGroup(ctx context.Context, name string, opts ...Par
 		return group, nil
 	}
 
-	options := applyPartitionGroupOptions(opts...)
-
-	group = &PartitionGroup{
-		Name:      name,
-		Namespace: c.options.namespace,
-		client:    c,
-		options:   options,
-	}
-	var err error
-	if c.options.joinTimeout != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), *c.options.joinTimeout)
-		err = group.join(ctx)
-		cancel()
-	} else {
-		err = group.join(context.Background())
-	}
+	group, err := membership.NewPartitionGroup(name, c.address, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +162,7 @@ func (c *Client) GetPartitionGroup(ctx context.Context, name string, opts ...Par
 }
 
 // GetMembershipGroup gets a membership group by name from the client's namespace
-func (c *Client) GetMembershipGroup(ctx context.Context, name string) (*MembershipGroup, error) {
+func (c *Client) GetMembershipGroup(ctx context.Context, name string, opts ...membership.GroupOption) (*membership.Group, error) {
 	c.mu.RLock()
 	group, ok := c.membershipGroups[name]
 	c.mu.RUnlock()
@@ -221,19 +177,7 @@ func (c *Client) GetMembershipGroup(ctx context.Context, name string) (*Membersh
 		return group, nil
 	}
 
-	group = &MembershipGroup{
-		Name:      name,
-		Namespace: c.options.namespace,
-		client:    c,
-	}
-	var err error
-	if c.options.joinTimeout != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), *c.options.joinTimeout)
-		err = group.join(ctx)
-		cancel()
-	} else {
-		err = group.join(context.Background())
-	}
+	group, err := membership.NewGroup(name, c.address, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -243,13 +187,7 @@ func (c *Client) GetMembershipGroup(ctx context.Context, name string) (*Membersh
 
 // Close closes the client
 func (c *Client) Close() error {
-	if c.options.joinTimeout != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), *c.options.joinTimeout)
-		_ = c.cluster.leave(ctx)
-		cancel()
-	} else {
-		_ = c.cluster.leave(context.Background())
-	}
+	_ = c.cluster.Close()
 	if err := c.conn.Close(); err != nil {
 		return err
 	}
