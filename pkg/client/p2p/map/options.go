@@ -15,6 +15,7 @@
 package _map //nolint:golint
 
 import (
+	times "github.com/atomix/go-client/pkg/client/time"
 	"time"
 )
 
@@ -22,6 +23,7 @@ func applyGossipMapOptions(opts ...GossipMapOption) gossipMapOptions {
 	options := &gossipMapOptions{
 		gossipPeriod:      50 * time.Millisecond,
 		antiEntropyPeriod: time.Second,
+		clock:             times.NewLogicalClock(),
 	}
 	for _, opt := range opts {
 		opt.apply(options)
@@ -36,8 +38,24 @@ type GossipMapOption interface {
 
 // gossipMapOptions is a set of gossip map options
 type gossipMapOptions struct {
+	clock             times.Clock
 	gossipPeriod      time.Duration
 	antiEntropyPeriod time.Duration
+}
+
+// WithClock sets the gossip clock
+func WithClock(clock times.Clock) GossipMapOption {
+	return &gossipClockOption{
+		clock: clock,
+	}
+}
+
+type gossipClockOption struct {
+	clock times.Clock
+}
+
+func (o *gossipClockOption) apply(options *gossipMapOptions) {
+	options.clock = o.clock
 }
 
 // WithGossipPeriod sets the gossip period for a gossip map

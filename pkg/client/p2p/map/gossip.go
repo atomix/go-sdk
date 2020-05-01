@@ -20,6 +20,7 @@ import (
 	"github.com/atomix/api/proto/atomix/gossip_map"
 	primitiveapi "github.com/atomix/api/proto/atomix/primitive"
 	"github.com/atomix/go-client/pkg/client/p2p/primitive"
+	times "github.com/atomix/go-client/pkg/client/time"
 	"github.com/google/uuid"
 	"math/rand"
 	"sync"
@@ -30,54 +31,19 @@ import (
 func NewGossipMap(ctx context.Context, name primitive.Name, peers *primitive.PeerGroup, opts ...GossipMapOption) (Map, error) {
 	options := applyGossipMapOptions(opts...)
 	m := &gossipMap{
-		name:      name,
-		options:   options,
-		group:     peers,
-		peers:     make(map[primitive.PeerID]*gossipMapPeer),
-		watchers:  make(map[string]chan<- Event),
-		timestamp: &logicalClockProvider{},
-		closeCh:   make(chan struct{}),
+		name:     name,
+		options:  options,
+		group:    peers,
+		peers:    make(map[primitive.PeerID]*gossipMapPeer),
+		watchers: make(map[string]chan<- Event),
+		clock:    options.clock,
+		closeCh:  make(chan struct{}),
 	}
 	err := m.bootstrap(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return m, nil
-}
-
-type TimestampProvider interface {
-	Get() uint64
-	Increment() uint64
-	Update(timestamp uint64) uint64
-}
-
-type logicalClockProvider struct {
-	timestamp uint64
-	mu        sync.RWMutex
-}
-
-func (p *logicalClockProvider) Get() uint64 {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	return p.timestamp
-}
-
-func (p *logicalClockProvider) Increment() uint64 {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.timestamp++
-	return p.timestamp
-}
-
-func (p *logicalClockProvider) Update(timestamp uint64) uint64 {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if timestamp > p.timestamp {
-		p.timestamp = timestamp
-	} else {
-		p.timestamp++
-	}
-	return p.timestamp
 }
 
 // gossipMap is a gossip based peer-to-peer map
@@ -90,7 +56,7 @@ type gossipMap struct {
 	entries   map[string]gossip_map.MapValue
 	entriesMu sync.RWMutex
 	watchers  map[string]chan<- Event
-	timestamp TimestampProvider
+	clock     times.Clock
 	closeCh   chan struct{}
 }
 
@@ -120,7 +86,7 @@ func (m *gossipMap) watchPeers() error {
 				_, ok := m.peers[peer.ID]
 				m.peersMu.RUnlock()
 				if !ok {
-					mapPeer, err := newGossipMapPeer(m.name, peer, m.timestamp, m.options)
+					mapPeer, err := newGossipMapPeer(m.name, peer, m.clock, m.options)
 					if err == nil {
 						m.peersMu.Lock()
 						if _, ok := m.peers[peer.ID]; !ok {
@@ -158,7 +124,7 @@ func (m *gossipMap) bootstrap(ctx context.Context) error {
 		_, ok := m.peers[peer.ID]
 		m.peersMu.RUnlock()
 		if !ok {
-			mapPeer, err := newGossipMapPeer(m.name, peer, m.timestamp, m.options)
+			mapPeer, err := newGossipMapPeer(m.name, peer, m.clock, m.options)
 			if err == nil {
 				m.peersMu.Lock()
 				if _, ok := m.peers[peer.ID]; !ok {
@@ -223,15 +189,32 @@ func (m *gossipMap) handle(message *gossip_map.Message, stream gossip_map.Gossip
 
 // handleUpdate handles an Update
 func (m *gossipMap) handleUpdate(source primitive.PeerID, message *gossip_map.Update, stream gossip_map.GossipMapService_ConnectServer) error {
-	m.timestamp.Update(message.Timestamp)
+	timestamp := m.clock.New()
+	err := timestamp.Unmarshal(message.Timestamp)
+	if err != nil {
+		return err
+	}
+	m.clock.Update(timestamp)
 	for key, update := range message.Updates {
 		m.entriesMu.RLock()
 		value, ok := m.entries[key]
 		m.entriesMu.RUnlock()
 		if !ok && !update.Digest.Tombstone {
 			m.entries[key] = update
-		} else if ok && update.Digest.Timestamp > value.Digest.Timestamp {
-			m.entries[key] = update
+		} else if ok {
+			updateTimestamp := m.clock.New()
+			err := updateTimestamp.Unmarshal(update.Digest.Timestamp)
+			if err != nil {
+				return err
+			}
+			valueTimestamp := m.clock.New()
+			err = valueTimestamp.Unmarshal(value.Digest.Timestamp)
+			if err != nil {
+				return err
+			}
+			if updateTimestamp.GreaterThan(valueTimestamp) {
+				m.entries[key] = update
+			}
 		}
 	}
 	return nil
@@ -239,7 +222,12 @@ func (m *gossipMap) handleUpdate(source primitive.PeerID, message *gossip_map.Up
 
 // handleUpdateRequest handles an UpdateRequest
 func (m *gossipMap) handleUpdateRequest(source primitive.PeerID, message *gossip_map.UpdateRequest, stream gossip_map.GossipMapService_ConnectServer) error {
-	m.timestamp.Update(message.Timestamp)
+	timestamp := m.clock.New()
+	err := timestamp.Unmarshal(message.Timestamp)
+	if err != nil {
+		return err
+	}
+	m.clock.Update(timestamp)
 
 	m.peersMu.RLock()
 	peer, ok := m.peers[source]
@@ -264,7 +252,12 @@ func (m *gossipMap) handleUpdateRequest(source primitive.PeerID, message *gossip
 
 // handleAntiEntropyAdvertisement handles an AntiEntropyAdvertisement
 func (m *gossipMap) handleAntiEntropyAdvertisement(source primitive.PeerID, message *gossip_map.AntiEntropyAdvertisement, stream gossip_map.GossipMapService_ConnectServer) error {
-	timestamp := m.timestamp.Update(message.Timestamp)
+	timestamp := m.clock.New()
+	err := timestamp.Unmarshal(message.Timestamp)
+	if err != nil {
+		return err
+	}
+	timestamp = m.clock.Update(timestamp)
 
 	m.peersMu.RLock()
 	peer, ok := m.peers[source]
@@ -278,20 +271,37 @@ func (m *gossipMap) handleAntiEntropyAdvertisement(source primitive.PeerID, mess
 		m.entriesMu.RLock()
 		value, ok := m.entries[key]
 		m.entriesMu.RUnlock()
+
 		if !ok {
 			requests = append(requests, key)
-		} else if digest.Timestamp > value.Digest.Timestamp {
-			requests = append(requests, key)
-		} else if digest.Timestamp < value.Digest.Timestamp {
-			peer.enqueueUpdate(&gossip_map.UpdateEntry{
-				Key:   key,
-				Value: &value,
-			})
+		} else {
+			digestTimestamp := m.clock.New()
+			err := digestTimestamp.Unmarshal(digest.Timestamp)
+			if err != nil {
+				return err
+			}
+			valueTimestamp := m.clock.New()
+			err = valueTimestamp.Unmarshal(value.Digest.Timestamp)
+			if err != nil {
+				return err
+			}
+			if digestTimestamp.GreaterThan(valueTimestamp) {
+				requests = append(requests, key)
+			} else if digestTimestamp.LessThan(valueTimestamp) {
+				peer.enqueueUpdate(&gossip_map.UpdateEntry{
+					Key:   key,
+					Value: &value,
+				})
+			}
 		}
 	}
 
 	if len(requests) > 0 {
-		err := stream.Send(&gossip_map.Message{
+		timestampBytes, err := timestamp.Marshal()
+		if err != nil {
+			return err
+		}
+		err = stream.Send(&gossip_map.Message{
 			Target: primitiveapi.Name{
 				Namespace: m.name.Group,
 				Name:      m.name.Name,
@@ -299,7 +309,7 @@ func (m *gossipMap) handleAntiEntropyAdvertisement(source primitive.PeerID, mess
 			Message: &gossip_map.Message_UpdateRequest{
 				UpdateRequest: &gossip_map.UpdateRequest{
 					Keys:      requests,
-					Timestamp: timestamp,
+					Timestamp: timestampBytes,
 				},
 			},
 		})
@@ -334,7 +344,10 @@ func (m *gossipMap) Get(ctx context.Context, key string, opts ...GetOption) (*En
 func (m *gossipMap) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*Entry, error) {
 	m.entriesMu.Lock()
 	defer m.entriesMu.Unlock()
-	timestamp := m.timestamp.Increment()
+	timestamp, err := m.clock.Increment().Marshal()
+	if err != nil {
+		return nil, err
+	}
 	entry := gossip_map.MapValue{
 		Digest: gossip_map.Digest{
 			Timestamp: timestamp,
@@ -355,7 +368,10 @@ func (m *gossipMap) Put(ctx context.Context, key string, value []byte, opts ...P
 func (m *gossipMap) Remove(ctx context.Context, key string, opts ...RemoveOption) (*Entry, error) {
 	m.entriesMu.Lock()
 	defer m.entriesMu.Unlock()
-	timestamp := m.timestamp.Increment()
+	timestamp, err := m.clock.Increment().Marshal()
+	if err != nil {
+		return nil, err
+	}
 	entry, ok := m.entries[key]
 	if !ok {
 		return nil, nil
@@ -386,7 +402,10 @@ func (m *gossipMap) Len(ctx context.Context) (int, error) {
 func (m *gossipMap) Clear(ctx context.Context) error {
 	m.entriesMu.Lock()
 	defer m.entriesMu.Unlock()
-	timestamp := m.timestamp.Increment()
+	timestamp, err := m.clock.Increment().Marshal()
+	if err != nil {
+		return err
+	}
 	for key := range m.entries {
 		_, ok := m.entries[key]
 		if ok {
@@ -451,7 +470,7 @@ func (m *gossipMap) Delete(ctx context.Context) error {
 	return nil
 }
 
-func newGossipMapPeer(name primitive.Name, peer *primitive.Peer, timestamp TimestampProvider, options gossipMapOptions) (*gossipMapPeer, error) {
+func newGossipMapPeer(name primitive.Name, peer *primitive.Peer, clock times.Clock, options gossipMapOptions) (*gossipMapPeer, error) {
 	conn, err := peer.Connect()
 	if err != nil {
 		return nil, err
@@ -463,14 +482,14 @@ func newGossipMapPeer(name primitive.Name, peer *primitive.Peer, timestamp Times
 		return nil, err
 	}
 	mapPeer := &gossipMapPeer{
-		name:      name,
-		options:   options,
-		peer:      peer,
-		stream:    stream,
-		updates:   list.New(),
-		timestamp: timestamp,
-		cancel:    cancel,
-		closeCh:   make(chan struct{}),
+		name:    name,
+		options: options,
+		peer:    peer,
+		stream:  stream,
+		updates: list.New(),
+		clock:   clock,
+		cancel:  cancel,
+		closeCh: make(chan struct{}),
 	}
 	go mapPeer.start()
 	return mapPeer, nil
@@ -478,15 +497,15 @@ func newGossipMapPeer(name primitive.Name, peer *primitive.Peer, timestamp Times
 
 // gossipMapPeer is a gossip map peer
 type gossipMapPeer struct {
-	name      primitive.Name
-	options   gossipMapOptions
-	peer      *primitive.Peer
-	stream    gossip_map.GossipMapService_ConnectClient
-	updates   *list.List
-	timestamp TimestampProvider
-	cancel    context.CancelFunc
-	closeCh   chan struct{}
-	mu        sync.RWMutex
+	name    primitive.Name
+	options gossipMapOptions
+	peer    *primitive.Peer
+	stream  gossip_map.GossipMapService_ConnectClient
+	updates *list.List
+	clock   times.Clock
+	cancel  context.CancelFunc
+	closeCh chan struct{}
+	mu      sync.RWMutex
 }
 
 func (p *gossipMapPeer) start() {
@@ -523,7 +542,10 @@ func (p *gossipMapPeer) processUpdates() {
 }
 
 func (p *gossipMapPeer) sendUpdates(updates map[string]gossip_map.MapValue) {
-	timestamp := p.timestamp.Get()
+	timestamp, err := p.clock.Get().Marshal()
+	if err != nil {
+		return
+	}
 	_ = p.stream.Send(&gossip_map.Message{
 		Target: primitiveapi.Name{
 			Namespace: p.name.Group,
@@ -539,7 +561,10 @@ func (p *gossipMapPeer) sendUpdates(updates map[string]gossip_map.MapValue) {
 }
 
 func (p *gossipMapPeer) sendAdvertisement(digest map[string]gossip_map.Digest) {
-	timestamp := p.timestamp.Get()
+	timestamp, err := p.clock.Get().Marshal()
+	if err != nil {
+		return
+	}
 	_ = p.stream.Send(&gossip_map.Message{
 		Target: primitiveapi.Name{
 			Namespace: p.name.Group,
