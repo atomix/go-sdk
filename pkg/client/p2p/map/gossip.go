@@ -30,13 +30,13 @@ import (
 func NewGossipMap(ctx context.Context, name primitive.Name, peers *primitive.PeerGroup, opts ...GossipMapOption) (Map, error) {
 	options := applyGossipMapOptions(opts...)
 	m := &gossipMap{
-		name:     name,
-		peers:    peers,
-		options:  options,
-		streams:  make(map[primitive.PeerID]gossip_map.GossipMapService_ConnectClient),
-		updates:  list.New(),
-		watchers: make(map[string]chan<- Event),
-		closeCh:  make(chan struct{}),
+		name:      name,
+		options:   options,
+		group:     peers,
+		peers:     make(map[primitive.PeerID]*gossipMapPeer),
+		watchers:  make(map[string]chan<- Event),
+		timestamp: &logicalClockProvider{},
+		closeCh:   make(chan struct{}),
 	}
 	err := m.bootstrap(ctx)
 	if err != nil {
@@ -45,18 +45,52 @@ func NewGossipMap(ctx context.Context, name primitive.Name, peers *primitive.Pee
 	return m, nil
 }
 
+type TimestampProvider interface {
+	Get() uint64
+	Increment() uint64
+	Update(timestamp uint64) uint64
+}
+
+type logicalClockProvider struct {
+	timestamp uint64
+	mu        sync.RWMutex
+}
+
+func (p *logicalClockProvider) Get() uint64 {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.timestamp
+}
+
+func (p *logicalClockProvider) Increment() uint64 {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.timestamp++
+	return p.timestamp
+}
+
+func (p *logicalClockProvider) Update(timestamp uint64) uint64 {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if timestamp > p.timestamp {
+		p.timestamp = timestamp
+	} else {
+		p.timestamp++
+	}
+	return p.timestamp
+}
+
 // gossipMap is a gossip based peer-to-peer map
 type gossipMap struct {
 	name      primitive.Name
-	peers     *primitive.PeerGroup
 	options   gossipMapOptions
+	group     *primitive.PeerGroup
+	peers     map[primitive.PeerID]*gossipMapPeer
+	peersMu   sync.RWMutex
 	entries   map[string]gossip_map.MapValue
 	entriesMu sync.RWMutex
-	streams   map[primitive.PeerID]gossip_map.GossipMapService_ConnectClient
-	streamsMu sync.RWMutex
-	updates   *list.List
 	watchers  map[string]chan<- Event
-	timestamp uint64
+	timestamp TimestampProvider
 	closeCh   chan struct{}
 }
 
@@ -67,47 +101,46 @@ func (m *gossipMap) Name() primitive.Name {
 // watchPeers watches peers for changes
 func (m *gossipMap) watchPeers() error {
 	ch := make(chan primitive.PeerGroup)
-	err := m.peers.Watch(context.Background(), ch)
+	ctx, cancel := context.WithCancel(context.Background())
+	err := m.group.Watch(ctx, ch)
 	if err != nil {
 		return err
 	}
 
 	go func() {
+		<-m.closeCh
+		cancel()
+	}()
+
+	go func() {
 		for peers := range ch {
 			active := make(map[primitive.PeerID]bool)
 			for _, peer := range peers.Peers() {
-				m.streamsMu.RLock()
-				_, ok := m.streams[peer.ID]
+				m.peersMu.RLock()
+				_, ok := m.peers[peer.ID]
+				m.peersMu.RUnlock()
 				if !ok {
-					conn, err := peer.Connect()
+					mapPeer, err := newGossipMapPeer(m.name, peer, m.timestamp, m.options)
 					if err == nil {
-						client := gossip_map.NewGossipMapServiceClient(conn)
-						stream, err := client.Connect(context.Background())
-						if err == nil {
-							m.streams[peer.ID] = stream
-							_ = stream.Send(&gossip_map.Message{
-								Target: primitiveapi.Name{
-									Namespace: m.name.Group,
-									Name:      m.name.Name,
-								},
-								Message: &gossip_map.Message_BootstrapRequest{
-									BootstrapRequest: &gossip_map.BootstrapRequest{},
-								},
-							})
+						m.peersMu.Lock()
+						if _, ok := m.peers[peer.ID]; !ok {
+							m.peers[peer.ID] = mapPeer
+						} else {
+							_ = mapPeer.close()
 						}
+						m.peersMu.Unlock()
 					}
 				}
 				active[peer.ID] = true
-				m.streamsMu.RUnlock()
 			}
-			m.streamsMu.Lock()
-			for peer, stream := range m.streams {
-				if !active[peer] {
-					delete(m.streams, peer)
-					_ = stream.CloseSend()
+			m.peersMu.Lock()
+			for peerID, peer := range m.peers {
+				if !active[peerID] {
+					delete(m.peers, peerID)
+					peer.close()
 				}
 			}
-			m.streamsMu.Unlock()
+			m.peersMu.Unlock()
 		}
 	}()
 	return nil
@@ -120,71 +153,25 @@ func (m *gossipMap) bootstrap(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	for _, peer := range m.peers.Peers() {
-		conn, err := peer.Connect()
-		if err != nil {
-			return err
+	for _, peer := range m.group.Peers() {
+		m.peersMu.RLock()
+		_, ok := m.peers[peer.ID]
+		m.peersMu.RUnlock()
+		if !ok {
+			mapPeer, err := newGossipMapPeer(m.name, peer, m.timestamp, m.options)
+			if err == nil {
+				m.peersMu.Lock()
+				if _, ok := m.peers[peer.ID]; !ok {
+					m.peers[peer.ID] = mapPeer
+				} else {
+					_ = mapPeer.close()
+				}
+				m.peersMu.Unlock()
+			}
 		}
-		client := gossip_map.NewGossipMapServiceClient(conn)
-		stream, err := client.Connect(ctx)
-		if err != nil {
-			return err
-		}
-		m.streamsMu.Lock()
-		m.streams[peer.ID] = stream
-		m.streamsMu.Unlock()
-		_ = stream.Send(&gossip_map.Message{
-			Target: primitiveapi.Name{
-				Namespace: m.name.Group,
-				Name:      m.name.Name,
-			},
-			Message: &gossip_map.Message_BootstrapRequest{
-				BootstrapRequest: &gossip_map.BootstrapRequest{},
-			},
-		})
 	}
-	go m.sendUpdates()
 	go m.sendAdvertisements()
 	return nil
-}
-
-func (m *gossipMap) sendUpdates() {
-	ticker := time.NewTicker(m.options.gossipPeriod)
-	for {
-		select {
-		case <-ticker.C:
-			m.sendUpdate()
-		case <-m.closeCh:
-			return
-		}
-	}
-}
-
-func (m *gossipMap) sendUpdate() {
-	m.entriesMu.Lock()
-	updates := make([]*gossip_map.UpdateEntry, 0)
-	entry := m.updates.Front()
-	for i := 0; i < 100 && entry != nil; i++ {
-		updates = append(updates, entry.Value.(*gossip_map.UpdateEntry))
-		next := entry.Next()
-		m.updates.Remove(entry)
-		entry = next
-	}
-	timestamp := m.timestamp
-	m.entriesMu.Unlock()
-
-	m.streamsMu.Lock()
-	for _, stream := range m.streams {
-		_ = stream.Send(&gossip_map.Message{
-			Message: &gossip_map.Message_Update{
-				Update: &gossip_map.Update{
-					Updates:   updates,
-					Timestamp: timestamp,
-				},
-			},
-		})
-	}
-	m.streamsMu.Unlock()
 }
 
 func (m *gossipMap) sendAdvertisements() {
@@ -200,67 +187,135 @@ func (m *gossipMap) sendAdvertisements() {
 }
 
 func (m *gossipMap) sendAdvertisement() {
-	peers := m.peers.Peers()
-	peer := peers[rand.Intn(len(peers))]
+	peers := m.group.Peers()
+	if len(peers) == 0 {
+		return
+	}
 
-	m.streamsMu.RLock()
-	stream, ok := m.streams[peer.ID]
-	m.streamsMu.RUnlock()
+	m.peersMu.RLock()
+	peer, ok := m.peers[peers[rand.Intn(len(peers))].ID]
+	m.peersMu.RUnlock()
 	if !ok {
 		return
 	}
 
+	digest := make(map[string]gossip_map.Digest)
 	m.entriesMu.RLock()
-	timestamp := m.timestamp
-	entries := make(map[string]*gossip_map.Digest)
 	for key, value := range m.entries {
-		entries[key] = &value.Digest
+		digest[key] = value.Digest
 	}
 	m.entriesMu.RUnlock()
-
-	_ = stream.Send(&gossip_map.Message{
-		Message: &gossip_map.Message_AntiEntropyAdvertisement{
-			AntiEntropyAdvertisement: &gossip_map.AntiEntropyAdvertisement{
-				Digest:    entries,
-				Timestamp: timestamp,
-			},
-		},
-	})
+	peer.sendAdvertisement(digest)
 }
 
 // handle handles a message
 func (m *gossipMap) handle(message *gossip_map.Message, stream gossip_map.GossipMapService_ConnectServer) error {
 	switch msg := message.Message.(type) {
-	case *gossip_map.Message_BootstrapRequest:
-		return m.handleBootstrapRequest(msg.BootstrapRequest, stream)
 	case *gossip_map.Message_Update:
-		return m.handleUpdate(msg.Update, stream)
+		return m.handleUpdate(primitive.PeerID(message.Source), msg.Update, stream)
 	case *gossip_map.Message_UpdateRequest:
-		return m.handleUpdateRequest(msg.UpdateRequest, stream)
+		return m.handleUpdateRequest(primitive.PeerID(message.Source), msg.UpdateRequest, stream)
 	case *gossip_map.Message_AntiEntropyAdvertisement:
-		return m.handleAntiEntropyAdvertisement(msg.AntiEntropyAdvertisement, stream)
+		return m.handleAntiEntropyAdvertisement(primitive.PeerID(message.Source), msg.AntiEntropyAdvertisement, stream)
 	}
 	return nil
 }
 
-// handleBootstrapRequest handles a BootstrapRequest
-func (m *gossipMap) handleBootstrapRequest(message *gossip_map.BootstrapRequest, stream gossip_map.GossipMapService_ConnectServer) error {
-	return nil
-}
-
 // handleUpdate handles an Update
-func (m *gossipMap) handleUpdate(message *gossip_map.Update, stream gossip_map.GossipMapService_ConnectServer) error {
+func (m *gossipMap) handleUpdate(source primitive.PeerID, message *gossip_map.Update, stream gossip_map.GossipMapService_ConnectServer) error {
+	m.timestamp.Update(message.Timestamp)
+	for key, update := range message.Updates {
+		m.entriesMu.RLock()
+		value, ok := m.entries[key]
+		m.entriesMu.RUnlock()
+		if !ok && !update.Digest.Tombstone {
+			m.entries[key] = update
+		} else if ok && update.Digest.Timestamp > value.Digest.Timestamp {
+			m.entries[key] = update
+		}
+	}
 	return nil
 }
 
 // handleUpdateRequest handles an UpdateRequest
-func (m *gossipMap) handleUpdateRequest(message *gossip_map.UpdateRequest, stream gossip_map.GossipMapService_ConnectServer) error {
+func (m *gossipMap) handleUpdateRequest(source primitive.PeerID, message *gossip_map.UpdateRequest, stream gossip_map.GossipMapService_ConnectServer) error {
+	m.timestamp.Update(message.Timestamp)
+
+	m.peersMu.RLock()
+	peer, ok := m.peers[source]
+	m.peersMu.RUnlock()
+	if !ok {
+		return nil
+	}
+
+	for _, key := range message.Keys {
+		m.entriesMu.RLock()
+		value, ok := m.entries[key]
+		m.entriesMu.RUnlock()
+		if ok {
+			peer.enqueueUpdate(&gossip_map.UpdateEntry{
+				Key:   key,
+				Value: &value,
+			})
+		}
+	}
 	return nil
 }
 
 // handleAntiEntropyAdvertisement handles an AntiEntropyAdvertisement
-func (m *gossipMap) handleAntiEntropyAdvertisement(message *gossip_map.AntiEntropyAdvertisement, stream gossip_map.GossipMapService_ConnectServer) error {
+func (m *gossipMap) handleAntiEntropyAdvertisement(source primitive.PeerID, message *gossip_map.AntiEntropyAdvertisement, stream gossip_map.GossipMapService_ConnectServer) error {
+	timestamp := m.timestamp.Update(message.Timestamp)
+
+	m.peersMu.RLock()
+	peer, ok := m.peers[source]
+	m.peersMu.RUnlock()
+	if !ok {
+		return nil
+	}
+
+	requests := make([]string, 0)
+	for key, digest := range message.Digest {
+		m.entriesMu.RLock()
+		value, ok := m.entries[key]
+		m.entriesMu.RUnlock()
+		if !ok {
+			requests = append(requests, key)
+		} else if digest.Timestamp > value.Digest.Timestamp {
+			requests = append(requests, key)
+		} else if digest.Timestamp < value.Digest.Timestamp {
+			peer.enqueueUpdate(&gossip_map.UpdateEntry{
+				Key:   key,
+				Value: &value,
+			})
+		}
+	}
+
+	if len(requests) > 0 {
+		err := stream.Send(&gossip_map.Message{
+			Target: primitiveapi.Name{
+				Namespace: m.name.Group,
+				Name:      m.name.Name,
+			},
+			Message: &gossip_map.Message_UpdateRequest{
+				UpdateRequest: &gossip_map.UpdateRequest{
+					Keys:      requests,
+					Timestamp: timestamp,
+				},
+			},
+		})
+		if err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+func (m *gossipMap) enqueueUpdate(update *gossip_map.UpdateEntry) {
+	m.peersMu.RLock()
+	defer m.peersMu.RUnlock()
+	for _, peer := range m.peers {
+		peer.enqueueUpdate(update)
+	}
 }
 
 func (m *gossipMap) Get(ctx context.Context, key string, opts ...GetOption) (*Entry, error) {
@@ -279,15 +334,15 @@ func (m *gossipMap) Get(ctx context.Context, key string, opts ...GetOption) (*En
 func (m *gossipMap) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*Entry, error) {
 	m.entriesMu.Lock()
 	defer m.entriesMu.Unlock()
-	m.timestamp++
+	timestamp := m.timestamp.Increment()
 	entry := gossip_map.MapValue{
 		Digest: gossip_map.Digest{
-			Timestamp: m.timestamp,
+			Timestamp: timestamp,
 		},
 		Value: value,
 	}
 	m.entries[key] = entry
-	m.updates.PushBack(&gossip_map.UpdateEntry{
+	go m.enqueueUpdate(&gossip_map.UpdateEntry{
 		Key:   key,
 		Value: &entry,
 	})
@@ -300,19 +355,19 @@ func (m *gossipMap) Put(ctx context.Context, key string, value []byte, opts ...P
 func (m *gossipMap) Remove(ctx context.Context, key string, opts ...RemoveOption) (*Entry, error) {
 	m.entriesMu.Lock()
 	defer m.entriesMu.Unlock()
-	m.timestamp++
+	timestamp := m.timestamp.Increment()
 	entry, ok := m.entries[key]
 	if !ok {
 		return nil, nil
 	}
 	update := gossip_map.MapValue{
 		Digest: gossip_map.Digest{
-			Timestamp: m.timestamp,
+			Timestamp: timestamp,
 			Tombstone: true,
 		},
 	}
 	m.entries[key] = update
-	m.updates.PushBack(&gossip_map.UpdateEntry{
+	go m.enqueueUpdate(&gossip_map.UpdateEntry{
 		Key:   key,
 		Value: &update,
 	})
@@ -331,18 +386,18 @@ func (m *gossipMap) Len(ctx context.Context) (int, error) {
 func (m *gossipMap) Clear(ctx context.Context) error {
 	m.entriesMu.Lock()
 	defer m.entriesMu.Unlock()
-	m.timestamp++
+	timestamp := m.timestamp.Increment()
 	for key := range m.entries {
 		_, ok := m.entries[key]
 		if ok {
 			update := gossip_map.MapValue{
 				Digest: gossip_map.Digest{
-					Timestamp: m.timestamp,
+					Timestamp: timestamp,
 					Tombstone: true,
 				},
 			}
 			m.entries[key] = update
-			m.updates.PushBack(&gossip_map.UpdateEntry{
+			go m.enqueueUpdate(&gossip_map.UpdateEntry{
 				Key:   key,
 				Value: &update,
 			})
@@ -382,6 +437,11 @@ func (m *gossipMap) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOpt
 }
 
 func (m *gossipMap) Close(ctx context.Context) error {
+	m.peersMu.RLock()
+	for _, peer := range m.peers {
+		_ = peer.close()
+	}
+	m.peersMu.RUnlock()
 	close(m.closeCh)
 	return nil
 }
@@ -389,4 +449,113 @@ func (m *gossipMap) Close(ctx context.Context) error {
 func (m *gossipMap) Delete(ctx context.Context) error {
 	close(m.closeCh)
 	return nil
+}
+
+func newGossipMapPeer(name primitive.Name, peer *primitive.Peer, timestamp TimestampProvider, options gossipMapOptions) (*gossipMapPeer, error) {
+	conn, err := peer.Connect()
+	if err != nil {
+		return nil, err
+	}
+	client := gossip_map.NewGossipMapServiceClient(conn)
+	ctx, cancel := context.WithCancel(context.Background())
+	stream, err := client.Connect(ctx)
+	if err != nil {
+		return nil, err
+	}
+	mapPeer := &gossipMapPeer{
+		name:      name,
+		options:   options,
+		peer:      peer,
+		stream:    stream,
+		updates:   list.New(),
+		timestamp: timestamp,
+		cancel:    cancel,
+		closeCh:   make(chan struct{}),
+	}
+	go mapPeer.start()
+	return mapPeer, nil
+}
+
+// gossipMapPeer is a gossip map peer
+type gossipMapPeer struct {
+	name      primitive.Name
+	options   gossipMapOptions
+	peer      *primitive.Peer
+	stream    gossip_map.GossipMapService_ConnectClient
+	updates   *list.List
+	timestamp TimestampProvider
+	cancel    context.CancelFunc
+	closeCh   chan struct{}
+	mu        sync.RWMutex
+}
+
+func (p *gossipMapPeer) start() {
+	go p.processUpdates()
+}
+
+func (p *gossipMapPeer) enqueueUpdate(update *gossip_map.UpdateEntry) {
+	p.mu.Lock()
+	p.updates.PushBack(update)
+	p.mu.Unlock()
+}
+
+func (p *gossipMapPeer) processUpdates() {
+	ticker := time.NewTicker(p.options.gossipPeriod)
+	for {
+		select {
+		case <-ticker.C:
+			p.mu.Lock()
+			updates := make(map[string]gossip_map.MapValue)
+			entry := p.updates.Front()
+			for i := 0; i < 100 && entry != nil; i++ {
+				update := entry.Value.(*gossip_map.UpdateEntry)
+				updates[update.Key] = *update.Value
+				next := entry.Next()
+				p.updates.Remove(entry)
+				entry = next
+			}
+			p.mu.Unlock()
+			p.sendUpdates(updates)
+		case <-p.closeCh:
+			return
+		}
+	}
+}
+
+func (p *gossipMapPeer) sendUpdates(updates map[string]gossip_map.MapValue) {
+	timestamp := p.timestamp.Get()
+	_ = p.stream.Send(&gossip_map.Message{
+		Target: primitiveapi.Name{
+			Namespace: p.name.Group,
+			Name:      p.name.Name,
+		},
+		Message: &gossip_map.Message_Update{
+			Update: &gossip_map.Update{
+				Updates:   updates,
+				Timestamp: timestamp,
+			},
+		},
+	})
+}
+
+func (p *gossipMapPeer) sendAdvertisement(digest map[string]gossip_map.Digest) {
+	timestamp := p.timestamp.Get()
+	_ = p.stream.Send(&gossip_map.Message{
+		Target: primitiveapi.Name{
+			Namespace: p.name.Group,
+			Name:      p.name.Name,
+		},
+		Message: &gossip_map.Message_AntiEntropyAdvertisement{
+			AntiEntropyAdvertisement: &gossip_map.AntiEntropyAdvertisement{
+				Digest:    digest,
+				Timestamp: timestamp,
+			},
+		},
+	})
+}
+
+func (p *gossipMapPeer) close() error {
+	close(p.closeCh)
+	p.cancel()
+	return p.stream.CloseSend()
 }
