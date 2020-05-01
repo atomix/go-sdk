@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	controllerapi "github.com/atomix/api/proto/atomix/controller"
+	"github.com/atomix/go-client/pkg/client/p2p/primitive"
 	"google.golang.org/grpc"
 	"io"
 	"sync"
@@ -34,9 +35,20 @@ func New(address string, opts ...Option) (*Cluster, error) {
 		return nil, err
 	}
 
+	var member *Member
+	if options.memberID != "" {
+		member = &Member{
+			ID:   MemberID(options.memberID),
+			Host: options.peerHost,
+			Port: options.peerPort,
+		}
+	}
+
 	cluster := &Cluster{
+		member:   member,
 		conn:     conn,
 		options:  options,
+		leaveCh:  make(chan struct{}),
 		watchers: make([]chan<- Membership, 0),
 	}
 
@@ -55,6 +67,7 @@ func New(address string, opts ...Option) (*Cluster, error) {
 
 // Cluster manages the cluster membership for a client
 type Cluster struct {
+	member     *Member
 	conn       *grpc.ClientConn
 	options    clusterOptions
 	membership *Membership
@@ -62,6 +75,11 @@ type Cluster struct {
 	closer     context.CancelFunc
 	leaveCh    chan struct{}
 	mu         sync.RWMutex
+}
+
+// Member returns the local cluster member
+func (c *Cluster) Member() *Member {
+	return c.member
 }
 
 // Membership returns the current cluster membership
@@ -74,17 +92,30 @@ func (c *Cluster) Membership() Membership {
 	return Membership{}
 }
 
+// serve begins service if necessary
+func (c *Cluster) serve(ctx context.Context) error {
+	if c.member != nil {
+		return primitive.Serve(c.member.Port, c.leaveCh)
+	}
+	return nil
+}
+
 // join joins the cluster
 func (c *Cluster) join(ctx context.Context) error {
+	err := c.serve(ctx)
+	if err != nil {
+		return err
+	}
+
 	var member *controllerapi.Member
-	if c.options.memberID != "" {
+	if c.member != nil {
 		member = &controllerapi.Member{
 			ID: controllerapi.MemberId{
 				Namespace: c.options.namespace,
 				Name:      c.options.memberID,
 			},
-			Host: c.options.peerHost,
-			Port: int32(c.options.peerPort),
+			Host: c.member.Host,
+			Port: int32(c.member.Port),
 		}
 	}
 
@@ -105,8 +136,6 @@ func (c *Cluster) join(ctx context.Context) error {
 	c.mu.Lock()
 	joinCh := make(chan struct{})
 	c.closer = cancel
-	leaveCh := make(chan struct{})
-	c.leaveCh = leaveCh
 	c.mu.Unlock()
 
 	go func() {
@@ -114,24 +143,40 @@ func (c *Cluster) join(ctx context.Context) error {
 		for {
 			response, err := stream.Recv()
 			if err == io.EOF {
-				close(leaveCh)
+				close(c.leaveCh)
 				return
 			} else if err != nil {
 				fmt.Println(err)
-				close(leaveCh)
+				close(c.leaveCh)
 				return
 			} else {
-				members := make([]Member, 0, len(response.Membership.Members))
-				for _, member := range response.Membership.Members {
-					members = append(members, Member{
-						ID: MemberID(member.ID.Name),
-					})
-				}
-				membership := Membership{
-					Members: members,
+				c.mu.Lock()
+
+				oldMembers := make(map[MemberID]*Member)
+				if c.membership != nil {
+					for _, member := range c.membership.Members {
+						oldMembers[member.ID] = member
+					}
 				}
 
-				c.mu.Lock()
+				newMembers := make([]*Member, 0, len(response.Membership.Members))
+				for _, member := range response.Membership.Members {
+					memberID := MemberID(member.ID.Name)
+					oldMember, ok := oldMembers[memberID]
+					if ok {
+						newMembers = append(newMembers, oldMember)
+					} else {
+						newMembers = append(newMembers, &Member{
+							ID:   memberID,
+							Host: member.Host,
+							Port: int(member.Port),
+						})
+					}
+				}
+				membership := Membership{
+					Members: newMembers,
+				}
+
 				c.membership = &membership
 				c.mu.Unlock()
 
@@ -216,7 +261,7 @@ func (c *Cluster) Close() error {
 
 // Membership is a set of cluster members
 type Membership struct {
-	Members []Member
+	Members []*Member
 }
 
 // MemberID is a member identifier
@@ -224,5 +269,32 @@ type MemberID string
 
 // Member is a membership group member
 type Member struct {
-	ID MemberID
+	ID   MemberID
+	Host string
+	Port int
+	conn *grpc.ClientConn
+	mu   sync.RWMutex
+}
+
+// Connect connects to the member
+func (m *Member) Connect() (*grpc.ClientConn, error) {
+	m.mu.RLock()
+	conn := m.conn
+	m.mu.RUnlock()
+	if conn != nil {
+		return conn, nil
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.conn != nil {
+		return m.conn, nil
+	}
+
+	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", m.Host, m.Port), grpc.WithInsecure())
+	if err != nil {
+		return nil, err
+	}
+	m.conn = conn
+	return conn, err
 }

@@ -201,13 +201,30 @@ func (p *Partition) update(group controllerapi.MembershipGroup) {
 	if p.lastUpdate != nil && (*p.lastUpdate).String() == group.String() {
 		return
 	}
+	p.group.mu.Lock()
 
-	members := make([]cluster.Member, 0, len(group.Members))
-	for _, member := range group.Members {
-		members = append(members, cluster.Member{
-			ID: cluster.MemberID(member.ID.Name),
-		})
+	oldMembers := make(map[cluster.MemberID]*cluster.Member)
+	if p.group.membership != nil {
+		for _, member := range p.group.membership.Members {
+			oldMembers[member.ID] = member
+		}
 	}
+
+	newMembers := make([]*cluster.Member, 0, len(group.Members))
+	for _, member := range group.Members {
+		memberID := cluster.MemberID(member.ID.Name)
+		oldMember, ok := oldMembers[memberID]
+		if ok {
+			newMembers = append(newMembers, oldMember)
+		} else {
+			newMembers = append(newMembers, &cluster.Member{
+				ID:   memberID,
+				Host: member.Host,
+				Port: int(member.Port),
+			})
+		}
+	}
+
 	var leadership *Leadership
 	if group.Leader != nil {
 		leadership = &Leadership{
@@ -217,7 +234,7 @@ func (p *Partition) update(group controllerapi.MembershipGroup) {
 	}
 	membership := Membership{
 		Leadership: leadership,
-		Members:    members,
+		Members:    newMembers,
 	}
 
 	p.group.mu.Lock()
