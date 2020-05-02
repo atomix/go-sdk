@@ -38,9 +38,10 @@ type Option interface {
 
 // gossipMapOptions is a set of gossip map options
 type gossipMapOptions struct {
-	clock             times.Clock
-	gossipPeriod      time.Duration
-	antiEntropyPeriod time.Duration
+	clock                times.Clock
+	gossipPeriod         time.Duration
+	antiEntropyPeriod    time.Duration
+	tombstonePurgePeriod time.Duration
 }
 
 // WithClock sets the gossip clock
@@ -86,6 +87,21 @@ type antiEntropyPeriodOption struct {
 
 func (o *antiEntropyPeriodOption) apply(options *gossipMapOptions) {
 	options.antiEntropyPeriod = o.period
+}
+
+// WithTombstonePurgePeriod sets the interval at which to purge tombstones from the map
+func WithTombstonePurgePeriod(period time.Duration) Option {
+	return &tombstonePurgePeriodOption{
+		period: period,
+	}
+}
+
+type tombstonePurgePeriodOption struct {
+	period time.Duration
+}
+
+func (o *tombstonePurgePeriodOption) apply(options *gossipMapOptions) {
+	options.tombstonePurgePeriod = o.period
 }
 
 // PutOption is an option for the Put method

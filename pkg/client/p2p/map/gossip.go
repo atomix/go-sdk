@@ -35,6 +35,7 @@ func NewGossipMap(ctx context.Context, name primitive.Name, peers *primitive.Pee
 		options:  options,
 		group:    peers,
 		peers:    make(map[primitive.PeerID]*gossipMapPeer),
+		entries:  make(map[string]timestampedEntry),
 		watchers: make(map[string]chan<- Event),
 		clock:    options.clock,
 		closeCh:  make(chan struct{}),
@@ -53,7 +54,7 @@ type gossipMap struct {
 	group     *primitive.PeerGroup
 	peers     map[primitive.PeerID]*gossipMapPeer
 	peersMu   sync.RWMutex
-	entries   map[string]gossip_map.MapValue
+	entries   map[string]timestampedEntry
 	entriesMu sync.RWMutex
 	watchers  map[string]chan<- Event
 	clock     times.Clock
@@ -136,11 +137,35 @@ func (m *gossipMap) bootstrap(ctx context.Context) error {
 			}
 		}
 	}
-	go m.sendAdvertisements()
+	go m.startSendAdvertisements()
+	go m.startPurgeTombstones()
 	return nil
 }
 
-func (m *gossipMap) sendAdvertisements() {
+func (m *gossipMap) startPurgeTombstones() {
+	ticker := time.NewTicker(m.options.tombstonePurgePeriod)
+	for {
+		select {
+		case <-ticker.C:
+			m.purgeTombstones()
+		case <-m.closeCh:
+			return
+		}
+	}
+}
+
+func (m *gossipMap) purgeTombstones() {
+	m.entriesMu.Lock()
+	now := time.Now()
+	for key, entry := range m.entries {
+		if entry.value.Digest.Tombstone && now.Sub(entry.timestamp) > m.options.tombstonePurgePeriod {
+			delete(m.entries, key)
+		}
+	}
+	m.entriesMu.Unlock()
+}
+
+func (m *gossipMap) startSendAdvertisements() {
 	ticker := time.NewTicker(m.options.antiEntropyPeriod)
 	for {
 		select {
@@ -167,8 +192,8 @@ func (m *gossipMap) sendAdvertisement() {
 
 	digest := make(map[string]gossip_map.Digest)
 	m.entriesMu.RLock()
-	for key, value := range m.entries {
-		digest[key] = value.Digest
+	for key, entry := range m.entries {
+		digest[key] = entry.value.Digest
 	}
 	m.entriesMu.RUnlock()
 	peer.sendAdvertisement(digest)
@@ -197,23 +222,29 @@ func (m *gossipMap) handleUpdate(source primitive.PeerID, message *gossip_map.Up
 	m.clock.Update(timestamp)
 	for key, update := range message.Updates {
 		m.entriesMu.RLock()
-		value, ok := m.entries[key]
+		entry, ok := m.entries[key]
 		m.entriesMu.RUnlock()
 		if !ok && !update.Digest.Tombstone {
-			m.entries[key] = update
+			m.entries[key] = timestampedEntry{
+				timestamp: time.Now(),
+				value:     update,
+			}
 		} else if ok {
 			updateTimestamp := m.clock.New()
 			err := updateTimestamp.Unmarshal(update.Digest.Timestamp)
 			if err != nil {
 				return err
 			}
-			valueTimestamp := m.clock.New()
-			err = valueTimestamp.Unmarshal(value.Digest.Timestamp)
+			entryTimestamp := m.clock.New()
+			err = entryTimestamp.Unmarshal(entry.value.Digest.Timestamp)
 			if err != nil {
 				return err
 			}
-			if updateTimestamp.GreaterThan(valueTimestamp) {
-				m.entries[key] = update
+			if updateTimestamp.GreaterThan(entryTimestamp) {
+				m.entries[key] = timestampedEntry{
+					timestamp: time.Now(),
+					value:     update,
+				}
 			}
 		}
 	}
@@ -238,12 +269,12 @@ func (m *gossipMap) handleUpdateRequest(source primitive.PeerID, message *gossip
 
 	for _, key := range message.Keys {
 		m.entriesMu.RLock()
-		value, ok := m.entries[key]
+		entry, ok := m.entries[key]
 		m.entriesMu.RUnlock()
 		if ok {
 			peer.enqueueUpdate(&gossip_map.UpdateEntry{
 				Key:   key,
-				Value: &value,
+				Value: &entry.value,
 			})
 		}
 	}
@@ -269,7 +300,7 @@ func (m *gossipMap) handleAntiEntropyAdvertisement(source primitive.PeerID, mess
 	requests := make([]string, 0)
 	for key, digest := range message.Digest {
 		m.entriesMu.RLock()
-		value, ok := m.entries[key]
+		entry, ok := m.entries[key]
 		m.entriesMu.RUnlock()
 
 		if !ok {
@@ -280,17 +311,17 @@ func (m *gossipMap) handleAntiEntropyAdvertisement(source primitive.PeerID, mess
 			if err != nil {
 				return err
 			}
-			valueTimestamp := m.clock.New()
-			err = valueTimestamp.Unmarshal(value.Digest.Timestamp)
+			entryTimestamp := m.clock.New()
+			err = entryTimestamp.Unmarshal(entry.value.Digest.Timestamp)
 			if err != nil {
 				return err
 			}
-			if digestTimestamp.GreaterThan(valueTimestamp) {
+			if digestTimestamp.GreaterThan(entryTimestamp) {
 				requests = append(requests, key)
-			} else if digestTimestamp.LessThan(valueTimestamp) {
+			} else if digestTimestamp.LessThan(entryTimestamp) {
 				peer.enqueueUpdate(&gossip_map.UpdateEntry{
 					Key:   key,
-					Value: &value,
+					Value: &entry.value,
 				})
 			}
 		}
@@ -332,10 +363,10 @@ func (m *gossipMap) Get(ctx context.Context, key string, opts ...GetOption) (*En
 	m.entriesMu.RLock()
 	defer m.entriesMu.RUnlock()
 	entry, ok := m.entries[key]
-	if ok && !entry.Digest.Tombstone {
+	if ok && !entry.value.Digest.Tombstone {
 		return &Entry{
 			Key:   key,
-			Value: entry.Value,
+			Value: entry.value.Value,
 		}, nil
 	}
 	return nil, nil
@@ -354,7 +385,10 @@ func (m *gossipMap) Put(ctx context.Context, key string, value []byte, opts ...P
 		},
 		Value: value,
 	}
-	m.entries[key] = entry
+	m.entries[key] = timestampedEntry{
+		timestamp: time.Now(),
+		value:     entry,
+	}
 	go m.enqueueUpdate(&gossip_map.UpdateEntry{
 		Key:   key,
 		Value: &entry,
@@ -382,14 +416,17 @@ func (m *gossipMap) Remove(ctx context.Context, key string, opts ...RemoveOption
 			Tombstone: true,
 		},
 	}
-	m.entries[key] = update
+	m.entries[key] = timestampedEntry{
+		timestamp: time.Now(),
+		value:     update,
+	}
 	go m.enqueueUpdate(&gossip_map.UpdateEntry{
 		Key:   key,
 		Value: &update,
 	})
 	return &Entry{
 		Key:   key,
-		Value: entry.Value,
+		Value: entry.value.Value,
 	}, nil
 }
 
@@ -415,7 +452,10 @@ func (m *gossipMap) Clear(ctx context.Context) error {
 					Tombstone: true,
 				},
 			}
-			m.entries[key] = update
+			m.entries[key] = timestampedEntry{
+				timestamp: time.Now(),
+				value:     update,
+			}
 			go m.enqueueUpdate(&gossip_map.UpdateEntry{
 				Key:   key,
 				Value: &update,
@@ -429,11 +469,11 @@ func (m *gossipMap) Entries(ctx context.Context, ch chan<- Entry) error {
 	go func() {
 		m.entriesMu.RLock()
 		defer m.entriesMu.RUnlock()
-		for key, value := range m.entries {
-			if !value.Digest.Tombstone {
+		for key, entry := range m.entries {
+			if !entry.value.Digest.Tombstone {
 				ch <- Entry{
 					Key:   key,
-					Value: value.Value,
+					Value: entry.value.Value,
 				}
 			}
 		}
@@ -583,4 +623,9 @@ func (p *gossipMapPeer) close() error {
 	close(p.closeCh)
 	p.cancel()
 	return p.stream.CloseSend()
+}
+
+type timestampedEntry struct {
+	timestamp time.Time
+	value     gossip_map.MapValue
 }
