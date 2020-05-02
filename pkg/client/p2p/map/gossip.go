@@ -28,7 +28,7 @@ import (
 )
 
 // NewGossipMap creates a new gossip Map
-func NewGossipMap(ctx context.Context, name primitive.Name, peers *primitive.PeerGroup, opts ...GossipMapOption) (Map, error) {
+func NewGossipMap(ctx context.Context, name primitive.Name, peers *primitive.PeerGroup, opts ...Option) (Map, error) {
 	options := applyGossipMapOptions(opts...)
 	m := &gossipMap{
 		name:     name,

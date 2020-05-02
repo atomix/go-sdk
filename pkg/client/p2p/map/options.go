@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-func applyGossipMapOptions(opts ...GossipMapOption) gossipMapOptions {
+func applyGossipMapOptions(opts ...Option) gossipMapOptions {
 	options := &gossipMapOptions{
 		gossipPeriod:      50 * time.Millisecond,
 		antiEntropyPeriod: time.Second,
@@ -31,8 +31,8 @@ func applyGossipMapOptions(opts ...GossipMapOption) gossipMapOptions {
 	return *options
 }
 
-// GossipMapOption is an option for a gossip Map instance
-type GossipMapOption interface {
+// Option is an option for a gossip Map instance
+type Option interface {
 	apply(options *gossipMapOptions)
 }
 
@@ -44,22 +44,22 @@ type gossipMapOptions struct {
 }
 
 // WithClock sets the gossip clock
-func WithClock(clock times.Clock) GossipMapOption {
-	return &gossipClockOption{
+func WithClock(clock times.Clock) Option {
+	return &clockOption{
 		clock: clock,
 	}
 }
 
-type gossipClockOption struct {
+type clockOption struct {
 	clock times.Clock
 }
 
-func (o *gossipClockOption) apply(options *gossipMapOptions) {
+func (o *clockOption) apply(options *gossipMapOptions) {
 	options.clock = o.clock
 }
 
 // WithGossipPeriod sets the gossip period for a gossip map
-func WithGossipPeriod(period time.Duration) GossipMapOption {
+func WithGossipPeriod(period time.Duration) Option {
 	return &gossipPeriodOption{
 		period: period,
 	}
@@ -74,7 +74,7 @@ func (o *gossipPeriodOption) apply(options *gossipMapOptions) {
 }
 
 // WithAntiEntropyPeriod sets the anti-entropy period for a gossip map
-func WithAntiEntropyPeriod(period time.Duration) GossipMapOption {
+func WithAntiEntropyPeriod(period time.Duration) Option {
 	return &antiEntropyPeriodOption{
 		period: period,
 	}
