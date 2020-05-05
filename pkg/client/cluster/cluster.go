@@ -45,11 +45,13 @@ func New(address string, opts ...Option) (*Cluster, error) {
 	}
 
 	cluster := &Cluster{
-		member:   member,
-		conn:     conn,
-		options:  options,
-		leaveCh:  make(chan struct{}),
-		watchers: make([]chan<- Membership, 0),
+		Namespace: options.namespace,
+		Name:      options.scope,
+		member:    member,
+		conn:      conn,
+		options:   options,
+		leaveCh:   make(chan struct{}),
+		watchers:  make([]chan<- Membership, 0),
 	}
 
 	if options.joinTimeout != nil {
@@ -67,6 +69,8 @@ func New(address string, opts ...Option) (*Cluster, error) {
 
 // Cluster manages the cluster membership for a client
 type Cluster struct {
+	Namespace  string
+	Name       string
 	member     *Member
 	conn       *grpc.ClientConn
 	options    clusterOptions

@@ -27,7 +27,7 @@ var manager *gossipMapManager
 func getManager() *gossipMapManager {
 	if manager == nil {
 		manager = &gossipMapManager{
-			instances: make(map[string]map[string]gossipMapHandler),
+			instances: make(map[string]gossipMapHandler),
 		}
 	}
 	return manager
@@ -38,19 +38,17 @@ type gossipMapHandler func(*mapapi.Message, mapapi.GossipMapService_ConnectServe
 
 // gossipMapManager manages gossip map streams
 type gossipMapManager struct {
-	instances map[string]map[string]gossipMapHandler
+	instances map[string]gossipMapHandler
 	mu        sync.RWMutex
 }
 
 func (s *gossipMapManager) register(name primitive.Name, handler gossipMapHandler) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	instances, ok := s.instances[name.Protocol]
+	_, ok := s.instances[name.String()]
 	if !ok {
-		instances = make(map[string]gossipMapHandler)
-		s.instances[name.Protocol] = instances
+		s.instances[name.String()] = handler
 	}
-	instances[name.Name] = handler
 }
 
 func (s *gossipMapManager) Connect(stream mapapi.GossipMapService_ConnectServer) error {
@@ -63,19 +61,20 @@ func (s *gossipMapManager) Connect(stream mapapi.GossipMapService_ConnectServer)
 			return err
 		}
 
+		name := primitive.Name{
+			Namespace: request.Header.Protocol.Namespace,
+			Protocol:  request.Header.Protocol.Name,
+			Scope:     request.Header.Primitive.Namespace,
+			Name:      request.Header.Primitive.Name,
+		}
 		s.mu.RLock()
-		instances, ok := s.instances[request.Header.Namespace]
+		handler, ok := s.instances[name.String()]
+		s.mu.RUnlock()
 		if ok {
-			handler, ok := instances[request.Target.Name]
-			s.mu.RUnlock()
-			if ok {
-				err := handler(request, stream)
-				if err != nil {
-					return err
-				}
+			err := handler(request, stream)
+			if err != nil {
+				return err
 			}
-		} else {
-			s.mu.RUnlock()
 		}
 	}
 }

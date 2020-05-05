@@ -23,6 +23,7 @@ import (
 	primitiveapi "github.com/atomix/api/proto/atomix/primitive"
 	"github.com/atomix/api/proto/atomix/protocol"
 	"github.com/atomix/go-client/pkg/client/gossip/peer"
+	"github.com/atomix/go-client/pkg/client/primitive"
 	times "github.com/atomix/go-client/pkg/client/time"
 	"github.com/google/uuid"
 	"math/rand"
@@ -31,7 +32,7 @@ import (
 )
 
 // NewGossipMap creates a new gossip Map
-func NewGossipMap(ctx context.Context, name peer.Name, peers *peer.Group, opts ...Option) (Map, error) {
+func NewGossipMap(ctx context.Context, name primitive.Name, peers *peer.Group, opts ...Option) (Map, error) {
 	options := applyGossipMapOptions(opts...)
 	m := &gossipMap{
 		name:     name,
@@ -52,7 +53,7 @@ func NewGossipMap(ctx context.Context, name peer.Name, peers *peer.Group, opts .
 
 // gossipMap is a gossip based peer-to-peer map
 type gossipMap struct {
-	name      peer.Name
+	name      primitive.Name
 	options   gossipMapOptions
 	group     *peer.Group
 	peers     map[peer.ID]*gossipMapPeer
@@ -64,7 +65,7 @@ type gossipMap struct {
 	closeCh   chan struct{}
 }
 
-func (m *gossipMap) Name() peer.Name {
+func (m *gossipMap) Name() primitive.Name {
 	return m.name
 }
 
@@ -339,10 +340,10 @@ func (m *gossipMap) handleAntiEntropyAdvertisement(source peer.ID, message *mapa
 			Header: headers.MessageHeader{
 				Protocol: protocol.ProtocolId{
 					Namespace: m.name.Namespace,
-					Name:      m.name.Group,
+					Name:      m.name.Protocol,
 				},
 				Primitive: primitiveapi.PrimitiveId{
-					Namespace: m.name.Namespace,
+					Namespace: m.name.Scope,
 					Name:      m.name.Name,
 				},
 				Source: membership.MemberId{
@@ -522,7 +523,7 @@ func (m *gossipMap) Delete(ctx context.Context) error {
 	return nil
 }
 
-func newGossipMapPeer(name peer.Name, group *peer.Group, peer *peer.Peer, clock times.Clock, options gossipMapOptions) (*gossipMapPeer, error) {
+func newGossipMapPeer(name primitive.Name, group *peer.Group, peer *peer.Peer, clock times.Clock, options gossipMapOptions) (*gossipMapPeer, error) {
 	conn, err := peer.Connect()
 	if err != nil {
 		return nil, err
@@ -550,7 +551,7 @@ func newGossipMapPeer(name peer.Name, group *peer.Group, peer *peer.Peer, clock 
 
 // gossipMapPeer is a gossip map peer
 type gossipMapPeer struct {
-	name    peer.Name
+	name    primitive.Name
 	options gossipMapOptions
 	group   *peer.Group
 	peer    *peer.Peer
@@ -604,10 +605,10 @@ func (p *gossipMapPeer) sendUpdates(updates map[string]mapapi.MapValue) {
 		Header: headers.MessageHeader{
 			Protocol: protocol.ProtocolId{
 				Namespace: p.name.Namespace,
-				Name:      p.name.Group,
+				Name:      p.name.Protocol,
 			},
 			Primitive: primitiveapi.PrimitiveId{
-				Namespace: p.name.Namespace,
+				Namespace: p.name.Scope,
 				Name:      p.name.Name,
 			},
 			Source: membership.MemberId{
@@ -632,10 +633,10 @@ func (p *gossipMapPeer) sendAdvertisement(digest map[string]mapapi.Digest) {
 		Header: headers.MessageHeader{
 			Protocol: protocol.ProtocolId{
 				Namespace: p.name.Namespace,
-				Name:      p.name.Group,
+				Name:      p.name.Protocol,
 			},
 			Primitive: primitiveapi.PrimitiveId{
-				Namespace: p.name.Namespace,
+				Namespace: p.name.Scope,
 				Name:      p.name.Name,
 			},
 			Source: membership.MemberId{

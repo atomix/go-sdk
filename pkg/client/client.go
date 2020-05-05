@@ -146,7 +146,7 @@ func (c *Client) GetMembershipGroup(ctx context.Context, name string, opts ...me
 		return membershipGroup, nil
 	}
 
-	membershipGroup, err := membership.NewGroup(ctx, protocol.New(c.conn, c.options.namespace, name, c.options.scope), opts...)
+	membershipGroup, err := membership.NewGroup(ctx, c.conn, c.cluster, protocol.New(c.conn, c.options.namespace, name, c.options.scope), opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +170,7 @@ func (c *Client) GetPartitionGroup(ctx context.Context, name string, opts ...par
 		return partitionGroup, nil
 	}
 
-	partitionGroup, err := partition.NewGroup(ctx, protocol.New(c.conn, c.options.namespace, name, c.options.scope), opts...)
+	partitionGroup, err := partition.NewGroup(ctx, c.conn, c.cluster, protocol.New(c.conn, c.options.namespace, name, c.options.scope), opts...)
 	if err != nil {
 		return nil, err
 	}

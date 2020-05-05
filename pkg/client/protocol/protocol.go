@@ -22,9 +22,14 @@ import (
 	"google.golang.org/grpc"
 )
 
-// New creates a new Protocol instance
-func New(conn *grpc.ClientConn, namespace string, name string, scope string) *Protocol {
-	return &Protocol{
+// Protocol is an interface for protocol clients
+type Protocol interface {
+	Close(ctx context.Context) error
+}
+
+// New creates a new Client instance
+func New(conn *grpc.ClientConn, namespace string, name string, scope string) *Client {
+	return &Client{
 		conn:      conn,
 		Namespace: namespace,
 		Name:      name,
@@ -32,8 +37,9 @@ func New(conn *grpc.ClientConn, namespace string, name string, scope string) *Pr
 	}
 }
 
-// Protocol is the base for protocols
-type Protocol struct {
+// Client is the base client for protocols
+type Client struct {
+	Protocol
 	conn      *grpc.ClientConn
 	Namespace string
 	Name      string
@@ -41,7 +47,7 @@ type Protocol struct {
 }
 
 // GetPrimitives gets a list of primitives in the database
-func (p *Protocol) GetPrimitives(ctx context.Context, opts ...PrimitiveOption) ([]primitive.Metadata, error) {
+func (p *Client) GetPrimitives(ctx context.Context, opts ...PrimitiveOption) ([]primitive.Metadata, error) {
 	options := &primitiveOptions{}
 	for _, opt := range opts {
 		opt.apply(options)
@@ -73,8 +79,8 @@ func (p *Protocol) GetPrimitives(ctx context.Context, opts ...PrimitiveOption) (
 
 	request := &primitiveapi.GetPrimitivesRequest{
 		Protocol: &protocol.ProtocolId{
-			Namespace: p.namespace,
-			Name:      p.name,
+			Namespace: p.Namespace,
+			Name:      p.Name,
 		},
 		Primitive: &primitiveapi.PrimitiveId{
 			Namespace: p.Scope,

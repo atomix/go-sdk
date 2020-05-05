@@ -22,16 +22,19 @@ import (
 	"github.com/atomix/go-client/pkg/client/cluster"
 	"github.com/atomix/go-client/pkg/client/gossip/map"
 	"github.com/atomix/go-client/pkg/client/gossip/peer"
+	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/protocol"
+	"google.golang.org/grpc"
 	"io"
 	"sync"
-	"time"
 )
 
 // NewGroup creates a new Group
-func NewGroup(ctx context.Context, protocol *protocol.Protocol, opts ...Option) (*Group, error) {
+func NewGroup(ctx context.Context, conn *grpc.ClientConn, cluster *cluster.Cluster, client *protocol.Client, opts ...Option) (*Group, error) {
 	group := &Group{
-		Protocol: protocol,
+		Client:   client,
+		cluster:  cluster,
+		conn:     conn,
 		watchers: make([]chan<- Membership, 0),
 	}
 
@@ -44,7 +47,9 @@ func NewGroup(ctx context.Context, protocol *protocol.Protocol, opts ...Option) 
 
 // Group manages the primitives in a membership group
 type Group struct {
-	*protocol.Protocol
+	*protocol.Client
+	cluster    *cluster.Cluster
+	conn       *grpc.ClientConn
 	membership *Membership
 	watchers   []chan<- Membership
 	closer     context.CancelFunc
@@ -52,17 +57,16 @@ type Group struct {
 	mu         sync.RWMutex
 }
 
-// GetMap gets or creates a Map with the given name
-func (g *Group) GetMap(ctx context.Context, name string, opts ..._map.Option) (_map.Map, error) {
-	provider := &membershipGroupPeerProvider{g}
-	member := cluster.Member{
-		ID: cluster.MemberID(g.options.memberID),
+// Member returns the local group member
+func (g *Group) Member() *Member {
+	member := g.cluster.Member()
+	if member == nil {
+		return nil
 	}
-	peers, err := peer.NewGroup(member, provider)
-	if err != nil {
-		return nil, err
+	return &Member{
+		ID:     MemberID(member.ID),
+		Member: member,
 	}
-	return _map.NewGossipMap(ctx, peer.NewName(g.Namespace, g.Name, g.Scope, name), peers, opts...)
 }
 
 // Membership returns the current group membership
@@ -73,6 +77,19 @@ func (g *Group) Membership() Membership {
 		return *g.membership
 	}
 	return Membership{}
+}
+
+// GetMap gets or creates a Map with the given name
+func (g *Group) GetMap(ctx context.Context, name string, opts ..._map.Option) (_map.Map, error) {
+	if g.cluster.Member() == nil {
+		return nil, fmt.Errorf("cannot create peer-to-peer map: not a member of group %s", g.Name)
+	}
+	provider := &membershipGroupPeerProvider{g}
+	peers, err := peer.NewGroup(*g.cluster.Member(), provider)
+	if err != nil {
+		return nil, err
+	}
+	return _map.NewGossipMap(ctx, primitive.NewName(g.Namespace, g.Name, g.Scope, name), peers, opts...)
 }
 
 // Watch watches the membership for changes
@@ -113,10 +130,10 @@ func (g *Group) Watch(ctx context.Context, ch chan<- Membership) error {
 // join joins the membership group
 func (g *Group) join(ctx context.Context) error {
 	var memberID *membershipapi.MemberId
-	if g.options.memberID != "" {
+	if g.cluster.Member() != nil {
 		memberID = &membershipapi.MemberId{
-			Namespace: g.options.namespace,
-			Name:      g.options.memberID,
+			Namespace: g.cluster.Namespace,
+			Name:      string(g.cluster.Member().ID),
 		}
 	}
 
@@ -155,24 +172,27 @@ func (g *Group) join(ctx context.Context) error {
 			} else {
 				g.mu.Lock()
 
-				oldMembers := make(map[cluster.MemberID]*cluster.Member)
+				oldMembers := make(map[MemberID]*Member)
 				if g.membership != nil {
 					for _, member := range g.membership.Members {
 						oldMembers[member.ID] = member
 					}
 				}
 
-				newMembers := make([]*cluster.Member, 0, len(response.Group.Members))
+				newMembers := make([]*Member, 0, len(response.Group.Members))
 				for _, member := range response.Group.Members {
-					memberID := cluster.MemberID(member.ID.Name)
+					memberID := MemberID(member.ID.Name)
 					oldMember, ok := oldMembers[memberID]
 					if ok {
 						newMembers = append(newMembers, oldMember)
 					} else {
-						newMembers = append(newMembers, &cluster.Member{
-							ID:   memberID,
-							Host: member.Host,
-							Port: int(member.Port),
+						newMembers = append(newMembers, &Member{
+							ID: memberID,
+							Member: &cluster.Member{
+								ID:   cluster.MemberID(memberID),
+								Host: member.Host,
+								Port: int(member.Port),
+							},
 						})
 					}
 				}
@@ -207,30 +227,35 @@ func (g *Group) join(ctx context.Context) error {
 }
 
 // Close closes the membership group
-func (g *Group) Close() error {
+func (g *Group) Close(ctx context.Context) error {
 	g.mu.RLock()
 	closer := g.closer
 	leaveCh := g.leaveCh
 	g.mu.RUnlock()
 	if closer != nil {
 		closer()
-		timeout := 30 * time.Second
-		if g.options.joinTimeout != nil {
-			timeout = *g.options.joinTimeout
-		}
 		select {
 		case <-leaveCh:
 			return nil
-		case <-time.After(timeout):
+		case <-ctx.Done():
 			return errors.New("leave timed out")
 		}
 	}
 	return nil
 }
 
+// MemberID is a group member identifier
+type MemberID string
+
+// Member is a membership group member
+type Member struct {
+	ID MemberID
+	*cluster.Member
+}
+
 // Membership is a set of members
 type Membership struct {
-	Members []*cluster.Member
+	Members []*Member
 }
 
 // membershipGroupPeerProvider is a Provider for a Group
@@ -245,13 +270,14 @@ func (p *membershipGroupPeerProvider) Watch(ctx context.Context, ch chan<- peer.
 		return err
 	}
 	go func() {
+		localMember := p.group.Member()
 		for membership := range membershipCh {
 			peers := make([]peer.Peer, 0)
 			for _, member := range membership.Members {
-				if string(member.ID) != p.group.options.memberID {
+				if localMember == nil || member.ID != localMember.ID {
 					peers = append(peers, peer.Peer{
 						ID:     peer.ID(member.ID),
-						Member: member,
+						Member: member.Member,
 					})
 				}
 			}
