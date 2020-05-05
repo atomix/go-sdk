@@ -17,8 +17,8 @@ package test
 import (
 	"context"
 	"fmt"
-	"github.com/atomix/api/proto/atomix/controller"
-	"github.com/atomix/go-client/pkg/client/database/primitive"
+	"github.com/atomix/api/proto/atomix/database"
+	"github.com/atomix/go-client/pkg/client/database/partition"
 	netutil "github.com/atomix/go-client/pkg/client/util/net"
 	"github.com/atomix/go-framework/pkg/atomix/registry"
 	"github.com/atomix/go-local/pkg/atomix/local"
@@ -28,13 +28,13 @@ import (
 const basePort = 5000
 
 // StartTestPartitions starts the given number of local partitions and returns client connections for them
-func StartTestPartitions(numPartitions int) ([]primitive.Partition, []chan struct{}) {
-	partitions := make([]primitive.Partition, numPartitions)
+func StartTestPartitions(numPartitions int) ([]partition.Partition, []chan struct{}) {
+	partitions := make([]partition.Partition, numPartitions)
 	chans := make([]chan struct{}, numPartitions)
 	for i := 0; i < numPartitions; i++ {
 		partitionID := i + 1
 		address, ch := startTestPartition(partitionID)
-		partitions[i] = primitive.Partition{
+		partitions[i] = partition.Partition{
 			ID:      partitionID,
 			Address: address,
 		}
@@ -51,7 +51,7 @@ func startTestPartition(partitionID int) (netutil.Address, chan struct{}) {
 		if err != nil {
 			continue
 		}
-		node := local.NewNode(lis, registry.Registry, []*controller.PartitionId{{Partition: int32(partitionID)}})
+		node := local.NewNode(lis, registry.Registry, []database.PartitionId{{Partition: int32(partitionID)}})
 		node.Start()
 
 		ch := make(chan struct{})
@@ -65,10 +65,10 @@ func startTestPartition(partitionID int) (netutil.Address, chan struct{}) {
 }
 
 // OpenSessions opens sessions for the given partitions
-func OpenSessions(partitions []primitive.Partition, opts ...primitive.SessionOption) ([]*primitive.Session, error) {
-	sessions := make([]*primitive.Session, len(partitions))
-	for i, partition := range partitions {
-		session, err := primitive.NewSession(context.TODO(), partition, opts...)
+func OpenSessions(partitions []partition.Partition, opts ...partition.SessionOption) ([]*partition.Session, error) {
+	sessions := make([]*partition.Session, len(partitions))
+	for i, p := range partitions {
+		session, err := partition.NewSession(context.TODO(), p, opts...)
 		if err != nil {
 			return nil, err
 		}
@@ -78,7 +78,7 @@ func OpenSessions(partitions []primitive.Partition, opts ...primitive.SessionOpt
 }
 
 // CloseSessions closes the given sessions
-func CloseSessions(sessions []*primitive.Session) {
+func CloseSessions(sessions []*partition.Session) {
 	for _, session := range sessions {
 		_ = session.Close()
 	}

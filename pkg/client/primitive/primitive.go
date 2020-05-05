@@ -14,39 +14,7 @@
 
 package primitive
 
-import (
-	"context"
-	"fmt"
-)
-
-// Type is the type of a primitive
-type Type string
-
-// NewName returns a qualified primitive name with the given namespace, group, application, and name
-func NewName(namespace string, group string, scope string, name string) Name {
-	return Name{
-		Namespace: namespace,
-		Group:     group,
-		Scope:     scope,
-		Name:      name,
-	}
-}
-
-// Name is a qualified primitive name consisting of Namespace, Database, Application, and Name
-type Name struct {
-	// Namespace is the namespace within which the database is stored
-	Namespace string
-	// Group is the group in which the primitive is replicated
-	Group string
-	// Scope is the application scope in which the primitive is stored
-	Scope string
-	// Name is the simple name of the primitive
-	Name string
-}
-
-func (n Name) String() string {
-	return fmt.Sprintf("%s.%s.%s.%s", n.Namespace, n.Group, n.Scope, n.Name)
-}
+import "context"
 
 // Primitive is the base interface for primitives
 type Primitive interface {

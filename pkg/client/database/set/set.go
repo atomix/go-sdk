@@ -16,7 +16,8 @@ package set
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/client/database/primitive"
+	"github.com/atomix/go-client/pkg/client/database/partition"
+	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/util"
 	"sync"
 )
@@ -85,9 +86,9 @@ type Event struct {
 }
 
 // New creates a new partitioned set primitive
-func New(ctx context.Context, name primitive.Name, partitions []*primitive.Session) (Set, error) {
-	results, err := util.ExecuteOrderedAsync(len(partitions), func(i int) (interface{}, error) {
-		return newPartition(ctx, name, partitions[i])
+func New(ctx context.Context, name primitive.Name, sessions []*partition.Session) (Set, error) {
+	results, err := util.ExecuteOrderedAsync(len(sessions), func(i int) (interface{}, error) {
+		return newPartition(ctx, name, sessions[i])
 	})
 	if err != nil {
 		return nil, err

@@ -16,7 +16,8 @@ package election
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/client/database/primitive"
+	"github.com/atomix/go-client/pkg/client/database/partition"
+	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 	"testing"

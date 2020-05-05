@@ -15,7 +15,7 @@
 package log
 
 import (
-	api "github.com/atomix/api/proto/atomix/log"
+	api "github.com/atomix/api/proto/atomix/database/log"
 )
 
 // SetOption is an option for the Append method

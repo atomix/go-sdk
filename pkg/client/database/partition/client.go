@@ -12,56 +12,57 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package primitive
+package partition
 
 import (
 	"context"
-	"github.com/atomix/api/proto/atomix/headers"
+	"github.com/atomix/api/proto/atomix/database/headers"
+	"github.com/atomix/go-client/pkg/client/primitive"
 	"google.golang.org/grpc"
 )
 
-// NewInstance creates a new primitive instance
-func NewInstance(ctx context.Context, name Name, session *Session, handler Handler) (*Instance, error) {
-	instance := &Instance{
+// NewClient creates a new partition client
+func NewClient(ctx context.Context, name primitive.Name, session *Session, handler Handler) (*Client, error) {
+	client := &Client{
 		Name:    name,
 		Session: session,
 		handler: handler,
 	}
-	if err := instance.create(ctx); err != nil {
+	if err := client.create(ctx); err != nil {
 		return nil, err
 	}
-	return instance, nil
+	return client, nil
 }
 
-// Instance is a primitive instance
-type Instance struct {
-	Name    Name
+// Client is a database partition client
+type Client struct {
+	Name    primitive.Name
 	Session *Session
 	handler Handler
 }
 
 // DoCreate sends a create session request
-func (i *Instance) DoCreate(ctx context.Context, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
+func (i *Client) DoCreate(ctx context.Context, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
 	return i.Session.doCreate(ctx, i.Name, f)
 }
 
 // DoClose sends a session close request
-func (i *Instance) DoClose(ctx context.Context, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
+func (i *Client) DoClose(ctx context.Context, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
 	return i.Session.doClose(ctx, i.Name, f)
 }
 
 // DoQuery sends a session query request
-func (i *Instance) DoQuery(ctx context.Context, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) (interface{}, error) {
+func (i *Client) DoQuery(ctx context.Context, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) (interface{}, error) {
 	return i.Session.doQuery(ctx, i.Name, f)
 }
 
 // DoCommand sends a session command request
-func (i *Instance) DoCommand(ctx context.Context, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) (interface{}, error) {
+func (i *Client) DoCommand(ctx context.Context, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) (interface{}, error) {
 	return i.Session.doCommand(ctx, i.Name, f)
 }
 
 // DoQueryStream sends a session query stream request
-func (i *Instance) DoQueryStream(
+func (i *Client) DoQueryStream(
 	ctx context.Context,
 	f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error),
 	responseFunc func(interface{}) (*headers.ResponseHeader, interface{}, error)) (<-chan interface{}, error) {
@@ -69,7 +70,7 @@ func (i *Instance) DoQueryStream(
 }
 
 // DoCommandStream sends a session command stream request
-func (i *Instance) DoCommandStream(
+func (i *Client) DoCommandStream(
 	ctx context.Context,
 	f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error),
 	responseFunc func(interface{}) (*headers.ResponseHeader, interface{}, error)) (<-chan interface{}, error) {
@@ -77,16 +78,16 @@ func (i *Instance) DoCommandStream(
 }
 
 // create creates the instance
-func (i *Instance) create(ctx context.Context) error {
+func (i *Client) create(ctx context.Context) error {
 	return i.handler.Create(ctx, i)
 }
 
 // Close closes the instance
-func (i *Instance) Close(ctx context.Context) error {
+func (i *Client) Close(ctx context.Context) error {
 	return i.handler.Close(ctx, i)
 }
 
 // Delete deletes the instance
-func (i *Instance) Delete(ctx context.Context) error {
+func (i *Client) Delete(ctx context.Context) error {
 	return i.handler.Delete(ctx, i)
 }

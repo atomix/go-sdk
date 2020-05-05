@@ -17,7 +17,7 @@ package database
 import (
 	"context"
 	"fmt"
-	"github.com/atomix/api/proto/atomix/controller"
+	databaseapi "github.com/atomix/api/proto/atomix/database"
 	"github.com/atomix/go-client/pkg/client/database/counter"
 	"github.com/atomix/go-client/pkg/client/database/election"
 	"github.com/atomix/go-client/pkg/client/database/indexedmap"
@@ -26,15 +26,16 @@ import (
 	"github.com/atomix/go-client/pkg/client/database/lock"
 	"github.com/atomix/go-client/pkg/client/database/log"
 	"github.com/atomix/go-client/pkg/client/database/map"
-	"github.com/atomix/go-client/pkg/client/database/primitive"
+	"github.com/atomix/go-client/pkg/client/database/partition"
 	"github.com/atomix/go-client/pkg/client/database/set"
 	"github.com/atomix/go-client/pkg/client/database/value"
-	"github.com/atomix/go-client/pkg/client/util"
+	"github.com/atomix/go-client/pkg/client/primitive"
+	"github.com/atomix/go-client/pkg/client/protocol"
 	"github.com/atomix/go-client/pkg/client/util/net"
 	"sort"
 )
 
-func New(ctx context.Context, databaseProto *controller.Database, opts ...Option) (*Database, error) {
+func New(ctx context.Context, protocol *protocol.Protocol, databaseProto *databaseapi.Database, opts ...Option) (*Database, error) {
 	options := applyOptions(opts...)
 
 	// Ensure the partitions are sorted in case the controller sent them out of order.
@@ -44,19 +45,19 @@ func New(ctx context.Context, databaseProto *controller.Database, opts ...Option
 	})
 
 	// Iterate through the partitions and create gRPC client connections for each partition.
-	partitions := make([]primitive.Partition, len(databaseProto.Partitions))
+	partitions := make([]partition.Partition, len(databaseProto.Partitions))
 	for i, partitionProto := range partitionProtos {
 		ep := partitionProto.Endpoints[0]
-		partitions[i] = primitive.Partition{
+		partitions[i] = partition.Partition{
 			ID:      int(partitionProto.PartitionID),
 			Address: net.Address(fmt.Sprintf("%s:%d", ep.Host, ep.Port)),
 		}
 	}
 
 	// Iterate through partitions and open sessions
-	sessions := make([]*primitive.Session, len(partitions))
-	for i, partition := range partitions {
-		session, err := primitive.NewSession(ctx, partition, primitive.WithSessionTimeout(options.sessionTimeout))
+	sessions := make([]*partition.Session, len(partitions))
+	for i, p := range partitions {
+		session, err := partition.NewSession(ctx, p, partition.WithSessionTimeout(options.sessionTimeout))
 		if err != nil {
 			return nil, err
 		}
@@ -64,43 +65,17 @@ func New(ctx context.Context, databaseProto *controller.Database, opts ...Option
 	}
 
 	return &Database{
-		Namespace: databaseProto.ID.Namespace,
-		Name:      databaseProto.ID.Name,
-		scope:     options.scope,
-		sessions:  sessions,
+		Protocol: protocol,
+		sessions: sessions,
 	}, nil
 }
 
 // Database manages the primitives in a set of partitions
 type Database struct {
-	Namespace string
-	Name      string
+	*protocol.Protocol
 
 	scope    string
-	sessions []*primitive.Session
-}
-
-// GetPrimitives gets a list of primitives in the database
-func (d *Database) GetPrimitives(ctx context.Context, opts ...primitive.MetadataOption) ([]primitive.Metadata, error) {
-	dupPrimitives, err := util.ExecuteAsync(len(d.sessions), func(i int) (interface{}, error) {
-		return d.sessions[i].GetPrimitives(ctx, opts...)
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	dedupPrimitives := make(map[string]primitive.Metadata)
-	for _, partPrimitives := range dupPrimitives {
-		for _, partPrimitive := range partPrimitives.([]primitive.Metadata) {
-			dedupPrimitives[partPrimitive.Name.String()] = partPrimitive
-		}
-	}
-
-	primitives := make([]primitive.Metadata, 0, len(dedupPrimitives))
-	for _, primitive := range dedupPrimitives {
-		primitives = append(primitives, primitive)
-	}
-	return primitives, nil
+	sessions []*partition.Session
 }
 
 // GetCounter gets or creates a Counter with the given name
@@ -152,3 +127,14 @@ func (d *Database) GetSet(ctx context.Context, name string) (set.Set, error) {
 func (d *Database) GetValue(ctx context.Context, name string) (value.Value, error) {
 	return value.New(ctx, primitive.NewName(d.Namespace, d.Name, d.scope, name), d.sessions)
 }
+
+var _ counter.Client = &Database{}
+var _ election.Client = &Database{}
+var _ indexedmap.Client = &Database{}
+var _ leader.Client = &Database{}
+var _ list.Client = &Database{}
+var _ lock.Client = &Database{}
+var _ log.Client = &Database{}
+var _ _map.Client = &Database{}
+var _ set.Client = &Database{}
+var _ value.Client = &Database{}

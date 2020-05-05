@@ -15,7 +15,7 @@
 package value
 
 import (
-	api "github.com/atomix/api/proto/atomix/value"
+	api "github.com/atomix/api/proto/atomix/database/value"
 )
 
 // SetOption is an option for Set calls

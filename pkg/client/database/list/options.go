@@ -15,7 +15,7 @@
 package list
 
 import (
-	api "github.com/atomix/api/proto/atomix/list"
+	api "github.com/atomix/api/proto/atomix/database/list"
 )
 
 // WatchOption is an option for list Watch calls

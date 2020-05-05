@@ -16,7 +16,7 @@ package leader
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/client/database/primitive"
+	"github.com/atomix/go-client/pkg/client/database/partition"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -38,7 +38,7 @@ func TestLatchOperations(t *testing.T) {
 	assert.NoError(t, err)
 	defer test.CloseSessions(sessions3)
 
-	name := primitive.NewName("default", "test", "default", "test")
+	name := partition.NewName("default", "test", "default", "test")
 	latch1, err := New(context.TODO(), name, sessions1)
 	assert.NoError(t, err)
 	assert.NotNil(t, latch1)

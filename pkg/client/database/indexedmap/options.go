@@ -15,7 +15,7 @@
 package indexedmap
 
 import (
-	api "github.com/atomix/api/proto/atomix/indexedmap"
+	api "github.com/atomix/api/proto/atomix/database/indexedmap"
 )
 
 // SetOption is an option for the Put method

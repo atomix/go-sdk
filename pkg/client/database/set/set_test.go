@@ -16,7 +16,7 @@ package set
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/client/database/primitive"
+	"github.com/atomix/go-client/pkg/client/database/partition"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -30,7 +30,7 @@ func TestSetOperations(t *testing.T) {
 	assert.NoError(t, err)
 	defer test.CloseSessions(sessions)
 
-	name := primitive.NewName("default", "test", "default", "test")
+	name := partition.NewName("default", "test", "default", "test")
 	set, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 	assert.NotNil(t, set)

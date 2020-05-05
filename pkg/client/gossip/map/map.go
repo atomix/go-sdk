@@ -17,14 +17,14 @@ package _map
 import (
 	"context"
 	"fmt"
-	"github.com/atomix/api/proto/atomix/gossip_map"
-	"github.com/atomix/go-client/pkg/client/p2p/primitive"
+	mapapi "github.com/atomix/api/proto/atomix/gossip/map"
+	"github.com/atomix/go-client/pkg/client/primitive"
 	"google.golang.org/grpc"
 )
 
 func init() {
 	primitive.RegisterService(func(server *grpc.Server) {
-		gossip_map.RegisterGossipMapServiceServer(server, getManager())
+		mapapi.RegisterGossipMapServiceServer(server, getManager())
 	})
 }
 

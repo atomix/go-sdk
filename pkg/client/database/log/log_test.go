@@ -18,7 +18,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/atomix/go-client/pkg/client/database/primitive"
+	"github.com/atomix/go-client/pkg/client/database/partition"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 )
@@ -32,7 +32,7 @@ func TestLogOperations(t *testing.T) {
 	defer test.CloseSessions(sessions)
 
 	// Creates a new log primitive
-	name := primitive.NewName("default", "test", "default", "test")
+	name := partition.NewName("default", "test", "default", "test")
 	log, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
@@ -128,7 +128,7 @@ func TestLogStreams(t *testing.T) {
 	defer test.CloseSessions(sessions)
 
 	// Creates a new log primitive
-	name := primitive.NewName("default", "test", "default", "test")
+	name := partition.NewName("default", "test", "default", "test")
 	log, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 

@@ -12,22 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package primitive
+package peer
 
 import (
 	"context"
 	"github.com/atomix/go-client/pkg/client/cluster"
+	"github.com/google/uuid"
 	"sync"
 )
 
-// NewPeerGroup creates a new peer group
-func NewPeerGroup(provider PeerProvider) (*PeerGroup, error) {
-	group := &PeerGroup{
-		peersByID: make(map[PeerID]*Peer),
+// NewGroup creates a new peer group
+func NewGroup(member cluster.Member, provider Provider) (*Group, error) {
+	group := &Group{
+		Member:    member,
+		peersByID: make(map[ID]*Peer),
 		peers:     make([]*Peer, 0),
-		watchers:  make([]chan<- PeerGroup, 0),
+		watchers:  make(map[string]chan<- Group),
 	}
-	ch := make(chan PeerSet)
+	ch := make(chan Set)
 	err := provider.Watch(context.Background(), ch)
 	if err != nil {
 		return nil, err
@@ -40,44 +42,49 @@ func NewPeerGroup(provider PeerProvider) (*PeerGroup, error) {
 	return group, nil
 }
 
-// PeerProvider is a peer provider for peer groups
-type PeerProvider interface {
-	Watch(context.Context, chan<- PeerSet) error
+// ID is a peer identifier
+type ID string
+
+// Peer is a peer
+type Peer struct {
+	ID ID
+	*cluster.Member
 }
 
-// PeerSet is the set of peers in a group
-type PeerSet []Peer
+// Set is the set of peers in a group
+type Set []Peer
 
-// PeerGroup is a primitive peer group
-type PeerGroup struct {
-	peersByID map[PeerID]*Peer
+// Group is a primitive peer group
+type Group struct {
+	Member    cluster.Member
+	peersByID map[ID]*Peer
 	peers     []*Peer
-	watchers  []chan<- PeerGroup
+	watchers  map[string]chan<- Group
 	mu        sync.RWMutex
 }
 
 // Peers returns the set of peers in the group
-func (g *PeerGroup) Peers() []*Peer {
+func (g *Group) Peers() []*Peer {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	return g.peers
 }
 
 // Peer returns a peer by ID
-func (g *PeerGroup) Peer(id PeerID) *Peer {
+func (g *Group) Peer(id ID) *Peer {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	return g.peersByID[id]
 }
 
 // update updates the peers in the peer group
-func (g *PeerGroup) update(peers PeerSet) {
+func (g *Group) update(peers Set) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
 	oldPeers := g.peersByID
 	newPeers := make([]*Peer, 0)
-	newPeersByID := make(map[PeerID]*Peer)
+	newPeersByID := make(map[ID]*Peer)
 	for _, newPeer := range peers {
 		peer, ok := oldPeers[newPeer.ID]
 		if !ok {
@@ -91,15 +98,21 @@ func (g *PeerGroup) update(peers PeerSet) {
 }
 
 // watch watches the peers in the group
-func (g *PeerGroup) Watch(ctx context.Context, ch chan<- PeerGroup) error {
-
+func (g *Group) Watch(ctx context.Context, ch chan<- Group) error {
+	id := uuid.New().String()
+	g.mu.Lock()
+	g.watchers[id] = ch
+	g.mu.Unlock()
+	go func() {
+		<-ctx.Done()
+		g.mu.Lock()
+		delete(g.watchers, id)
+		g.mu.Unlock()
+	}()
+	return nil
 }
 
-// PeerID is a peer identifier
-type PeerID string
-
-// Peer is a peer
-type Peer struct {
-	ID PeerID
-	*cluster.Member
+// Provider is a peer provider for peer groups
+type Provider interface {
+	Watch(context.Context, chan<- Set) error
 }

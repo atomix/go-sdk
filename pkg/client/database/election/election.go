@@ -16,9 +16,10 @@ package election
 
 import (
 	"context"
-	api "github.com/atomix/api/proto/atomix/election"
-	"github.com/atomix/api/proto/atomix/headers"
-	"github.com/atomix/go-client/pkg/client/database/primitive"
+	api "github.com/atomix/api/proto/atomix/database/election"
+	"github.com/atomix/api/proto/atomix/database/headers"
+	"github.com/atomix/go-client/pkg/client/database/partition"
+	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/util"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
@@ -131,7 +132,7 @@ type Event struct {
 }
 
 // New creates a new election primitive
-func New(ctx context.Context, name primitive.Name, partitions []*primitive.Session, opts ...Option) (Election, error) {
+func New(ctx context.Context, name primitive.Name, partitions []*partition.Session, opts ...Option) (Election, error) {
 	options := &options{
 		id: uuid.New().String(),
 	}
@@ -144,23 +145,23 @@ func New(ctx context.Context, name primitive.Name, partitions []*primitive.Sessi
 		return nil, err
 	}
 
-	instance, err := primitive.NewInstance(ctx, name, partitions[i], &primitiveHandler{})
+	client, err := partition.NewClient(ctx, name, partitions[i], &primitiveHandler{})
 	if err != nil {
 		return nil, err
 	}
 
 	return &election{
-		id:       options.id,
-		name:     name,
-		instance: instance,
+		id:     options.id,
+		name:   name,
+		client: client,
 	}, nil
 }
 
 // election is the default single-partition implementation of Election
 type election struct {
-	id       string
-	name     primitive.Name
-	instance *primitive.Instance
+	id     string
+	name   primitive.Name
+	client *partition.Client
 }
 
 func (e *election) Name() primitive.Name {
@@ -172,7 +173,7 @@ func (e *election) ID() string {
 }
 
 func (e *election) GetTerm(ctx context.Context) (*Term, error) {
-	response, err := e.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := e.client.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLeaderElectionServiceClient(conn)
 		request := &api.GetTermRequest{
 			Header: header,
@@ -190,7 +191,7 @@ func (e *election) GetTerm(ctx context.Context) (*Term, error) {
 }
 
 func (e *election) Enter(ctx context.Context) (*Term, error) {
-	response, err := e.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := e.client.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLeaderElectionServiceClient(conn)
 		request := &api.EnterRequest{
 			Header:      header,
@@ -209,7 +210,7 @@ func (e *election) Enter(ctx context.Context) (*Term, error) {
 }
 
 func (e *election) Leave(ctx context.Context) (*Term, error) {
-	response, err := e.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := e.client.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLeaderElectionServiceClient(conn)
 		request := &api.WithdrawRequest{
 			Header:      header,
@@ -228,7 +229,7 @@ func (e *election) Leave(ctx context.Context) (*Term, error) {
 }
 
 func (e *election) Anoint(ctx context.Context, id string) (*Term, error) {
-	response, err := e.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := e.client.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLeaderElectionServiceClient(conn)
 		request := &api.AnointRequest{
 			Header:      header,
@@ -247,7 +248,7 @@ func (e *election) Anoint(ctx context.Context, id string) (*Term, error) {
 }
 
 func (e *election) Promote(ctx context.Context, id string) (*Term, error) {
-	response, err := e.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := e.client.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLeaderElectionServiceClient(conn)
 		request := &api.PromoteRequest{
 			Header:      header,
@@ -266,7 +267,7 @@ func (e *election) Promote(ctx context.Context, id string) (*Term, error) {
 }
 
 func (e *election) Evict(ctx context.Context, id string) (*Term, error) {
-	response, err := e.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := e.client.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLeaderElectionServiceClient(conn)
 		request := &api.EvictRequest{
 			Header:      header,
@@ -285,7 +286,7 @@ func (e *election) Evict(ctx context.Context, id string) (*Term, error) {
 }
 
 func (e *election) Watch(ctx context.Context, ch chan<- *Event) error {
-	stream, err := e.instance.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
+	stream, err := e.client.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
 		client := api.NewLeaderElectionServiceClient(conn)
 		request := &api.EventRequest{
 			Header: header,
@@ -316,9 +317,9 @@ func (e *election) Watch(ctx context.Context, ch chan<- *Event) error {
 }
 
 func (e *election) Close(ctx context.Context) error {
-	return e.instance.Close(ctx)
+	return e.client.Close(ctx)
 }
 
 func (e *election) Delete(ctx context.Context) error {
-	return e.instance.Delete(ctx)
+	return e.client.Delete(ctx)
 }

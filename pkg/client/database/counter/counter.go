@@ -16,9 +16,10 @@ package counter
 
 import (
 	"context"
-	api "github.com/atomix/api/proto/atomix/counter"
-	"github.com/atomix/api/proto/atomix/headers"
-	"github.com/atomix/go-client/pkg/client/database/primitive"
+	api "github.com/atomix/api/proto/atomix/database/counter"
+	"github.com/atomix/api/proto/atomix/database/headers"
+	"github.com/atomix/go-client/pkg/client/database/partition"
+	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/util"
 	"google.golang.org/grpc"
 )
@@ -50,27 +51,27 @@ type Counter interface {
 }
 
 // New creates a new counter for the given partitions
-func New(ctx context.Context, name primitive.Name, partitions []*primitive.Session) (Counter, error) {
+func New(ctx context.Context, name primitive.Name, partitions []*partition.Session) (Counter, error) {
 	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
 		return nil, err
 	}
 
-	instance, err := primitive.NewInstance(ctx, name, partitions[i], &primitiveHandler{})
+	client, err := partition.NewClient(ctx, name, partitions[i], &primitiveHandler{})
 	if err != nil {
 		return nil, err
 	}
 
 	return &counter{
-		name:     name,
-		instance: instance,
+		name:   name,
+		client: client,
 	}, nil
 }
 
 // counter is the single partition implementation of Counter
 type counter struct {
-	name     primitive.Name
-	instance *primitive.Instance
+	name   primitive.Name
+	client *partition.Client
 }
 
 func (c *counter) Name() primitive.Name {
@@ -78,7 +79,7 @@ func (c *counter) Name() primitive.Name {
 }
 
 func (c *counter) Get(ctx context.Context) (int64, error) {
-	response, err := c.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := c.client.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewCounterServiceClient(conn)
 		request := &api.GetRequest{
 			Header: header,
@@ -96,7 +97,7 @@ func (c *counter) Get(ctx context.Context) (int64, error) {
 }
 
 func (c *counter) Set(ctx context.Context, value int64) error {
-	_, err := c.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	_, err := c.client.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewCounterServiceClient(conn)
 		request := &api.SetRequest{
 			Header: header,
@@ -112,7 +113,7 @@ func (c *counter) Set(ctx context.Context, value int64) error {
 }
 
 func (c *counter) Increment(ctx context.Context, delta int64) (int64, error) {
-	response, err := c.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := c.client.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewCounterServiceClient(conn)
 		request := &api.IncrementRequest{
 			Header: header,
@@ -131,7 +132,7 @@ func (c *counter) Increment(ctx context.Context, delta int64) (int64, error) {
 }
 
 func (c *counter) Decrement(ctx context.Context, delta int64) (int64, error) {
-	response, err := c.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := c.client.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewCounterServiceClient(conn)
 		request := &api.DecrementRequest{
 			Header: header,
@@ -150,9 +151,9 @@ func (c *counter) Decrement(ctx context.Context, delta int64) (int64, error) {
 }
 
 func (c *counter) Close(ctx context.Context) error {
-	return c.instance.Close(ctx)
+	return c.client.Close(ctx)
 }
 
 func (c *counter) Delete(ctx context.Context) error {
-	return c.instance.Delete(ctx)
+	return c.client.Delete(ctx)
 }

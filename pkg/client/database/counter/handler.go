@@ -16,15 +16,15 @@ package counter
 
 import (
 	"context"
-	api "github.com/atomix/api/proto/atomix/counter"
-	"github.com/atomix/api/proto/atomix/headers"
-	"github.com/atomix/go-client/pkg/client/database/primitive"
+	api "github.com/atomix/api/proto/atomix/database/counter"
+	"github.com/atomix/api/proto/atomix/database/headers"
+	"github.com/atomix/go-client/pkg/client/database/partition"
 	"google.golang.org/grpc"
 )
 
 type primitiveHandler struct{}
 
-func (m *primitiveHandler) Create(ctx context.Context, s *primitive.Instance) error {
+func (m *primitiveHandler) Create(ctx context.Context, s *partition.Client) error {
 	return s.DoCreate(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		request := &api.CreateRequest{
 			Header: header,
@@ -38,11 +38,11 @@ func (m *primitiveHandler) Create(ctx context.Context, s *primitive.Instance) er
 	})
 }
 
-func (m *primitiveHandler) KeepAlive(ctx context.Context, s *primitive.Instance) error {
+func (m *primitiveHandler) KeepAlive(ctx context.Context, s *partition.Client) error {
 	return nil
 }
 
-func (m *primitiveHandler) Close(ctx context.Context, s *primitive.Instance) error {
+func (m *primitiveHandler) Close(ctx context.Context, s *partition.Client) error {
 	return s.DoClose(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		request := &api.CloseRequest{
 			Header: header,
@@ -56,7 +56,7 @@ func (m *primitiveHandler) Close(ctx context.Context, s *primitive.Instance) err
 	})
 }
 
-func (m *primitiveHandler) Delete(ctx context.Context, s *primitive.Instance) error {
+func (m *primitiveHandler) Delete(ctx context.Context, s *partition.Client) error {
 	return s.DoClose(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		request := &api.CloseRequest{
 			Header: header,

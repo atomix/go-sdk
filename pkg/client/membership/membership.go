@@ -12,59 +12,39 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package group
+package membership
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	controllerapi "github.com/atomix/api/proto/atomix/controller"
+	membershipapi "github.com/atomix/api/proto/atomix/membership"
 	"github.com/atomix/go-client/pkg/client/cluster"
-	"github.com/atomix/go-client/pkg/client/p2p/map"
-	"github.com/atomix/go-client/pkg/client/p2p/primitive"
-	"google.golang.org/grpc"
+	"github.com/atomix/go-client/pkg/client/gossip/map"
+	"github.com/atomix/go-client/pkg/client/gossip/peer"
+	"github.com/atomix/go-client/pkg/client/protocol"
 	"io"
 	"sync"
 	"time"
 )
 
-// NewMembershipGroup creates a new MembershipGroup
-func NewMembershipGroup(name string, address string, opts ...MembershipGroupOption) (*MembershipGroup, error) {
-	options := applyOptions(opts...)
-
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
-	if err != nil {
-		return nil, err
+// NewGroup creates a new Group
+func NewGroup(ctx context.Context, protocol *protocol.Protocol, opts ...Option) (*Group, error) {
+	group := &Group{
+		Protocol: protocol,
+		watchers: make([]chan<- Membership, 0),
 	}
 
-	group := &MembershipGroup{
-		Namespace: options.namespace,
-		Name:      name,
-		conn:      conn,
-		options:   options,
-		watchers:  make([]chan<- Membership, 0),
-	}
-
-	if options.joinTimeout != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), *options.joinTimeout)
-		err = group.join(ctx)
-		cancel()
-	} else {
-		err = group.join(context.Background())
-	}
-
+	err := group.join(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return group, nil
 }
 
-// MembershipGroup manages the primitives in a membership group
-type MembershipGroup struct {
-	conn       *grpc.ClientConn
-	options    groupOptions
-	Namespace  string
-	Name       string
+// Group manages the primitives in a membership group
+type Group struct {
+	*protocol.Protocol
 	membership *Membership
 	watchers   []chan<- Membership
 	closer     context.CancelFunc
@@ -73,17 +53,20 @@ type MembershipGroup struct {
 }
 
 // GetMap gets or creates a Map with the given name
-func (g *MembershipGroup) GetMap(ctx context.Context, name string, opts ..._map.Option) (_map.Map, error) {
+func (g *Group) GetMap(ctx context.Context, name string, opts ..._map.Option) (_map.Map, error) {
 	provider := &membershipGroupPeerProvider{g}
-	peers, err := primitive.NewPeerGroup(provider)
+	member := cluster.Member{
+		ID: cluster.MemberID(g.options.memberID),
+	}
+	peers, err := peer.NewGroup(member, provider)
 	if err != nil {
 		return nil, err
 	}
-	return _map.NewGossipMap(ctx, primitive.NewName(g.Namespace, g.Name, g.options.scope, name), peers, opts...)
+	return _map.NewGossipMap(ctx, peer.NewName(g.Namespace, g.Name, g.Scope, name), peers, opts...)
 }
 
 // Membership returns the current group membership
-func (g *MembershipGroup) Membership() Membership {
+func (g *Group) Membership() Membership {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	if g.membership != nil {
@@ -93,7 +76,7 @@ func (g *MembershipGroup) Membership() Membership {
 }
 
 // Watch watches the membership for changes
-func (g *MembershipGroup) Watch(ctx context.Context, ch chan<- Membership) error {
+func (g *Group) Watch(ctx context.Context, ch chan<- Membership) error {
 	g.mu.Lock()
 	watcher := make(chan Membership)
 	membership := g.membership
@@ -128,19 +111,19 @@ func (g *MembershipGroup) Watch(ctx context.Context, ch chan<- Membership) error
 }
 
 // join joins the membership group
-func (g *MembershipGroup) join(ctx context.Context) error {
-	var memberID *controllerapi.MemberId
+func (g *Group) join(ctx context.Context) error {
+	var memberID *membershipapi.MemberId
 	if g.options.memberID != "" {
-		memberID = &controllerapi.MemberId{
+		memberID = &membershipapi.MemberId{
 			Namespace: g.options.namespace,
 			Name:      g.options.memberID,
 		}
 	}
 
-	client := controllerapi.NewMembershipGroupServiceClient(g.conn)
-	request := &controllerapi.JoinMembershipGroupRequest{
+	client := membershipapi.NewMembershipServiceClient(g.conn)
+	request := &membershipapi.JoinMembershipGroupRequest{
 		MemberID: memberID,
-		GroupID: controllerapi.MembershipGroupId{
+		GroupID: membershipapi.MembershipGroupId{
 			Namespace: g.Namespace,
 			Name:      g.Name,
 		},
@@ -194,16 +177,8 @@ func (g *MembershipGroup) join(ctx context.Context) error {
 					}
 				}
 
-				var leadership *Leadership
-				if response.Group.Leader != nil {
-					leadership = &Leadership{
-						Leader: cluster.MemberID(response.Group.Leader.Name),
-						Term:   TermID(response.Group.Term),
-					}
-				}
 				membership := Membership{
-					Leadership: leadership,
-					Members:    newMembers,
+					Members: newMembers,
 				}
 
 				g.membership = &membership
@@ -232,7 +207,7 @@ func (g *MembershipGroup) join(ctx context.Context) error {
 }
 
 // Close closes the membership group
-func (g *MembershipGroup) Close() error {
+func (g *Group) Close() error {
 	g.mu.RLock()
 	closer := g.closer
 	leaveCh := g.leaveCh
@@ -255,25 +230,15 @@ func (g *MembershipGroup) Close() error {
 
 // Membership is a set of members
 type Membership struct {
-	Leadership *Leadership
-	Members    []*cluster.Member
+	Members []*cluster.Member
 }
 
-// TermID is a leadership term
-type TermID uint64
-
-// Leadership is a group leadership
-type Leadership struct {
-	Leader cluster.MemberID
-	Term   TermID
-}
-
-// membershipGroupPeerProvider is a PeerProvider for a MembershipGroup
+// membershipGroupPeerProvider is a Provider for a Group
 type membershipGroupPeerProvider struct {
-	group *MembershipGroup
+	group *Group
 }
 
-func (p *membershipGroupPeerProvider) Watch(ctx context.Context, ch chan<- primitive.PeerSet) error {
+func (p *membershipGroupPeerProvider) Watch(ctx context.Context, ch chan<- peer.Set) error {
 	membershipCh := make(chan Membership)
 	err := p.group.Watch(ctx, membershipCh)
 	if err != nil {
@@ -281,11 +246,11 @@ func (p *membershipGroupPeerProvider) Watch(ctx context.Context, ch chan<- primi
 	}
 	go func() {
 		for membership := range membershipCh {
-			peers := make([]primitive.Peer, 0)
+			peers := make([]peer.Peer, 0)
 			for _, member := range membership.Members {
 				if string(member.ID) != p.group.options.memberID {
-					peers = append(peers, primitive.Peer{
-						ID:     primitive.PeerID(member.ID),
+					peers = append(peers, peer.Peer{
+						ID:     peer.ID(member.ID),
 						Member: member,
 					})
 				}
@@ -296,4 +261,4 @@ func (p *membershipGroupPeerProvider) Watch(ctx context.Context, ch chan<- primi
 	return nil
 }
 
-var _ primitive.PeerProvider = &membershipGroupPeerProvider{}
+var _ peer.Provider = &membershipGroupPeerProvider{}

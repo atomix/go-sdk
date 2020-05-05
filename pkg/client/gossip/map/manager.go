@@ -15,8 +15,8 @@
 package _map
 
 import (
-	"github.com/atomix/api/proto/atomix/gossip_map"
-	"github.com/atomix/go-client/pkg/client/p2p/primitive"
+	mapapi "github.com/atomix/api/proto/atomix/gossip/map"
+	"github.com/atomix/go-client/pkg/client/primitive"
 	"io"
 	"sync"
 )
@@ -34,7 +34,7 @@ func getManager() *gossipMapManager {
 }
 
 // gossipMapHandler handles gossip map streams
-type gossipMapHandler func(*gossip_map.Message, gossip_map.GossipMapService_ConnectServer) error
+type gossipMapHandler func(*mapapi.Message, mapapi.GossipMapService_ConnectServer) error
 
 // gossipMapManager manages gossip map streams
 type gossipMapManager struct {
@@ -45,15 +45,15 @@ type gossipMapManager struct {
 func (s *gossipMapManager) register(name primitive.Name, handler gossipMapHandler) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	instances, ok := s.instances[name.Group]
+	instances, ok := s.instances[name.Protocol]
 	if !ok {
 		instances = make(map[string]gossipMapHandler)
-		s.instances[name.Group] = instances
+		s.instances[name.Protocol] = instances
 	}
 	instances[name.Name] = handler
 }
 
-func (s *gossipMapManager) Connect(stream gossip_map.GossipMapService_ConnectServer) error {
+func (s *gossipMapManager) Connect(stream mapapi.GossipMapService_ConnectServer) error {
 	for {
 		request, err := stream.Recv()
 		if err != nil {
@@ -64,7 +64,7 @@ func (s *gossipMapManager) Connect(stream gossip_map.GossipMapService_ConnectSer
 		}
 
 		s.mu.RLock()
-		instances, ok := s.instances[request.Target.Namespace]
+		instances, ok := s.instances[request.Header.Namespace]
 		if ok {
 			handler, ok := instances[request.Target.Name]
 			s.mu.RUnlock()

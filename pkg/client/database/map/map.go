@@ -17,7 +17,8 @@ package _map //nolint:golint
 import (
 	"context"
 	"fmt"
-	"github.com/atomix/go-client/pkg/client/database/primitive"
+	"github.com/atomix/go-client/pkg/client/database/partition"
+	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/util"
 	"math"
 	"sync"
@@ -113,7 +114,7 @@ type Event struct {
 }
 
 // New creates a new partitioned Map
-func New(ctx context.Context, name primitive.Name, sessions []*primitive.Session, opts ...Option) (Map, error) {
+func New(ctx context.Context, name primitive.Name, sessions []*partition.Session, opts ...Option) (Map, error) {
 	options := &options{}
 	for _, opt := range opts {
 		opt.apply(options)

@@ -17,7 +17,7 @@ package list
 import (
 	"context"
 	"errors"
-	"github.com/atomix/go-client/pkg/client/database/primitive"
+	"github.com/atomix/go-client/pkg/client/database/partition"
 )
 
 // slicedList is a slice of a list
@@ -27,7 +27,7 @@ type slicedList struct {
 	list List
 }
 
-func (l *slicedList) Name() primitive.Name {
+func (l *slicedList) Name() partition.Name {
 	return l.list.Name()
 }
 

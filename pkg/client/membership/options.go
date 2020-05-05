@@ -12,20 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package value
+package membership
 
-import (
-	api "github.com/atomix/api/proto/atomix/database/value"
-	"github.com/stretchr/testify/assert"
-	"testing"
-)
+type options struct{}
 
-func TestOptions(t *testing.T) {
-	request := &api.SetRequest{}
-	assert.Nil(t, request.ExpectValue)
-	assert.Equal(t, uint64(0), request.ExpectVersion)
-	IfValue([]byte("foo")).beforeSet(request)
-	IfVersion(uint64(1)).beforeSet(request)
-	assert.Equal(t, "foo", string(request.ExpectValue))
-	assert.Equal(t, uint64(1), request.ExpectVersion)
+// Option provides a group option
+type Option interface {
+	apply(options *options)
 }

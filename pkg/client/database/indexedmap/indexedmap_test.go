@@ -18,7 +18,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/atomix/go-client/pkg/client/database/primitive"
+	"github.com/atomix/go-client/pkg/client/database/partition"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 )
@@ -31,7 +31,7 @@ func TestIndexedMapOperations(t *testing.T) {
 	assert.NoError(t, err)
 	defer test.CloseSessions(sessions)
 
-	name := primitive.NewName("default", "test", "default", "test")
+	name := partition.NewName("default", "test", "default", "test")
 	_map, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 
@@ -189,7 +189,7 @@ func TestIndexedMapStreams(t *testing.T) {
 	assert.NoError(t, err)
 	defer test.CloseSessions(sessions)
 
-	name := primitive.NewName("default", "test", "default", "test")
+	name := partition.NewName("default", "test", "default", "test")
 	_map, err := New(context.TODO(), name, sessions)
 	assert.NoError(t, err)
 

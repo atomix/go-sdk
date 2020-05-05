@@ -17,9 +17,10 @@ package leader
 import (
 	"context"
 	"errors"
-	"github.com/atomix/api/proto/atomix/headers"
-	api "github.com/atomix/api/proto/atomix/leader"
-	"github.com/atomix/go-client/pkg/client/database/primitive"
+	"github.com/atomix/api/proto/atomix/database/headers"
+	api "github.com/atomix/api/proto/atomix/database/leader"
+	"github.com/atomix/go-client/pkg/client/database/partition"
+	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/util"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
@@ -56,8 +57,8 @@ const Type primitive.Type = "LeaderLatch"
 
 // Client provides an API for creating Latches
 type Client interface {
-	// GetLatch gets the Latch instance of the given name
-	GetLatch(ctx context.Context, name string, opts ...Option) (Latch, error)
+	// GetLeaderLatch gets the Latch instance of the given name
+	GetLeaderLatch(ctx context.Context, name string, opts ...Option) (Latch, error)
 }
 
 // Latch provides distributed leader latch
@@ -123,7 +124,7 @@ type Event struct {
 }
 
 // New creates a new latch primitive
-func New(ctx context.Context, name primitive.Name, partitions []*primitive.Session, opts ...Option) (Latch, error) {
+func New(ctx context.Context, name primitive.Name, partitions []*partition.Session, opts ...Option) (Latch, error) {
 	options := &options{
 		id: uuid.New().String(),
 	}
@@ -136,23 +137,23 @@ func New(ctx context.Context, name primitive.Name, partitions []*primitive.Sessi
 		return nil, err
 	}
 
-	instance, err := primitive.NewInstance(ctx, name, partitions[i], &primitiveHandler{})
+	client, err := partition.NewClient(ctx, name, partitions[i], &primitiveHandler{})
 	if err != nil {
 		return nil, err
 	}
 
 	return &latch{
-		id:       options.id,
-		name:     name,
-		instance: instance,
+		id:     options.id,
+		name:   name,
+		client: client,
 	}, nil
 }
 
 // latch is the default single-partition implementation of Latch
 type latch struct {
-	id       string
-	name     primitive.Name
-	instance *primitive.Instance
+	id     string
+	name   primitive.Name
+	client *partition.Client
 }
 
 func (l *latch) Name() primitive.Name {
@@ -164,7 +165,7 @@ func (l *latch) ID() string {
 }
 
 func (l *latch) Get(ctx context.Context) (*Leadership, error) {
-	response, err := l.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := l.client.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLeaderLatchServiceClient(conn)
 		request := &api.GetRequest{
 			Header: header,
@@ -182,7 +183,7 @@ func (l *latch) Get(ctx context.Context) (*Leadership, error) {
 }
 
 func (l *latch) Join(ctx context.Context) (*Leadership, error) {
-	response, err := l.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := l.client.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLeaderLatchServiceClient(conn)
 		request := &api.LatchRequest{
 			Header:        header,
@@ -222,7 +223,7 @@ func (l *latch) Latch(ctx context.Context) (*Leadership, error) {
 }
 
 func (l *latch) Watch(ctx context.Context, ch chan<- *Event) error {
-	stream, err := l.instance.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
+	stream, err := l.client.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
 		client := api.NewLeaderLatchServiceClient(conn)
 		request := &api.EventRequest{
 			Header: header,
@@ -253,9 +254,9 @@ func (l *latch) Watch(ctx context.Context, ch chan<- *Event) error {
 }
 
 func (l *latch) Close(ctx context.Context) error {
-	return l.instance.Close(ctx)
+	return l.client.Close(ctx)
 }
 
 func (l *latch) Delete(ctx context.Context) error {
-	return l.instance.Delete(ctx)
+	return l.client.Delete(ctx)
 }

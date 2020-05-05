@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package primitive
+package partition
 
 import (
 	"context"
 	"errors"
-	"github.com/atomix/api/proto/atomix/headers"
-	"github.com/atomix/api/proto/atomix/metadata"
+	"github.com/atomix/api/proto/atomix/database/headers"
+	api "github.com/atomix/api/proto/atomix/database/session"
 	primitiveapi "github.com/atomix/api/proto/atomix/primitive"
-	api "github.com/atomix/api/proto/atomix/session"
+	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/util/net"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
@@ -50,46 +50,6 @@ func (o sessionTimeoutOption) prepare(options *sessionOptions) {
 type sessionOptions struct {
 	id      string
 	timeout time.Duration
-}
-
-// MetadataOption implements a session metadata option
-type MetadataOption interface {
-	apply(options *metadataOptions)
-}
-
-// WithNamespace returns a metadata option limiting a query by namespace
-func WithNamespace(namespace string) MetadataOption {
-	return &metadataNamespaceOption{
-		namespace: namespace,
-	}
-}
-
-type metadataNamespaceOption struct {
-	namespace string
-}
-
-func (o *metadataNamespaceOption) apply(options *metadataOptions) {
-	options.namespace = o.namespace
-}
-
-// WithPrimitiveType returns a metadata option limiting a query by primitive type
-func WithPrimitiveType(primitiveType Type) MetadataOption {
-	return &metadataPrimitiveTypeOption{
-		primitiveType: primitiveType,
-	}
-}
-
-type metadataPrimitiveTypeOption struct {
-	primitiveType Type
-}
-
-func (o *metadataPrimitiveTypeOption) apply(options *metadataOptions) {
-	options.primitiveType = o.primitiveType
-}
-
-type metadataOptions struct {
-	namespace     string
-	primitiveType Type
 }
 
 // NewSession creates a new Session for the given partition
@@ -194,19 +154,19 @@ func (s *Session) close(ctx context.Context) error {
 	})
 }
 
-func getName(name Name) *primitiveapi.Name {
-	return &primitiveapi.Name{
+func getPrimitiveId(name primitive.Name) *primitiveapi.PrimitiveId {
+	return &primitiveapi.PrimitiveId{
 		Name:      name.Name,
 		Namespace: name.Namespace,
 	}
 }
 
 // getState gets the header for the current state of the session
-func (s *Session) getState(name *primitiveapi.Name) *headers.RequestHeader {
+func (s *Session) getState(primitive *primitiveapi.PrimitiveId) *headers.RequestHeader {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return &headers.RequestHeader{
-		Name:      name,
+		Primitive: primitive,
 		Partition: int32(s.Partition),
 		SessionID: s.SessionID,
 		Index:     s.lastIndex,
@@ -216,11 +176,11 @@ func (s *Session) getState(name *primitiveapi.Name) *headers.RequestHeader {
 }
 
 // getQueryHeader gets the current read header
-func (s *Session) getQueryHeader(name *primitiveapi.Name) *headers.RequestHeader {
+func (s *Session) getQueryHeader(primitive *primitiveapi.PrimitiveId) *headers.RequestHeader {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return &headers.RequestHeader{
-		Name:      name,
+		Primitive: primitive,
 		Partition: int32(s.Partition),
 		SessionID: s.SessionID,
 		Index:     s.lastIndex,
@@ -229,12 +189,12 @@ func (s *Session) getQueryHeader(name *primitiveapi.Name) *headers.RequestHeader
 }
 
 // nextCommandHeader returns the next write header
-func (s *Session) nextCommandHeader(name *primitiveapi.Name) *headers.RequestHeader {
+func (s *Session) nextCommandHeader(primitive *primitiveapi.PrimitiveId) *headers.RequestHeader {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.requestID = s.requestID + 1
 	header := &headers.RequestHeader{
-		Name:      name,
+		Primitive: primitive,
 		Partition: int32(s.Partition),
 		SessionID: s.SessionID,
 		Index:     s.lastIndex,
@@ -244,7 +204,7 @@ func (s *Session) nextCommandHeader(name *primitiveapi.Name) *headers.RequestHea
 }
 
 // nextStreamHeader returns the next write stream and header
-func (s *Session) nextStreamHeader(name *primitiveapi.Name) (*Stream, *headers.RequestHeader) {
+func (s *Session) nextStreamHeader(primitive *primitiveapi.PrimitiveId) (*Stream, *headers.RequestHeader) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.requestID = s.requestID + 1
@@ -254,7 +214,7 @@ func (s *Session) nextStreamHeader(name *primitiveapi.Name) (*Stream, *headers.R
 	}
 	s.streams[s.requestID] = stream
 	header := &headers.RequestHeader{
-		Name:      name,
+		Primitive: primitive,
 		Partition: int32(s.Partition),
 		SessionID: s.SessionID,
 		Index:     s.lastIndex,
@@ -272,125 +232,35 @@ func (s *Session) doSession(ctx context.Context, f func(ctx context.Context, con
 }
 
 // doCreate sends a create session request
-func (s *Session) doCreate(ctx context.Context, name Name, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
+func (s *Session) doCreate(ctx context.Context, name primitive.Name, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
 	return s.doPrimitive(ctx, name, f)
 }
 
 // doClose sends a session close request
-func (s *Session) doClose(ctx context.Context, name Name, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
+func (s *Session) doClose(ctx context.Context, name primitive.Name, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
 	return s.doPrimitive(ctx, name, f)
 }
 
 // doPrimitive sends a primitive request
-func (s *Session) doPrimitive(ctx context.Context, name Name, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
-	header := s.nextCommandHeader(getName(name))
+func (s *Session) doPrimitive(ctx context.Context, name primitive.Name, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
+	header := s.nextCommandHeader(getPrimitiveId(name))
 	_, err := s.doRequest(header, func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error) {
 		return f(ctx, conn, header)
 	})
 	return err
 }
 
-// GetPrimitives gets a list of primitives in the partition
-func (s *Session) GetPrimitives(ctx context.Context, opts ...MetadataOption) ([]Metadata, error) {
-	options := &metadataOptions{}
-	for _, opt := range opts {
-		opt.apply(options)
-	}
-
-	header := s.getQueryHeader(nil)
-	iresponse, err := s.doRequest(header, func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error) {
-		var primitiveType primitiveapi.PrimitiveType
-		switch options.primitiveType {
-		case "Counter":
-			primitiveType = primitiveapi.PrimitiveType_COUNTER
-		case "Election":
-			primitiveType = primitiveapi.PrimitiveType_ELECTION
-		case "IndexedMap":
-			primitiveType = primitiveapi.PrimitiveType_INDEXED_MAP
-		case "LeaderLatch":
-			primitiveType = primitiveapi.PrimitiveType_LEADER_LATCH
-		case "List":
-			primitiveType = primitiveapi.PrimitiveType_LIST
-		case "Lock":
-			primitiveType = primitiveapi.PrimitiveType_LOCK
-		case "Log":
-			primitiveType = primitiveapi.PrimitiveType_LOG
-		case "Map":
-			primitiveType = primitiveapi.PrimitiveType_MAP
-		case "Set":
-			primitiveType = primitiveapi.PrimitiveType_SET
-		case "Value":
-			primitiveType = primitiveapi.PrimitiveType_VALUE
-		}
-
-		request := &metadata.GetPrimitivesRequest{
-			Header:    header,
-			Namespace: options.namespace,
-			Type:      primitiveType,
-		}
-
-		client := metadata.NewMetadataServiceClient(conn)
-		response, err := client.GetPrimitives(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		return response.Header, response, nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	response := iresponse.(*metadata.GetPrimitivesResponse)
-	primitives := make([]Metadata, len(response.Primitives))
-	for i, primitive := range response.Primitives {
-		var primitiveType Type
-		switch primitive.Type {
-		case primitiveapi.PrimitiveType_COUNTER:
-			primitiveType = "Counter"
-		case primitiveapi.PrimitiveType_ELECTION:
-			primitiveType = "Election"
-		case primitiveapi.PrimitiveType_INDEXED_MAP:
-			primitiveType = "IndexedMap"
-		case primitiveapi.PrimitiveType_LEADER_LATCH:
-			primitiveType = "LeaderLatch"
-		case primitiveapi.PrimitiveType_LIST:
-			primitiveType = "List"
-		case primitiveapi.PrimitiveType_LOCK:
-			primitiveType = "Lock"
-		case primitiveapi.PrimitiveType_LOG:
-			primitiveType = "Log"
-		case primitiveapi.PrimitiveType_MAP:
-			primitiveType = "Map"
-		case primitiveapi.PrimitiveType_SET:
-			primitiveType = "Set"
-		case primitiveapi.PrimitiveType_VALUE:
-			primitiveType = "Value"
-		default:
-			primitiveType = "Unknown"
-		}
-		primitives[i] = Metadata{
-			Type: primitiveType,
-			Name: Name{
-				Application: primitive.Name.Namespace,
-				Scope:       primitive.Name.Namespace,
-				Name:        primitive.Name.Name,
-			},
-		}
-	}
-	return primitives, nil
-}
-
 // doQuery sends a session query request
-func (s *Session) doQuery(ctx context.Context, name Name, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) (interface{}, error) {
-	header := s.getQueryHeader(getName(name))
+func (s *Session) doQuery(ctx context.Context, name primitive.Name, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) (interface{}, error) {
+	header := s.getQueryHeader(getPrimitiveId(name))
 	return s.doRequest(header, func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error) {
 		return f(ctx, conn, header)
 	})
 }
 
 // doCommand sends a session command request
-func (s *Session) doCommand(ctx context.Context, name Name, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) (interface{}, error) {
-	header := s.nextCommandHeader(getName(name))
+func (s *Session) doCommand(ctx context.Context, name primitive.Name, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) (interface{}, error) {
+	header := s.nextCommandHeader(getPrimitiveId(name))
 	return s.doRequest(header, func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error) {
 		return f(ctx, conn, header)
 	})
@@ -425,7 +295,7 @@ func (s *Session) doRequest(requestHeader *headers.RequestHeader, f func(conn *g
 // doQueryStream sends a session query stream request
 func (s *Session) doQueryStream(
 	ctx context.Context,
-	name Name,
+	name primitive.Name,
 	f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error),
 	responseFunc func(interface{}) (*headers.ResponseHeader, interface{}, error)) (<-chan interface{}, error) {
 	conn, err := s.conns.Connect()
@@ -433,7 +303,7 @@ func (s *Session) doQueryStream(
 		return nil, err
 	}
 
-	requestHeader := s.getQueryHeader(getName(name))
+	requestHeader := s.getQueryHeader(getPrimitiveId(name))
 	responses, err := f(ctx, conn, requestHeader)
 	if err != nil {
 		return nil, err
@@ -503,7 +373,7 @@ func (s *Session) queryStream(
 // doCommandStream sends a session command stream request
 func (s *Session) doCommandStream(
 	ctx context.Context,
-	name Name,
+	name primitive.Name,
 	f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error),
 	responseFunc func(interface{}) (*headers.ResponseHeader, interface{}, error)) (<-chan interface{}, error) {
 	conn, err := s.conns.Connect()
@@ -511,7 +381,7 @@ func (s *Session) doCommandStream(
 		return nil, err
 	}
 
-	stream, requestHeader := s.nextStreamHeader(getName(name))
+	stream, requestHeader := s.nextStreamHeader(getPrimitiveId(name))
 	responses, err := f(ctx, conn, requestHeader)
 	if err != nil {
 		stream.Close()

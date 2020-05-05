@@ -40,19 +40,6 @@ type Option interface {
 	apply(options *databaseOptions)
 }
 
-// WithScope configures the application scope for the client
-func WithScope(scope string) Option {
-	return &scopeOption{scope: scope}
-}
-
-type scopeOption struct {
-	scope string
-}
-
-func (o *scopeOption) apply(options *databaseOptions) {
-	options.scope = o.scope
-}
-
 // WithSessionTimeout sets the session timeout for the client
 func WithSessionTimeout(timeout time.Duration) Option {
 	return &sessionTimeoutOption{

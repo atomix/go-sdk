@@ -16,7 +16,7 @@ package _map //nolint:golint
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/client/database/primitive"
+	"github.com/atomix/go-client/pkg/client/database/partition"
 )
 
 // newDelegatingMap returns a Map that delegates all method calls to the given Map
@@ -31,7 +31,7 @@ type delegatingMap struct {
 	delegate Map
 }
 
-func (m *delegatingMap) Name() primitive.Name {
+func (m *delegatingMap) Name() partition.Name {
 	return m.delegate.Name()
 }
 

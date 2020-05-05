@@ -1,4 +1,4 @@
-// Copyright 2020-present Open Networking Foundation.
+// Copyright 2019-present Open Networking Foundation.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,20 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package primitive
+package partition
 
 import (
-	"context"
+	"github.com/atomix/go-client/pkg/client/util/net"
 )
 
-// Handler provides session management for a primitive implementation
-type Handler interface {
-	// Create is called to create the session
-	Create(ctx context.Context, instance *Instance) error
+// Partition is the ID and address for a partition
+type Partition struct {
+	// ID is the partition identifier
+	ID int
 
-	// Close is called to close the primitive
-	Close(ctx context.Context, instance *Instance) error
-
-	// Delete is called to delete the primitive
-	Delete(ctx context.Context, instance *Instance) error
+	// Address is the partition address
+	Address net.Address
 }

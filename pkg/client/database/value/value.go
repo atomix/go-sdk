@@ -17,9 +17,10 @@ package value
 import (
 	"context"
 	"errors"
-	"github.com/atomix/api/proto/atomix/headers"
-	api "github.com/atomix/api/proto/atomix/value"
-	"github.com/atomix/go-client/pkg/client/database/primitive"
+	"github.com/atomix/api/proto/atomix/database/headers"
+	api "github.com/atomix/api/proto/atomix/database/value"
+	"github.com/atomix/go-client/pkg/client/database/partition"
+	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/util"
 	"google.golang.org/grpc"
 )
@@ -69,30 +70,30 @@ type Event struct {
 
 // New creates a new Lock primitive for the given partitions
 // The value will be created in one of the given partitions.
-func New(ctx context.Context, name primitive.Name, partitions []*primitive.Session) (Value, error) {
-	i, err := util.GetPartitionIndex(name.Name, len(partitions))
+func New(ctx context.Context, name primitive.Name, sessions []*partition.Session) (Value, error) {
+	i, err := util.GetPartitionIndex(name.Name, len(sessions))
 	if err != nil {
 		return nil, err
 	}
-	return newValue(ctx, name, partitions[i])
+	return newValue(ctx, name, sessions[i])
 }
 
 // newValue creates a new Value primitive for the given partition
-func newValue(ctx context.Context, name primitive.Name, session *primitive.Session) (*value, error) {
-	instance, err := primitive.NewInstance(ctx, name, session, &primitiveHandler{})
+func newValue(ctx context.Context, name primitive.Name, session *partition.Session) (*value, error) {
+	client, err := partition.NewClient(ctx, name, session, &primitiveHandler{})
 	if err != nil {
 		return nil, err
 	}
 	return &value{
-		name:     name,
-		instance: instance,
+		name:   name,
+		client: client,
 	}, nil
 }
 
 // value is the single partition implementation of Lock
 type value struct {
-	name     primitive.Name
-	instance *primitive.Instance
+	name   primitive.Name
+	client *partition.Client
 }
 
 func (v *value) Name() primitive.Name {
@@ -105,7 +106,7 @@ func (v *value) Set(ctx context.Context, value []byte, opts ...SetOption) (uint6
 		opts[i].beforeSet(request)
 	}
 
-	r, err := v.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := v.client.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewValueServiceClient(conn)
 		request := &api.SetRequest{
 			Header: header,
@@ -139,7 +140,7 @@ func (v *value) Set(ctx context.Context, value []byte, opts ...SetOption) (uint6
 }
 
 func (v *value) Get(ctx context.Context) ([]byte, uint64, error) {
-	r, err := v.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := v.client.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewValueServiceClient(conn)
 		request := &api.GetRequest{
 			Header: header,
@@ -159,7 +160,7 @@ func (v *value) Get(ctx context.Context) ([]byte, uint64, error) {
 }
 
 func (v *value) Watch(ctx context.Context, ch chan<- *Event) error {
-	stream, err := v.instance.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
+	stream, err := v.client.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
 		client := api.NewValueServiceClient(conn)
 		request := &api.EventRequest{
 			Header: header,
@@ -191,9 +192,9 @@ func (v *value) Watch(ctx context.Context, ch chan<- *Event) error {
 }
 
 func (v *value) Close(ctx context.Context) error {
-	return v.instance.Close(ctx)
+	return v.client.Close(ctx)
 }
 
 func (v *value) Delete(ctx context.Context) error {
-	return v.instance.Delete(ctx)
+	return v.client.Delete(ctx)
 }

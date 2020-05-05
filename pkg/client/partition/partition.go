@@ -12,55 +12,40 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package group
+package partition
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	controllerapi "github.com/atomix/api/proto/atomix/controller"
+	partitionapi "github.com/atomix/api/proto/atomix/partition"
 	"github.com/atomix/go-client/pkg/client/cluster"
-	"google.golang.org/grpc"
+	"github.com/atomix/go-client/pkg/client/protocol"
 	"io"
 	"sync"
 	"time"
 )
 
-// NewPartitionGroup creates a new PartitionGroup
-func NewPartitionGroup(name string, address string, opts ...PartitionGroupOption) (*PartitionGroup, error) {
-	options := applyPartitionGroupOptions(opts...)
+// NewGroup creates a new Group
+func NewGroup(ctx context.Context, protocol *protocol.Protocol, opts ...Option) (*Group, error) {
+	options := applyOptions(opts...)
 
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
-	if err != nil {
-		return nil, err
+	group := &Group{
+		Protocol: protocol,
+		options:  options,
 	}
 
-	group := &PartitionGroup{
-		Namespace: options.namespace,
-		Name:      name,
-		conn:      conn,
-		options:   options,
-	}
-
-	if options.joinTimeout != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), *options.joinTimeout)
-		err = group.join(ctx)
-		cancel()
-	} else {
-		err = group.join(context.Background())
-	}
+	err := group.join(context.Background())
 	if err != nil {
 		return nil, err
 	}
 	return group, nil
 }
 
-// PartitionGroup manages the primitives in a partition group
-type PartitionGroup struct {
-	conn         *grpc.ClientConn
-	Namespace    string
-	Name         string
-	options      partitionGroupOptions
+// Group manages the primitives in a partition group
+type Group struct {
+	*protocol.Protocol
+	options      options
 	partitions   []*Partition
 	partitionMap map[string]*Partition
 	closer       context.CancelFunc
@@ -68,19 +53,19 @@ type PartitionGroup struct {
 	mu           sync.RWMutex
 }
 
-func (g *PartitionGroup) Partitions() []*Partition {
+func (g *Group) Partitions() []*Partition {
 	return g.partitions
 }
 
-func (g *PartitionGroup) Partition(id PartitionID) *Partition {
+func (g *Group) Partition(id PartitionID) *Partition {
 	return g.partitionMap[fmt.Sprintf("%s-%d", g.Name, id)]
 }
 
 // join joins the partition group
-func (g *PartitionGroup) join(ctx context.Context) error {
-	var memberID *controllerapi.MemberId
+func (g *Group) join(ctx context.Context) error {
+	var memberID *partitionapi.MemberId
 	if g.options.memberID != "" {
-		memberID = &controllerapi.MemberId{
+		memberID = &partitionapi.MemberId{
 			Namespace: g.options.namespace,
 			Name:      g.options.memberID,
 		}
@@ -89,28 +74,20 @@ func (g *PartitionGroup) join(ctx context.Context) error {
 	g.partitions = make([]*Partition, 0, g.options.partitions)
 	g.partitionMap = make(map[string]*Partition)
 	for i := 1; i <= g.options.partitions; i++ {
-		groupOptions := groupOptions{
-			memberID:  g.options.memberID,
-			scope:     g.options.scope,
-			namespace: g.options.namespace,
-		}
 		partition := &Partition{
-			ID: PartitionID(i),
-			group: &MembershipGroup{
-				Namespace: g.Namespace,
-				Name:      fmt.Sprintf("%s-%d", g.Name, i),
-				options:   groupOptions,
-				watchers:  make([]chan<- Membership, 0),
-			},
+			ID:        PartitionID(i),
+			Namespace: g.Namespace,
+			Name:      fmt.Sprintf("%s-%d", g.Name, i),
+			watchers:  make([]chan<- Membership, 0),
 		}
 		g.partitions = append(g.partitions, partition)
-		g.partitionMap[partition.group.Name] = partition
+		g.partitionMap[partition.partition.Name] = partition
 	}
 
-	client := controllerapi.NewPartitionGroupServiceClient(g.conn)
-	request := &controllerapi.JoinPartitionGroupRequest{
+	client := partitionapi.NewPartitionServiceClient(g.conn)
+	request := &partitionapi.JoinPartitionGroupRequest{
 		MemberID: memberID,
-		GroupID: controllerapi.PartitionGroupId{
+		GroupID: partitionapi.PartitionGroupId{
 			Namespace: g.Namespace,
 			Name:      g.Name,
 		},
@@ -166,7 +143,7 @@ func (g *PartitionGroup) join(ctx context.Context) error {
 }
 
 // Close closes the partition group
-func (g *PartitionGroup) Close() error {
+func (g *Group) Close() error {
 	g.mu.RLock()
 	closer := g.closer
 	leaveCh := g.leaveCh
@@ -193,19 +170,69 @@ type PartitionID int
 // Partition manages a partition
 type Partition struct {
 	ID         PartitionID
-	group      *MembershipGroup
-	lastUpdate *controllerapi.MembershipGroup
+	Namespace  string
+	Name       string
+	partition  *Partition
+	membership *Membership
+	lastUpdate *partitionapi.Partition
+	watchers   []chan<- Membership
+	mu         sync.RWMutex
 }
 
-func (p *Partition) update(group controllerapi.MembershipGroup) {
+// Membership returns the current group membership
+func (p *Partition) Membership() Membership {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if p.membership != nil {
+		return *p.membership
+	}
+	return Membership{}
+}
+
+// Watch watches the membership for changes
+func (p *Partition) Watch(ctx context.Context, ch chan<- Membership) error {
+	p.mu.Lock()
+	watcher := make(chan Membership)
+	membership := p.membership
+	go func() {
+		if membership != nil {
+			ch <- *membership
+		}
+		for {
+			select {
+			case membership, ok := <-watcher:
+				if !ok {
+					return
+				}
+				ch <- membership
+			case <-ctx.Done():
+				p.mu.Lock()
+				watchers := make([]chan<- Membership, 0)
+				for _, ch := range p.watchers {
+					if ch != watcher {
+						watchers = append(watchers, ch)
+					}
+				}
+				p.watchers = watchers
+				p.mu.Unlock()
+				close(watcher)
+			}
+		}
+	}()
+	p.watchers = append(p.watchers, watcher)
+	p.mu.Unlock()
+	return nil
+}
+
+func (p *Partition) update(group partitionapi.Partition) {
 	if p.lastUpdate != nil && (*p.lastUpdate).String() == group.String() {
 		return
 	}
-	p.group.mu.Lock()
+	p.partition.mu.Lock()
 
 	oldMembers := make(map[cluster.MemberID]*cluster.Member)
-	if p.group.membership != nil {
-		for _, member := range p.group.membership.Members {
+	if p.partition.membership != nil {
+		for _, member := range p.partition.membership.Members {
 			oldMembers[member.ID] = member
 		}
 	}
@@ -237,17 +264,28 @@ func (p *Partition) update(group controllerapi.MembershipGroup) {
 		Members:    newMembers,
 	}
 
-	p.group.mu.Lock()
-	p.group.membership = &membership
-	p.group.mu.Unlock()
+	p.partition.mu.Lock()
+	p.partition.membership = &membership
+	p.partition.mu.Unlock()
 
-	p.group.mu.RLock()
-	for _, watcher := range p.group.watchers {
+	p.partition.mu.RLock()
+	for _, watcher := range p.partition.watchers {
 		watcher <- membership
 	}
-	p.group.mu.RUnlock()
+	p.partition.mu.RUnlock()
 }
 
-func (p *Partition) MembershipGroup() *MembershipGroup {
-	return p.group
+// Membership is a set of members
+type Membership struct {
+	Leadership *Leadership
+	Members    []*cluster.Member
+}
+
+// TermID is a leadership term
+type TermID uint64
+
+// Leadership is a group leadership
+type Leadership struct {
+	Leader cluster.MemberID
+	Term   TermID
 }

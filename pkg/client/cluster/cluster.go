@@ -18,8 +18,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	controllerapi "github.com/atomix/api/proto/atomix/controller"
-	"github.com/atomix/go-client/pkg/client/p2p/primitive"
+	clusterapi "github.com/atomix/api/proto/atomix/cluster"
+	"github.com/atomix/go-client/pkg/client/primitive"
 	"google.golang.org/grpc"
 	"io"
 	"sync"
@@ -107,10 +107,10 @@ func (c *Cluster) join(ctx context.Context) error {
 		return err
 	}
 
-	var member *controllerapi.Member
+	var member *clusterapi.Member
 	if c.member != nil {
-		member = &controllerapi.Member{
-			ID: controllerapi.MemberId{
+		member = &clusterapi.Member{
+			ID: clusterapi.MemberId{
 				Namespace: c.options.namespace,
 				Name:      c.options.memberID,
 			},
@@ -119,10 +119,10 @@ func (c *Cluster) join(ctx context.Context) error {
 		}
 	}
 
-	client := controllerapi.NewClusterServiceClient(c.conn)
-	request := &controllerapi.JoinClusterRequest{
+	client := clusterapi.NewClusterServiceClient(c.conn)
+	request := &clusterapi.JoinClusterRequest{
 		Member: member,
-		GroupID: controllerapi.MembershipGroupId{
+		ClusterID: clusterapi.ClusterId{
 			Namespace: c.options.namespace,
 			Name:      c.options.scope,
 		},
@@ -159,8 +159,8 @@ func (c *Cluster) join(ctx context.Context) error {
 					}
 				}
 
-				newMembers := make([]*Member, 0, len(response.Membership.Members))
-				for _, member := range response.Membership.Members {
+				newMembers := make([]*Member, 0, len(response.Members))
+				for _, member := range response.Members {
 					memberID := MemberID(member.ID.Name)
 					oldMember, ok := oldMembers[memberID]
 					if ok {

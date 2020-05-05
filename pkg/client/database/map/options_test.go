@@ -15,7 +15,7 @@
 package _map //nolint:golint
 
 import (
-	api "github.com/atomix/api/proto/atomix/map"
+	api "github.com/atomix/api/proto/atomix/database/map"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

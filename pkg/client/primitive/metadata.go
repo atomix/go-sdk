@@ -14,23 +14,15 @@
 
 package primitive
 
-import (
-	"context"
-	"fmt"
-	"github.com/atomix/go-client/pkg/client/util/net"
-)
-
-// Type is the type of a primitive
-type Type string
+import "fmt"
 
 // NewName returns a qualified primitive name with the given namespace, group, application, and name
-func NewName(namespace string, group string, scope string, name string) Name {
+func NewName(namespace string, protocol string, scope string, name string) Name {
 	return Name{
-		Namespace:   namespace,
-		Database:    group,
-		Application: scope,
-		Scope:       scope,
-		Name:        name,
+		Namespace: namespace,
+		Protocol:  protocol,
+		Scope:     scope,
+		Name:      name,
 	}
 }
 
@@ -38,11 +30,8 @@ func NewName(namespace string, group string, scope string, name string) Name {
 type Name struct {
 	// Namespace is the namespace within which the database is stored
 	Namespace string
-	// Database is the database in which the primitive is stored
-	Database string
-	// Application is the name of the application that owns the primitive
-	// Deprecated: Use Scope instead
-	Application string
+	// Protocol is the protocol with which the primitive is stored
+	Protocol string
 	// Scope is the application scope in which the primitive is stored
 	Scope string
 	// Name is the simple name of the primitive
@@ -50,35 +39,16 @@ type Name struct {
 }
 
 func (n Name) String() string {
-	return fmt.Sprintf("%s.%s.%s.%s", n.Namespace, n.Database, n.Scope, n.Name)
+	return fmt.Sprintf("%s.%s.%s.%s", n.Namespace, n.Protocol, n.Scope, n.Name)
 }
 
-// Primitive is the base interface for primitives
-type Primitive interface {
-	// Name returns the fully namespaced primitive name
-	Name() Name
+// Type is the type of a primitive
+type Type string
 
-	// Close closes the primitive
-	Close(ctx context.Context) error
-
-	// Delete deletes the primitive state from the cluster
-	Delete(ctx context.Context) error
-}
-
-// Partition is the ID and address for a partition
-type Partition struct {
-	// ID is the partition identifier
-	ID int
-
-	// Address is the partition address
-	Address net.Address
-}
-
-// Metadata is primitive metadata
+// Metadata provides primitive metadata
 type Metadata struct {
 	// Type is the primitive type
 	Type Type
-
 	// Name is the primitive name
 	Name Name
 }

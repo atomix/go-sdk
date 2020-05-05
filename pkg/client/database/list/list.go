@@ -18,9 +18,10 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
-	"github.com/atomix/api/proto/atomix/headers"
-	api "github.com/atomix/api/proto/atomix/list"
-	"github.com/atomix/go-client/pkg/client/database/primitive"
+	"github.com/atomix/api/proto/atomix/database/headers"
+	api "github.com/atomix/api/proto/atomix/database/list"
+	"github.com/atomix/go-client/pkg/client/database/partition"
+	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/util"
 	"google.golang.org/grpc"
 )
@@ -108,7 +109,7 @@ type Event struct {
 }
 
 // New creates a new list primitive
-func New(ctx context.Context, name primitive.Name, partitions []*primitive.Session) (List, error) {
+func New(ctx context.Context, name primitive.Name, partitions []*partition.Session) (List, error) {
 	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
 		return nil, err
@@ -117,21 +118,21 @@ func New(ctx context.Context, name primitive.Name, partitions []*primitive.Sessi
 }
 
 // newList creates a new list for the given partition
-func newList(ctx context.Context, name primitive.Name, partition *primitive.Session) (*list, error) {
-	instance, err := primitive.NewInstance(ctx, name, partition, &primitiveHandler{})
+func newList(ctx context.Context, name primitive.Name, session *partition.Session) (*list, error) {
+	client, err := partition.NewClient(ctx, name, session, &primitiveHandler{})
 	if err != nil {
 		return nil, err
 	}
 	return &list{
-		name:     name,
-		instance: instance,
+		name:   name,
+		client: client,
 	}, nil
 }
 
 // list is the single partition implementation of List
 type list struct {
-	name     primitive.Name
-	instance *primitive.Instance
+	name   primitive.Name
+	client *partition.Client
 }
 
 func (l *list) Name() primitive.Name {
@@ -139,7 +140,7 @@ func (l *list) Name() primitive.Name {
 }
 
 func (l *list) Append(ctx context.Context, value []byte) error {
-	_, err := l.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	_, err := l.client.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewListServiceClient(conn)
 		request := &api.AppendRequest{
 			Header: header,
@@ -155,7 +156,7 @@ func (l *list) Append(ctx context.Context, value []byte) error {
 }
 
 func (l *list) Insert(ctx context.Context, index int, value []byte) error {
-	response, err := l.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := l.client.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewListServiceClient(conn)
 		request := &api.InsertRequest{
 			Header: header,
@@ -181,7 +182,7 @@ func (l *list) Insert(ctx context.Context, index int, value []byte) error {
 }
 
 func (l *list) Set(ctx context.Context, index int, value []byte) error {
-	response, err := l.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := l.client.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewListServiceClient(conn)
 		request := &api.SetRequest{
 			Header: header,
@@ -207,7 +208,7 @@ func (l *list) Set(ctx context.Context, index int, value []byte) error {
 }
 
 func (l *list) Get(ctx context.Context, index int) ([]byte, error) {
-	r, err := l.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := l.client.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewListServiceClient(conn)
 		request := &api.GetRequest{
 			Header: header,
@@ -233,7 +234,7 @@ func (l *list) Get(ctx context.Context, index int) ([]byte, error) {
 }
 
 func (l *list) Remove(ctx context.Context, index int) ([]byte, error) {
-	r, err := l.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := l.client.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewListServiceClient(conn)
 		request := &api.RemoveRequest{
 			Header: header,
@@ -259,7 +260,7 @@ func (l *list) Remove(ctx context.Context, index int) ([]byte, error) {
 }
 
 func (l *list) Len(ctx context.Context) (int, error) {
-	response, err := l.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := l.client.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewListServiceClient(conn)
 		request := &api.SizeRequest{
 			Header: header,
@@ -277,7 +278,7 @@ func (l *list) Len(ctx context.Context) (int, error) {
 }
 
 func (l *list) Items(ctx context.Context, ch chan<- []byte) error {
-	stream, err := l.instance.DoQueryStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
+	stream, err := l.client.DoQueryStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
 		client := api.NewListServiceClient(conn)
 		request := &api.IterateRequest{
 			Header: header,
@@ -307,7 +308,7 @@ func (l *list) Items(ctx context.Context, ch chan<- []byte) error {
 }
 
 func (l *list) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error {
-	stream, err := l.instance.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
+	stream, err := l.client.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
 		client := api.NewListServiceClient(conn)
 		request := &api.EventRequest{
 			Header: header,
@@ -379,7 +380,7 @@ func (l *list) SliceTo(ctx context.Context, to int) (List, error) {
 }
 
 func (l *list) Clear(ctx context.Context) error {
-	_, err := l.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	_, err := l.client.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewListServiceClient(conn)
 		request := &api.ClearRequest{
 			Header: header,
@@ -394,9 +395,9 @@ func (l *list) Clear(ctx context.Context) error {
 }
 
 func (l *list) Close(ctx context.Context) error {
-	return l.instance.Close(ctx)
+	return l.client.Close(ctx)
 }
 
 func (l *list) Delete(ctx context.Context) error {
-	return l.instance.Delete(ctx)
+	return l.client.Delete(ctx)
 }

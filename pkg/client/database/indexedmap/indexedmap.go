@@ -18,9 +18,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/atomix/api/proto/atomix/headers"
-	api "github.com/atomix/api/proto/atomix/indexedmap"
-	"github.com/atomix/go-client/pkg/client/database/primitive"
+	"github.com/atomix/api/proto/atomix/database/headers"
+	api "github.com/atomix/api/proto/atomix/database/indexedmap"
+	"github.com/atomix/go-client/pkg/client/database/partition"
+	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/util"
 	"google.golang.org/grpc"
 	"time"
@@ -167,7 +168,7 @@ type Event struct {
 }
 
 // New creates a new IndexedMap primitive
-func New(ctx context.Context, name primitive.Name, partitions []*primitive.Session) (IndexedMap, error) {
+func New(ctx context.Context, name primitive.Name, partitions []*partition.Session) (IndexedMap, error) {
 	i, err := util.GetPartitionIndex(name.Name, len(partitions))
 	if err != nil {
 		return nil, err
@@ -176,21 +177,21 @@ func New(ctx context.Context, name primitive.Name, partitions []*primitive.Sessi
 }
 
 // newIndexedMap creates a new IndexedMap for the given partition
-func newIndexedMap(ctx context.Context, name primitive.Name, partition *primitive.Session) (*indexedMap, error) {
-	instance, err := primitive.NewInstance(ctx, name, partition, &primitiveHandler{})
+func newIndexedMap(ctx context.Context, name primitive.Name, session *partition.Session) (*indexedMap, error) {
+	client, err := partition.NewClient(ctx, name, session, &primitiveHandler{})
 	if err != nil {
 		return nil, err
 	}
 	return &indexedMap{
-		name:     name,
-		instance: instance,
+		name:   name,
+		client: client,
 	}, nil
 }
 
 // indexedMap is the default single-partition implementation of Map
 type indexedMap struct {
-	name     primitive.Name
-	instance *primitive.Instance
+	name   primitive.Name
+	client *partition.Client
 }
 
 func (m *indexedMap) Name() primitive.Name {
@@ -198,7 +199,7 @@ func (m *indexedMap) Name() primitive.Name {
 }
 
 func (m *indexedMap) Append(ctx context.Context, key string, value []byte) (*Entry, error) {
-	r, err := m.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := m.client.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.PutRequest{
 			Header:  header,
@@ -241,7 +242,7 @@ func (m *indexedMap) Append(ctx context.Context, key string, value []byte) (*Ent
 }
 
 func (m *indexedMap) Put(ctx context.Context, key string, value []byte) (*Entry, error) {
-	r, err := m.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := m.client.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.PutRequest{
 			Header: header,
@@ -283,7 +284,7 @@ func (m *indexedMap) Put(ctx context.Context, key string, value []byte) (*Entry,
 }
 
 func (m *indexedMap) Set(ctx context.Context, index Index, key string, value []byte, opts ...SetOption) (*Entry, error) {
-	r, err := m.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := m.client.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.PutRequest{
 			Header: header,
@@ -332,7 +333,7 @@ func (m *indexedMap) Set(ctx context.Context, index Index, key string, value []b
 }
 
 func (m *indexedMap) Get(ctx context.Context, key string, opts ...GetOption) (*Entry, error) {
-	r, err := m.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := m.client.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.GetRequest{
 			Header: header,
@@ -369,7 +370,7 @@ func (m *indexedMap) Get(ctx context.Context, key string, opts ...GetOption) (*E
 }
 
 func (m *indexedMap) GetIndex(ctx context.Context, index Index, opts ...GetOption) (*Entry, error) {
-	r, err := m.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := m.client.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.GetRequest{
 			Header: header,
@@ -406,7 +407,7 @@ func (m *indexedMap) GetIndex(ctx context.Context, index Index, opts ...GetOptio
 }
 
 func (m *indexedMap) FirstIndex(ctx context.Context) (Index, error) {
-	r, err := m.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := m.client.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.FirstEntryRequest{
 			Header: header,
@@ -429,7 +430,7 @@ func (m *indexedMap) FirstIndex(ctx context.Context) (Index, error) {
 }
 
 func (m *indexedMap) LastIndex(ctx context.Context) (Index, error) {
-	r, err := m.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := m.client.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.LastEntryRequest{
 			Header: header,
@@ -452,7 +453,7 @@ func (m *indexedMap) LastIndex(ctx context.Context) (Index, error) {
 }
 
 func (m *indexedMap) PrevIndex(ctx context.Context, index Index) (Index, error) {
-	r, err := m.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := m.client.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.PrevEntryRequest{
 			Header: header,
@@ -476,7 +477,7 @@ func (m *indexedMap) PrevIndex(ctx context.Context, index Index) (Index, error) 
 }
 
 func (m *indexedMap) NextIndex(ctx context.Context, index Index) (Index, error) {
-	r, err := m.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := m.client.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.NextEntryRequest{
 			Header: header,
@@ -500,7 +501,7 @@ func (m *indexedMap) NextIndex(ctx context.Context, index Index) (Index, error) 
 }
 
 func (m *indexedMap) FirstEntry(ctx context.Context) (*Entry, error) {
-	r, err := m.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := m.client.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.FirstEntryRequest{
 			Header: header,
@@ -530,7 +531,7 @@ func (m *indexedMap) FirstEntry(ctx context.Context) (*Entry, error) {
 }
 
 func (m *indexedMap) LastEntry(ctx context.Context) (*Entry, error) {
-	r, err := m.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := m.client.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.LastEntryRequest{
 			Header: header,
@@ -560,7 +561,7 @@ func (m *indexedMap) LastEntry(ctx context.Context) (*Entry, error) {
 }
 
 func (m *indexedMap) PrevEntry(ctx context.Context, index Index) (*Entry, error) {
-	r, err := m.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := m.client.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.PrevEntryRequest{
 			Header: header,
@@ -591,7 +592,7 @@ func (m *indexedMap) PrevEntry(ctx context.Context, index Index) (*Entry, error)
 }
 
 func (m *indexedMap) NextEntry(ctx context.Context, index Index) (*Entry, error) {
-	r, err := m.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := m.client.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.NextEntryRequest{
 			Header: header,
@@ -622,7 +623,7 @@ func (m *indexedMap) NextEntry(ctx context.Context, index Index) (*Entry, error)
 }
 
 func (m *indexedMap) Replace(ctx context.Context, key string, value []byte, opts ...ReplaceOption) (*Entry, error) {
-	r, err := m.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := m.client.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.ReplaceRequest{
 			Header:   header,
@@ -663,7 +664,7 @@ func (m *indexedMap) Replace(ctx context.Context, key string, value []byte, opts
 }
 
 func (m *indexedMap) ReplaceIndex(ctx context.Context, index Index, value []byte, opts ...ReplaceOption) (*Entry, error) {
-	r, err := m.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := m.client.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.ReplaceRequest{
 			Header:   header,
@@ -704,7 +705,7 @@ func (m *indexedMap) ReplaceIndex(ctx context.Context, index Index, value []byte
 }
 
 func (m *indexedMap) Remove(ctx context.Context, key string, opts ...RemoveOption) (*Entry, error) {
-	r, err := m.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := m.client.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.RemoveRequest{
 			Header: header,
@@ -744,7 +745,7 @@ func (m *indexedMap) Remove(ctx context.Context, key string, opts ...RemoveOptio
 }
 
 func (m *indexedMap) RemoveIndex(ctx context.Context, index Index, opts ...RemoveOption) (*Entry, error) {
-	r, err := m.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := m.client.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.RemoveRequest{
 			Header: header,
@@ -784,7 +785,7 @@ func (m *indexedMap) RemoveIndex(ctx context.Context, index Index, opts ...Remov
 }
 
 func (m *indexedMap) Len(ctx context.Context) (int, error) {
-	response, err := m.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	response, err := m.client.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.SizeRequest{
 			Header: header,
@@ -802,7 +803,7 @@ func (m *indexedMap) Len(ctx context.Context) (int, error) {
 }
 
 func (m *indexedMap) Clear(ctx context.Context) error {
-	_, err := m.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	_, err := m.client.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.ClearRequest{
 			Header: header,
@@ -817,7 +818,7 @@ func (m *indexedMap) Clear(ctx context.Context) error {
 }
 
 func (m *indexedMap) Entries(ctx context.Context, ch chan<- *Entry) error {
-	stream, err := m.instance.DoQueryStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
+	stream, err := m.client.DoQueryStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.EntriesRequest{
 			Header: header,
@@ -852,7 +853,7 @@ func (m *indexedMap) Entries(ctx context.Context, ch chan<- *Entry) error {
 }
 
 func (m *indexedMap) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error {
-	stream, err := m.instance.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
+	stream, err := m.client.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.EventRequest{
 			Header: header,
@@ -909,9 +910,9 @@ func (m *indexedMap) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchO
 }
 
 func (m *indexedMap) Close(ctx context.Context) error {
-	return m.instance.Close(ctx)
+	return m.client.Close(ctx)
 }
 
 func (m *indexedMap) Delete(ctx context.Context) error {
-	return m.instance.Delete(ctx)
+	return m.client.Delete(ctx)
 }
