@@ -30,8 +30,8 @@ func init() {
 
 // Client provides an API for creating Maps
 type Client interface {
-	// GetGossipMap gets the Map instance of the given name
-	GetGossipMap(ctx context.Context, name string, opts ...Option) (Map, error)
+	// GetMap gets the Map instance of the given name
+	GetMap(ctx context.Context, name string, opts ...Option) (Map, error)
 }
 
 // Map is a distributed set of keys and values

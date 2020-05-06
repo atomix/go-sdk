@@ -22,7 +22,7 @@ import (
 )
 
 // NewGroup creates a new peer group
-func NewGroup(member cluster.Member, provider Provider) (*Group, error) {
+func NewGroup(member *cluster.Member, provider Provider) (*Group, error) {
 	group := &Group{
 		Member:    member,
 		peersByID: make(map[ID]*Peer),
@@ -56,7 +56,7 @@ type Set []Peer
 
 // Group is a primitive peer group
 type Group struct {
-	Member    cluster.Member
+	Member    *cluster.Member
 	peersByID map[ID]*Peer
 	peers     []*Peer
 	watchers  map[string]chan<- Group

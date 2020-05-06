@@ -85,7 +85,7 @@ func (g *Group) GetMap(ctx context.Context, name string, opts ..._map.Option) (_
 		return nil, fmt.Errorf("cannot create peer-to-peer map: not a member of group %s", g.Name)
 	}
 	provider := &membershipGroupPeerProvider{g}
-	peers, err := peer.NewGroup(*g.cluster.Member(), provider)
+	peers, err := peer.NewGroup(g.cluster.Member(), provider)
 	if err != nil {
 		return nil, err
 	}
@@ -243,6 +243,8 @@ func (g *Group) Close(ctx context.Context) error {
 	}
 	return nil
 }
+
+var _ _map.Client = &Group{}
 
 // MemberID is a group member identifier
 type MemberID string
