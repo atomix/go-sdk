@@ -79,7 +79,11 @@ func (g *Group) GetMap(ctx context.Context, name string, opts ..._map.Option) (_
 	}
 	partitions := make([]*replica.Group, 0)
 	for _, partition := range g.partitions {
-		partitions = append(partitions, replica.NewGroup(g.Member(), &partitionReplicaProvider{partition}))
+		group, err := replica.NewGroup(replica.GroupID(partition.ID), g.cluster.Member(), &partitionReplicaProvider{partition})
+		if err != nil {
+			return nil, err
+		}
+		partitions = append(partitions, group)
 	}
 	return _map.New(ctx, primitive.NewName(g.Namespace, g.Name, g.Scope, name), partitions, opts...)
 }
@@ -109,10 +113,11 @@ func (g *Group) join(ctx context.Context) error {
 			ID:        ID(i),
 			Namespace: g.Namespace,
 			Name:      fmt.Sprintf("%s-%d", g.Name, i),
+			member:    g.Member(),
 			watchers:  make([]chan<- Membership, 0),
 		}
 		g.partitions = append(g.partitions, partition)
-		g.partitionMap[partition.partition.Name] = partition
+		g.partitionMap[partition.Name] = partition
 	}
 
 	client := partitionapi.NewPartitionServiceClient(g.conn)
@@ -216,3 +221,47 @@ type Leadership struct {
 	Leader MemberID
 	Term   TermID
 }
+
+// partitionReplicaProvider is a Provider for a Group
+type partitionReplicaProvider struct {
+	partition *Partition
+}
+
+func (p *partitionReplicaProvider) Watch(ctx context.Context, ch chan<- replica.Set) error {
+	membershipCh := make(chan Membership)
+	err := p.partition.Watch(ctx, membershipCh)
+	if err != nil {
+		return err
+	}
+	go func() {
+		for membership := range membershipCh {
+			var term replica.Term
+			var primary *replica.Replica
+			backups := make([]replica.Replica, 0)
+			if membership.Leadership != nil {
+				term = replica.Term(membership.Leadership.Term)
+				for _, member := range membership.Members {
+					if member.ID == membership.Leadership.Leader {
+						primary = &replica.Replica{
+							ID:     replica.ID(member.ID),
+							Member: member.Member,
+						}
+					} else {
+						backups = append(backups, replica.Replica{
+							ID:     replica.ID(member.ID),
+							Member: member.Member,
+						})
+					}
+				}
+			}
+			ch <- replica.Set{
+				Term:    term,
+				Primary: primary,
+				Backups: backups,
+			}
+		}
+	}()
+	return nil
+}
+
+var _ replica.Provider = &partitionReplicaProvider{}

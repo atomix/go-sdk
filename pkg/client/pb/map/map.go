@@ -115,8 +115,12 @@ type Event struct {
 // New creates a new partitioned Map
 func New(ctx context.Context, name primitive.Name, partitions []*replica.Group, opts ...Option) (Map, error) {
 	maps := make([]Map, len(partitions))
-	for i, partition := range partitions {
-		maps[i] = newPartition(ctx, name, partition, opts...)
+	for i, group := range partitions {
+		partition, err := newPartition(ctx, name, group, opts...)
+		if err != nil {
+			return nil, err
+		}
+		maps[i] = partition
 	}
 	return &_map{
 		name:       name,

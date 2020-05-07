@@ -29,11 +29,16 @@ type Partition struct {
 	ID         ID
 	Namespace  string
 	Name       string
-	partition  *Partition
+	member     *Member
 	membership *Membership
 	lastUpdate *partitionapi.Partition
 	watchers   []chan<- Membership
 	mu         sync.RWMutex
+}
+
+// Member returns the local member
+func (p *Partition) Member() *Member {
+	return p.member
 }
 
 // Membership returns the current group membership
@@ -85,11 +90,11 @@ func (p *Partition) update(group partitionapi.Partition) {
 	if p.lastUpdate != nil && (*p.lastUpdate).String() == group.String() {
 		return
 	}
-	p.partition.mu.Lock()
+	p.mu.Lock()
 
 	oldMembers := make(map[MemberID]*Member)
-	if p.partition.membership != nil {
-		for _, member := range p.partition.membership.Members {
+	if p.membership != nil {
+		for _, member := range p.membership.Members {
 			oldMembers[member.ID] = member
 		}
 	}
@@ -124,13 +129,12 @@ func (p *Partition) update(group partitionapi.Partition) {
 		Members:    newMembers,
 	}
 
-	p.partition.mu.Lock()
-	p.partition.membership = &membership
-	p.partition.mu.Unlock()
+	p.membership = &membership
+	p.mu.Unlock()
 
-	p.partition.mu.RLock()
-	for _, watcher := range p.partition.watchers {
+	p.mu.RLock()
+	for _, watcher := range p.watchers {
 		watcher <- membership
 	}
-	p.partition.mu.RUnlock()
+	p.mu.RUnlock()
 }
