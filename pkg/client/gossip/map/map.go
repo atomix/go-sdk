@@ -101,5 +101,5 @@ type Event struct {
 	Type EventType
 
 	// Entry is the event entry
-	Entry *Entry
+	Entry Entry
 }

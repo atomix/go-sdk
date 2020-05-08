@@ -27,7 +27,7 @@ func NewGroup(member *cluster.Member, provider Provider) (*Group, error) {
 		Member:    member,
 		peersByID: make(map[ID]*Peer),
 		peers:     make([]*Peer, 0),
-		watchers:  make(map[string]chan<- Group),
+		watchers:  make(map[string]chan<- Set),
 	}
 	ch := make(chan Set)
 	err := provider.Watch(context.Background(), ch)
@@ -59,7 +59,7 @@ type Group struct {
 	Member    *cluster.Member
 	peersByID map[ID]*Peer
 	peers     []*Peer
-	watchers  map[string]chan<- Group
+	watchers  map[string]chan<- Set
 	mu        sync.RWMutex
 }
 
@@ -95,10 +95,14 @@ func (g *Group) update(peers Set) {
 	}
 	g.peers = newPeers
 	g.peersByID = newPeersByID
+
+	for _, watcher := range g.watchers {
+		watcher <- peers
+	}
 }
 
 // watch watches the peers in the group
-func (g *Group) Watch(ctx context.Context, ch chan<- Group) error {
+func (g *Group) Watch(ctx context.Context, ch chan<- Set) error {
 	id := uuid.New().String()
 	g.mu.Lock()
 	g.watchers[id] = ch
