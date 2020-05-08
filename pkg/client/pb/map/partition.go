@@ -67,7 +67,10 @@ func (m *mapPartition) Name() primitive.Name {
 }
 
 func (m *mapPartition) open(ctx context.Context) error {
-	getManager().register(m.name, m.group.ID, m)
+	replica := m.group.Local()
+	if replica != nil {
+		getManager(replica.ID).register(m.name, m.group.ID, m)
+	}
 	ch := make(chan replica.Set)
 	err := m.group.Watch(context.Background(), ch)
 	if err != nil {

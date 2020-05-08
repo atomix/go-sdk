@@ -89,7 +89,7 @@ func (g *Group) GetMap(ctx context.Context, name string, opts ..._map.Option) (_
 	if err != nil {
 		return nil, err
 	}
-	return _map.NewGossipMap(ctx, primitive.NewName(g.Namespace, g.Name, g.Scope, name), peers, opts...)
+	return _map.NewMap(ctx, primitive.NewName(g.Namespace, g.Name, g.Scope, name), peers, opts...)
 }
 
 // Watch watches the membership for changes

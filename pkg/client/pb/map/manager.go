@@ -28,12 +28,16 @@ import (
 
 var manager *primaryBackupMapManager
 
+var managers = make(map[replica.ID]*primaryBackupMapManager)
+
 // getManager returns the primary-backup map manager
-func getManager() *primaryBackupMapManager {
-	if manager == nil {
+func getManager(replicaID replica.ID) *primaryBackupMapManager {
+	manager, ok := managers[replicaID]
+	if !ok {
 		manager = &primaryBackupMapManager{
 			servers: make(map[string]map[replica.GroupID]mapReplicaServer),
 		}
+		managers[replicaID] = manager
 	}
 	return manager
 }

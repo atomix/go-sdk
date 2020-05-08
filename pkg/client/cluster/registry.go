@@ -12,14 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package primitive
+package cluster
 
-import "google.golang.org/grpc"
+import (
+	"google.golang.org/grpc"
+)
 
 var registry = &serviceRegistry{services: []Service{}}
 
 // Service is a peer-to-peer primitive service
-type Service func(server *grpc.Server)
+type Service func(MemberID, *grpc.Server)
 
 // RegisterService registers a peer-to-peer primitive service
 func RegisterService(service Service) {

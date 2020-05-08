@@ -16,19 +16,22 @@ package _map
 
 import (
 	mapapi "github.com/atomix/api/proto/atomix/gossip/map"
+	"github.com/atomix/go-client/pkg/client/cluster"
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"io"
 	"sync"
 )
 
-var manager *gossipMapManager
+var managers = make(map[cluster.MemberID]*gossipMapManager)
 
 // getManager returns the gossip map manager
-func getManager() *gossipMapManager {
-	if manager == nil {
+func getManager(memberID cluster.MemberID) *gossipMapManager {
+	manager, ok := managers[memberID]
+	if !ok {
 		manager = &gossipMapManager{
 			instances: make(map[string]gossipMapHandler),
 		}
+		managers[memberID] = manager
 	}
 	return manager
 }

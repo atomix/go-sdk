@@ -18,13 +18,14 @@ import (
 	"context"
 	"fmt"
 	mapapi "github.com/atomix/api/proto/atomix/gossip/map"
+	"github.com/atomix/go-client/pkg/client/cluster"
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"google.golang.org/grpc"
 )
 
 func init() {
-	primitive.RegisterService(func(server *grpc.Server) {
-		mapapi.RegisterGossipMapServiceServer(server, getManager())
+	cluster.RegisterService(func(memberID cluster.MemberID, server *grpc.Server) {
+		mapapi.RegisterGossipMapServiceServer(server, getManager(memberID))
 	})
 }
 

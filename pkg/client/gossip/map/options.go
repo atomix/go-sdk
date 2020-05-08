@@ -21,9 +21,10 @@ import (
 
 func applyGossipMapOptions(opts ...Option) gossipMapOptions {
 	options := &gossipMapOptions{
-		gossipPeriod:      50 * time.Millisecond,
-		antiEntropyPeriod: time.Second,
-		clock:             times.NewLogicalClock(),
+		gossipPeriod:         50 * time.Millisecond,
+		antiEntropyPeriod:    time.Second,
+		tombstonePurgePeriod: time.Minute,
+		clock:                times.NewLogicalClock(),
 	}
 	for _, opt := range opts {
 		opt.apply(options)

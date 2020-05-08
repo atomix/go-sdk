@@ -12,21 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package client
+package database
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/client/counter"
-	"github.com/atomix/go-client/pkg/client/election"
-	"github.com/atomix/go-client/pkg/client/indexedmap"
-	"github.com/atomix/go-client/pkg/client/list"
-	"github.com/atomix/go-client/pkg/client/lock"
-	"github.com/atomix/go-client/pkg/client/log"
-	"github.com/atomix/go-client/pkg/client/map"
-	"github.com/atomix/go-client/pkg/client/database/partition"
-	"github.com/atomix/go-client/pkg/client/set"
+	"github.com/atomix/go-client/pkg/client/database/counter"
+	"github.com/atomix/go-client/pkg/client/database/election"
+	"github.com/atomix/go-client/pkg/client/database/indexedmap"
+	"github.com/atomix/go-client/pkg/client/database/list"
+	"github.com/atomix/go-client/pkg/client/database/lock"
+	"github.com/atomix/go-client/pkg/client/database/log"
+	"github.com/atomix/go-client/pkg/client/database/map"
+	"github.com/atomix/go-client/pkg/client/database/set"
+	"github.com/atomix/go-client/pkg/client/database/value"
+	"github.com/atomix/go-client/pkg/client/protocol"
 	"github.com/atomix/go-client/pkg/client/test"
-	"github.com/atomix/go-client/pkg/client/value"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -40,10 +40,8 @@ func TestDatabase(t *testing.T) {
 	defer test.CloseSessions(sessions)
 
 	database := &Database{
-		Namespace: "default",
-		Name:      "test",
-		scope:     "default",
-		sessions:  sessions,
+		Client:   protocol.New(nil, "default", "test", "default"),
+		sessions: sessions,
 	}
 
 	primitives, err := database.GetPrimitives(context.TODO())
@@ -57,7 +55,7 @@ func TestDatabase(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 1)
 
-	primitives, err = database.GetPrimitives(context.TODO(), partition.WithPrimitiveType(counter.Type))
+	primitives, err = database.GetPrimitives(context.TODO(), protocol.WithPrimitiveType(counter.Type))
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 1)
 
@@ -68,7 +66,7 @@ func TestDatabase(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 2)
 
-	primitives, err = database.GetPrimitives(context.TODO(), partition.WithPrimitiveType(election.Type))
+	primitives, err = database.GetPrimitives(context.TODO(), protocol.WithPrimitiveType(election.Type))
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 1)
 
@@ -79,7 +77,7 @@ func TestDatabase(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 3)
 
-	primitives, err = database.GetPrimitives(context.TODO(), partition.WithPrimitiveType(indexedmap.Type))
+	primitives, err = database.GetPrimitives(context.TODO(), protocol.WithPrimitiveType(indexedmap.Type))
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 1)
 
@@ -90,7 +88,7 @@ func TestDatabase(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 4)
 
-	primitives, err = database.GetPrimitives(context.TODO(), partition.WithPrimitiveType(list.Type))
+	primitives, err = database.GetPrimitives(context.TODO(), protocol.WithPrimitiveType(list.Type))
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 1)
 
@@ -101,7 +99,7 @@ func TestDatabase(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 5)
 
-	primitives, err = database.GetPrimitives(context.TODO(), partition.WithPrimitiveType(lock.Type))
+	primitives, err = database.GetPrimitives(context.TODO(), protocol.WithPrimitiveType(lock.Type))
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 1)
 
@@ -112,7 +110,7 @@ func TestDatabase(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 6)
 
-	primitives, err = database.GetPrimitives(context.TODO(), partition.WithPrimitiveType(log.Type))
+	primitives, err = database.GetPrimitives(context.TODO(), protocol.WithPrimitiveType(log.Type))
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 1)
 
@@ -123,7 +121,7 @@ func TestDatabase(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 7)
 
-	primitives, err = database.GetPrimitives(context.TODO(), partition.WithPrimitiveType(_map.Type))
+	primitives, err = database.GetPrimitives(context.TODO(), protocol.WithPrimitiveType(_map.Type))
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 1)
 
@@ -134,7 +132,7 @@ func TestDatabase(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 8)
 
-	primitives, err = database.GetPrimitives(context.TODO(), partition.WithPrimitiveType(set.Type))
+	primitives, err = database.GetPrimitives(context.TODO(), protocol.WithPrimitiveType(set.Type))
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 1)
 
@@ -145,7 +143,7 @@ func TestDatabase(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 9)
 
-	primitives, err = database.GetPrimitives(context.TODO(), partition.WithPrimitiveType(value.Type))
+	primitives, err = database.GetPrimitives(context.TODO(), protocol.WithPrimitiveType(value.Type))
 	assert.NoError(t, err)
 	assert.Len(t, primitives, 1)
 }

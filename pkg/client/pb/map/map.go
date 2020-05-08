@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	mapapi "github.com/atomix/api/proto/atomix/pb/map"
+	"github.com/atomix/go-client/pkg/client/cluster"
 	"github.com/atomix/go-client/pkg/client/pb/replica"
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/util"
@@ -26,8 +27,8 @@ import (
 )
 
 func init() {
-	primitive.RegisterService(func(server *grpc.Server) {
-		mapapi.RegisterMapServiceServer(server, getManager())
+	cluster.RegisterService(func(memberID cluster.MemberID, server *grpc.Server) {
+		mapapi.RegisterMapServiceServer(server, getManager(replica.ID(memberID)))
 	})
 }
 

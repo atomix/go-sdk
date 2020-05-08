@@ -31,8 +31,8 @@ import (
 	"time"
 )
 
-// NewGossipMap creates a new gossip Map
-func NewGossipMap(ctx context.Context, name primitive.Name, peers *peer.Group, opts ...Option) (Map, error) {
+// NewMap creates a new gossip Map
+func NewMap(ctx context.Context, name primitive.Name, peers *peer.Group, opts ...Option) (Map, error) {
 	options := applyGossipMapOptions(opts...)
 	m := &gossipMap{
 		name:     name,
@@ -119,7 +119,7 @@ func (m *gossipMap) watchPeers() error {
 
 // bootstrap bootstraps the map
 func (m *gossipMap) bootstrap(ctx context.Context) error {
-	getManager().register(m.name, m.handle)
+	getManager(m.group.Member.ID).register(m.name, m.handle)
 	err := m.watchPeers()
 	if err != nil {
 		return err

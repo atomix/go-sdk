@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	clusterapi "github.com/atomix/api/proto/atomix/cluster"
-	"github.com/atomix/go-client/pkg/client/primitive"
 	"google.golang.org/grpc"
 	"io"
 	"sync"
@@ -35,13 +34,9 @@ func New(address string, opts ...Option) (*Cluster, error) {
 		return nil, err
 	}
 
-	var member *Member
+	var member *LocalMember
 	if options.memberID != "" {
-		member = &Member{
-			ID:   MemberID(options.memberID),
-			Host: options.peerHost,
-			Port: options.peerPort,
-		}
+		member = NewLocalMember(MemberID(options.memberID), options.peerHost, options.peerPort)
 	}
 
 	cluster := &Cluster{
@@ -71,7 +66,7 @@ func New(address string, opts ...Option) (*Cluster, error) {
 type Cluster struct {
 	Namespace  string
 	Name       string
-	member     *Member
+	member     *LocalMember
 	conn       *grpc.ClientConn
 	options    clusterOptions
 	membership *Membership
@@ -83,7 +78,7 @@ type Cluster struct {
 
 // Member returns the local cluster member
 func (c *Cluster) Member() *Member {
-	return c.member
+	return c.member.Member
 }
 
 // Membership returns the current cluster membership
@@ -96,19 +91,13 @@ func (c *Cluster) Membership() Membership {
 	return Membership{}
 }
 
-// serve begins service if necessary
-func (c *Cluster) serve(ctx context.Context) error {
-	if c.member != nil {
-		return primitive.Serve(c.member.Port, c.leaveCh)
-	}
-	return nil
-}
-
 // join joins the cluster
 func (c *Cluster) join(ctx context.Context) error {
-	err := c.serve(ctx)
-	if err != nil {
-		return err
+	if c.member != nil {
+		err := c.member.Serve()
+		if err != nil {
+			return nil
+		}
 	}
 
 	var member *clusterapi.Member
@@ -170,11 +159,7 @@ func (c *Cluster) join(ctx context.Context) error {
 					if ok {
 						newMembers = append(newMembers, oldMember)
 					} else {
-						newMembers = append(newMembers, &Member{
-							ID:   memberID,
-							Host: member.Host,
-							Port: int(member.Port),
-						})
+						newMembers = append(newMembers, NewMember(memberID, member.Host, int(member.Port)))
 					}
 				}
 				membership := Membership{
@@ -266,39 +251,4 @@ func (c *Cluster) Close() error {
 // Membership is a set of cluster members
 type Membership struct {
 	Members []*Member
-}
-
-// MemberID is a member identifier
-type MemberID string
-
-// Member is a membership group member
-type Member struct {
-	ID   MemberID
-	Host string
-	Port int
-	conn *grpc.ClientConn
-	mu   sync.RWMutex
-}
-
-// Connect connects to the member
-func (m *Member) Connect() (*grpc.ClientConn, error) {
-	m.mu.RLock()
-	conn := m.conn
-	m.mu.RUnlock()
-	if conn != nil {
-		return conn, nil
-	}
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.conn != nil {
-		return m.conn, nil
-	}
-
-	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", m.Host, m.Port), grpc.WithInsecure())
-	if err != nil {
-		return nil, err
-	}
-	m.conn = conn
-	return conn, err
 }
