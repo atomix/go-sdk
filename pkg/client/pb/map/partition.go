@@ -25,6 +25,7 @@ import (
 	"github.com/atomix/api/proto/atomix/protocol"
 	"github.com/atomix/go-client/pkg/client/pb/replica"
 	"github.com/atomix/go-client/pkg/client/primitive"
+	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"io"
@@ -35,11 +36,14 @@ import (
 func newPartition(ctx context.Context, name primitive.Name, replicas *replica.Group, opts ...Option) (Map, error) {
 	options := applyOptions(opts...)
 	partition := &mapPartition{
-		name:    name,
-		options: options,
-		group:   replicas,
-		entries: make(map[string]mapapi.Entry),
-		backups: make(map[replica.ID]*mapBackup),
+		name:     name,
+		options:  options,
+		group:    replicas,
+		entries:  make(map[string]mapapi.Entry),
+		backups:  make(map[replica.ID]*mapBackup),
+		backupCh: make(chan mapapi.Entry),
+		eventCh:  make(chan Event),
+		watchers: make(map[string]chan<- Event),
 	}
 	if err := partition.open(ctx); err != nil {
 		return nil, err
@@ -57,6 +61,9 @@ type mapPartition struct {
 	replicas   replica.Set
 	backups    map[replica.ID]*mapBackup
 	backupCh   chan mapapi.Entry
+	eventCh    chan Event
+	watchers   map[string]chan<- Event
+	watchersMu sync.RWMutex
 	timestamp  uint64
 	replicasMu sync.RWMutex
 	closeCh    chan struct{}
@@ -67,9 +74,9 @@ func (m *mapPartition) Name() primitive.Name {
 }
 
 func (m *mapPartition) open(ctx context.Context) error {
-	replica := m.group.Local()
-	if replica != nil {
-		getManager(replica.ID).register(m.name, m.group.ID, m)
+	local := m.group.Local()
+	if local != nil {
+		getManager(local.ID).register(m.name, m.group.ID, m)
 	}
 	ch := make(chan replica.Set)
 	err := m.group.Watch(context.Background(), ch)
@@ -78,6 +85,7 @@ func (m *mapPartition) open(ctx context.Context) error {
 	}
 	go m.processReplicaChanges(ch)
 	go m.processUpdates()
+	go m.processEvents()
 	return nil
 }
 
@@ -133,6 +141,25 @@ func (m *mapPartition) processUpdates() {
 			return
 		}
 	}
+}
+
+func (m *mapPartition) processEvents() {
+	for {
+		select {
+		case event := <-m.eventCh:
+			m.publishEvent(event)
+		case <-m.closeCh:
+			return
+		}
+	}
+}
+
+func (m *mapPartition) publishEvent(event Event) {
+	m.watchersMu.RLock()
+	for _, watcher := range m.watchers {
+		watcher <- event
+	}
+	m.watchersMu.RUnlock()
 }
 
 func (m *mapPartition) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*Entry, error) {
@@ -352,10 +379,21 @@ func (m *mapPartition) Entries(ctx context.Context, ch chan<- Entry) error {
 }
 
 func (m *mapPartition) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) error {
-	panic("implement me")
+	id := uuid.New().String()
+	m.watchersMu.Lock()
+	m.watchers[id] = ch
+	m.watchersMu.Unlock()
+	go func() {
+		<-ctx.Done()
+		m.watchersMu.Lock()
+		delete(m.watchers, id)
+		m.watchersMu.Unlock()
+	}()
+	return nil
 }
 
 func (m *mapPartition) Close(ctx context.Context) error {
+	close(m.closeCh)
 	return nil
 }
 

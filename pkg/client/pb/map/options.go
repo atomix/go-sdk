@@ -20,6 +20,7 @@ import (
 
 func applyOptions(opts ...Option) options {
 	options := &options{
+		backupPeriod:   10 * time.Millisecond,
 		maxBackupQueue: 1,
 	}
 	for _, opt := range opts {
