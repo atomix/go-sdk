@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+
 	"github.com/atomix/api/proto/atomix/headers"
 	api "github.com/atomix/api/proto/atomix/list"
 	"github.com/atomix/go-client/pkg/client/primitive"
@@ -57,6 +58,9 @@ type List interface {
 
 	// Len gets the length of the list
 	Len(ctx context.Context) (int, error)
+
+	// Contains checks whether the list contains a value
+	Contains(ctx context.Context, value []byte) (bool, error)
 
 	// Slice returns a slice of the list from the given start index to the given end index
 	Slice(ctx context.Context, from int, to int) (List, error)
@@ -256,6 +260,25 @@ func (l *list) Remove(ctx context.Context, index int) ([]byte, error) {
 	default:
 		return base64.StdEncoding.DecodeString(response.Value)
 	}
+}
+
+func (l *list) Contains(ctx context.Context, value []byte) (bool, error) {
+	response, err := l.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+		client := api.NewListServiceClient(conn)
+		request := &api.ContainsRequest{
+			Header: header,
+			Value:  base64.StdEncoding.EncodeToString(value),
+		}
+		response, err := client.Contains(ctx, request)
+		if err != nil {
+			return nil, nil, err
+		}
+		return response.Header, response, nil
+	})
+	if err != nil {
+		return false, err
+	}
+	return bool(response.(*api.ContainsResponse).Contains), nil
 }
 
 func (l *list) Len(ctx context.Context) (int, error) {

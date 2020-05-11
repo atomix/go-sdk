@@ -17,6 +17,7 @@ package list
 import (
 	"context"
 	"errors"
+
 	"github.com/atomix/go-client/pkg/client/primitive"
 )
 
@@ -94,6 +95,11 @@ func (l *slicedList) Len(ctx context.Context) (int, error) {
 		size -= *l.from
 	}
 	return size, nil
+}
+
+func (l *slicedList) Contains(ctx context.Context, value []byte) (bool, error) {
+	contain, err := l.list.Contains(ctx, value)
+	return contain, err
 }
 
 func (l *slicedList) Slice(ctx context.Context, from int, to int) (List, error) {

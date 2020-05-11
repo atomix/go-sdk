@@ -16,10 +16,11 @@ package counter
 
 import (
 	"context"
+	"testing"
+
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestCounterOperations(t *testing.T) {
@@ -69,6 +70,18 @@ func TestCounterOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, int64(10), value)
 
+	casValue, err := counter.CAS(context.TODO(), 15, 25)
+	assert.NoError(t, err)
+	assert.Equal(t, false, casValue)
+
+	casValue, err = counter.CAS(context.TODO(), 10, 20)
+	assert.NoError(t, err)
+	assert.Equal(t, true, casValue)
+
+	value, err = counter.Get(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, int64(20), value)
+
 	err = counter.Close(context.Background())
 	assert.NoError(t, err)
 
@@ -80,7 +93,7 @@ func TestCounterOperations(t *testing.T) {
 
 	value, err = counter1.Get(context.TODO())
 	assert.NoError(t, err)
-	assert.Equal(t, int64(10), value)
+	assert.Equal(t, int64(20), value)
 
 	err = counter1.Close(context.Background())
 	assert.NoError(t, err)

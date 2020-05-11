@@ -16,10 +16,11 @@ package list
 
 import (
 	"context"
+	"testing"
+
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestListOperations(t *testing.T) {
@@ -52,6 +53,10 @@ func TestListOperations(t *testing.T) {
 	value, err := list.Get(context.TODO(), 0)
 	assert.NoError(t, err)
 	assert.Equal(t, "foo", string(value))
+
+	contain, err := list.Contains(context.TODO(), []byte("foo"))
+	assert.NoError(t, err)
+	assert.Equal(t, true, contain)
 
 	err = list.Append(context.TODO(), []byte("bar"))
 	assert.NoError(t, err)
