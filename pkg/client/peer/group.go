@@ -18,7 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	clusterapi "github.com/atomix/api/proto/atomix/membership"
+	membershipapi "github.com/atomix/api/proto/atomix/membership"
 	"google.golang.org/grpc"
 	"io"
 	"sync"
@@ -43,7 +43,7 @@ func NewGroup(address string, opts ...Option) (*Group, error) {
 		member = NewMember(ID(options.memberID), options.peerHost, options.peerPort, services...)
 	}
 
-	cluster := &Group{
+	group := &Group{
 		Namespace: options.namespace,
 		Name:      options.scope,
 		member:    member,
@@ -56,15 +56,15 @@ func NewGroup(address string, opts ...Option) (*Group, error) {
 
 	if options.joinTimeout != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), *options.joinTimeout)
-		err = cluster.join(ctx)
+		err = group.join(ctx)
 		cancel()
 	} else {
-		err = cluster.join(context.Background())
+		err = group.join(context.Background())
 	}
 	if err != nil {
 		return nil, err
 	}
-	return cluster, nil
+	return group, nil
 }
 
 // Group manages the peer group for a client
@@ -101,7 +101,7 @@ func (c *Group) Peers() Set {
 	return Set{}
 }
 
-// join joins the cluster
+// join joins the group
 func (c *Group) join(ctx context.Context) error {
 	if c.member != nil {
 		err := c.member.serve()
@@ -110,10 +110,10 @@ func (c *Group) join(ctx context.Context) error {
 		}
 	}
 
-	var member *clusterapi.Member
+	var member *membershipapi.Member
 	if c.member != nil {
-		member = &clusterapi.Member{
-			ID: clusterapi.MemberId{
+		member = &membershipapi.Member{
+			ID: membershipapi.MemberId{
 				Namespace: c.options.namespace,
 				Name:      c.options.memberID,
 			},
@@ -122,16 +122,16 @@ func (c *Group) join(ctx context.Context) error {
 		}
 	}
 
-	client := clusterapi.NewMembershipServiceClient(c.conn)
-	request := &clusterapi.JoinClusterRequest{
+	client := membershipapi.NewMembershipServiceClient(c.conn)
+	request := &membershipapi.JoinGroupRequest{
 		Member: member,
-		ClusterID: clusterapi.ClusterId{
+		GroupID: membershipapi.GroupId{
 			Namespace: c.options.namespace,
 			Name:      c.options.scope,
 		},
 	}
 	streamCtx, cancel := context.WithCancel(context.Background())
-	stream, err := client.JoinCluster(streamCtx, request)
+	stream, err := client.JoinGroup(streamCtx, request)
 	if err != nil {
 		cancel()
 		return err
@@ -155,7 +155,7 @@ func (c *Group) join(ctx context.Context) error {
 				return
 			} else {
 				c.mu.Lock()
-				members := make(map[ID]clusterapi.Member)
+				members := make(map[ID]membershipapi.Member)
 				for _, member := range response.Members {
 					members[ID(member.ID.Name)] = member
 				}
@@ -233,7 +233,7 @@ func (c *Group) Watch(ctx context.Context, ch chan<- Set) error {
 	return nil
 }
 
-// Close closes the cluster
+// Close closes the group
 func (c *Group) Close() error {
 	c.mu.RLock()
 	closer := c.closer
