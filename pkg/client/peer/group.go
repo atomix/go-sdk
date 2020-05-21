@@ -133,6 +133,7 @@ func (c *Group) join(ctx context.Context) error {
 	streamCtx, cancel := context.WithCancel(context.Background())
 	stream, err := client.JoinCluster(streamCtx, request)
 	if err != nil {
+		cancel()
 		return err
 	}
 
