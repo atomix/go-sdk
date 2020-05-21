@@ -72,7 +72,7 @@ func (c *Client) Peer(id peer.ID) *peer.Peer {
 }
 
 // Peers returns the peer group
-func (c *Client) Peers() peer.Peers {
+func (c *Client) Peers() peer.Set {
 	return c.peers.Peers()
 }
 

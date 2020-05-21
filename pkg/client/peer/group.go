@@ -47,12 +47,11 @@ func NewGroup(address string, opts ...Option) (*Group, error) {
 		Namespace: options.namespace,
 		Name:      options.scope,
 		member:    member,
-		peers:     make(Peers, 0),
-		peersByID: make(map[ID]*Peer),
+		peers:     make(Set),
 		conn:      conn,
 		options:   *options,
 		leaveCh:   make(chan struct{}),
-		watchers:  make([]chan<- Peers, 0),
+		watchers:  make([]chan<- Set, 0),
 	}
 
 	if options.joinTimeout != nil {
@@ -75,9 +74,8 @@ type Group struct {
 	member    *Member
 	conn      *grpc.ClientConn
 	options   options
-	peers     Peers
-	peersByID map[ID]*Peer
-	watchers  []chan<- Peers
+	peers     Set
+	watchers  []chan<- Set
 	closer    context.CancelFunc
 	leaveCh   chan struct{}
 	mu        sync.RWMutex
@@ -90,17 +88,17 @@ func (c *Group) Member() *Peer {
 
 // Peer returns a peer by ID
 func (c *Group) Peer(id ID) *Peer {
-	return c.peersByID[id]
+	return c.peers[id]
 }
 
 // Peers returns the current group peers
-func (c *Group) Peers() Peers {
+func (c *Group) Peers() Set {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	if c.peers != nil {
 		return c.peers
 	}
-	return Peers{}
+	return Set{}
 }
 
 // join joins the cluster
@@ -156,31 +154,25 @@ func (c *Group) join(ctx context.Context) error {
 				return
 			} else {
 				c.mu.Lock()
-
-				oldPeers := make(map[ID]*Peer)
-				if c.peers != nil {
-					for _, peer := range c.peers {
-						oldPeers[peer.ID] = peer
-					}
-				}
-
-				newPeers := make([]*Peer, 0, len(response.Members))
+				members := make(map[ID]clusterapi.Member)
 				for _, member := range response.Members {
-					memberID := ID(member.ID.Name)
-					oldMember, ok := oldPeers[memberID]
-					if ok {
-						newPeers = append(newPeers, oldMember)
-					} else {
-						newPeers = append(newPeers, NewPeer(memberID, member.Host, int(member.Port)))
+					members[ID(member.ID.Name)] = member
+				}
+
+				for id := range c.peers {
+					_, ok := members[id]
+					if !ok {
+						delete(c.peers, id)
 					}
 				}
 
-				c.peers = newPeers
-				peersByID := make(map[ID]*Peer)
-				for _, peer := range newPeers {
-					peersByID[peer.ID] = peer
+				for id, member := range members {
+					_, ok := c.peers[id]
+					if !ok {
+						c.peers[id] = NewPeer(id, member.Host, int(member.Port))
+					}
 				}
-				c.peersByID = peersByID
+				peers := c.peers
 				c.mu.Unlock()
 
 				if !joined {
@@ -190,7 +182,7 @@ func (c *Group) join(ctx context.Context) error {
 
 				c.mu.RLock()
 				for _, watcher := range c.watchers {
-					watcher <- newPeers
+					watcher <- peers
 				}
 				c.mu.RUnlock()
 			}
@@ -206,9 +198,9 @@ func (c *Group) join(ctx context.Context) error {
 }
 
 // Watch watches the peers for changes
-func (c *Group) Watch(ctx context.Context, ch chan<- Peers) error {
+func (c *Group) Watch(ctx context.Context, ch chan<- Set) error {
 	c.mu.Lock()
-	watcher := make(chan Peers)
+	watcher := make(chan Set)
 	peers := c.peers
 	go func() {
 		if peers != nil {
@@ -223,7 +215,7 @@ func (c *Group) Watch(ctx context.Context, ch chan<- Peers) error {
 				ch <- peers
 			case <-ctx.Done():
 				c.mu.Lock()
-				watchers := make([]chan<- Peers, 0)
+				watchers := make([]chan<- Set, 0)
 				for _, ch := range c.watchers {
 					if ch != watcher {
 						watchers = append(watchers, ch)
@@ -262,5 +254,5 @@ func (c *Group) Close() error {
 	return nil
 }
 
-// Peers is a set of peers
-type Peers []*Peer
+// Set is a set of peers
+type Set map[ID]*Peer
