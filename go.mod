@@ -15,3 +15,5 @@ require (
 )
 
 replace github.com/atomix/api => ../atomix-api
+replace github.com/atomix/go-framework => ../atomix-go-node
+replace github.com/atomix/go-local => ../atomix-go-local

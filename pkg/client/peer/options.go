@@ -1,4 +1,4 @@
-// Copyright 2019-present Open Networking Foundation.
+// Copyright 2020-present Open Networking Foundation.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,20 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package client
+package peer
 
 import (
-	"github.com/atomix/go-client/pkg/client/peer"
 	"os"
 	"time"
 )
 
 func applyOptions(opts ...Option) *options {
 	options := &options{
-		namespace:      os.Getenv("ATOMIX_NAMESPACE"),
-		scope:          os.Getenv("ATOMIX_SCOPE"),
-		peerPort:       8080,
-		sessionTimeout: 1 * time.Minute,
+		namespace: os.Getenv("ATOMIX_NAMESPACE"),
+		scope:     os.Getenv("ATOMIX_SCOPE"),
+		peerPort:  8080,
 	}
 	for _, opt := range opts {
 		opt.apply(options)
@@ -34,14 +32,13 @@ func applyOptions(opts ...Option) *options {
 }
 
 type options struct {
-	memberID       string
-	peerHost       string
-	peerPort       int
-	services       []peer.Service
-	joinTimeout    *time.Duration
-	scope          string
-	namespace      string
-	sessionTimeout time.Duration
+	memberID    string
+	peerHost    string
+	peerPort    int
+	services    []Service
+	joinTimeout *time.Duration
+	scope       string
+	namespace   string
 }
 
 // Option provides a client option
@@ -92,19 +89,19 @@ func (o *peerPortOption) apply(options *options) {
 }
 
 // WithService configures a peer-to-peer service
-func WithService(service peer.Service) Option {
+func WithService(service Service) Option {
 	return &serviceOption{
 		service: service,
 	}
 }
 
 type serviceOption struct {
-	service peer.Service
+	service Service
 }
 
 func (o *serviceOption) apply(options *options) {
 	if options.services == nil {
-		options.services = make([]peer.Service, 0)
+		options.services = make([]Service, 0)
 	}
 	options.services = append(options.services, o.service)
 }
@@ -152,19 +149,4 @@ func (o *namespaceOption) apply(options *options) {
 // WithNamespace configures the client's partition group namespace
 func WithNamespace(namespace string) Option {
 	return &namespaceOption{namespace: namespace}
-}
-
-type sessionTimeoutOption struct {
-	timeout time.Duration
-}
-
-func (s *sessionTimeoutOption) apply(options *options) {
-	options.sessionTimeout = s.timeout
-}
-
-// WithSessionTimeout sets the session timeout for the client
-func WithSessionTimeout(timeout time.Duration) Option {
-	return &sessionTimeoutOption{
-		timeout: timeout,
-	}
 }

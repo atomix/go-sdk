@@ -18,24 +18,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	primitiveapi "github.com/atomix/api/proto/atomix/primitive"
-	"sort"
-	"time"
-
 	databaseapi "github.com/atomix/api/proto/atomix/database"
-	"github.com/atomix/go-client/pkg/client/counter"
-	"github.com/atomix/go-client/pkg/client/election"
-	"github.com/atomix/go-client/pkg/client/indexedmap"
-	"github.com/atomix/go-client/pkg/client/leader"
-	"github.com/atomix/go-client/pkg/client/list"
-	"github.com/atomix/go-client/pkg/client/lock"
-	"github.com/atomix/go-client/pkg/client/log"
-	"github.com/atomix/go-client/pkg/client/map"
+	"github.com/atomix/go-client/pkg/client/peer"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/set"
 	"github.com/atomix/go-client/pkg/client/util/net"
-	"github.com/atomix/go-client/pkg/client/value"
 	"google.golang.org/grpc"
+	"sort"
 )
 
 // New returns a new Atomix client
@@ -48,33 +36,51 @@ func New(address string, opts ...Option) (*Client, error) {
 		return nil, err
 	}
 
-	return &Client{
-		conn:           conn,
-		scope:          options.scope,
-		namespace:      options.namespace,
-		sessionTimeout: options.sessionTimeout,
-	}, nil
-}
+	clusterOpts := []peer.Option{
+		peer.WithNamespace(options.namespace),
+		peer.WithScope(options.scope),
+		peer.WithMemberID(options.memberID),
+		peer.WithPeerHost(options.peerHost),
+		peer.WithPeerPort(options.peerPort),
+	}
+	if options.joinTimeout != nil {
+		clusterOpts = append(clusterOpts, peer.WithJoinTimeout(*options.joinTimeout))
+	}
 
-// NewClient returns a new Atomix client
-// Deprected: use New instead
-func NewClient(address string, opts ...Option) (*Client, error) {
-	return New(address, opts...)
+	peers, err := peer.NewGroup(address, clusterOpts...)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Client{
+		conn:    conn,
+		peers:   peers,
+		options: *options,
+	}, nil
 }
 
 // Client is an Atomix client
 type Client struct {
-	scope          string
-	namespace      string
-	sessionTimeout time.Duration
-	conn           *grpc.ClientConn
+	conn    *grpc.ClientConn
+	peers   *peer.Group
+	options options
+}
+
+// Peer returns a peer by name
+func (c *Client) Peer(id peer.ID) *peer.Peer {
+	return c.peers.Peer(id)
+}
+
+// Peers returns the peer group
+func (c *Client) Peers() peer.Peers {
+	return c.peers.Peers()
 }
 
 // GetDatabases returns a list of all databases in the client's namespace
 func (c *Client) GetDatabases(ctx context.Context) ([]*Database, error) {
 	client := databaseapi.NewDatabaseServiceClient(c.conn)
 	request := &databaseapi.GetDatabasesRequest{
-		Namespace: c.namespace,
+		Namespace: c.options.namespace,
 	}
 
 	response, err := client.GetDatabases(ctx, request)
@@ -99,7 +105,7 @@ func (c *Client) GetDatabase(ctx context.Context, name string) (*Database, error
 	request := &databaseapi.GetDatabaseRequest{
 		ID: databaseapi.DatabaseId{
 			Name:      name,
-			Namespace: c.namespace,
+			Namespace: c.options.namespace,
 		},
 	}
 
@@ -132,7 +138,7 @@ func (c *Client) newDatabase(ctx context.Context, databaseProto *databaseapi.Dat
 	// Iterate through partitions and open sessions
 	sessions := make([]*primitive.Session, len(partitions))
 	for i, partition := range partitions {
-		session, err := primitive.NewSession(ctx, partition, primitive.WithSessionTimeout(c.sessionTimeout))
+		session, err := primitive.NewSession(ctx, partition, primitive.WithSessionTimeout(c.options.sessionTimeout))
 		if err != nil {
 			return nil, err
 		}
@@ -142,7 +148,7 @@ func (c *Client) newDatabase(ctx context.Context, databaseProto *databaseapi.Dat
 	return &Database{
 		Namespace: databaseProto.ID.Namespace,
 		Name:      databaseProto.ID.Name,
-		scope:     c.scope,
+		scope:     c.options.scope,
 		sessions:  sessions,
 		conn:      c.conn,
 	}, nil
@@ -154,183 +160,4 @@ func (c *Client) Close() error {
 		return err
 	}
 	return nil
-}
-
-// Database manages the primitives in a set of partitions
-type Database struct {
-	Namespace string
-	Name      string
-
-	scope    string
-	conn     *grpc.ClientConn
-	sessions []*primitive.Session
-}
-
-// GetPrimitives gets a list of primitives in the database
-func (d *Database) GetPrimitives(ctx context.Context, opts ...primitive.MetadataOption) ([]primitive.Metadata, error) {
-	client := primitiveapi.NewPrimitiveServiceClient(d.conn)
-
-	request := &primitiveapi.GetPrimitivesRequest{
-		Database: &databaseapi.DatabaseId{
-			Namespace: d.Namespace,
-			Name:      d.Name,
-		},
-		Primitive: &primitiveapi.PrimitiveId{
-			Namespace: d.scope,
-		},
-	}
-
-	response, err := client.GetPrimitives(ctx, request)
-	if err != nil {
-		return nil, err
-	}
-
-	primitives := make([]primitive.Metadata, len(response.Primitives))
-	for i, p := range response.Primitives {
-		var primitiveType primitive.Type
-		switch p.Type {
-		case primitiveapi.PrimitiveType_COUNTER:
-			primitiveType = "Counter"
-		case primitiveapi.PrimitiveType_ELECTION:
-			primitiveType = "Election"
-		case primitiveapi.PrimitiveType_INDEXED_MAP:
-			primitiveType = "IndexedMap"
-		case primitiveapi.PrimitiveType_LEADER_LATCH:
-			primitiveType = "LeaderLatch"
-		case primitiveapi.PrimitiveType_LIST:
-			primitiveType = "List"
-		case primitiveapi.PrimitiveType_LOCK:
-			primitiveType = "Lock"
-		case primitiveapi.PrimitiveType_LOG:
-			primitiveType = "Log"
-		case primitiveapi.PrimitiveType_MAP:
-			primitiveType = "Map"
-		case primitiveapi.PrimitiveType_SET:
-			primitiveType = "Set"
-		case primitiveapi.PrimitiveType_VALUE:
-			primitiveType = "Value"
-		default:
-			primitiveType = "Unknown"
-		}
-		primitives[i] = primitive.Metadata{
-			Type: primitiveType,
-			Name: primitive.Name{
-				Scope: p.Primitive.Namespace,
-				Name:  p.Primitive.Name,
-			},
-		}
-	}
-	return primitives, nil
-}
-
-// GetCounter gets or creates a Counter with the given name
-func (d *Database) GetCounter(ctx context.Context, name string) (counter.Counter, error) {
-	return counter.New(ctx, primitive.NewName(d.Namespace, d.Name, d.scope, name), d.sessions)
-}
-
-// GetElection gets or creates an Election with the given name
-func (d *Database) GetElection(ctx context.Context, name string, opts ...election.Option) (election.Election, error) {
-	return election.New(ctx, primitive.NewName(d.Namespace, d.Name, d.scope, name), d.sessions)
-}
-
-// GetIndexedMap gets or creates a Map with the given name
-func (d *Database) GetIndexedMap(ctx context.Context, name string) (indexedmap.IndexedMap, error) {
-	return indexedmap.New(ctx, primitive.NewName(d.Namespace, d.Name, d.scope, name), d.sessions)
-}
-
-// GetLeaderLatch gets or creates a LeaderLatch with the given name
-func (d *Database) GetLeaderLatch(ctx context.Context, name string, opts ...leader.Option) (leader.Latch, error) {
-	return leader.New(ctx, primitive.NewName(d.Namespace, d.Name, d.scope, name), d.sessions)
-}
-
-// GetList gets or creates a List with the given name
-func (d *Database) GetList(ctx context.Context, name string) (list.List, error) {
-	return list.New(ctx, primitive.NewName(d.Namespace, d.Name, d.scope, name), d.sessions)
-}
-
-// GetLock gets or creates a Lock with the given name
-func (d *Database) GetLock(ctx context.Context, name string) (lock.Lock, error) {
-	return lock.New(ctx, primitive.NewName(d.Namespace, d.Name, d.scope, name), d.sessions)
-}
-
-// GetLog gets or creates a Log with the given name
-func (d *Database) GetLog(ctx context.Context, name string) (log.Log, error) {
-	return log.New(ctx, primitive.NewName(d.Namespace, d.Name, d.scope, name), d.sessions)
-}
-
-// GetMap gets or creates a Map with the given name
-func (d *Database) GetMap(ctx context.Context, name string, opts ..._map.Option) (_map.Map, error) {
-	return _map.New(ctx, primitive.NewName(d.Namespace, d.Name, d.scope, name), d.sessions, opts...)
-}
-
-// GetSet gets or creates a Set with the given name
-func (d *Database) GetSet(ctx context.Context, name string) (set.Set, error) {
-	return set.New(ctx, primitive.NewName(d.Namespace, d.Name, d.scope, name), d.sessions)
-}
-
-// GetValue gets or creates a Value with the given name
-func (d *Database) GetValue(ctx context.Context, name string) (value.Value, error) {
-	return value.New(ctx, primitive.NewName(d.Namespace, d.Name, d.scope, name), d.sessions)
-}
-
-// PartitionGroup manages the primitives in a partition group
-// Deprecated: PartitionGroup has been replaced by the Database abstraction
-type PartitionGroup struct {
-	Namespace     string
-	Name          string
-	Partitions    int
-	PartitionSize int
-
-	scope    string
-	sessions []*primitive.Session
-}
-
-// GetCounter gets or creates a Counter with the given name
-func (g *PartitionGroup) GetCounter(ctx context.Context, name string) (counter.Counter, error) {
-	return counter.New(ctx, primitive.NewName(g.Namespace, g.Name, g.scope, name), g.sessions)
-}
-
-// GetElection gets or creates an Election with the given name
-func (g *PartitionGroup) GetElection(ctx context.Context, name string, opts ...election.Option) (election.Election, error) {
-	return election.New(ctx, primitive.NewName(g.Namespace, g.Name, g.scope, name), g.sessions)
-}
-
-// GetIndexedMap gets or creates a Map with the given name
-func (g *PartitionGroup) GetIndexedMap(ctx context.Context, name string) (indexedmap.IndexedMap, error) {
-	return indexedmap.New(ctx, primitive.NewName(g.Namespace, g.Name, g.scope, name), g.sessions)
-}
-
-// GetLeaderLatch gets or creates a LeaderLatch with the given name
-func (g *PartitionGroup) GetLeaderLatch(ctx context.Context, name string, opts ...leader.Option) (leader.Latch, error) {
-	return leader.New(ctx, primitive.NewName(g.Namespace, g.Name, g.scope, name), g.sessions)
-}
-
-// GetList gets or creates a List with the given name
-func (g *PartitionGroup) GetList(ctx context.Context, name string) (list.List, error) {
-	return list.New(ctx, primitive.NewName(g.Namespace, g.Name, g.scope, name), g.sessions)
-}
-
-// GetLock gets or creates a Lock with the given name
-func (g *PartitionGroup) GetLock(ctx context.Context, name string) (lock.Lock, error) {
-	return lock.New(ctx, primitive.NewName(g.Namespace, g.Name, g.scope, name), g.sessions)
-}
-
-// GetLog gets or creates a Log with the given name
-func (g *PartitionGroup) GetLog(ctx context.Context, name string) (log.Log, error) {
-	return log.New(ctx, primitive.NewName(g.Namespace, g.Name, g.scope, name), g.sessions)
-}
-
-// GetMap gets or creates a Map with the given name
-func (g *PartitionGroup) GetMap(ctx context.Context, name string, opts ..._map.Option) (_map.Map, error) {
-	return _map.New(ctx, primitive.NewName(g.Namespace, g.Name, g.scope, name), g.sessions, opts...)
-}
-
-// GetSet gets or creates a Set with the given name
-func (g *PartitionGroup) GetSet(ctx context.Context, name string) (set.Set, error) {
-	return set.New(ctx, primitive.NewName(g.Namespace, g.Name, g.scope, name), g.sessions)
-}
-
-// GetValue gets or creates a Value with the given name
-func (g *PartitionGroup) GetValue(ctx context.Context, name string) (value.Value, error) {
-	return value.New(ctx, primitive.NewName(g.Namespace, g.Name, g.scope, name), g.sessions)
 }

@@ -51,7 +51,7 @@ func startTestPartition(partitionID int) (netutil.Address, chan struct{}) {
 		if err != nil {
 			continue
 		}
-		node := local.NewNode(lis, registry.Registry, []*database.PartitionId{{Partition: int32(partitionID)}})
+		node := local.NewNode(lis, registry.Registry, []database.PartitionId{{Partition: int32(partitionID)}})
 		node.Start()
 
 		ch := make(chan struct{})
