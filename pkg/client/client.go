@@ -66,14 +66,9 @@ type Client struct {
 	options options
 }
 
-// Peer returns a peer by name
-func (c *Client) Peer(id peer.ID) *peer.Peer {
-	return c.peers.Peer(id)
-}
-
-// Peers returns the peer group
-func (c *Client) Peers() peer.Set {
-	return c.peers.Peers()
+// Group returns the peer group
+func (c *Client) Group() *peer.Group {
+	return c.peers
 }
 
 // GetDatabases returns a list of all databases in the client's namespace
