@@ -17,7 +17,7 @@ package test
 import (
 	"context"
 	"fmt"
-	"github.com/atomix/api/proto/atomix/controller"
+	"github.com/atomix/api/proto/atomix/database"
 	"github.com/atomix/go-client/pkg/client/primitive"
 	netutil "github.com/atomix/go-client/pkg/client/util/net"
 	"github.com/atomix/go-framework/pkg/atomix/registry"
@@ -51,7 +51,7 @@ func startTestPartition(partitionID int) (netutil.Address, chan struct{}) {
 		if err != nil {
 			continue
 		}
-		node := local.NewNode(lis, registry.Registry, []*controller.PartitionId{{Partition: int32(partitionID)}})
+		node := local.NewNode(lis, registry.Registry, []*database.PartitionId{{Partition: int32(partitionID)}})
 		node.Start()
 
 		ch := make(chan struct{})

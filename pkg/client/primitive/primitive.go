@@ -26,11 +26,10 @@ type Type string
 // NewName returns a qualified primitive name with the given namespace, group, application, and name
 func NewName(namespace string, group string, scope string, name string) Name {
 	return Name{
-		Namespace:   namespace,
-		Database:    group,
-		Application: scope,
-		Scope:       scope,
-		Name:        name,
+		Namespace: namespace,
+		Database:  group,
+		Scope:     scope,
+		Name:      name,
 	}
 }
 
@@ -40,9 +39,6 @@ type Name struct {
 	Namespace string
 	// Database is the database in which the primitive is stored
 	Database string
-	// Application is the name of the application that owns the primitive
-	// Deprecated: Use Scope instead
-	Application string
 	// Scope is the application scope in which the primitive is stored
 	Scope string
 	// Name is the simple name of the primitive
