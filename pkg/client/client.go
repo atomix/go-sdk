@@ -40,8 +40,10 @@ func New(address string, opts ...Option) (*Client, error) {
 		peer.WithNamespace(options.namespace),
 		peer.WithScope(options.scope),
 		peer.WithMemberID(options.memberID),
-		peer.WithPeerHost(options.peerHost),
-		peer.WithPeerPort(options.peerPort),
+		peer.WithHost(options.peerHost),
+		peer.WithPort(options.peerPort),
+		peer.WithServices(options.peerServices...),
+		peer.WithServerOptions(options.peerServerOpts...),
 	}
 	if options.joinTimeout != nil {
 		clusterOpts = append(clusterOpts, peer.WithJoinTimeout(*options.joinTimeout))

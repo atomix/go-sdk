@@ -43,8 +43,8 @@ type Member struct {
 }
 
 // serve begins serving the local member
-func (m *Member) serve() error {
-	server := grpc.NewServer()
+func (m *Member) serve(opts ...grpc.ServerOption) error {
+	server := grpc.NewServer(opts...)
 	for _, service := range m.services {
 		service(m.ID, server)
 	}

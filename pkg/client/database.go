@@ -106,7 +106,7 @@ func (d *Database) GetCounter(ctx context.Context, name string) (counter.Counter
 
 // GetElection gets or creates an Election with the given name
 func (d *Database) GetElection(ctx context.Context, name string, opts ...election.Option) (election.Election, error) {
-	return election.New(ctx, primitive.NewName(d.Namespace, d.Name, d.scope, name), d.sessions)
+	return election.New(ctx, primitive.NewName(d.Namespace, d.Name, d.scope, name), d.sessions, opts...)
 }
 
 // GetIndexedMap gets or creates a Map with the given name
@@ -116,7 +116,7 @@ func (d *Database) GetIndexedMap(ctx context.Context, name string) (indexedmap.I
 
 // GetLeaderLatch gets or creates a LeaderLatch with the given name
 func (d *Database) GetLeaderLatch(ctx context.Context, name string, opts ...leader.Option) (leader.Latch, error) {
-	return leader.New(ctx, primitive.NewName(d.Namespace, d.Name, d.scope, name), d.sessions)
+	return leader.New(ctx, primitive.NewName(d.Namespace, d.Name, d.scope, name), d.sessions, opts...)
 }
 
 // GetList gets or creates a List with the given name

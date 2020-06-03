@@ -42,7 +42,9 @@ type Peer struct {
 }
 
 // Connect connects to the member
-func (m *Peer) Connect() (*grpc.ClientConn, error) {
+func (m *Peer) Connect(opts ...ConnectOption) (*grpc.ClientConn, error) {
+	options := applyConnectOptions(opts...)
+
 	m.mu.RLock()
 	conn := m.conn
 	m.mu.RUnlock()
@@ -56,7 +58,7 @@ func (m *Peer) Connect() (*grpc.ClientConn, error) {
 		return m.conn, nil
 	}
 
-	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", m.Host, m.Port), grpc.WithInsecure())
+	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", m.Host, m.Port), options.dialOptions...)
 	if err != nil {
 		return nil, err
 	}

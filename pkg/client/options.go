@@ -16,6 +16,7 @@ package client
 
 import (
 	"github.com/atomix/go-client/pkg/client/peer"
+	"google.golang.org/grpc"
 	"os"
 	"time"
 )
@@ -26,6 +27,8 @@ func applyOptions(opts ...Option) *options {
 		scope:          os.Getenv("ATOMIX_SCOPE"),
 		peerPort:       8080,
 		sessionTimeout: 1 * time.Minute,
+		peerServices:   make([]peer.Service, 0),
+		peerServerOpts: make([]grpc.ServerOption, 0),
 	}
 	for _, opt := range opts {
 		opt.apply(options)
@@ -37,7 +40,8 @@ type options struct {
 	memberID       string
 	peerHost       string
 	peerPort       int
-	services       []peer.Service
+	peerServices   []peer.Service
+	peerServerOpts []grpc.ServerOption
 	joinTimeout    *time.Duration
 	scope          string
 	namespace      string
@@ -91,22 +95,34 @@ func (o *peerPortOption) apply(options *options) {
 	options.peerPort = o.port
 }
 
-// WithService configures a peer-to-peer service
-func WithService(service peer.Service) Option {
-	return &serviceOption{
+// WithPeerService configures a peer-to-peer service
+func WithPeerService(service peer.Service) Option {
+	return &peerServiceOption{
 		service: service,
 	}
 }
 
-type serviceOption struct {
+type peerServiceOption struct {
 	service peer.Service
 }
 
-func (o *serviceOption) apply(options *options) {
-	if options.services == nil {
-		options.services = make([]peer.Service, 0)
+func (o *peerServiceOption) apply(options *options) {
+	options.peerServices = append(options.peerServices, o.service)
+}
+
+// WithPeerServerOption configures a server option
+func WithPeerServerOption(option grpc.ServerOption) Option {
+	return &peerServerOption{
+		option: option,
 	}
-	options.services = append(options.services, o.service)
+}
+
+type peerServerOption struct {
+	option grpc.ServerOption
+}
+
+func (o *peerServerOption) apply(options *options) {
+	options.peerServerOpts = append(options.peerServerOpts, o.option)
 }
 
 // WithJoinTimeout configures the client's join timeout

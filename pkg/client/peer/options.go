@@ -15,15 +15,18 @@
 package peer
 
 import (
+	"google.golang.org/grpc"
 	"os"
 	"time"
 )
 
 func applyOptions(opts ...Option) *options {
 	options := &options{
-		namespace: os.Getenv("ATOMIX_NAMESPACE"),
-		scope:     os.Getenv("ATOMIX_SCOPE"),
-		peerPort:  8080,
+		namespace:     os.Getenv("ATOMIX_NAMESPACE"),
+		scope:         os.Getenv("ATOMIX_SCOPE"),
+		peerPort:      8080,
+		services:      make([]Service, 0),
+		serverOptions: make([]grpc.ServerOption, 0),
 	}
 	for _, opt := range opts {
 		opt.apply(options)
@@ -32,21 +35,22 @@ func applyOptions(opts ...Option) *options {
 }
 
 type options struct {
-	memberID    string
-	peerHost    string
-	peerPort    int
-	services    []Service
-	joinTimeout *time.Duration
-	scope       string
-	namespace   string
+	memberID      string
+	peerHost      string
+	peerPort      int
+	services      []Service
+	joinTimeout   *time.Duration
+	scope         string
+	namespace     string
+	serverOptions []grpc.ServerOption
 }
 
-// Option provides a client option
+// Option provides a peer option
 type Option interface {
 	apply(options *options)
 }
 
-// WithMemberID configures the client's member ID
+// WithMemberID configures the peer's member ID
 func WithMemberID(memberID string) Option {
 	return &memberIDOption{id: memberID}
 }
@@ -62,29 +66,29 @@ func (o *memberIDOption) apply(options *options) {
 	}
 }
 
-// WithPeerHost configures the client's peer host
-func WithPeerHost(host string) Option {
-	return &peerHostOption{host: host}
+// WithHost configures the peer's host
+func WithHost(host string) Option {
+	return &hostOption{host: host}
 }
 
-type peerHostOption struct {
+type hostOption struct {
 	host string
 }
 
-func (o *peerHostOption) apply(options *options) {
+func (o *hostOption) apply(options *options) {
 	options.peerHost = o.host
 }
 
-// WithPeerPort configures the client's peer port
-func WithPeerPort(port int) Option {
-	return &peerPortOption{port: port}
+// WithPort configures the peer's port
+func WithPort(port int) Option {
+	return &portOption{port: port}
 }
 
-type peerPortOption struct {
+type portOption struct {
 	port int
 }
 
-func (o *peerPortOption) apply(options *options) {
+func (o *portOption) apply(options *options) {
 	options.peerPort = o.port
 }
 
@@ -100,10 +104,22 @@ type serviceOption struct {
 }
 
 func (o *serviceOption) apply(options *options) {
-	if options.services == nil {
-		options.services = make([]Service, 0)
-	}
 	options.services = append(options.services, o.service)
+}
+
+// WithServices configures peer-to-peer services
+func WithServices(services ...Service) Option {
+	return &servicesOption{
+		services: services,
+	}
+}
+
+type servicesOption struct {
+	services []Service
+}
+
+func (o *servicesOption) apply(options *options) {
+	options.services = append(options.services, o.services...)
 }
 
 // WithJoinTimeout configures the client's join timeout
@@ -127,12 +143,6 @@ func (o *scopeOption) apply(options *options) {
 	options.scope = o.scope
 }
 
-// WithApplication configures the application name for the client
-// Deprecated: Use WithScope instead
-func WithApplication(application string) Option {
-	return &scopeOption{scope: application}
-}
-
 // WithScope configures the application scope for the client
 func WithScope(scope string) Option {
 	return &scopeOption{scope: scope}
@@ -149,4 +159,92 @@ func (o *namespaceOption) apply(options *options) {
 // WithNamespace configures the client's partition group namespace
 func WithNamespace(namespace string) Option {
 	return &namespaceOption{namespace: namespace}
+}
+
+// WithServerOption configures a server option
+func WithServerOption(option grpc.ServerOption) Option {
+	return &serverOptionOption{
+		option: option,
+	}
+}
+
+type serverOptionOption struct {
+	option grpc.ServerOption
+}
+
+func (o *serverOptionOption) apply(options *options) {
+	options.serverOptions = append(options.serverOptions, o.option)
+}
+
+// WithServerOptions configures server options
+func WithServerOptions(options ...grpc.ServerOption) Option {
+	return &serverOptionsOption{
+		options: options,
+	}
+}
+
+type serverOptionsOption struct {
+	options []grpc.ServerOption
+}
+
+func (o *serverOptionsOption) apply(options *options) {
+	options.serverOptions = append(options.serverOptions, o.options...)
+}
+
+func applyConnectOptions(opts ...ConnectOption) *connectOptions {
+	options := &connectOptions{}
+	for _, opt := range opts {
+		opt.apply(options)
+	}
+	if options.dialOptions == nil {
+		options.dialOptions = []grpc.DialOption{
+			grpc.WithInsecure(),
+		}
+	}
+	return options
+}
+
+type connectOptions struct {
+	dialOptions []grpc.DialOption
+}
+
+// ConnectOption is an option for connecting to a peer
+type ConnectOption interface {
+	apply(options *connectOptions)
+}
+
+// WithDialOption creates a dial option for the gRPC connection
+func WithDialOption(option grpc.DialOption) ConnectOption {
+	return &dialOptionOption{
+		option: option,
+	}
+}
+
+type dialOptionOption struct {
+	option grpc.DialOption
+}
+
+func (o *dialOptionOption) apply(options *connectOptions) {
+	if options.dialOptions == nil {
+		options.dialOptions = make([]grpc.DialOption, 0)
+	}
+	options.dialOptions = append(options.dialOptions, o.option)
+}
+
+// WithDialOptions creates a dial option for the gRPC connection
+func WithDialOptions(options ...grpc.DialOption) ConnectOption {
+	return &dialOptionsOption{
+		options: options,
+	}
+}
+
+type dialOptionsOption struct {
+	options []grpc.DialOption
+}
+
+func (o *dialOptionsOption) apply(options *connectOptions) {
+	if options.dialOptions == nil {
+		options.dialOptions = make([]grpc.DialOption, 0)
+	}
+	options.dialOptions = append(options.dialOptions, o.options...)
 }
