@@ -264,7 +264,7 @@ func (s *Session) nextStreamHeader(primitive primitiveapi.PrimitiveId) (*Stream,
 
 func (s *Session) doSession(ctx context.Context, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
 	header := s.getState(primitiveapi.PrimitiveId{})
-	_, err := s.doRequest(header, func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error) {
+	_, err := s.doRequest(ctx, header, func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error) {
 		return f(ctx, conn, header)
 	})
 	return err
@@ -273,7 +273,7 @@ func (s *Session) doSession(ctx context.Context, f func(ctx context.Context, con
 // doPrimitive sends a primitive request
 func (s *Session) doPrimitive(ctx context.Context, name Name, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) error {
 	header := s.nextCommandHeader(getPrimitiveID(name))
-	_, err := s.doRequest(header, func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error) {
+	_, err := s.doRequest(ctx, header, func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error) {
 		return f(ctx, conn, header)
 	})
 	return err
@@ -292,7 +292,7 @@ func (s *Session) doClose(ctx context.Context, name Name, f func(ctx context.Con
 // doQuery sends a session query request
 func (s *Session) doQuery(ctx context.Context, name Name, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) (interface{}, error) {
 	header := s.getQueryHeader(getPrimitiveID(name))
-	return s.doRequest(header, func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error) {
+	return s.doRequest(ctx, header, func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error) {
 		return f(ctx, conn, header)
 	})
 }
@@ -300,12 +300,12 @@ func (s *Session) doQuery(ctx context.Context, name Name, f func(ctx context.Con
 // doCommand sends a session command request
 func (s *Session) doCommand(ctx context.Context, name Name, f func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error)) (interface{}, error) {
 	header := s.nextCommandHeader(getPrimitiveID(name))
-	return s.doRequest(header, func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error) {
+	return s.doRequest(ctx, header, func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error) {
 		return f(ctx, conn, header)
 	})
 }
 
-func (s *Session) doRequest(requestHeader *headers.RequestHeader, f func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error)) (interface{}, error) {
+func (s *Session) doRequest(ctx context.Context, requestHeader *headers.RequestHeader, f func(conn *grpc.ClientConn) (*headers.ResponseHeader, interface{}, error)) (interface{}, error) {
 	i := 0
 	for {
 		conn, err := s.conns.Connect()
@@ -325,8 +325,12 @@ func (s *Session) doRequest(requestHeader *headers.RequestHeader, f func(conn *g
 				return nil, errors.New("an unknown error occurred")
 			}
 		} else {
-			i++
-			time.Sleep(time.Duration(math.Max(math.Pow(float64(i), 2), 1000)) * time.Millisecond)
+			select {
+			case <-time.After(time.Duration(math.Max(math.Pow(float64(i), 2), 1000)) * time.Millisecond):
+				i++
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
 		}
 	}
 }
