@@ -21,9 +21,11 @@ import (
 	databaseapi "github.com/atomix/api/proto/atomix/database"
 	"github.com/atomix/go-client/pkg/client/peer"
 	"github.com/atomix/go-client/pkg/client/primitive"
+	"github.com/atomix/go-client/pkg/client/util"
 	"github.com/atomix/go-client/pkg/client/util/net"
 	"google.golang.org/grpc"
 	"sort"
+	"time"
 )
 
 // New returns a new Atomix client
@@ -31,7 +33,7 @@ func New(address string, opts ...Option) (*Client, error) {
 	options := applyOptions(opts...)
 
 	// Set up a connection to the server.
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithUnaryInterceptor(util.RetryingUnaryClientInterceptor()), grpc.WithStreamInterceptor(util.RetryingStreamClientInterceptor(time.Second)))
 	if err != nil {
 		return nil, err
 	}

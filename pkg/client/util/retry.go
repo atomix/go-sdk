@@ -30,7 +30,9 @@ import (
 func RetryingUnaryClientInterceptor() func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 	return func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 		return backoff.Retry(func() error {
-			if err := invoker(ctx, method, req, reply, cc, opts...); err != nil {
+			c, cancel := context.WithTimeout(ctx, 5*time.Second)
+			defer cancel()
+			if err := invoker(c, method, req, reply, cc, opts...); err != nil {
 				if isRetryable(err) {
 					return err
 				}
@@ -44,9 +46,23 @@ func RetryingUnaryClientInterceptor() func(ctx context.Context, method string, r
 // RetryingStreamClientInterceptor returns a ClientStreamInterceptor that retries both requests and responses
 func RetryingStreamClientInterceptor(duration time.Duration) func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
 	return func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+		if desc.ClientStreams && desc.ServerStreams {
+			return newBiDirectionalStreamClientInterceptor(duration)(ctx, desc, cc, method, streamer, opts...)
+		} else if desc.ClientStreams {
+			return newClientStreamClientInterceptor(duration)(ctx, desc, cc, method, streamer, opts...)
+		} else if desc.ServerStreams {
+			return newServerStreamClientInterceptor(duration)(ctx, desc, cc, method, streamer, opts...)
+		}
+		panic("Invalid StreamDesc")
+	}
+}
+
+// newClientStreamClientInterceptor returns a ClientStreamInterceptor that retries both requests and responses
+func newClientStreamClientInterceptor(duration time.Duration) func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+	return func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
 		stream := &retryingClientStream{
 			ctx:      ctx,
-			buffer:   make([]interface{}, 0, 1),
+			buffer:   &retryingClientStreamBuffer{},
 			duration: duration,
 			newStream: func(ctx context.Context) (grpc.ClientStream, error) {
 				return streamer(ctx, desc, cc, method, opts...)
@@ -56,12 +72,97 @@ func RetryingStreamClientInterceptor(duration time.Duration) func(ctx context.Co
 	}
 }
 
+// newServerStreamClientInterceptor returns a ClientStreamInterceptor that retries both requests and responses
+func newServerStreamClientInterceptor(duration time.Duration) func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+	return func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+		stream := &retryingClientStream{
+			ctx:      ctx,
+			buffer:   &retryingServerStreamBuffer{},
+			duration: duration,
+			newStream: func(ctx context.Context) (grpc.ClientStream, error) {
+				return streamer(ctx, desc, cc, method, opts...)
+			},
+		}
+		return stream, stream.retryStream()
+	}
+}
+
+// newBiDirectionalStreamClientInterceptor returns a ClientStreamInterceptor that retries both requests and responses
+func newBiDirectionalStreamClientInterceptor(duration time.Duration) func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+	return func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+		stream := &retryingClientStream{
+			ctx:      ctx,
+			buffer:   &retryingBiDirectionalStreamBuffer{},
+			duration: duration,
+			newStream: func(ctx context.Context) (grpc.ClientStream, error) {
+				return streamer(ctx, desc, cc, method, opts...)
+			},
+		}
+		return stream, stream.retryStream()
+	}
+}
+
+type retryingStreamBuffer interface {
+	append(interface{})
+	list() []interface{}
+}
+
+type retryingClientStreamBuffer struct {
+	buffer []interface{}
+	mu     sync.RWMutex
+}
+
+func (b *retryingClientStreamBuffer) append(msg interface{}) {
+	b.mu.Lock()
+	b.buffer = append(b.buffer, msg)
+	b.mu.Unlock()
+}
+
+func (b *retryingClientStreamBuffer) list() []interface{} {
+	b.mu.RLock()
+	buffer := make([]interface{}, len(b.buffer))
+	copy(buffer, b.buffer)
+	b.mu.RUnlock()
+	return buffer
+}
+
+type retryingServerStreamBuffer struct {
+	msg interface{}
+	mu  sync.RWMutex
+}
+
+func (b *retryingServerStreamBuffer) append(msg interface{}) {
+	b.mu.Lock()
+	b.msg = msg
+	b.mu.Unlock()
+}
+
+func (b *retryingServerStreamBuffer) list() []interface{} {
+	b.mu.RLock()
+	msg := b.msg
+	b.mu.RUnlock()
+	if msg != nil {
+		return []interface{}{msg}
+	}
+	return []interface{}{}
+}
+
+type retryingBiDirectionalStreamBuffer struct{}
+
+func (b *retryingBiDirectionalStreamBuffer) append(interface{}) {
+
+}
+
+func (b *retryingBiDirectionalStreamBuffer) list() []interface{} {
+	return []interface{}{}
+}
+
 type retryingClientStream struct {
 	ctx       context.Context
 	stream    grpc.ClientStream
 	duration  time.Duration
 	mu        sync.RWMutex
-	buffer    []interface{}
+	buffer    retryingStreamBuffer
 	newStream func(ctx context.Context) (grpc.ClientStream, error)
 	closed    bool
 }
@@ -101,13 +202,57 @@ func (s *retryingClientStream) Trailer() metadata.MD {
 }
 
 func (s *retryingClientStream) SendMsg(m interface{}) error {
-	s.mu.Lock()
-	s.buffer = append(s.buffer, m)
-	s.mu.Unlock()
-	if err := s.getStream().SendMsg(m); err != nil {
+	err := s.getStream().SendMsg(m)
+	if err == nil {
+		s.buffer.append(m)
+		return nil
+	}
+
+	if err == io.EOF {
+		s.mu.RLock()
+		closed := s.closed
+		s.mu.RUnlock()
+		if closed {
+			return err
+		}
+	} else if !isRetryable(err) {
 		return err
 	}
-	return nil
+
+	err = backoff.Retry(func() error {
+		if err := s.retryStream(); err != nil {
+			if err == io.EOF {
+				s.mu.RLock()
+				closed := s.closed
+				s.mu.RUnlock()
+				if !closed {
+					return err
+				}
+			} else if isRetryable(err) {
+				return err
+			}
+			return backoff.Permanent(err)
+		}
+		if err := s.getStream().SendMsg(m); err != nil {
+			if err == io.EOF {
+				s.mu.RLock()
+				closed := s.closed
+				s.mu.RUnlock()
+				if !closed {
+					return err
+				}
+			} else if isRetryable(err) {
+				return err
+			}
+			return backoff.Permanent(err)
+		}
+		return nil
+	}, backoff.NewExponentialBackOff())
+	if err == nil {
+		s.buffer.append(m)
+		return nil
+	}
+	return err
 }
 
 func (s *retryingClientStream) RecvMsg(m interface{}) error {
@@ -142,10 +287,10 @@ func (s *retryingClientStream) retryStream() error {
 		}
 
 		s.mu.RLock()
-		buffer := s.buffer
 		closed := s.closed
 		s.mu.RUnlock()
-		for _, m := range buffer {
+		msgs := s.buffer.list()
+		for _, m := range msgs {
 			if err := stream.SendMsg(m); err != nil {
 				if isRetryable(err) {
 					return err
@@ -170,8 +315,5 @@ func (s *retryingClientStream) retryStream() error {
 
 func isRetryable(err error) bool {
 	st := status.Code(err)
-	if st == codes.Unavailable || st == codes.Unknown {
-		return true
-	}
-	return false
+	return st == codes.Unavailable || st == codes.Unknown
 }
