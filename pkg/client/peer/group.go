@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	membershipapi "github.com/atomix/api/proto/atomix/membership"
+	"github.com/atomix/go-client/pkg/client/util"
 	"google.golang.org/grpc"
 	"io"
 	"sync"
@@ -29,7 +30,7 @@ import (
 func NewGroup(address string, opts ...Option) (*Group, error) {
 	options := applyOptions(opts...)
 
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithUnaryInterceptor(util.RetryingUnaryClientInterceptor()), grpc.WithStreamInterceptor(util.RetryingStreamClientInterceptor(time.Second)))
 	if err != nil {
 		return nil, err
 	}
