@@ -469,11 +469,11 @@ func (s *Session) commandStream(
 
 		switch responseHeader.Type {
 		case headers.ResponseType_OPEN_STREAM:
-			if stream.Serialize(responseHeader) && handshakeCh != nil {
+			if stream.serialize(responseHeader) && handshakeCh != nil {
 				close(handshakeCh)
 			}
 		case headers.ResponseType_CLOSE_STREAM:
-			if stream.Serialize(responseHeader) {
+			if stream.serialize(responseHeader) {
 				close(responseCh)
 				stream.Close()
 				return
@@ -485,7 +485,7 @@ func (s *Session) commandStream(
 				s.recordResponse(requestHeader, responseHeader)
 
 				// Attempt to serialize the response to the stream and skip the response if serialization failed.
-				if stream.Serialize(responseHeader) {
+				if stream.serialize(responseHeader) {
 					responseCh <- response
 				}
 			case headers.ResponseStatus_NOT_LEADER:
@@ -578,8 +578,8 @@ func (s *Stream) getHeader() headers.StreamHeader {
 	}
 }
 
-// Serialize updates the stream response metadata and returns whether the response was received in sequential order
-func (s *Stream) Serialize(header *headers.ResponseHeader) bool {
+// serialize updates the stream response metadata and returns whether the response was received in sequential order
+func (s *Stream) serialize(header *headers.ResponseHeader) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if header.ResponseID == s.responseID+1 {

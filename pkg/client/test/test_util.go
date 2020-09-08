@@ -17,10 +17,19 @@ package test
 import (
 	"context"
 	"fmt"
-	"github.com/atomix/api/proto/atomix/database"
 	"github.com/atomix/go-client/pkg/client/primitive"
 	netutil "github.com/atomix/go-client/pkg/client/util/net"
-	"github.com/atomix/go-framework/pkg/atomix/registry"
+	"github.com/atomix/go-framework/pkg/atomix/counter"
+	"github.com/atomix/go-framework/pkg/atomix/election"
+	"github.com/atomix/go-framework/pkg/atomix/indexedmap"
+	"github.com/atomix/go-framework/pkg/atomix/leader"
+	"github.com/atomix/go-framework/pkg/atomix/list"
+	"github.com/atomix/go-framework/pkg/atomix/lock"
+	"github.com/atomix/go-framework/pkg/atomix/log"
+	"github.com/atomix/go-framework/pkg/atomix/map"
+	atomixprimitive "github.com/atomix/go-framework/pkg/atomix/primitive"
+	"github.com/atomix/go-framework/pkg/atomix/set"
+	"github.com/atomix/go-framework/pkg/atomix/value"
 	"github.com/atomix/go-local/pkg/atomix/local"
 	"net"
 )
@@ -51,7 +60,17 @@ func startTestPartition(partitionID int) (netutil.Address, chan struct{}) {
 		if err != nil {
 			continue
 		}
-		node := local.NewNode(lis, registry.Registry, []database.PartitionId{{Partition: int32(partitionID)}})
+		node := local.NewNode(lis, []atomixprimitive.PartitionID{atomixprimitive.PartitionID(partitionID)})
+		counter.RegisterPrimitive(node)
+		election.RegisterPrimitive(node)
+		indexedmap.RegisterPrimitive(node)
+		lock.RegisterPrimitive(node)
+		log.RegisterPrimitive(node)
+		leader.RegisterPrimitive(node)
+		list.RegisterPrimitive(node)
+		_map.RegisterPrimitive(node)
+		set.RegisterPrimitive(node)
+		value.RegisterPrimitive(node)
 		node.Start()
 
 		ch := make(chan struct{})
