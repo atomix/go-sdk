@@ -96,7 +96,7 @@ type filterOption struct {
 
 func (o filterOption) beforeWatch(request *api.EventRequest) {
 	if o.filter.Index > 0 {
-		request.Index = int64(o.filter.Index)
+		request.Index = uint64(o.filter.Index)
 	}
 }
 

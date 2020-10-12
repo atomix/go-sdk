@@ -204,7 +204,7 @@ func (m *indexedMap) Append(ctx context.Context, key string, value []byte) (*Ent
 			Header:  header,
 			Key:     key,
 			Value:   value,
-			Version: -1,
+			IfEmpty: true,
 		}
 		response, err := client.Put(ctx, request)
 		if err != nil {
@@ -287,7 +287,7 @@ func (m *indexedMap) Set(ctx context.Context, index Index, key string, value []b
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.PutRequest{
 			Header: header,
-			Index:  int64(index),
+			Index:  uint64(index),
 			Key:    key,
 			Value:  value,
 		}
@@ -373,7 +373,7 @@ func (m *indexedMap) GetIndex(ctx context.Context, index Index, opts ...GetOptio
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.GetRequest{
 			Header: header,
-			Index:  int64(index),
+			Index:  uint64(index),
 		}
 		for i := range opts {
 			opts[i].beforeGet(request)
@@ -456,7 +456,7 @@ func (m *indexedMap) PrevIndex(ctx context.Context, index Index) (Index, error) 
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.PrevEntryRequest{
 			Header: header,
-			Index:  int64(index),
+			Index:  uint64(index),
 		}
 		response, err := client.PrevEntry(ctx, request)
 		if err != nil {
@@ -480,7 +480,7 @@ func (m *indexedMap) NextIndex(ctx context.Context, index Index) (Index, error) 
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.NextEntryRequest{
 			Header: header,
-			Index:  int64(index),
+			Index:  uint64(index),
 		}
 		response, err := client.NextEntry(ctx, request)
 		if err != nil {
@@ -564,7 +564,7 @@ func (m *indexedMap) PrevEntry(ctx context.Context, index Index) (*Entry, error)
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.PrevEntryRequest{
 			Header: header,
-			Index:  int64(index),
+			Index:  uint64(index),
 		}
 		response, err := client.PrevEntry(ctx, request)
 		if err != nil {
@@ -595,7 +595,7 @@ func (m *indexedMap) NextEntry(ctx context.Context, index Index) (*Entry, error)
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.NextEntryRequest{
 			Header: header,
-			Index:  int64(index),
+			Index:  uint64(index),
 		}
 		response, err := client.NextEntry(ctx, request)
 		if err != nil {
@@ -667,7 +667,7 @@ func (m *indexedMap) ReplaceIndex(ctx context.Context, index Index, value []byte
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.ReplaceRequest{
 			Header:   header,
-			Index:    int64(index),
+			Index:    uint64(index),
 			NewValue: value,
 		}
 		for i := range opts {
@@ -748,7 +748,7 @@ func (m *indexedMap) RemoveIndex(ctx context.Context, index Index, opts ...Remov
 		client := api.NewIndexedMapServiceClient(conn)
 		request := &api.RemoveRequest{
 			Header: header,
-			Index:  int64(index),
+			Index:  uint64(index),
 		}
 		for i := range opts {
 			opts[i].beforeRemove(request)

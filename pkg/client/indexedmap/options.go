@@ -50,7 +50,7 @@ type VersionOption struct {
 }
 
 func (o VersionOption) beforePut(request *api.PutRequest) {
-	request.Version = int64(o.version)
+	request.Version = uint64(o.version)
 }
 
 func (o VersionOption) afterPut(response *api.PutResponse) {
@@ -58,7 +58,7 @@ func (o VersionOption) afterPut(response *api.PutResponse) {
 }
 
 func (o VersionOption) beforeReplace(request *api.ReplaceRequest) {
-	request.PreviousVersion = int64(o.version)
+	request.PreviousVersion = uint64(o.version)
 }
 
 func (o VersionOption) afterReplace(response *api.ReplaceResponse) {
@@ -66,7 +66,7 @@ func (o VersionOption) afterReplace(response *api.ReplaceResponse) {
 }
 
 func (o VersionOption) beforeRemove(request *api.RemoveRequest) {
-	request.Version = int64(o.version)
+	request.Version = uint64(o.version)
 }
 
 func (o VersionOption) afterRemove(response *api.RemoveResponse) {
@@ -83,7 +83,7 @@ type NotSetOption struct {
 }
 
 func (o NotSetOption) beforePut(request *api.PutRequest) {
-	request.Version = -1
+	request.IfEmpty = true
 }
 
 func (o NotSetOption) afterPut(response *api.PutResponse) {
@@ -144,7 +144,7 @@ func (o filterOption) beforeWatch(request *api.EventRequest) {
 		request.Key = o.filter.Key
 	}
 	if o.filter.Index > 0 {
-		request.Index = int64(o.filter.Index)
+		request.Index = uint64(o.filter.Index)
 	}
 }
 

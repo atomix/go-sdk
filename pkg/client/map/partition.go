@@ -85,7 +85,7 @@ func (m *mapPartition) Put(ctx context.Context, key string, value []byte, opts .
 		return &Entry{
 			Key:     key,
 			Value:   value,
-			Version: int64(response.Header.Index),
+			Version: Version(response.Header.Index),
 			Created: response.Created,
 			Updated: response.Updated,
 		}, nil
@@ -97,7 +97,7 @@ func (m *mapPartition) Put(ctx context.Context, key string, value []byte, opts .
 		return &Entry{
 			Key:     key,
 			Value:   value,
-			Version: int64(response.PreviousVersion),
+			Version: Version(response.PreviousVersion),
 			Created: response.Created,
 			Updated: response.Updated,
 		}, nil
@@ -132,7 +132,7 @@ func (m *mapPartition) Get(ctx context.Context, key string, opts ...GetOption) (
 		return &Entry{
 			Key:     key,
 			Value:   response.Value,
-			Version: response.Version,
+			Version: Version(response.Version),
 			Created: response.Created,
 			Updated: response.Updated,
 		}, nil
@@ -141,7 +141,7 @@ func (m *mapPartition) Get(ctx context.Context, key string, opts ...GetOption) (
 	// Return a non-empty nil-value Entry when response version is 0
 	return &Entry{
 		Key:     key,
-		Version: int64(response.Header.Index),
+		Version: Version(response.Header.Index),
 	}, nil
 }
 
@@ -173,7 +173,7 @@ func (m *mapPartition) Remove(ctx context.Context, key string, opts ...RemoveOpt
 		return &Entry{
 			Key:     key,
 			Value:   response.PreviousValue,
-			Version: response.PreviousVersion,
+			Version: Version(response.PreviousVersion),
 		}, nil
 	} else if response.Status == api.ResponseStatus_PRECONDITION_FAILED {
 		return nil, errors.New("write condition failed")
@@ -242,7 +242,7 @@ func (m *mapPartition) Entries(ctx context.Context, ch chan<- *Entry) error {
 			ch <- &Entry{
 				Key:     response.Key,
 				Value:   response.Value,
-				Version: response.Version,
+				Version: Version(response.Version),
 				Created: response.Created,
 				Updated: response.Updated,
 			}
@@ -279,21 +279,21 @@ func (m *mapPartition) Watch(ctx context.Context, ch chan<- *Event, opts ...Watc
 		defer close(ch)
 		for event := range stream {
 			response := event.(*api.EventResponse)
-			var version int64
+			var version Version
 			var t EventType
 			switch response.Type {
 			case api.EventResponse_NONE:
 				t = EventNone
-				version = response.Version
+				version = Version(response.Version)
 			case api.EventResponse_INSERTED:
 				t = EventInserted
-				version = response.Version
+				version = Version(response.Version)
 			case api.EventResponse_UPDATED:
 				t = EventUpdated
-				version = response.Version
+				version = Version(response.Version)
 			case api.EventResponse_REMOVED:
 				t = EventRemoved
-				version = int64(response.Header.Index)
+				version = Version(response.Header.Index)
 			}
 			ch <- &Event{
 				Type: t,

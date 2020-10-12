@@ -43,7 +43,7 @@ type cachingMap struct {
 	cancel       context.CancelFunc
 	pending      map[string]*cachedEntry
 	cache        *lru.Cache
-	cacheVersion int64
+	cacheVersion Version
 	mu           sync.RWMutex
 }
 

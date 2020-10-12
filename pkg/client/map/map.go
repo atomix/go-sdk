@@ -63,11 +63,14 @@ type Map interface {
 	Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error
 }
 
+// Version is an entry version
+type Version uint64
+
 // Entry is a versioned key/value pair
 type Entry struct {
 	// Version is the unique, monotonically increasing version number for the key/value pair. The version is
 	// suitable for use in optimistic locking.
-	Version int64
+	Version Version
 
 	// Key is the key of the pair
 	Key string

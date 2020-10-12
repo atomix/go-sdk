@@ -206,7 +206,7 @@ func (s *Session) getState(primitive primitiveapi.PrimitiveId) *headers.RequestH
 	defer s.mu.RUnlock()
 	return &headers.RequestHeader{
 		Primitive: primitive,
-		Partition: int32(s.Partition),
+		Partition: uint32(s.Partition),
 		SessionID: s.SessionID,
 		Index:     s.lastIndex,
 		RequestID: s.responseID,
@@ -220,7 +220,7 @@ func (s *Session) getQueryHeader(primitive primitiveapi.PrimitiveId) *headers.Re
 	defer s.mu.RUnlock()
 	return &headers.RequestHeader{
 		Primitive: primitive,
-		Partition: int32(s.Partition),
+		Partition: uint32(s.Partition),
 		SessionID: s.SessionID,
 		Index:     s.lastIndex,
 		RequestID: s.requestID,
@@ -234,7 +234,7 @@ func (s *Session) nextCommandHeader(primitive primitiveapi.PrimitiveId) *headers
 	s.requestID = s.requestID + 1
 	header := &headers.RequestHeader{
 		Primitive: primitive,
-		Partition: int32(s.Partition),
+		Partition: uint32(s.Partition),
 		SessionID: s.SessionID,
 		Index:     s.lastIndex,
 		RequestID: s.requestID,
@@ -254,7 +254,7 @@ func (s *Session) nextStreamHeader(primitive primitiveapi.PrimitiveId) (*Stream,
 	s.streams[s.requestID] = stream
 	header := &headers.RequestHeader{
 		Primitive: primitive,
-		Partition: int32(s.Partition),
+		Partition: uint32(s.Partition),
 		SessionID: s.SessionID,
 		Index:     s.lastIndex,
 		RequestID: s.requestID,

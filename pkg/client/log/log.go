@@ -47,7 +47,7 @@ type Log interface {
 	Append(ctx context.Context, value []byte) (*Entry, error)
 
 	// Get gets the value of the given index
-	Get(ctx context.Context, index int64, opts ...GetOption) (*Entry, error)
+	Get(ctx context.Context, index Index, opts ...GetOption) (*Entry, error)
 
 	// FirstIndex gets the first index in the log
 	FirstIndex(ctx context.Context) (Index, error)
@@ -74,7 +74,7 @@ type Log interface {
 	NextEntry(ctx context.Context, index Index) (*Entry, error)
 
 	// Remove removes an entry from the log
-	Remove(ctx context.Context, index int64, opts ...RemoveOption) (*Entry, error)
+	Remove(ctx context.Context, index Index, opts ...RemoveOption) (*Entry, error)
 
 	// Size returns the number of entries in the log
 	Size(ctx context.Context) (int, error)
@@ -200,12 +200,12 @@ func (l *log) Append(ctx context.Context, value []byte) (*Entry, error) {
 	}
 }
 
-func (l *log) Get(ctx context.Context, index int64, opts ...GetOption) (*Entry, error) {
+func (l *log) Get(ctx context.Context, index Index, opts ...GetOption) (*Entry, error) {
 	r, err := l.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLogServiceClient(conn)
 		request := &api.GetRequest{
 			Header: header,
-			Index:  index,
+			Index:  uint64(index),
 		}
 		for i := range opts {
 			opts[i].beforeGet(request)
@@ -238,7 +238,7 @@ func (l *log) GetIndex(ctx context.Context, index Index, opts ...GetOption) (*En
 		client := api.NewLogServiceClient(conn)
 		request := &api.GetRequest{
 			Header: header,
-			Index:  int64(index),
+			Index:  uint64(index),
 		}
 		for i := range opts {
 			opts[i].beforeGet(request)
@@ -311,7 +311,7 @@ func (l *log) PrevIndex(ctx context.Context, index Index) (Index, error) {
 		client := api.NewLogServiceClient(conn)
 		request := &api.PrevEntryRequest{
 			Header: header,
-			Index:  int64(index),
+			Index:  uint64(index),
 		}
 		response, err := client.PrevEntry(ctx, request)
 		if err != nil {
@@ -333,7 +333,7 @@ func (l *log) NextIndex(ctx context.Context, index Index) (Index, error) {
 		client := api.NewLogServiceClient(conn)
 		request := &api.NextEntryRequest{
 			Header: header,
-			Index:  int64(index),
+			Index:  uint64(index),
 		}
 		response, err := client.NextEntry(ctx, request)
 		if err != nil {
@@ -406,7 +406,7 @@ func (l *log) PrevEntry(ctx context.Context, index Index) (*Entry, error) {
 		client := api.NewLogServiceClient(conn)
 		request := &api.PrevEntryRequest{
 			Header: header,
-			Index:  int64(index),
+			Index:  uint64(index),
 		}
 		response, err := client.PrevEntry(ctx, request)
 		if err != nil {
@@ -431,7 +431,7 @@ func (l *log) NextEntry(ctx context.Context, index Index) (*Entry, error) {
 		client := api.NewLogServiceClient(conn)
 		request := &api.NextEntryRequest{
 			Header: header,
-			Index:  int64(index),
+			Index:  uint64(index),
 		}
 		response, err := client.NextEntry(ctx, request)
 		if err != nil {
@@ -451,12 +451,12 @@ func (l *log) NextEntry(ctx context.Context, index Index) (*Entry, error) {
 	}, nil
 }
 
-func (l *log) Remove(ctx context.Context, index int64, opts ...RemoveOption) (*Entry, error) {
+func (l *log) Remove(ctx context.Context, index Index, opts ...RemoveOption) (*Entry, error) {
 	r, err := l.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewLogServiceClient(conn)
 		request := &api.RemoveRequest{
 			Header: header,
-			Index:  index,
+			Index:  uint64(index),
 		}
 		for i := range opts {
 			opts[i].beforeRemove(request)
