@@ -22,14 +22,14 @@ import (
 
 func TestOptions(t *testing.T) {
 	putRequest := &api.PutRequest{}
-	assert.Equal(t, int64(0), putRequest.Version)
+	assert.Equal(t, uint64(0), putRequest.Version)
 	IfVersion(1).beforePut(putRequest)
-	assert.Equal(t, int64(1), putRequest.Version)
+	assert.Equal(t, uint64(1), putRequest.Version)
 
 	removeRequest := &api.RemoveRequest{}
-	assert.Equal(t, int64(0), removeRequest.Version)
+	assert.Equal(t, uint64(0), removeRequest.Version)
 	IfVersion(2).beforeRemove(removeRequest)
-	assert.Equal(t, int64(2), removeRequest.Version)
+	assert.Equal(t, uint64(2), removeRequest.Version)
 
 	getResponse := &api.GetResponse{}
 	assert.Nil(t, getResponse.Value)

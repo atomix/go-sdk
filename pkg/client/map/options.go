@@ -64,7 +64,7 @@ type RemoveOption interface {
 }
 
 // IfVersion sets the required version for optimistic concurrency control
-func IfVersion(version uint64) VersionOption {
+func IfVersion(version Version) VersionOption {
 	return VersionOption{version: version}
 }
 
@@ -72,11 +72,11 @@ func IfVersion(version uint64) VersionOption {
 type VersionOption struct {
 	PutOption
 	RemoveOption
-	version uint64
+	version Version
 }
 
 func (o VersionOption) beforePut(request *api.PutRequest) {
-	request.Version = o.version
+	request.Version = uint64(o.version)
 }
 
 func (o VersionOption) afterPut(response *api.PutResponse) {
@@ -84,7 +84,7 @@ func (o VersionOption) afterPut(response *api.PutResponse) {
 }
 
 func (o VersionOption) beforeRemove(request *api.RemoveRequest) {
-	request.Version = o.version
+	request.Version = uint64(o.version)
 }
 
 func (o VersionOption) afterRemove(response *api.RemoveResponse) {
