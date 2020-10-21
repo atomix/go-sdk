@@ -1,5 +1,7 @@
 # Atomix Go Client
 
+### [User Guide]
+
 [![Build Status](https://travis-ci.org/atomix/go-client.svg?branch=master)](https://travis-ci.org/atomix/go-client)
 [![Integration Test Status](https://img.shields.io/travis/atomix/go-client?label=Integration%20Tests&logo=Integration)](https://travis-ci.org/onosproject/onos-test)
 [![Go Report Card](https://goreportcard.com/badge/github.com/atomix/go-client)](https://goreportcard.com/report/github.com/atomix/go-client)
@@ -8,8 +10,6 @@
 [![GoDoc](https://godoc.org/github.com/atomix/go-client?status.svg)](https://godoc.org/github.com/atomix/go-client)
 
 This project provides a [Go] client for [Atomix Cloud].
-
-### [User Guide]
 
 [Go]: https://golang.org
 [Atomix Cloud]: https://cloud.atomix.io
