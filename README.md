@@ -7,7 +7,10 @@
 [![Coverage Status](https://img.shields.io/coveralls/github/atomix/go-client/badge.svg)](https://coveralls.io/github/atomix/go-client?branch=master)
 [![GoDoc](https://godoc.org/github.com/atomix/go-client?status.svg)](https://godoc.org/github.com/atomix/go-client)
 
-This project provides a [Go] client for [Atomix].
+This project provides a [Go] client for [Atomix Cloud].
 
-[go]: https://golang.org
-[atomix]: https://atomix.io
+### [User Guide]
+
+[Go]: https://golang.org
+[Atomix Cloud]: https://cloud.atomix.io
+[User Guide]: docs
