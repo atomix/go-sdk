@@ -28,9 +28,21 @@ import (
 
 // NewGroup creates a new peer group
 func NewGroup(address string, opts ...Option) (*Group, error) {
+	ctx := context.Background()
+	options := applyOptions(opts...)
+	if options.joinTimeout != nil {
+		c, cancel := context.WithTimeout(context.Background(), *options.joinTimeout)
+		defer cancel()
+		ctx = c
+	}
+	return NewGroupWithContext(ctx, address, opts...)
+}
+
+// NewGroupWithContext creates a new peer group
+func NewGroupWithContext(ctx context.Context, address string, opts ...Option) (*Group, error) {
 	options := applyOptions(opts...)
 
-	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithUnaryInterceptor(util.RetryingUnaryClientInterceptor()), grpc.WithStreamInterceptor(util.RetryingStreamClientInterceptor(time.Second)))
+	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithUnaryInterceptor(util.RetryingUnaryClientInterceptor()), grpc.WithStreamInterceptor(util.RetryingStreamClientInterceptor(time.Second)))
 	if err != nil {
 		return nil, err
 	}
@@ -55,13 +67,7 @@ func NewGroup(address string, opts ...Option) (*Group, error) {
 		watchers:  make([]chan<- Set, 0),
 	}
 
-	if options.joinTimeout != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), *options.joinTimeout)
-		err = group.join(ctx)
-		cancel()
-	} else {
-		err = group.join(context.Background())
-	}
+	err = group.join(ctx)
 	if err != nil {
 		return nil, err
 	}

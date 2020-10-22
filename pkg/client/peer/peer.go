@@ -15,6 +15,7 @@
 package peer
 
 import (
+	"context"
 	"fmt"
 	"google.golang.org/grpc"
 	"sync"
@@ -42,7 +43,7 @@ type Peer struct {
 }
 
 // Connect connects to the member
-func (m *Peer) Connect(opts ...ConnectOption) (*grpc.ClientConn, error) {
+func (m *Peer) Connect(ctx context.Context, opts ...ConnectOption) (*grpc.ClientConn, error) {
 	options := applyConnectOptions(opts...)
 
 	m.mu.RLock()
@@ -58,7 +59,7 @@ func (m *Peer) Connect(opts ...ConnectOption) (*grpc.ClientConn, error) {
 		return m.conn, nil
 	}
 
-	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", m.Host, m.Port), options.dialOptions...)
+	conn, err := grpc.DialContext(ctx, fmt.Sprintf("%s:%d", m.Host, m.Port), append([]grpc.DialOption{grpc.WithBlock()}, options.dialOptions...)...)
 	if err != nil {
 		return nil, err
 	}

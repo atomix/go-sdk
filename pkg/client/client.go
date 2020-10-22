@@ -28,12 +28,24 @@ import (
 	"time"
 )
 
-// New returns a new Atomix client
+// New creates a new Atomix client
 func New(address string, opts ...Option) (*Client, error) {
+	ctx := context.Background()
+	options := applyOptions(opts...)
+	if options.joinTimeout != nil {
+		c, cancel := context.WithTimeout(context.Background(), *options.joinTimeout)
+		defer cancel()
+		ctx = c
+	}
+	return NewWithContext(ctx, address, opts...)
+}
+
+// NewWithContext returns a new Atomix client
+func NewWithContext(ctx context.Context, address string, opts ...Option) (*Client, error) {
 	options := applyOptions(opts...)
 
 	// Set up a connection to the server.
-	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithUnaryInterceptor(util.RetryingUnaryClientInterceptor()), grpc.WithStreamInterceptor(util.RetryingStreamClientInterceptor(time.Second)))
+	conn, err := grpc.DialContext(ctx, address, grpc.WithInsecure(), grpc.WithBlock(), grpc.WithUnaryInterceptor(util.RetryingUnaryClientInterceptor()), grpc.WithStreamInterceptor(util.RetryingStreamClientInterceptor(time.Second)))
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +63,7 @@ func New(address string, opts ...Option) (*Client, error) {
 		clusterOpts = append(clusterOpts, peer.WithJoinTimeout(*options.joinTimeout))
 	}
 
-	peers, err := peer.NewGroup(address, clusterOpts...)
+	peers, err := peer.NewGroupWithContext(ctx, address, clusterOpts...)
 	if err != nil {
 		return nil, err
 	}
