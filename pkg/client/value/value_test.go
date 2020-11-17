@@ -16,6 +16,7 @@ package value
 
 import (
 	"context"
+	"github.com/atomix/go-client/pkg/client/errors"
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/stretchr/testify/assert"
@@ -46,10 +47,12 @@ func TestValue(t *testing.T) {
 	assert.NoError(t, err)
 
 	_, err = value.Set(context.TODO(), []byte("foo"), IfVersion(1))
-	assert.EqualError(t, err, "version mismatch")
+	assert.Error(t, err)
+	assert.True(t, errors.IsConflict(err))
 
 	_, err = value.Set(context.TODO(), []byte("foo"), IfValue([]byte("bar")))
-	assert.EqualError(t, err, "value mismatch")
+	assert.Error(t, err)
+	assert.True(t, errors.IsConflict(err))
 
 	version, err = value.Set(context.TODO(), []byte("foo"))
 	assert.NoError(t, err)
@@ -61,7 +64,8 @@ func TestValue(t *testing.T) {
 	assert.Equal(t, "foo", string(val))
 
 	_, err = value.Set(context.TODO(), []byte("foo"), IfVersion(2))
-	assert.EqualError(t, err, "version mismatch")
+	assert.Error(t, err)
+	assert.True(t, errors.IsConflict(err))
 
 	version, err = value.Set(context.TODO(), []byte("bar"), IfVersion(1))
 	assert.NoError(t, err)
@@ -116,7 +120,8 @@ func TestValue(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = value2.Delete(context.Background())
-	assert.NoError(t, err)
+	assert.Error(t, err)
+	assert.True(t, errors.IsNotFound(err))
 
 	value, err = New(context.TODO(), name, sessions)
 	assert.NoError(t, err)

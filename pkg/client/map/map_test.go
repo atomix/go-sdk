@@ -16,6 +16,7 @@ package _map //nolint:golint
 
 import (
 	"context"
+	"github.com/atomix/go-client/pkg/client/errors"
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/stretchr/testify/assert"
@@ -215,7 +216,8 @@ func TestMapStreams(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = map2.Delete(context.Background())
-	assert.NoError(t, err)
+	assert.Error(t, err)
+	assert.True(t, errors.IsNotFound(err))
 
 	_map, err = New(context.TODO(), name, sessions)
 	assert.NoError(t, err)

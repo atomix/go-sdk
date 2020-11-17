@@ -16,6 +16,7 @@ package election
 
 import (
 	"context"
+	"github.com/atomix/go-client/pkg/client/errors"
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/stretchr/testify/assert"
@@ -255,7 +256,8 @@ func TestElectionOperations(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = election2.Delete(context.Background())
-	assert.NoError(t, err)
+	assert.Error(t, err)
+	assert.True(t, errors.IsNotFound(err))
 
 	election, err := New(context.TODO(), name, sessions3)
 	assert.NoError(t, err)

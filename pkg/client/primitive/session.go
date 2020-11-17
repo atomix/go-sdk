@@ -16,10 +16,10 @@ package primitive
 
 import (
 	"context"
-	"errors"
 	"github.com/atomix/api/proto/atomix/headers"
 	primitiveapi "github.com/atomix/api/proto/atomix/primitive"
 	api "github.com/atomix/api/proto/atomix/session"
+	"github.com/atomix/go-client/pkg/client/errors"
 	"github.com/atomix/go-client/pkg/client/util/net"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
@@ -317,13 +317,16 @@ func (s *Session) doRequest(ctx context.Context, requestHeader *headers.RequestH
 			switch responseHeader.Status {
 			case headers.ResponseStatus_OK:
 				s.recordResponse(requestHeader, responseHeader)
-				return response, err
+				return response, nil
 			case headers.ResponseStatus_NOT_LEADER:
 				s.conns.Reconnect(net.Address(responseHeader.Leader))
 				continue
-			case headers.ResponseStatus_ERROR:
-				return nil, errors.New("an unknown error occurred")
+			default:
+				s.recordResponse(requestHeader, responseHeader)
+				return response, errors.FromHeader(responseHeader)
 			}
+		} else if err == context.Canceled {
+			return nil, errors.NewCanceled(err.Error())
 		} else {
 			select {
 			case <-time.After(time.Duration(math.Max(math.Pow(float64(i), 2), 1000)) * time.Millisecond):
@@ -360,7 +363,7 @@ func (s *Session) doQueryStream(
 	case <-handshakeCh:
 		return responseCh, nil
 	case <-time.After(15 * time.Second):
-		return nil, errors.New("handshake timed out")
+		return nil, errors.NewTimeout("handshake timed out")
 	}
 }
 
@@ -446,7 +449,7 @@ func (s *Session) doCommandStream(
 	case <-handshakeCh:
 		return responseCh, nil
 	case <-time.After(15 * time.Second):
-		return nil, errors.New("handshake timed out")
+		return nil, errors.NewTimeout("handshake timed out")
 	}
 }
 

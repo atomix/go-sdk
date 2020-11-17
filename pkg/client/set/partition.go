@@ -16,7 +16,6 @@ package set
 
 import (
 	"context"
-	"errors"
 	"github.com/atomix/api/proto/atomix/headers"
 	api "github.com/atomix/api/proto/atomix/set"
 	"github.com/atomix/go-client/pkg/client/primitive"
@@ -61,9 +60,6 @@ func (s *setPartition) Add(ctx context.Context, value string) (bool, error) {
 	}
 
 	response := r.(*api.AddResponse)
-	if response.Status == api.ResponseStatus_WRITE_LOCK {
-		return false, errors.New("write lock failed")
-	}
 	return response.Added, nil
 }
 
@@ -85,9 +81,6 @@ func (s *setPartition) Remove(ctx context.Context, value string) (bool, error) {
 	}
 
 	response := r.(*api.RemoveResponse)
-	if response.Status == api.ResponseStatus_WRITE_LOCK {
-		return false, errors.New("write lock failed")
-	}
 	return response.Removed, nil
 }
 

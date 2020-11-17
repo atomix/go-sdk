@@ -16,6 +16,7 @@ package lock
 
 import (
 	"context"
+	"github.com/atomix/go-client/pkg/client/errors"
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/stretchr/testify/assert"
@@ -92,7 +93,8 @@ func TestLock(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = l2.Delete(context.Background())
-	assert.NoError(t, err)
+	assert.Error(t, err)
+	assert.True(t, errors.IsNotFound(err))
 
 	sessions, err := test.OpenSessions(partitions)
 	assert.NoError(t, err)

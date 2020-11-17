@@ -16,6 +16,7 @@ package indexedmap
 
 import (
 	"context"
+	"github.com/atomix/go-client/pkg/client/errors"
 	"testing"
 
 	"github.com/atomix/go-client/pkg/client/primitive"
@@ -307,7 +308,8 @@ func TestIndexedMapStreams(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = map2.Delete(context.Background())
-	assert.NoError(t, err)
+	assert.Error(t, err)
+	assert.True(t, errors.IsNotFound(err))
 
 	_map, err = New(context.TODO(), name, sessions)
 	assert.NoError(t, err)

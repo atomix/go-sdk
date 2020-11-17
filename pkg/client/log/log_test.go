@@ -16,6 +16,7 @@ package log
 
 import (
 	"context"
+	"github.com/atomix/go-client/pkg/client/errors"
 	"testing"
 
 	"github.com/atomix/go-client/pkg/client/primitive"
@@ -212,7 +213,8 @@ func TestLogStreams(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = log2.Delete(context.Background())
-	assert.NoError(t, err)
+	assert.Error(t, err)
+	assert.True(t, errors.IsNotFound(err))
 
 	log, err = New(context.TODO(), name, sessions)
 	assert.NoError(t, err)

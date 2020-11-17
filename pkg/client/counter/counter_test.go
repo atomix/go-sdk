@@ -16,6 +16,7 @@ package counter
 
 import (
 	"context"
+	"github.com/atomix/go-client/pkg/client/errors"
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/stretchr/testify/assert"
@@ -89,7 +90,8 @@ func TestCounterOperations(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = counter2.Delete(context.Background())
-	assert.NoError(t, err)
+	assert.Error(t, err)
+	assert.True(t, errors.IsNotFound(err))
 
 	counter, err = New(context.TODO(), name, sessions)
 	assert.NoError(t, err)

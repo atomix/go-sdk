@@ -17,7 +17,6 @@ package list
 import (
 	"context"
 	"encoding/base64"
-	"errors"
 	"github.com/atomix/api/proto/atomix/headers"
 	api "github.com/atomix/api/proto/atomix/list"
 	"github.com/atomix/go-client/pkg/client/primitive"
@@ -155,7 +154,7 @@ func (l *list) Append(ctx context.Context, value []byte) error {
 }
 
 func (l *list) Insert(ctx context.Context, index int, value []byte) error {
-	response, err := l.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	_, err := l.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewListServiceClient(conn)
 		request := &api.InsertRequest{
 			Header: header,
@@ -168,20 +167,11 @@ func (l *list) Insert(ctx context.Context, index int, value []byte) error {
 		}
 		return response.Header, response, nil
 	})
-	if err != nil {
-		return err
-	}
-
-	switch response.(*api.InsertResponse).Status {
-	case api.ResponseStatus_OUT_OF_BOUNDS:
-		return errors.New("index out of bounds")
-	default:
-		return nil
-	}
+	return err
 }
 
 func (l *list) Set(ctx context.Context, index int, value []byte) error {
-	response, err := l.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	_, err := l.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewListServiceClient(conn)
 		request := &api.SetRequest{
 			Header: header,
@@ -194,16 +184,7 @@ func (l *list) Set(ctx context.Context, index int, value []byte) error {
 		}
 		return response.Header, response, nil
 	})
-	if err != nil {
-		return err
-	}
-
-	switch response.(*api.SetResponse).Status {
-	case api.ResponseStatus_OUT_OF_BOUNDS:
-		return errors.New("index out of bounds")
-	default:
-		return nil
-	}
+	return err
 }
 
 func (l *list) Get(ctx context.Context, index int) ([]byte, error) {
@@ -222,14 +203,8 @@ func (l *list) Get(ctx context.Context, index int) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	response := r.(*api.GetResponse)
-	switch response.Status {
-	case api.ResponseStatus_OUT_OF_BOUNDS:
-		return nil, errors.New("index out of bounds")
-	default:
-		return base64.StdEncoding.DecodeString(response.Value)
-	}
+	return base64.StdEncoding.DecodeString(response.Value)
 }
 
 func (l *list) Remove(ctx context.Context, index int) ([]byte, error) {
@@ -248,14 +223,8 @@ func (l *list) Remove(ctx context.Context, index int) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	response := r.(*api.RemoveResponse)
-	switch response.Status {
-	case api.ResponseStatus_OUT_OF_BOUNDS:
-		return nil, errors.New("index out of bounds")
-	default:
-		return base64.StdEncoding.DecodeString(response.Value)
-	}
+	return base64.StdEncoding.DecodeString(response.Value)
 }
 
 func (l *list) Len(ctx context.Context) (int, error) {

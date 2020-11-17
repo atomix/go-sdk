@@ -16,7 +16,6 @@ package _map //nolint:golint
 
 import (
 	"context"
-	"errors"
 	"github.com/atomix/api/proto/atomix/headers"
 	api "github.com/atomix/api/proto/atomix/map"
 	"github.com/atomix/go-client/pkg/client/primitive"
@@ -81,27 +80,13 @@ func (m *mapPartition) Put(ctx context.Context, key string, value []byte, opts .
 	}
 
 	response := r.(*api.PutResponse)
-	if response.Status == api.ResponseStatus_OK {
-		return &Entry{
-			Key:     key,
-			Value:   value,
-			Version: Version(response.Header.Index),
-			Created: response.Created,
-			Updated: response.Updated,
-		}, nil
-	} else if response.Status == api.ResponseStatus_PRECONDITION_FAILED {
-		return nil, errors.New("write condition failed")
-	} else if response.Status == api.ResponseStatus_WRITE_LOCK {
-		return nil, errors.New("write lock failed")
-	} else {
-		return &Entry{
-			Key:     key,
-			Value:   value,
-			Version: Version(response.PreviousVersion),
-			Created: response.Created,
-			Updated: response.Updated,
-		}, nil
-	}
+	return &Entry{
+		Key:     key,
+		Value:   value,
+		Version: Version(response.Header.Index),
+		Created: response.Created,
+		Updated: response.Updated,
+	}, nil
 }
 
 func (m *mapPartition) Get(ctx context.Context, key string, opts ...GetOption) (*Entry, error) {
@@ -128,20 +113,12 @@ func (m *mapPartition) Get(ctx context.Context, key string, opts ...GetOption) (
 	}
 
 	response := r.(*api.GetResponse)
-	if response.Version != 0 {
-		return &Entry{
-			Key:     key,
-			Value:   response.Value,
-			Version: Version(response.Version),
-			Created: response.Created,
-			Updated: response.Updated,
-		}, nil
-	}
-
-	// Return a non-empty nil-value Entry when response version is 0
 	return &Entry{
 		Key:     key,
-		Version: Version(response.Header.Index),
+		Value:   response.Value,
+		Version: Version(response.Version),
+		Created: response.Created,
+		Updated: response.Updated,
 	}, nil
 }
 
@@ -169,23 +146,15 @@ func (m *mapPartition) Remove(ctx context.Context, key string, opts ...RemoveOpt
 	}
 
 	response := r.(*api.RemoveResponse)
-	if response.Status == api.ResponseStatus_OK {
-		return &Entry{
-			Key:     key,
-			Value:   response.PreviousValue,
-			Version: Version(response.PreviousVersion),
-		}, nil
-	} else if response.Status == api.ResponseStatus_PRECONDITION_FAILED {
-		return nil, errors.New("write condition failed")
-	} else if response.Status == api.ResponseStatus_WRITE_LOCK {
-		return nil, errors.New("write lock failed")
-	} else {
-		return nil, nil
-	}
+	return &Entry{
+		Key:     key,
+		Value:   response.PreviousValue,
+		Version: Version(response.PreviousVersion),
+	}, nil
 }
 
 func (m *mapPartition) Len(ctx context.Context) (int, error) {
-	response, err := m.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
+	r, err := m.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
 		client := api.NewMapServiceClient(conn)
 		request := &api.SizeRequest{
 			Header: header,
@@ -199,7 +168,7 @@ func (m *mapPartition) Len(ctx context.Context) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	return int(response.(*api.SizeResponse).Size_), nil
+	return int(r.(*api.SizeResponse).Size_), nil
 }
 
 func (m *mapPartition) Clear(ctx context.Context) error {

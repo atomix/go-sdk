@@ -16,6 +16,7 @@ package list
 
 import (
 	"context"
+	"github.com/atomix/go-client/pkg/client/errors"
 	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/stretchr/testify/assert"
@@ -40,7 +41,8 @@ func TestListOperations(t *testing.T) {
 	assert.Equal(t, 0, size)
 
 	_, err = list.Get(context.TODO(), 0)
-	assert.EqualError(t, err, "index out of bounds")
+	assert.Error(t, err)
+	assert.True(t, errors.IsInvalid(err))
 
 	err = list.Append(context.TODO(), []byte("foo"))
 	assert.NoError(t, err)
@@ -153,7 +155,8 @@ func TestListOperations(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = list2.Delete(context.Background())
-	assert.NoError(t, err)
+	assert.Error(t, err)
+	assert.True(t, errors.IsNotFound(err))
 
 	list, err = New(context.TODO(), name, sessions)
 	assert.NoError(t, err)

@@ -16,7 +16,6 @@ package value
 
 import (
 	"context"
-	"errors"
 	"github.com/atomix/api/proto/atomix/headers"
 	api "github.com/atomix/api/proto/atomix/value"
 	"github.com/atomix/go-client/pkg/client/primitive"
@@ -128,13 +127,6 @@ func (v *value) Set(ctx context.Context, value []byte, opts ...SetOption) (uint6
 	}
 
 	response := r.(*api.SetResponse)
-	if !response.Succeeded {
-		if request.ExpectVersion > 0 {
-			return 0, errors.New("version mismatch")
-		}
-		return 0, errors.New("value mismatch")
-	}
-
 	return response.Version, nil
 }
 
