@@ -36,7 +36,8 @@ func TestCachedMapOperations(t *testing.T) {
 	assert.NoError(t, err)
 
 	kv, err := _map.Get(context.Background(), "foo")
-	assert.NoError(t, err)
+	assert.Error(t, err)
+	assert.True(t, errors.IsNotFound(err))
 	assert.Nil(t, kv)
 
 	size, err := _map.Len(context.Background())
@@ -102,6 +103,7 @@ func TestCachedMapOperations(t *testing.T) {
 
 	_, err = _map.Put(context.Background(), "foo", []byte("baz"), IfVersion(1))
 	assert.Error(t, err)
+	assert.True(t, errors.IsConflict(err))
 
 	kv2, err := _map.Put(context.Background(), "foo", []byte("baz"), IfVersion(kv1.Version))
 	assert.NoError(t, err)
@@ -110,6 +112,7 @@ func TestCachedMapOperations(t *testing.T) {
 
 	_, err = _map.Remove(context.Background(), "foo", IfVersion(1))
 	assert.Error(t, err)
+	assert.True(t, errors.IsConflict(err))
 
 	removed, err := _map.Remove(context.Background(), "foo", IfVersion(kv2.Version))
 	assert.NoError(t, err)
