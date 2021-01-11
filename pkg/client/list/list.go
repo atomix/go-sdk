@@ -17,20 +17,20 @@ package list
 import (
 	"context"
 	"encoding/base64"
-	"github.com/atomix/api/proto/atomix/headers"
-	api "github.com/atomix/api/proto/atomix/list"
+	api "github.com/atomix/api/go/atomix/primitive/list"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/util"
+	"github.com/atomix/go-framework/pkg/atomix/client"
+	listclient "github.com/atomix/go-framework/pkg/atomix/client/list"
 	"google.golang.org/grpc"
 )
 
-// Type is the list type
-const Type primitive.Type = "List"
+// Type is the counter type
+const Type = primitive.Type(listclient.PrimitiveType)
 
 // Client provides an API for creating Lists
 type Client interface {
 	// GetList gets the List instance of the given name
-	GetList(ctx context.Context, name string) (List, error)
+	GetList(ctx context.Context, name string, opts ...Option) (List, error)
 }
 
 // List provides a distributed list data structure
@@ -57,15 +57,6 @@ type List interface {
 	// Len gets the length of the list
 	Len(ctx context.Context) (int, error)
 
-	// Slice returns a slice of the list from the given start index to the given end index
-	Slice(ctx context.Context, from int, to int) (List, error)
-
-	// SliceFrom returns a slice of the list from the given index
-	SliceFrom(ctx context.Context, from int) (List, error)
-
-	// SliceTo returns a slice of the list to the given index
-	SliceTo(ctx context.Context, to int) (List, error)
-
 	// Items iterates through the values in the list
 	// This is a non-blocking method. If the method returns without error, values will be pushed on to the
 	// given channel and the channel will be closed once all values have been read from the list.
@@ -74,7 +65,7 @@ type List interface {
 	// Watch watches the list for changes
 	// This is a non-blocking method. If the method returns without error, list events will be pushed onto
 	// the given channel.
-	Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error
+	Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) error
 
 	// Clear removes all values from the list
 	Clear(ctx context.Context) error
@@ -84,14 +75,14 @@ type List interface {
 type EventType string
 
 const (
-	// EventNone indicates the event is not a change event
-	EventNone EventType = ""
+	// EventAdd indicates a value was added to the list
+	EventAdd EventType = "add"
 
-	// EventInserted indicates a value was added to the list
-	EventInserted EventType = "added"
+	// EventRemove indicates a value was removed from the list
+	EventRemove EventType = "remove"
 
-	// EventRemoved indicates a value was removed from the list
-	EventRemoved EventType = "removed"
+	// EventReplay indicates a value was replayed
+	EventReplay EventType = "replay"
 )
 
 // Event is a list change event
@@ -107,167 +98,95 @@ type Event struct {
 }
 
 // New creates a new list primitive
-func New(ctx context.Context, name primitive.Name, partitions []*primitive.Session) (List, error) {
-	i, err := util.GetPartitionIndex(name.Name, len(partitions))
-	if err != nil {
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (List, error) {
+	options := applyOptions(opts...)
+	l := &list{
+		client: listclient.NewClient(client.ID(options.clientID), name, conn),
+	}
+	if err := l.create(ctx); err != nil {
 		return nil, err
 	}
-	return newList(ctx, name, partitions[i])
-}
-
-// newList creates a new list for the given partition
-func newList(ctx context.Context, name primitive.Name, partition *primitive.Session) (*list, error) {
-	instance, err := primitive.NewInstance(ctx, name, partition, &primitiveHandler{})
-	if err != nil {
-		return nil, err
-	}
-	return &list{
-		name:     name,
-		instance: instance,
-	}, nil
+	return l, nil
 }
 
 // list is the single partition implementation of List
 type list struct {
-	name     primitive.Name
-	instance *primitive.Instance
+	client listclient.Client
 }
 
-func (l *list) Name() primitive.Name {
-	return l.name
+func (l *list) Type() primitive.Type {
+	return Type
+}
+
+func (l *list) Name() string {
+	return l.client.Name()
 }
 
 func (l *list) Append(ctx context.Context, value []byte) error {
-	_, err := l.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewListServiceClient(conn)
-		request := &api.AppendRequest{
-			Header: header,
-			Value:  base64.StdEncoding.EncodeToString(value),
-		}
-		response, err := client.Append(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		return response.Header, response, nil
-	})
+	input := &api.AppendInput{
+		Value: base64.StdEncoding.EncodeToString(value),
+	}
+	_, err := l.client.Append(ctx, input)
 	return err
 }
 
 func (l *list) Insert(ctx context.Context, index int, value []byte) error {
-	_, err := l.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewListServiceClient(conn)
-		request := &api.InsertRequest{
-			Header: header,
-			Index:  uint32(index),
-			Value:  base64.StdEncoding.EncodeToString(value),
-		}
-		response, err := client.Insert(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		return response.Header, response, nil
-	})
+	input := &api.InsertInput{
+		Index: uint32(index),
+		Value: base64.StdEncoding.EncodeToString(value),
+	}
+	_, err := l.client.Insert(ctx, input)
 	return err
 }
 
 func (l *list) Set(ctx context.Context, index int, value []byte) error {
-	_, err := l.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewListServiceClient(conn)
-		request := &api.SetRequest{
-			Header: header,
-			Index:  uint32(index),
-			Value:  base64.StdEncoding.EncodeToString(value),
-		}
-		response, err := client.Set(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		return response.Header, response, nil
-	})
+	input := &api.SetInput{
+		Index: uint32(index),
+		Value: base64.StdEncoding.EncodeToString(value),
+	}
+	_, err := l.client.Set(ctx, input)
 	return err
 }
 
 func (l *list) Get(ctx context.Context, index int) ([]byte, error) {
-	r, err := l.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewListServiceClient(conn)
-		request := &api.GetRequest{
-			Header: header,
-			Index:  uint32(index),
-		}
-		response, err := client.Get(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		return response.Header, response, nil
-	})
+	input := &api.GetInput{
+		Index: uint32(index),
+	}
+	output, err := l.client.Get(ctx, input)
 	if err != nil {
 		return nil, err
 	}
-	response := r.(*api.GetResponse)
-	return base64.StdEncoding.DecodeString(response.Value)
+	return base64.StdEncoding.DecodeString(output.Value)
 }
 
 func (l *list) Remove(ctx context.Context, index int) ([]byte, error) {
-	r, err := l.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewListServiceClient(conn)
-		request := &api.RemoveRequest{
-			Header: header,
-			Index:  uint32(index),
-		}
-		response, err := client.Remove(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		return response.Header, response, nil
-	})
+	input := &api.RemoveInput{
+		Index: uint32(index),
+	}
+	output, err := l.client.Remove(ctx, input)
 	if err != nil {
 		return nil, err
 	}
-	response := r.(*api.RemoveResponse)
-	return base64.StdEncoding.DecodeString(response.Value)
+	return base64.StdEncoding.DecodeString(output.Value)
 }
 
 func (l *list) Len(ctx context.Context) (int, error) {
-	response, err := l.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewListServiceClient(conn)
-		request := &api.SizeRequest{
-			Header: header,
-		}
-		response, err := client.Size(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		return response.Header, response, nil
-	})
+	output, err := l.client.Size(ctx)
 	if err != nil {
 		return 0, err
 	}
-	return int(response.(*api.SizeResponse).Size_), nil
+	return int(output.Size_), nil
 }
 
 func (l *list) Items(ctx context.Context, ch chan<- []byte) error {
-	stream, err := l.instance.DoQueryStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
-		client := api.NewListServiceClient(conn)
-		request := &api.IterateRequest{
-			Header: header,
-		}
-		return client.Iterate(ctx, request)
-	}, func(responses interface{}) (*headers.ResponseHeader, interface{}, error) {
-		response, err := responses.(api.ListService_IterateClient).Recv()
-		if err != nil {
-			return nil, nil, err
-		}
-		return response.Header, response, nil
-	})
-	if err != nil {
+	input := &api.ElementsInput{}
+	outputCh := make(chan api.ElementsOutput)
+	if err := l.client.Elements(ctx, input, outputCh); err != nil {
 		return err
 	}
-
 	go func() {
-		defer close(ch)
-		for event := range stream {
-			response := event.(*api.IterateResponse)
-			if bytes, err := base64.StdEncoding.DecodeString(response.Value); err == nil {
+		for output := range outputCh {
+			if bytes, err := base64.StdEncoding.DecodeString(output.Value); err == nil {
 				ch <- bytes
 			}
 		}
@@ -275,48 +194,30 @@ func (l *list) Items(ctx context.Context, ch chan<- []byte) error {
 	return nil
 }
 
-func (l *list) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error {
-	stream, err := l.instance.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
-		client := api.NewListServiceClient(conn)
-		request := &api.EventRequest{
-			Header: header,
-		}
-		for _, opt := range opts {
-			opt.beforeWatch(request)
-		}
-		return client.Events(ctx, request)
-	}, func(responses interface{}) (*headers.ResponseHeader, interface{}, error) {
-		response, err := responses.(api.ListService_EventsClient).Recv()
-		if err != nil {
-			return nil, nil, err
-		}
-		for _, opt := range opts {
-			opt.afterWatch(response)
-		}
-		return response.Header, response, nil
-	})
-	if err != nil {
+func (l *list) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) error {
+	input := &api.EventsInput{}
+	for _, opt := range opts {
+		opt.beforeWatch(input)
+	}
+	outputCh := make(chan api.EventsOutput)
+	if err := l.client.Events(ctx, input, outputCh); err != nil {
 		return err
 	}
-
 	go func() {
-		defer close(ch)
-		for event := range stream {
-			response := event.(*api.EventResponse)
+		for output := range outputCh {
 			var t EventType
-			switch response.Type {
-			case api.EventResponse_NONE:
-				t = EventNone
-			case api.EventResponse_ADDED:
-				t = EventInserted
-			case api.EventResponse_REMOVED:
-				t = EventRemoved
+			switch output.Type {
+			case api.EventsOutput_ADD:
+				t = EventAdd
+			case api.EventsOutput_REMOVE:
+				t = EventRemove
+			case api.EventsOutput_REPLAY:
+				t = EventReplay
 			}
-
-			if bytes, err := base64.StdEncoding.DecodeString(response.Value); err == nil {
-				ch <- &Event{
+			if bytes, err := base64.StdEncoding.DecodeString(output.Value); err == nil {
+				ch <- Event{
 					Type:  t,
-					Index: int(response.Index),
+					Index: int(output.Index),
 					Value: bytes,
 				}
 			}
@@ -325,47 +226,18 @@ func (l *list) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption)
 	return nil
 }
 
-func (l *list) Slice(ctx context.Context, from int, to int) (List, error) {
-	return &slicedList{
-		from: &from,
-		to:   &to,
-		list: l,
-	}, nil
-}
-
-func (l *list) SliceFrom(ctx context.Context, from int) (List, error) {
-	return &slicedList{
-		from: &from,
-		list: l,
-	}, nil
-}
-
-func (l *list) SliceTo(ctx context.Context, to int) (List, error) {
-	return &slicedList{
-		to:   &to,
-		list: l,
-	}, nil
-}
-
 func (l *list) Clear(ctx context.Context) error {
-	_, err := l.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewListServiceClient(conn)
-		request := &api.ClearRequest{
-			Header: header,
-		}
-		response, err := client.Clear(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		return response.Header, response, nil
-	})
-	return err
+	return l.client.Clear(ctx)
+}
+
+func (l *list) create(ctx context.Context) error {
+	return l.client.Create(ctx)
 }
 
 func (l *list) Close(ctx context.Context) error {
-	return l.instance.Close(ctx)
+	return l.client.Close(ctx)
 }
 
 func (l *list) Delete(ctx context.Context) error {
-	return l.instance.Delete(ctx)
+	return l.client.Delete(ctx)
 }

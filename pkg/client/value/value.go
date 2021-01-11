@@ -16,20 +16,21 @@ package value
 
 import (
 	"context"
-	"github.com/atomix/api/proto/atomix/headers"
-	api "github.com/atomix/api/proto/atomix/value"
+	api "github.com/atomix/api/go/atomix/primitive/value"
+	"github.com/atomix/go-client/pkg/client/meta"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/util"
+	"github.com/atomix/go-framework/pkg/atomix/client"
+	valueclient "github.com/atomix/go-framework/pkg/atomix/client/value"
 	"google.golang.org/grpc"
 )
 
-// Type is the value type
-const Type primitive.Type = "Value"
+// Type is the counter type
+const Type = primitive.Type(valueclient.PrimitiveType)
 
 // Client provides an API for creating Values
 type Client interface {
 	// GetValue gets the Value instance of the given name
-	GetValue(ctx context.Context, name string) (Value, error)
+	GetValue(ctx context.Context, name string, opts ...Option) (Value, error)
 }
 
 // Value provides a simple atomic value
@@ -37,155 +38,117 @@ type Value interface {
 	primitive.Primitive
 
 	// Set sets the current value and returns the version
-	Set(ctx context.Context, value []byte, opts ...SetOption) (uint64, error)
+	Set(ctx context.Context, value []byte, opts ...SetOption) (meta.ObjectMeta, error)
 
 	// Get gets the current value and version
-	Get(ctx context.Context) ([]byte, uint64, error)
+	Get(ctx context.Context) ([]byte, meta.ObjectMeta, error)
 
 	// Watch watches the value for changes
-	Watch(ctx context.Context, ch chan<- *Event) error
+	Watch(ctx context.Context, ch chan<- Event) error
 }
 
 // EventType is the type of a set event
 type EventType string
 
 const (
-	// EventUpdated indicates the value was updated
-	EventUpdated EventType = "updated"
+	// EventUpdate indicates the value was updated
+	EventUpdate EventType = "update"
 )
 
 // Event is a value change event
 type Event struct {
+	meta.ObjectMeta
+
 	// Type is the change event type
 	Type EventType
 
 	// Value is the updated value
 	Value []byte
-
-	// Version is the updated version
-	Version uint64
 }
 
 // New creates a new Lock primitive for the given partitions
 // The value will be created in one of the given partitions.
-func New(ctx context.Context, name primitive.Name, partitions []*primitive.Session) (Value, error) {
-	i, err := util.GetPartitionIndex(name.Name, len(partitions))
-	if err != nil {
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Value, error) {
+	options := applyOptions(opts...)
+	v := &value{
+		client: valueclient.NewClient(client.ID(options.clientID), name, conn),
+	}
+	if err := v.create(ctx); err != nil {
 		return nil, err
 	}
-	return newValue(ctx, name, partitions[i])
-}
-
-// newValue creates a new Value primitive for the given partition
-func newValue(ctx context.Context, name primitive.Name, session *primitive.Session) (*value, error) {
-	instance, err := primitive.NewInstance(ctx, name, session, &primitiveHandler{})
-	if err != nil {
-		return nil, err
-	}
-	return &value{
-		name:     name,
-		instance: instance,
-	}, nil
+	return v, nil
 }
 
 // value is the single partition implementation of Lock
 type value struct {
-	name     primitive.Name
-	instance *primitive.Instance
+	client valueclient.Client
 }
 
-func (v *value) Name() primitive.Name {
-	return v.name
+func (v *value) Type() primitive.Type {
+	return Type
 }
 
-func (v *value) Set(ctx context.Context, value []byte, opts ...SetOption) (uint64, error) {
-	request := &api.SetRequest{}
+func (v *value) Name() string {
+	return v.client.Name()
+}
+
+func (v *value) Set(ctx context.Context, value []byte, opts ...SetOption) (meta.ObjectMeta, error) {
+	input := &api.SetInput{
+		Value: &api.Value{
+			Value: value,
+		},
+	}
 	for i := range opts {
-		opts[i].beforeSet(request)
+		opts[i].beforeSet(input)
 	}
-
-	r, err := v.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewValueServiceClient(conn)
-		request := &api.SetRequest{
-			Header: header,
-			Value:  value,
-		}
-		for i := range opts {
-			opts[i].beforeSet(request)
-		}
-		response, err := client.Set(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		for i := range opts {
-			opts[i].afterSet(response)
-		}
-		return response.Header, response, nil
-	})
+	output, err := v.client.Set(ctx, input)
 	if err != nil {
-		return 0, err
+		return meta.ObjectMeta{}, err
 	}
-
-	response := r.(*api.SetResponse)
-	return response.Version, nil
+	for i := range opts {
+		opts[i].afterSet(output)
+	}
+	return meta.New(output.Meta), nil
 }
 
-func (v *value) Get(ctx context.Context) ([]byte, uint64, error) {
-	r, err := v.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewValueServiceClient(conn)
-		request := &api.GetRequest{
-			Header: header,
-		}
-		response, err := client.Get(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		return response.Header, response, nil
-	})
+func (v *value) Get(ctx context.Context) ([]byte, meta.ObjectMeta, error) {
+	input := &api.GetInput{}
+	output, err := v.client.Get(ctx, input)
 	if err != nil {
-		return nil, 0, err
+		return nil, meta.ObjectMeta{}, err
 	}
-
-	response := r.(*api.GetResponse)
-	return response.Value, response.Version, nil
+	return output.Value.Value, meta.New(output.Value.Meta), nil
 }
 
-func (v *value) Watch(ctx context.Context, ch chan<- *Event) error {
-	stream, err := v.instance.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
-		client := api.NewValueServiceClient(conn)
-		request := &api.EventRequest{
-			Header: header,
-		}
-		return client.Events(ctx, request)
-	}, func(responses interface{}) (*headers.ResponseHeader, interface{}, error) {
-		response, err := responses.(api.ValueService_EventsClient).Recv()
-		if err != nil {
-			return nil, nil, err
-		}
-		return response.Header, response, nil
-	})
-	if err != nil {
+func (v *value) Watch(ctx context.Context, ch chan<- Event) error {
+	input := &api.EventsInput{}
+	outputCh := make(chan api.EventsOutput)
+	if err := v.client.Events(ctx, input, outputCh); err != nil {
 		return err
 	}
-
 	go func() {
-		defer close(ch)
-		for event := range stream {
-			response := event.(*api.EventResponse)
-			ch <- &Event{
-				Type:    EventUpdated,
-				Value:   response.NewValue,
-				Version: response.NewVersion,
+		for output := range outputCh {
+			switch output.Type {
+			case api.EventsOutput_UPDATE:
+				ch <- Event{
+					ObjectMeta: meta.New(output.Value.Meta),
+					Type:       EventUpdate,
+					Value:      output.Value.Value,
+				}
 			}
 		}
 	}()
 	return nil
 }
 
+func (v *value) create(ctx context.Context) error {
+	return v.client.Create(ctx)
+}
+
 func (v *value) Close(ctx context.Context) error {
-	return v.instance.Close(ctx)
+	return v.client.Close(ctx)
 }
 
 func (v *value) Delete(ctx context.Context) error {
-	return v.instance.Delete(ctx)
+	return v.client.Delete(ctx)
 }

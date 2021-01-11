@@ -16,18 +16,20 @@ package set
 
 import (
 	"context"
+	api "github.com/atomix/api/go/atomix/primitive/set"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/util"
-	"sync"
+	"github.com/atomix/go-framework/pkg/atomix/client"
+	setclient "github.com/atomix/go-framework/pkg/atomix/client/set"
+	"google.golang.org/grpc"
 )
 
-// Type is the set type
-const Type primitive.Type = "Set"
+// Type is the counter type
+const Type = primitive.Type(setclient.PrimitiveType)
 
 // Client provides an API for creating Sets
 type Client interface {
 	// GetSet gets the Set instance of the given name
-	GetSet(ctx context.Context, name string) (Set, error)
+	GetSet(ctx context.Context, name string, opts ...Option) (Set, error)
 }
 
 // Set provides a distributed set data structure
@@ -58,21 +60,21 @@ type Set interface {
 	// Watch watches the set for changes
 	// This is a non-blocking method. If the method returns without error, set events will be pushed onto
 	// the given channel.
-	Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error
+	Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) error
 }
 
 // EventType is the type of a set event
 type EventType string
 
 const (
-	// EventNone indicates that the event is not in reaction to a state change
-	EventNone EventType = ""
+	// EventAdd indicates a value was added to the set
+	EventAdd EventType = "add"
 
-	// EventAdded indicates a value was added to the set
-	EventAdded EventType = "added"
+	// EventRemove indicates a value was removed from the set
+	EventRemove EventType = "remove"
 
-	// EventRemoved indicates a value was removed from the set
-	EventRemoved EventType = "removed"
+	// EventReplay indicates a value was replayed
+	EventReplay EventType = "replay"
 )
 
 // Event is a set change event
@@ -85,140 +87,125 @@ type Event struct {
 }
 
 // New creates a new partitioned set primitive
-func New(ctx context.Context, name primitive.Name, partitions []*primitive.Session) (Set, error) {
-	results, err := util.ExecuteOrderedAsync(len(partitions), func(i int) (interface{}, error) {
-		return newPartition(ctx, name, partitions[i])
-	})
-	if err != nil {
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Set, error) {
+	options := applyOptions(opts...)
+	s := &set{
+		client: setclient.NewClient(client.ID(options.clientID), name, conn),
+	}
+	if err := s.create(ctx); err != nil {
 		return nil, err
 	}
-
-	sets := make([]Set, len(results))
-	for i, result := range results {
-		sets[i] = result.(Set)
-	}
-
-	return &set{
-		name:       name,
-		partitions: sets,
-	}, nil
+	return s, nil
 }
 
-// set is the partitioned implementation of Set
 type set struct {
-	name       primitive.Name
-	partitions []Set
+	client setclient.Client
 }
 
-func (s *set) Name() primitive.Name {
-	return s.name
+func (s *set) Type() primitive.Type {
+	return Type
 }
 
-func (s *set) getPartition(key string) (Set, error) {
-	i, err := util.GetPartitionIndex(key, len(s.partitions))
-	if err != nil {
-		return nil, err
-	}
-	return s.partitions[i], nil
+func (s *set) Name() string {
+	return s.client.Name()
 }
 
 func (s *set) Add(ctx context.Context, value string) (bool, error) {
-	partition, err := s.getPartition(value)
+	input := &api.AddInput{
+		Value: value,
+	}
+	output, err := s.client.Add(ctx, input)
 	if err != nil {
 		return false, err
 	}
-	return partition.Add(ctx, value)
+	return output.Added, nil
 }
 
 func (s *set) Remove(ctx context.Context, value string) (bool, error) {
-	partition, err := s.getPartition(value)
+	input := &api.RemoveInput{
+		Value: value,
+	}
+	output, err := s.client.Remove(ctx, input)
 	if err != nil {
 		return false, err
 	}
-	return partition.Remove(ctx, value)
+	return output.Removed, nil
 }
 
 func (s *set) Contains(ctx context.Context, value string) (bool, error) {
-	partition, err := s.getPartition(value)
+	input := &api.ContainsInput{
+		Value: value,
+	}
+	output, err := s.client.Contains(ctx, input)
 	if err != nil {
 		return false, err
 	}
-	return partition.Contains(ctx, value)
+	return output.Contains, nil
 }
 
 func (s *set) Len(ctx context.Context) (int, error) {
-	results, err := util.ExecuteAsync(len(s.partitions), func(i int) (interface{}, error) {
-		return s.partitions[i].Len(ctx)
-	})
+	output, err := s.client.Size(ctx)
 	if err != nil {
 		return 0, err
 	}
-
-	total := 0
-	for _, result := range results {
-		total += result.(int)
-	}
-	return total, nil
-}
-
-func (s *set) Elements(ctx context.Context, ch chan<- string) error {
-	n := len(s.partitions)
-	wg := sync.WaitGroup{}
-	wg.Add(n)
-
-	go func() {
-		wg.Wait()
-		close(ch)
-	}()
-
-	return util.IterAsync(n, func(i int) error {
-		partitionCh := make(chan string)
-		go func() {
-			for kv := range partitionCh {
-				ch <- kv
-			}
-			wg.Done()
-		}()
-		return s.partitions[i].Elements(ctx, partitionCh)
-	})
+	return int(output.Size_), nil
 }
 
 func (s *set) Clear(ctx context.Context) error {
-	return util.IterAsync(len(s.partitions), func(i int) error {
-		return s.partitions[i].Clear(ctx)
-	})
+	return s.client.Clear(ctx)
 }
 
-func (s *set) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error {
-	n := len(s.partitions)
-	wg := sync.WaitGroup{}
-	wg.Add(n)
-
+func (s *set) Elements(ctx context.Context, ch chan<- string) error {
+	input := &api.ElementsInput{}
+	outputCh := make(chan api.ElementsOutput)
+	if err := s.client.Elements(ctx, input, outputCh); err != nil {
+		return err
+	}
 	go func() {
-		wg.Wait()
-		close(ch)
+		for output := range outputCh {
+			ch <- output.Value
+		}
 	}()
+	return nil
+}
 
-	return util.IterAsync(n, func(i int) error {
-		partitionCh := make(chan *Event)
-		go func() {
-			for event := range partitionCh {
-				ch <- event
+func (s *set) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) error {
+	input := &api.EventsInput{}
+	for _, opt := range opts {
+		opt.beforeWatch(input)
+	}
+	outputCh := make(chan api.EventsOutput)
+	if err := s.client.Events(ctx, input, outputCh); err != nil {
+		return err
+	}
+	go func() {
+		for output := range outputCh {
+			var eventType EventType
+			switch output.Type {
+			case api.EventsOutput_ADD:
+				eventType = EventAdd
+			case api.EventsOutput_REMOVE:
+				eventType = EventRemove
+			case api.EventsOutput_REPLAY:
+				eventType = EventReplay
 			}
-			wg.Done()
-		}()
-		return s.partitions[i].Watch(ctx, partitionCh, opts...)
-	})
+			ch <- Event{
+				Type:  eventType,
+				Value: output.Value,
+			}
+		}
+	}()
+	return nil
+}
+
+func (s *set) create(ctx context.Context) error {
+	return s.client.Create(ctx)
 }
 
 func (s *set) Close(ctx context.Context) error {
-	return util.IterAsync(len(s.partitions), func(i int) error {
-		return s.partitions[i].Close(ctx)
-	})
+	return s.client.Close(ctx)
 }
 
 func (s *set) Delete(ctx context.Context) error {
-	return util.IterAsync(len(s.partitions), func(i int) error {
-		return s.partitions[i].Delete(ctx)
-	})
+	return s.client.Delete(ctx)
 }

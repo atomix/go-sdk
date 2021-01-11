@@ -15,13 +15,53 @@
 package list
 
 import (
-	api "github.com/atomix/api/proto/atomix/list"
+	api "github.com/atomix/api/go/atomix/primitive/list"
+	"github.com/google/uuid"
 )
+
+// Option is a list option
+type Option interface {
+	apply(options *options)
+}
+
+// options is list options
+type options struct {
+	clientID string
+}
+
+func applyOptions(opts ...Option) options {
+	id, err := uuid.NewUUID()
+	if err != nil {
+		panic(err)
+	}
+	options := &options{
+		clientID: id.String(),
+	}
+	for _, opt := range opts {
+		opt.apply(options)
+	}
+	return *options
+}
+
+// WithClientID sets the client identifier
+func WithClientID(id string) Option {
+	return &clientIDOption{
+		clientID: id,
+	}
+}
+
+type clientIDOption struct {
+	clientID string
+}
+
+func (o *clientIDOption) apply(options *options) {
+	options.clientID = o.clientID
+}
 
 // WatchOption is an option for list Watch calls
 type WatchOption interface {
-	beforeWatch(request *api.EventRequest)
-	afterWatch(response *api.EventResponse)
+	beforeWatch(input *api.EventsInput)
+	afterWatch(output *api.EventsOutput)
 }
 
 // WithReplay returns a Watch option to replay entries
@@ -31,10 +71,10 @@ func WithReplay() WatchOption {
 
 type replayOption struct{}
 
-func (o replayOption) beforeWatch(request *api.EventRequest) {
-	request.Replay = true
+func (o replayOption) beforeWatch(input *api.EventsInput) {
+	input.Replay = true
 }
 
-func (o replayOption) afterWatch(response *api.EventResponse) {
+func (o replayOption) afterWatch(output *api.EventsOutput) {
 
 }

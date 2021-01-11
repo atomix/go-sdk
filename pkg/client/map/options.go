@@ -15,79 +15,87 @@
 package _map //nolint:golint
 
 import (
-	api "github.com/atomix/api/proto/atomix/map"
+	api "github.com/atomix/api/go/atomix/primitive/map"
+	"github.com/atomix/go-client/pkg/client/meta"
+	"github.com/google/uuid"
 )
 
-// Option is an option for a Map instance
+// Option is a map option
 type Option interface {
 	apply(options *options)
 }
 
-// options is a set of map options
+// options is map options
 type options struct {
-	cached    bool
-	cacheSize int
+	clientID string
 }
 
-// WithCache returns an option that enables caching for a Map
-func WithCache(size int) Option {
-	if size <= 0 {
-		panic("cache size must be positive")
+func applyOptions(opts ...Option) options {
+	id, err := uuid.NewUUID()
+	if err != nil {
+		panic(err)
 	}
-	return &cacheOption{
-		enabled: true,
-		size:    size,
+	options := &options{
+		clientID: id.String(),
+	}
+	for _, opt := range opts {
+		opt.apply(options)
+	}
+	return *options
+}
+
+// WithClientID sets the client identifier
+func WithClientID(id string) Option {
+	return &clientIDOption{
+		clientID: id,
 	}
 }
 
-// cacheOption is a cache enable option
-type cacheOption struct {
-	enabled bool
-	size    int
+type clientIDOption struct {
+	clientID string
 }
 
-func (o *cacheOption) apply(options *options) {
-	options.cached = o.enabled
-	options.cacheSize = o.size
+func (o *clientIDOption) apply(options *options) {
+	options.clientID = o.clientID
 }
 
 // PutOption is an option for the Put method
 type PutOption interface {
-	beforePut(request *api.PutRequest)
-	afterPut(response *api.PutResponse)
+	beforePut(input *api.PutInput)
+	afterPut(output *api.PutOutput)
 }
 
 // RemoveOption is an option for the Remove method
 type RemoveOption interface {
-	beforeRemove(request *api.RemoveRequest)
-	afterRemove(response *api.RemoveResponse)
+	beforeRemove(input *api.RemoveInput)
+	afterRemove(output *api.RemoveOutput)
 }
 
-// IfVersion sets the required version for optimistic concurrency control
-func IfVersion(version Version) VersionOption {
-	return VersionOption{version: version}
+// IfMatch sets the required version for optimistic concurrency control
+func IfMatch(meta meta.ObjectMeta) MatchOption {
+	return MatchOption{meta: meta}
 }
 
-// VersionOption is an implementation of PutOption and RemoveOption to specify the version for concurrency control
-type VersionOption struct {
+// MatchOption is an implementation of PutOption and RemoveOption to specify the version for concurrency control
+type MatchOption struct {
 	PutOption
 	RemoveOption
-	version Version
+	meta meta.ObjectMeta
 }
 
-func (o VersionOption) beforePut(request *api.PutRequest) {
-	request.Version = uint64(o.version)
+func (o MatchOption) beforePut(input *api.PutInput) {
+	input.Meta = o.meta.Proto()
 }
 
-func (o VersionOption) afterPut(response *api.PutResponse) {
+func (o MatchOption) afterPut(output *api.PutOutput) {
 
 }
 
-func (o VersionOption) beforeRemove(request *api.RemoveRequest) {
-	request.Version = uint64(o.version)
+func (o MatchOption) beforeRemove(input *api.RemoveInput) {
+	input.Meta = o.meta.Proto()
 }
 
-func (o VersionOption) afterRemove(response *api.RemoveResponse) {
+func (o MatchOption) afterRemove(output *api.RemoveOutput) {
 
 }
 
@@ -100,42 +108,24 @@ func IfNotSet() PutOption {
 type NotSetOption struct {
 }
 
-func (o NotSetOption) beforePut(request *api.PutRequest) {
-	request.IfEmpty = true
+func (o NotSetOption) beforePut(input *api.PutInput) {
+	input.IfEmpty = true
 }
 
-func (o NotSetOption) afterPut(response *api.PutResponse) {
+func (o NotSetOption) afterPut(output *api.PutOutput) {
 
 }
 
 // GetOption is an option for the Get method
 type GetOption interface {
-	beforeGet(request *api.GetRequest)
-	afterGet(response *api.GetResponse)
-}
-
-// WithDefault sets the default value to return if the key is not present
-func WithDefault(def []byte) GetOption {
-	return defaultOption{def: def}
-}
-
-type defaultOption struct {
-	def []byte
-}
-
-func (o defaultOption) beforeGet(request *api.GetRequest) {
-}
-
-func (o defaultOption) afterGet(response *api.GetResponse) {
-	if response.Version == 0 {
-		response.Value = o.def
-	}
+	beforeGet(input *api.GetInput)
+	afterGet(output *api.GetOutput)
 }
 
 // WatchOption is an option for the Watch method
 type WatchOption interface {
-	beforeWatch(request *api.EventRequest)
-	afterWatch(response *api.EventResponse)
+	beforeWatch(input *api.EventsInput)
+	afterWatch(output *api.EventsOutput)
 }
 
 // WithReplay returns a watch option that enables replay of watch events
@@ -145,11 +135,11 @@ func WithReplay() WatchOption {
 
 type replayOption struct{}
 
-func (o replayOption) beforeWatch(request *api.EventRequest) {
-	request.Replay = true
+func (o replayOption) beforeWatch(input *api.EventsInput) {
+	input.Replay = true
 }
 
-func (o replayOption) afterWatch(response *api.EventResponse) {
+func (o replayOption) afterWatch(output *api.EventsOutput) {
 
 }
 
@@ -157,13 +147,13 @@ type filterOption struct {
 	filter Filter
 }
 
-func (o filterOption) beforeWatch(request *api.EventRequest) {
+func (o filterOption) beforeWatch(input *api.EventsInput) {
 	if o.filter.Key != "" {
-		request.Key = o.filter.Key
+		input.Key = o.filter.Key
 	}
 }
 
-func (o filterOption) afterWatch(response *api.EventResponse) {
+func (o filterOption) afterWatch(output *api.EventsOutput) {
 }
 
 // WithFilter returns a watch option that filters the watch events

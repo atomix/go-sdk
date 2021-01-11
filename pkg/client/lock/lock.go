@@ -16,20 +16,21 @@ package lock
 
 import (
 	"context"
-	"github.com/atomix/api/proto/atomix/headers"
-	api "github.com/atomix/api/proto/atomix/lock"
+	api "github.com/atomix/api/go/atomix/primitive/lock"
+	"github.com/atomix/go-client/pkg/client/meta"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/util"
+	"github.com/atomix/go-framework/pkg/atomix/client"
+	lockclient "github.com/atomix/go-framework/pkg/atomix/client/lock"
 	"google.golang.org/grpc"
 )
 
-// Type is the lock type
-const Type primitive.Type = "Lock"
+// Type is the counter type
+const Type = primitive.Type(lockclient.PrimitiveType)
 
 // Client provides an API for creating Locks
 type Client interface {
 	// GetLock gets the Lock instance of the given name
-	GetLock(ctx context.Context, name string) (Lock, error)
+	GetLock(ctx context.Context, name string, opts ...Option) (Lock, error)
 }
 
 // Lock provides distributed concurrency control
@@ -37,7 +38,7 @@ type Lock interface {
 	primitive.Primitive
 
 	// Lock acquires the lock
-	Lock(ctx context.Context, opts ...LockOption) (uint64, error)
+	Lock(ctx context.Context, opts ...LockOption) (meta.ObjectMeta, error)
 
 	// Unlock releases the lock
 	Unlock(ctx context.Context, opts ...UnlockOption) (bool, error)
@@ -48,112 +49,86 @@ type Lock interface {
 
 // New creates a new Lock primitive for the given partitions
 // The lock will be created in one of the given partitions.
-func New(ctx context.Context, name primitive.Name, partitions []*primitive.Session) (Lock, error) {
-	i, err := util.GetPartitionIndex(name.Name, len(partitions))
-	if err != nil {
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Lock, error) {
+	options := applyOptions(opts...)
+	l := &lock{
+		client: lockclient.NewClient(client.ID(options.clientID), name, conn),
+	}
+	if err := l.create(ctx); err != nil {
 		return nil, err
 	}
-	return newLock(ctx, name, partitions[i])
-}
-
-// newLock creates a new Lock primitive for the given partition
-func newLock(ctx context.Context, name primitive.Name, partition *primitive.Session) (*lock, error) {
-	instance, err := primitive.NewInstance(ctx, name, partition, &primitiveHandler{})
-	if err != nil {
-		return nil, err
-	}
-	return &lock{
-		name:     name,
-		instance: instance,
-	}, nil
+	return l, nil
 }
 
 // lock is the single partition implementation of Lock
 type lock struct {
-	name     primitive.Name
-	instance *primitive.Instance
+	client lockclient.Client
 }
 
-func (l *lock) Name() primitive.Name {
-	return l.name
+func (l *lock) Type() primitive.Type {
+	return Type
 }
 
-func (l *lock) Lock(ctx context.Context, opts ...LockOption) (uint64, error) {
-	response, err := l.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewLockServiceClient(conn)
-		request := &api.LockRequest{
-			Header: header,
-		}
-		for i := range opts {
-			opts[i].beforeLock(request)
-		}
-		response, err := client.Lock(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		for i := range opts {
-			opts[i].afterLock(response)
-		}
-		return response.Header, response, nil
-	})
-	if err != nil {
-		return 0, err
+func (l *lock) Name() string {
+	return l.client.Name()
+}
+
+func (l *lock) Lock(ctx context.Context, opts ...LockOption) (meta.ObjectMeta, error) {
+	input := &api.LockInput{
 	}
-	return response.(*api.LockResponse).Version, nil
+	for i := range opts {
+		opts[i].beforeLock(input)
+	}
+	output, err := l.client.Lock(ctx, input)
+	if err != nil {
+		return meta.ObjectMeta{}, err
+	}
+	for i := range opts {
+		opts[i].afterLock(output)
+	}
+	return meta.New(output.Meta), nil
 }
 
 func (l *lock) Unlock(ctx context.Context, opts ...UnlockOption) (bool, error) {
-	response, err := l.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewLockServiceClient(conn)
-		request := &api.UnlockRequest{
-			Header: header,
-		}
-		for i := range opts {
-			opts[i].beforeUnlock(request)
-		}
-		response, err := client.Unlock(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		for i := range opts {
-			opts[i].afterUnlock(response)
-		}
-		return response.Header, response, nil
-	})
+	input := &api.UnlockInput{
+	}
+	for i := range opts {
+		opts[i].beforeUnlock(input)
+	}
+	output, err := l.client.Unlock(ctx, input)
 	if err != nil {
 		return false, err
 	}
-	return response.(*api.UnlockResponse).Unlocked, nil
+	for i := range opts {
+		opts[i].afterUnlock(output)
+	}
+	return output.Unlocked, nil
 }
 
 func (l *lock) IsLocked(ctx context.Context, opts ...IsLockedOption) (bool, error) {
-	response, err := l.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewLockServiceClient(conn)
-		request := &api.IsLockedRequest{
-			Header: header,
-		}
-		for i := range opts {
-			opts[i].beforeIsLocked(request)
-		}
-		response, err := client.IsLocked(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		for i := range opts {
-			opts[i].afterIsLocked(response)
-		}
-		return response.Header, response, nil
-	})
+	input := &api.IsLockedInput{
+	}
+	for i := range opts {
+		opts[i].beforeIsLocked(input)
+	}
+	output, err := l.client.IsLocked(ctx, input)
 	if err != nil {
 		return false, err
 	}
-	return response.(*api.IsLockedResponse).IsLocked, nil
+	for i := range opts {
+		opts[i].afterIsLocked(output)
+	}
+	return output.IsLocked, nil
+}
+
+func (l *lock) create(ctx context.Context) error {
+	return l.client.Create(ctx)
 }
 
 func (l *lock) Close(ctx context.Context) error {
-	return l.instance.Close(ctx)
+	return l.client.Close(ctx)
 }
 
 func (l *lock) Delete(ctx context.Context) error {
-	return l.instance.Delete(ctx)
+	return l.client.Delete(ctx)
 }

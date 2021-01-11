@@ -16,18 +16,20 @@ package indexedmap
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"github.com/atomix/api/proto/atomix/headers"
-	api "github.com/atomix/api/proto/atomix/indexedmap"
+	api "github.com/atomix/api/go/atomix/primitive/indexedmap"
+	"github.com/atomix/go-client/pkg/client/meta"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/util"
+	"github.com/atomix/go-framework/pkg/atomix/client"
+	indexedmapclient "github.com/atomix/go-framework/pkg/atomix/client/indexedmap"
+	"github.com/atomix/go-framework/pkg/atomix/util/logging"
 	"google.golang.org/grpc"
-	"time"
 )
 
-// Type is the indexedmap type
-const Type primitive.Type = "IndexedMap"
+// Type is the counter type
+const Type = primitive.Type(indexedmapclient.PrimitiveType)
+
+var log = logging.GetLogger("atomix", "client", "indexedmap")
 
 // Index is the index of an entry
 type Index uint64
@@ -38,7 +40,7 @@ type Version uint64
 // Client provides an API for creating IndexedMaps
 type Client interface {
 	// GetIndexedMap gets the IndexedMap instance of the given name
-	GetIndexedMap(ctx context.Context, name string) (IndexedMap, error)
+	GetIndexedMap(ctx context.Context, name string, opts ...Option) (IndexedMap, error)
 }
 
 // IndexedMap is a distributed linked map
@@ -84,12 +86,6 @@ type IndexedMap interface {
 	// NextEntry gets the entry after the given index
 	NextEntry(ctx context.Context, index Index) (*Entry, error)
 
-	// Replace replaces the given key with the given value
-	Replace(ctx context.Context, key string, value []byte, opts ...ReplaceOption) (*Entry, error)
-
-	// ReplaceIndex replaces the given index with the given value
-	ReplaceIndex(ctx context.Context, index Index, value []byte, opts ...ReplaceOption) (*Entry, error)
-
 	// Remove removes a key from the map
 	Remove(ctx context.Context, key string, opts ...RemoveOption) (*Entry, error)
 
@@ -105,16 +101,18 @@ type IndexedMap interface {
 	// Entries lists the entries in the map
 	// This is a non-blocking method. If the method returns without error, key/value paids will be pushed on to the
 	// given channel and the channel will be closed once all entries have been read from the map.
-	Entries(ctx context.Context, ch chan<- *Entry) error
+	Entries(ctx context.Context, ch chan<- Entry) error
 
 	// Watch watches the map for changes
 	// This is a non-blocking method. If the method returns without error, map events will be pushed onto
 	// the given channel in the order in which they occur.
-	Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error
+	Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) error
 }
 
 // Entry is an indexed key/value pair
 type Entry struct {
+	meta.ObjectMeta
+
 	// Index is the unique, monotonically increasing, globally unique index of the entry. The index is static
 	// for the lifetime of a key.
 	Index Index
@@ -128,12 +126,6 @@ type Entry struct {
 
 	// Value is the value of the pair
 	Value []byte
-
-	// Created is the time at which the key was created
-	Created time.Time
-
-	// Updated is the time at which the key was last updated
-	Updated time.Time
 }
 
 func (kv Entry) String() string {
@@ -144,17 +136,17 @@ func (kv Entry) String() string {
 type EventType string
 
 const (
-	// EventNone indicates the event is not a change event
-	EventNone EventType = ""
+	// EventInsert indicates a key was newly created in the map
+	EventInsert EventType = "insert"
 
-	// EventInserted indicates a key was newly created in the map
-	EventInserted EventType = "inserted"
+	// EventUpdate indicates the value of an existing key was changed
+	EventUpdate EventType = "update"
 
-	// EventUpdated indicates the value of an existing key was changed
-	EventUpdated EventType = "updated"
+	// EventRemove indicates a key was removed from the map
+	EventRemove EventType = "remove"
 
-	// EventRemoved indicates a key was removed from the map
-	EventRemoved EventType = "removed"
+	// EventReplay indicats an entry was replayed
+	EventReplay EventType = "replay"
 )
 
 // Event is a map change event
@@ -163,744 +155,315 @@ type Event struct {
 	Type EventType
 
 	// Entry is the event entry
-	Entry *Entry
+	Entry Entry
 }
 
 // New creates a new IndexedMap primitive
-func New(ctx context.Context, name primitive.Name, partitions []*primitive.Session) (IndexedMap, error) {
-	i, err := util.GetPartitionIndex(name.Name, len(partitions))
-	if err != nil {
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (IndexedMap, error) {
+	options := applyOptions(opts...)
+	m := &indexedMap{
+		client: indexedmapclient.NewClient(client.ID(options.clientID), name, conn),
+	}
+	if err := m.create(ctx); err != nil {
 		return nil, err
 	}
-	return newIndexedMap(ctx, name, partitions[i])
-}
-
-// newIndexedMap creates a new IndexedMap for the given partition
-func newIndexedMap(ctx context.Context, name primitive.Name, partition *primitive.Session) (*indexedMap, error) {
-	instance, err := primitive.NewInstance(ctx, name, partition, &primitiveHandler{})
-	if err != nil {
-		return nil, err
-	}
-	return &indexedMap{
-		name:     name,
-		instance: instance,
-	}, nil
+	return m, nil
 }
 
 // indexedMap is the default single-partition implementation of Map
 type indexedMap struct {
-	name     primitive.Name
-	instance *primitive.Instance
+	client indexedmapclient.Client
 }
 
-func (m *indexedMap) Name() primitive.Name {
-	return m.name
+func (m *indexedMap) Type() primitive.Type {
+	return Type
+}
+
+func (m *indexedMap) Name() string {
+	return m.client.Name()
+}
+
+func newEntry(entry *api.Entry) *Entry {
+	if entry == nil {
+		return nil
+	}
+	return &Entry{
+		ObjectMeta: meta.New(entry.Value.Meta),
+		Index:      Index(entry.Pos.Index),
+		Key:        entry.Pos.Key,
+		Value:      entry.Value.Value,
+	}
 }
 
 func (m *indexedMap) Append(ctx context.Context, key string, value []byte) (*Entry, error) {
-	r, err := m.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewIndexedMapServiceClient(conn)
-		request := &api.PutRequest{
-			Header:  header,
-			Key:     key,
-			Value:   value,
-			IfEmpty: true,
-		}
-		response, err := client.Put(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		return response.Header, response, nil
-	})
+	input := &api.PutInput{
+		Entry: api.Entry{
+			Pos: api.Position{
+				Key: key,
+			},
+			Value: api.Value{
+				Value: value,
+			},
+		},
+		IfEmpty: true,
+	}
+	output, err := m.client.Put(ctx, input)
 	if err != nil {
 		return nil, err
 	}
-
-	response := r.(*api.PutResponse)
-	if response.Status == api.ResponseStatus_OK {
-		return &Entry{
-			Index:   Index(response.Index),
-			Key:     key,
-			Value:   value,
-			Version: Version(response.Header.Index),
-		}, nil
-	} else if response.Status == api.ResponseStatus_PRECONDITION_FAILED {
-		return nil, errors.New("write condition failed")
-	} else if response.Status == api.ResponseStatus_WRITE_LOCK {
-		return nil, errors.New("write lock failed")
-	} else {
-		return &Entry{
-			Index:   Index(response.Index),
-			Key:     key,
-			Value:   value,
-			Version: Version(response.PreviousVersion),
-			Created: response.Created,
-			Updated: response.Updated,
-		}, nil
-	}
+	return newEntry(output.Entry), nil
 }
 
 func (m *indexedMap) Put(ctx context.Context, key string, value []byte) (*Entry, error) {
-	r, err := m.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewIndexedMapServiceClient(conn)
-		request := &api.PutRequest{
-			Header: header,
-			Key:    key,
-			Value:  value,
-		}
-		response, err := client.Put(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		return response.Header, response, nil
-	})
+	input := &api.PutInput{
+		Entry: api.Entry{
+			Pos: api.Position{
+				Key: key,
+			},
+			Value: api.Value{
+				Value: value,
+			},
+		},
+	}
+	output, err := m.client.Put(ctx, input)
 	if err != nil {
 		return nil, err
 	}
-
-	response := r.(*api.PutResponse)
-	if response.Status == api.ResponseStatus_OK {
-		return &Entry{
-			Index:   Index(response.Index),
-			Key:     key,
-			Value:   value,
-			Version: Version(response.Header.Index),
-		}, nil
-	} else if response.Status == api.ResponseStatus_PRECONDITION_FAILED {
-		return nil, errors.New("write condition failed")
-	} else if response.Status == api.ResponseStatus_WRITE_LOCK {
-		return nil, errors.New("write lock failed")
-	} else {
-		return &Entry{
-			Index:   Index(response.Index),
-			Key:     key,
-			Value:   value,
-			Version: Version(response.PreviousVersion),
-			Created: response.Created,
-			Updated: response.Updated,
-		}, nil
-	}
+	return newEntry(output.Entry), nil
 }
 
 func (m *indexedMap) Set(ctx context.Context, index Index, key string, value []byte, opts ...SetOption) (*Entry, error) {
-	r, err := m.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewIndexedMapServiceClient(conn)
-		request := &api.PutRequest{
-			Header: header,
-			Index:  uint64(index),
-			Key:    key,
-			Value:  value,
-		}
-		for i := range opts {
-			opts[i].beforePut(request)
-		}
-		response, err := client.Put(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		for i := range opts {
-			opts[i].afterPut(response)
-		}
-		return response.Header, response, nil
-	})
+	input := &api.PutInput{
+		Entry: api.Entry{
+			Pos: api.Position{
+				Index: uint64(index),
+				Key:   key,
+			},
+			Value: api.Value{
+				Value: value,
+			},
+		},
+	}
+	for i := range opts {
+		opts[i].beforePut(input)
+	}
+	output, err := m.client.Put(ctx, input)
 	if err != nil {
 		return nil, err
 	}
-
-	response := r.(*api.PutResponse)
-	if response.Status == api.ResponseStatus_OK {
-		return &Entry{
-			Index:   Index(response.Index),
-			Key:     key,
-			Value:   value,
-			Version: Version(response.Header.Index),
-		}, nil
-	} else if response.Status == api.ResponseStatus_PRECONDITION_FAILED {
-		return nil, errors.New("write condition failed")
-	} else if response.Status == api.ResponseStatus_WRITE_LOCK {
-		return nil, errors.New("write lock failed")
-	} else {
-		return &Entry{
-			Index:   Index(response.Index),
-			Key:     key,
-			Value:   value,
-			Version: Version(response.PreviousVersion),
-			Created: response.Created,
-			Updated: response.Updated,
-		}, nil
+	for i := range opts {
+		opts[i].afterPut(output)
 	}
+	return newEntry(output.Entry), nil
 }
 
 func (m *indexedMap) Get(ctx context.Context, key string, opts ...GetOption) (*Entry, error) {
-	r, err := m.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewIndexedMapServiceClient(conn)
-		request := &api.GetRequest{
-			Header: header,
-			Key:    key,
-		}
-		for i := range opts {
-			opts[i].beforeGet(request)
-		}
-		response, err := client.Get(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		for i := range opts {
-			opts[i].afterGet(response)
-		}
-		return response.Header, response, nil
-	})
+	input := &api.GetInput{
+		Key: key,
+	}
+	for i := range opts {
+		opts[i].beforeGet(input)
+	}
+	output, err := m.client.Get(ctx, input)
 	if err != nil {
 		return nil, err
 	}
-
-	response := r.(*api.GetResponse)
-	if response.Version != 0 {
-		return &Entry{
-			Index:   Index(response.Index),
-			Key:     response.Key,
-			Value:   response.Value,
-			Version: Version(response.Version),
-			Created: response.Created,
-			Updated: response.Updated,
-		}, nil
+	for i := range opts {
+		opts[i].afterGet(output)
 	}
-	return nil, nil
+	return newEntry(output.Entry), nil
 }
 
 func (m *indexedMap) GetIndex(ctx context.Context, index Index, opts ...GetOption) (*Entry, error) {
-	r, err := m.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewIndexedMapServiceClient(conn)
-		request := &api.GetRequest{
-			Header: header,
-			Index:  uint64(index),
-		}
-		for i := range opts {
-			opts[i].beforeGet(request)
-		}
-		response, err := client.Get(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		for i := range opts {
-			opts[i].afterGet(response)
-		}
-		return response.Header, response, nil
-	})
+	input := &api.GetInput{
+		Index: uint64(index),
+	}
+	for i := range opts {
+		opts[i].beforeGet(input)
+	}
+	output, err := m.client.Get(ctx, input)
 	if err != nil {
 		return nil, err
 	}
-
-	response := r.(*api.GetResponse)
-	if response.Version != 0 {
-		return &Entry{
-			Index:   Index(response.Index),
-			Key:     response.Key,
-			Value:   response.Value,
-			Version: Version(response.Version),
-			Created: response.Created,
-			Updated: response.Updated,
-		}, nil
+	for i := range opts {
+		opts[i].afterGet(output)
 	}
-	return nil, nil
+	return newEntry(output.Entry), nil
 }
 
 func (m *indexedMap) FirstIndex(ctx context.Context) (Index, error) {
-	r, err := m.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewIndexedMapServiceClient(conn)
-		request := &api.FirstEntryRequest{
-			Header: header,
-		}
-		response, err := client.FirstEntry(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		return response.Header, response, nil
-	})
+	output, err := m.client.FirstEntry(ctx)
 	if err != nil {
 		return 0, err
 	}
-
-	response := r.(*api.FirstEntryResponse)
-	if response.Version != 0 {
-		return Index(response.Index), nil
-	}
-	return 0, nil
+	return Index(output.Entry.Pos.Index), nil
 }
 
 func (m *indexedMap) LastIndex(ctx context.Context) (Index, error) {
-	r, err := m.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewIndexedMapServiceClient(conn)
-		request := &api.LastEntryRequest{
-			Header: header,
-		}
-		response, err := client.LastEntry(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		return response.Header, response, nil
-	})
+	output, err := m.client.LastEntry(ctx)
 	if err != nil {
 		return 0, err
 	}
-
-	response := r.(*api.LastEntryResponse)
-	if response.Version != 0 {
-		return Index(response.Index), nil
-	}
-	return 0, nil
+	return Index(output.Entry.Pos.Index), nil
 }
 
 func (m *indexedMap) PrevIndex(ctx context.Context, index Index) (Index, error) {
-	r, err := m.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewIndexedMapServiceClient(conn)
-		request := &api.PrevEntryRequest{
-			Header: header,
-			Index:  uint64(index),
-		}
-		response, err := client.PrevEntry(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		return response.Header, response, nil
-	})
+	input := &api.PrevEntryInput{
+		Index: uint64(index),
+	}
+	output, err := m.client.PrevEntry(ctx, input)
 	if err != nil {
 		return 0, err
 	}
-
-	response := r.(*api.PrevEntryResponse)
-	if response.Version != 0 {
-		return Index(response.Index), nil
-	}
-	return 0, nil
+	return Index(output.Entry.Pos.Index), nil
 }
 
 func (m *indexedMap) NextIndex(ctx context.Context, index Index) (Index, error) {
-	r, err := m.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewIndexedMapServiceClient(conn)
-		request := &api.NextEntryRequest{
-			Header: header,
-			Index:  uint64(index),
-		}
-		response, err := client.NextEntry(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		return response.Header, response, nil
-	})
+	input := &api.NextEntryInput{
+		Index: uint64(index),
+	}
+	output, err := m.client.NextEntry(ctx, input)
 	if err != nil {
 		return 0, err
 	}
-
-	response := r.(*api.NextEntryResponse)
-	if response.Version != 0 {
-		return Index(response.Index), nil
-	}
-	return 0, nil
+	return Index(output.Entry.Pos.Index), nil
 }
 
 func (m *indexedMap) FirstEntry(ctx context.Context) (*Entry, error) {
-	r, err := m.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewIndexedMapServiceClient(conn)
-		request := &api.FirstEntryRequest{
-			Header: header,
-		}
-		response, err := client.FirstEntry(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		return response.Header, response, nil
-	})
+	output, err := m.client.FirstEntry(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	response := r.(*api.FirstEntryResponse)
-	if response.Version != 0 {
-		return &Entry{
-			Index:   Index(response.Index),
-			Key:     response.Key,
-			Value:   response.Value,
-			Version: Version(response.Version),
-			Created: response.Created,
-			Updated: response.Updated,
-		}, nil
-	}
-	return nil, err
+	return newEntry(output.Entry), nil
 }
 
 func (m *indexedMap) LastEntry(ctx context.Context) (*Entry, error) {
-	r, err := m.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewIndexedMapServiceClient(conn)
-		request := &api.LastEntryRequest{
-			Header: header,
-		}
-		response, err := client.LastEntry(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		return response.Header, response, nil
-	})
+	output, err := m.client.LastEntry(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	response := r.(*api.LastEntryResponse)
-	if response.Version != 0 {
-		return &Entry{
-			Index:   Index(response.Index),
-			Key:     response.Key,
-			Value:   response.Value,
-			Version: Version(response.Version),
-			Created: response.Created,
-			Updated: response.Updated,
-		}, nil
-	}
-	return nil, err
+	return newEntry(output.Entry), nil
 }
 
 func (m *indexedMap) PrevEntry(ctx context.Context, index Index) (*Entry, error) {
-	r, err := m.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewIndexedMapServiceClient(conn)
-		request := &api.PrevEntryRequest{
-			Header: header,
-			Index:  uint64(index),
-		}
-		response, err := client.PrevEntry(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		return response.Header, response, nil
-	})
+	input := &api.PrevEntryInput{
+		Index: uint64(index),
+	}
+	output, err := m.client.PrevEntry(ctx, input)
 	if err != nil {
 		return nil, err
 	}
-
-	response := r.(*api.PrevEntryResponse)
-	if response.Version != 0 {
-		return &Entry{
-			Index:   Index(response.Index),
-			Key:     response.Key,
-			Value:   response.Value,
-			Version: Version(response.Version),
-			Created: response.Created,
-			Updated: response.Updated,
-		}, nil
-	}
-	return nil, err
+	return newEntry(output.Entry), nil
 }
 
 func (m *indexedMap) NextEntry(ctx context.Context, index Index) (*Entry, error) {
-	r, err := m.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewIndexedMapServiceClient(conn)
-		request := &api.NextEntryRequest{
-			Header: header,
-			Index:  uint64(index),
-		}
-		response, err := client.NextEntry(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		return response.Header, response, nil
-	})
+	input := &api.NextEntryInput{
+		Index: uint64(index),
+	}
+	output, err := m.client.NextEntry(ctx, input)
 	if err != nil {
 		return nil, err
 	}
-
-	response := r.(*api.NextEntryResponse)
-	if response.Version != 0 {
-		return &Entry{
-			Index:   Index(response.Index),
-			Key:     response.Key,
-			Value:   response.Value,
-			Version: Version(response.Version),
-			Created: response.Created,
-			Updated: response.Updated,
-		}, nil
-	}
-	return nil, err
-}
-
-func (m *indexedMap) Replace(ctx context.Context, key string, value []byte, opts ...ReplaceOption) (*Entry, error) {
-	r, err := m.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewIndexedMapServiceClient(conn)
-		request := &api.ReplaceRequest{
-			Header:   header,
-			Key:      key,
-			NewValue: value,
-		}
-		for i := range opts {
-			opts[i].beforeReplace(request)
-		}
-		response, err := client.Replace(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		for i := range opts {
-			opts[i].afterReplace(response)
-		}
-		return response.Header, response, nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	response := r.(*api.ReplaceResponse)
-	if response.Status == api.ResponseStatus_OK {
-		return &Entry{
-			Index:   Index(response.Index),
-			Key:     key,
-			Value:   value,
-			Version: Version(response.Header.Index),
-		}, nil
-	} else if response.Status == api.ResponseStatus_PRECONDITION_FAILED {
-		return nil, errors.New("write condition failed")
-	} else if response.Status == api.ResponseStatus_WRITE_LOCK {
-		return nil, errors.New("write lock failed")
-	} else {
-		return nil, nil
-	}
-}
-
-func (m *indexedMap) ReplaceIndex(ctx context.Context, index Index, value []byte, opts ...ReplaceOption) (*Entry, error) {
-	r, err := m.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewIndexedMapServiceClient(conn)
-		request := &api.ReplaceRequest{
-			Header:   header,
-			Index:    uint64(index),
-			NewValue: value,
-		}
-		for i := range opts {
-			opts[i].beforeReplace(request)
-		}
-		response, err := client.Replace(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		for i := range opts {
-			opts[i].afterReplace(response)
-		}
-		return response.Header, response, nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	response := r.(*api.ReplaceResponse)
-	if response.Status == api.ResponseStatus_OK {
-		return &Entry{
-			Index:   Index(response.Index),
-			Key:     response.Key,
-			Value:   response.PreviousValue,
-			Version: Version(response.PreviousVersion),
-		}, nil
-	} else if response.Status == api.ResponseStatus_PRECONDITION_FAILED {
-		return nil, errors.New("write condition failed")
-	} else if response.Status == api.ResponseStatus_WRITE_LOCK {
-		return nil, errors.New("write lock failed")
-	} else {
-		return nil, nil
-	}
+	return newEntry(output.Entry), nil
 }
 
 func (m *indexedMap) Remove(ctx context.Context, key string, opts ...RemoveOption) (*Entry, error) {
-	r, err := m.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewIndexedMapServiceClient(conn)
-		request := &api.RemoveRequest{
-			Header: header,
-			Key:    key,
-		}
-		for i := range opts {
-			opts[i].beforeRemove(request)
-		}
-		response, err := client.Remove(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		for i := range opts {
-			opts[i].afterRemove(response)
-		}
-		return response.Header, response, nil
-	})
+	input := &api.RemoveInput{
+		Entry: &api.Entry{
+			Pos: api.Position{
+				Key: key,
+			},
+		},
+	}
+	for i := range opts {
+		opts[i].beforeRemove(input)
+	}
+	output, err := m.client.Remove(ctx, input)
 	if err != nil {
 		return nil, err
 	}
-
-	response := r.(*api.RemoveResponse)
-	if response.Status == api.ResponseStatus_OK {
-		return &Entry{
-			Index:   Index(response.Index),
-			Key:     key,
-			Value:   response.PreviousValue,
-			Version: Version(response.PreviousVersion),
-		}, nil
-	} else if response.Status == api.ResponseStatus_PRECONDITION_FAILED {
-		return nil, errors.New("write condition failed")
-	} else if response.Status == api.ResponseStatus_WRITE_LOCK {
-		return nil, errors.New("write lock failed")
-	} else {
-		return nil, nil
+	for i := range opts {
+		opts[i].afterRemove(output)
 	}
+	return newEntry(output.Entry), nil
 }
 
 func (m *indexedMap) RemoveIndex(ctx context.Context, index Index, opts ...RemoveOption) (*Entry, error) {
-	r, err := m.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewIndexedMapServiceClient(conn)
-		request := &api.RemoveRequest{
-			Header: header,
-			Index:  uint64(index),
-		}
-		for i := range opts {
-			opts[i].beforeRemove(request)
-		}
-		response, err := client.Remove(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		for i := range opts {
-			opts[i].afterRemove(response)
-		}
-		return response.Header, response, nil
-	})
+	input := &api.RemoveInput{
+		Entry: &api.Entry{
+			Pos: api.Position{
+				Index: uint64(index),
+			},
+		},
+	}
+	for i := range opts {
+		opts[i].beforeRemove(input)
+	}
+	output, err := m.client.Remove(ctx, input)
 	if err != nil {
 		return nil, err
 	}
-
-	response := r.(*api.RemoveResponse)
-	if response.Status == api.ResponseStatus_OK {
-		return &Entry{
-			Index:   Index(response.Index),
-			Key:     response.Key,
-			Value:   response.PreviousValue,
-			Version: Version(response.PreviousVersion),
-		}, nil
-	} else if response.Status == api.ResponseStatus_PRECONDITION_FAILED {
-		return nil, errors.New("write condition failed")
-	} else if response.Status == api.ResponseStatus_WRITE_LOCK {
-		return nil, errors.New("write lock failed")
-	} else {
-		return nil, nil
+	for i := range opts {
+		opts[i].afterRemove(output)
 	}
+	return newEntry(output.Entry), nil
 }
 
 func (m *indexedMap) Len(ctx context.Context) (int, error) {
-	response, err := m.instance.DoQuery(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewIndexedMapServiceClient(conn)
-		request := &api.SizeRequest{
-			Header: header,
-		}
-		response, err := client.Size(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		return response.Header, response, nil
-	})
+	output, err := m.client.Size(ctx)
 	if err != nil {
 		return 0, err
 	}
-	return int(response.(*api.SizeResponse).Size_), nil
+	return int(output.Size_), nil
 }
 
 func (m *indexedMap) Clear(ctx context.Context) error {
-	_, err := m.instance.DoCommand(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (*headers.ResponseHeader, interface{}, error) {
-		client := api.NewIndexedMapServiceClient(conn)
-		request := &api.ClearRequest{
-			Header: header,
-		}
-		response, err := client.Clear(ctx, request)
-		if err != nil {
-			return nil, nil, err
-		}
-		return response.Header, response, nil
-	})
-	return err
+	return m.client.Clear(ctx)
 }
 
-func (m *indexedMap) Entries(ctx context.Context, ch chan<- *Entry) error {
-	stream, err := m.instance.DoQueryStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
-		client := api.NewIndexedMapServiceClient(conn)
-		request := &api.EntriesRequest{
-			Header: header,
-		}
-		return client.Entries(ctx, request)
-	}, func(responses interface{}) (*headers.ResponseHeader, interface{}, error) {
-		response, err := responses.(api.IndexedMapService_EntriesClient).Recv()
-		if err != nil {
-			return nil, nil, err
-		}
-		return response.Header, response, nil
-	})
-	if err != nil {
+func (m *indexedMap) Entries(ctx context.Context, ch chan<- Entry) error {
+	input := &api.EntriesInput{}
+	outputCh := make(chan api.EntriesOutput)
+	if err := m.client.Entries(ctx, input, outputCh); err != nil {
 		return err
 	}
-
 	go func() {
-		defer close(ch)
-		for event := range stream {
-			response := event.(*api.EntriesResponse)
-			ch <- &Entry{
-				Index:   Index(response.Index),
-				Key:     response.Key,
-				Value:   response.Value,
-				Version: Version(response.Version),
-				Created: response.Created,
-				Updated: response.Updated,
-			}
+		for output := range outputCh {
+			ch <- *newEntry(&output.Entry)
 		}
 	}()
 	return nil
 }
 
-func (m *indexedMap) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error {
-	stream, err := m.instance.DoCommandStream(ctx, func(ctx context.Context, conn *grpc.ClientConn, header *headers.RequestHeader) (interface{}, error) {
-		client := api.NewIndexedMapServiceClient(conn)
-		request := &api.EventRequest{
-			Header: header,
-		}
-		for _, opt := range opts {
-			opt.beforeWatch(request)
-		}
-		return client.Events(ctx, request)
-	}, func(responses interface{}) (*headers.ResponseHeader, interface{}, error) {
-		response, err := responses.(api.IndexedMapService_EventsClient).Recv()
-		if err != nil {
-			return nil, nil, err
-		}
-		for _, opt := range opts {
-			opt.afterWatch(response)
-		}
-		return response.Header, response, nil
-	})
-	if err != nil {
+func (m *indexedMap) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) error {
+	input := &api.EventsInput{}
+	for _, opt := range opts {
+		opt.beforeWatch(input)
+	}
+	outputCh := make(chan api.EventsOutput)
+	if err := m.client.Events(ctx, input, outputCh); err != nil {
 		return err
 	}
-
 	go func() {
-		defer close(ch)
-		for event := range stream {
-			response := event.(*api.EventResponse)
-
-			// If this is a normal event (not a handshake response), write the event to the watch channel
-			var t EventType
-			switch response.Type {
-			case api.EventResponse_NONE:
-				t = EventNone
-			case api.EventResponse_INSERTED:
-				t = EventInserted
-			case api.EventResponse_UPDATED:
-				t = EventUpdated
-			case api.EventResponse_REMOVED:
-				t = EventRemoved
+		for output := range outputCh {
+			var eventType EventType
+			switch output.Type {
+			case api.EventsOutput_INSERT:
+				eventType = EventInsert
+			case api.EventsOutput_UPDATE:
+				eventType = EventUpdate
+			case api.EventsOutput_REMOVE:
+				eventType = EventRemove
+			case api.EventsOutput_REPLAY:
+				eventType = EventReplay
 			}
-			ch <- &Event{
-				Type: t,
-				Entry: &Entry{
-					Index:   Index(response.Index),
-					Key:     response.Key,
-					Value:   response.Value,
-					Version: Version(response.Version),
-					Created: response.Created,
-					Updated: response.Updated,
+			ch <- Event{
+				Type: eventType,
+				Entry: Entry{
+					ObjectMeta: meta.New(output.Entry.Value.Meta),
+					Key:        output.Entry.Pos.Key,
+					Value:      output.Entry.Value.Value,
+					Index:      Index(output.Entry.Pos.Index),
 				},
 			}
 		}
@@ -908,10 +471,14 @@ func (m *indexedMap) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchO
 	return nil
 }
 
+func (m *indexedMap) create(ctx context.Context) error {
+	return m.client.Create(ctx)
+}
+
 func (m *indexedMap) Close(ctx context.Context) error {
-	return m.instance.Close(ctx)
+	return m.client.Close(ctx)
 }
 
 func (m *indexedMap) Delete(ctx context.Context) error {
-	return m.instance.Delete(ctx)
+	return m.client.Delete(ctx)
 }

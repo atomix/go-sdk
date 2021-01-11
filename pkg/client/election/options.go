@@ -1,4 +1,4 @@
-// Copyright 2019-present Open Networking Foundation.
+// Copyright 2020-present Open Networking Foundation.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,19 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package set
+package election
 
-import (
-	api "github.com/atomix/api/go/atomix/primitive/set"
-	"github.com/google/uuid"
-)
+import "github.com/google/uuid"
 
-// Option is a set option
+// Option is an election option
 type Option interface {
 	apply(options *options)
 }
 
-// options is set options
+// options is election options
 type options struct {
 	clientID string
 }
@@ -56,25 +53,4 @@ type clientIDOption struct {
 
 func (o *clientIDOption) apply(options *options) {
 	options.clientID = o.clientID
-}
-
-// WatchOption is an option for set Watch calls
-type WatchOption interface {
-	beforeWatch(input *api.EventsInput)
-	afterWatch(output *api.EventsOutput)
-}
-
-// WithReplay returns a Watch option to replay entries
-func WithReplay() WatchOption {
-	return replayOption{}
-}
-
-type replayOption struct{}
-
-func (o replayOption) beforeWatch(input *api.EventsInput) {
-	input.Replay = true
-}
-
-func (o replayOption) afterWatch(output *api.EventsOutput) {
-
 }

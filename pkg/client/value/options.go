@@ -15,45 +15,69 @@
 package value
 
 import (
-	api "github.com/atomix/api/proto/atomix/value"
+	api "github.com/atomix/api/go/atomix/primitive/value"
+	"github.com/atomix/go-client/pkg/client/meta"
+	"github.com/google/uuid"
 )
+
+// Option is a value option
+type Option interface {
+	apply(options *options)
+}
+
+// options is value options
+type options struct {
+	clientID string
+}
+
+func applyOptions(opts ...Option) options {
+	id, err := uuid.NewUUID()
+	if err != nil {
+		panic(err)
+	}
+	options := &options{
+		clientID: id.String(),
+	}
+	for _, opt := range opts {
+		opt.apply(options)
+	}
+	return *options
+}
+
+// WithClientID sets the client identifier
+func WithClientID(id string) Option {
+	return &clientIDOption{
+		clientID: id,
+	}
+}
+
+type clientIDOption struct {
+	clientID string
+}
+
+func (o *clientIDOption) apply(options *options) {
+	options.clientID = o.clientID
+}
 
 // SetOption is an option for Set calls
 type SetOption interface {
-	beforeSet(request *api.SetRequest)
-	afterSet(response *api.SetResponse)
+	beforeSet(input *api.SetInput)
+	afterSet(output *api.SetOutput)
 }
 
-// IfValue updates the value if the current value matches the given value
-func IfValue(value []byte) SetOption {
-	return valueOption{value}
+// IfMatch updates the value if the version matches the given version
+func IfMatch(meta meta.ObjectMeta) SetOption {
+	return matchOption{meta}
 }
 
-type valueOption struct {
-	value []byte
+type matchOption struct {
+	meta meta.ObjectMeta
 }
 
-func (o valueOption) beforeSet(request *api.SetRequest) {
-	request.ExpectValue = o.value
+func (o matchOption) beforeSet(input *api.SetInput) {
+	input.Value.Meta = o.meta.Proto()
 }
 
-func (o valueOption) afterSet(response *api.SetResponse) {
-
-}
-
-// IfVersion updates the value if the version matches the given version
-func IfVersion(version uint64) SetOption {
-	return versionOption{version}
-}
-
-type versionOption struct {
-	version uint64
-}
-
-func (o versionOption) beforeSet(request *api.SetRequest) {
-	request.ExpectVersion = o.version
-}
-
-func (o versionOption) afterSet(response *api.SetResponse) {
+func (o matchOption) afterSet(output *api.SetOutput) {
 
 }

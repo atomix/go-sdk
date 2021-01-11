@@ -16,30 +16,29 @@ package lock
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/client/errors"
-	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/test"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
+	lockrsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/lock"
+	lockproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/lock"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
 )
 
 func TestLock(t *testing.T) {
-	partitions, closers := test.StartTestPartitions(3)
-	defer test.StopTestPartitions(closers)
+	test := test.New().
+		SetPartitions(1).
+		SetSessions(3).
+		SetStorage(lockrsm.RegisterService).
+		SetProxy(lockproxy.RegisterProxy)
 
-	sessions1, err := test.OpenSessions(partitions, primitive.WithSessionTimeout(5*time.Second))
+	conns, err := test.Start()
 	assert.NoError(t, err)
-	defer test.CloseSessions(sessions1)
+	defer test.Stop()
 
-	sessions2, err := test.OpenSessions(partitions, primitive.WithSessionTimeout(5*time.Second))
+	l1, err := New(context.TODO(), "test", conns[0])
 	assert.NoError(t, err)
-	defer test.CloseSessions(sessions2)
-
-	name := primitive.NewName("default", "test", "default", "test")
-	l1, err := New(context.TODO(), name, sessions1)
-	assert.NoError(t, err)
-	l2, err := New(context.TODO(), name, sessions2)
+	l2, err := New(context.TODO(), "test", conns[1])
 	assert.NoError(t, err)
 
 	v1, err := l1.Lock(context.Background())
@@ -96,11 +95,7 @@ func TestLock(t *testing.T) {
 	assert.Error(t, err)
 	assert.True(t, errors.IsNotFound(err))
 
-	sessions, err := test.OpenSessions(partitions)
-	assert.NoError(t, err)
-	defer test.CloseSessions(sessions)
-
-	l, err := New(context.TODO(), name, sessions)
+	l, err := New(context.TODO(), "test", conns[2])
 	assert.NoError(t, err)
 
 	locked, err = l.IsLocked(context.TODO())

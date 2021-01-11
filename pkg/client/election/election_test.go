@@ -16,43 +16,38 @@ package election
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/client/errors"
-	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/test"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
+	electionrsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/election"
+	electionproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/election"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestElectionOperations(t *testing.T) {
-	partitions, closers := test.StartTestPartitions(3)
-	defer test.StopTestPartitions(closers)
+	test := test.New().
+		SetPartitions(1).
+		SetSessions(3).
+		SetStorage(electionrsm.RegisterService).
+		SetProxy(electionproxy.RegisterProxy)
 
-	sessions1, err := test.OpenSessions(partitions)
+	conns, err := test.Start()
 	assert.NoError(t, err)
-	defer test.CloseSessions(sessions1)
+	defer test.Stop()
 
-	sessions2, err := test.OpenSessions(partitions)
-	assert.NoError(t, err)
-	defer test.CloseSessions(sessions2)
-
-	sessions3, err := test.OpenSessions(partitions)
-	assert.NoError(t, err)
-	defer test.CloseSessions(sessions3)
-
-	name := primitive.NewName("default", "test", "default", "test")
-	election1, err := New(context.TODO(), name, sessions1)
+	election1, err := New(context.TODO(), "test", conns[0], WithClientID("client-1"))
 	assert.NoError(t, err)
 	assert.NotNil(t, election1)
 
-	election2, err := New(context.TODO(), name, sessions2)
+	election2, err := New(context.TODO(), "test", conns[1], WithClientID("client-2"))
 	assert.NoError(t, err)
 	assert.NotNil(t, election2)
 
-	election3, err := New(context.TODO(), name, sessions3)
+	election3, err := New(context.TODO(), "test", conns[2], WithClientID("client-3"))
 	assert.NoError(t, err)
 	assert.NotNil(t, election3)
 
-	ch := make(chan *Event)
+	ch := make(chan Event)
 	err = election1.Watch(context.TODO(), ch)
 	assert.NoError(t, err)
 
@@ -70,7 +65,7 @@ func TestElectionOperations(t *testing.T) {
 	assert.Equal(t, election1.ID(), term.Candidates[0])
 
 	event := <-ch
-	assert.Equal(t, EventChanged, event.Type)
+	assert.Equal(t, EventChange, event.Type)
 	assert.Equal(t, uint64(1), event.Term.ID)
 	assert.Equal(t, election1.ID(), event.Term.Leader)
 	assert.Len(t, event.Term.Candidates, 1)
@@ -85,7 +80,7 @@ func TestElectionOperations(t *testing.T) {
 	assert.Equal(t, election2.ID(), term.Candidates[1])
 
 	event = <-ch
-	assert.Equal(t, EventChanged, event.Type)
+	assert.Equal(t, EventChange, event.Type)
 	assert.Equal(t, uint64(1), event.Term.ID)
 	assert.Equal(t, election1.ID(), event.Term.Leader)
 	assert.Len(t, event.Term.Candidates, 2)
@@ -102,7 +97,7 @@ func TestElectionOperations(t *testing.T) {
 	assert.Equal(t, election3.ID(), term.Candidates[2])
 
 	event = <-ch
-	assert.Equal(t, EventChanged, event.Type)
+	assert.Equal(t, EventChange, event.Type)
 	assert.Equal(t, uint64(1), event.Term.ID)
 	assert.Equal(t, election1.ID(), event.Term.Leader)
 	assert.Len(t, event.Term.Candidates, 3)
@@ -120,7 +115,7 @@ func TestElectionOperations(t *testing.T) {
 	assert.Equal(t, election2.ID(), term.Candidates[2])
 
 	event = <-ch
-	assert.Equal(t, EventChanged, event.Type)
+	assert.Equal(t, EventChange, event.Type)
 	assert.Equal(t, uint64(1), event.Term.ID)
 	assert.Equal(t, election1.ID(), event.Term.Leader)
 	assert.Len(t, event.Term.Candidates, 3)
@@ -138,7 +133,7 @@ func TestElectionOperations(t *testing.T) {
 	assert.Equal(t, election2.ID(), term.Candidates[2])
 
 	event = <-ch
-	assert.Equal(t, EventChanged, event.Type)
+	assert.Equal(t, EventChange, event.Type)
 	assert.Equal(t, uint64(2), event.Term.ID)
 	assert.Equal(t, election3.ID(), event.Term.Leader)
 	assert.Len(t, event.Term.Candidates, 3)
@@ -156,7 +151,7 @@ func TestElectionOperations(t *testing.T) {
 	assert.Equal(t, election1.ID(), term.Candidates[2])
 
 	event = <-ch
-	assert.Equal(t, EventChanged, event.Type)
+	assert.Equal(t, EventChange, event.Type)
 	assert.Equal(t, uint64(3), event.Term.ID)
 	assert.Equal(t, election2.ID(), event.Term.Leader)
 	assert.Len(t, event.Term.Candidates, 3)
@@ -173,7 +168,7 @@ func TestElectionOperations(t *testing.T) {
 	assert.Equal(t, election1.ID(), term.Candidates[1])
 
 	event = <-ch
-	assert.Equal(t, EventChanged, event.Type)
+	assert.Equal(t, EventChange, event.Type)
 	assert.Equal(t, uint64(4), event.Term.ID)
 	assert.Equal(t, election3.ID(), event.Term.Leader)
 	assert.Len(t, event.Term.Candidates, 2)
@@ -188,7 +183,7 @@ func TestElectionOperations(t *testing.T) {
 	assert.Equal(t, election1.ID(), term.Candidates[0])
 
 	event = <-ch
-	assert.Equal(t, EventChanged, event.Type)
+	assert.Equal(t, EventChange, event.Type)
 	assert.Equal(t, uint64(5), event.Term.ID)
 	assert.Equal(t, election1.ID(), event.Term.Leader)
 	assert.Len(t, event.Term.Candidates, 1)
@@ -202,7 +197,7 @@ func TestElectionOperations(t *testing.T) {
 	assert.Equal(t, election1.ID(), term.Candidates[0])
 
 	event = <-ch
-	assert.Equal(t, EventChanged, event.Type)
+	assert.Equal(t, EventChange, event.Type)
 	assert.Equal(t, uint64(5), event.Term.ID)
 	assert.Equal(t, election1.ID(), event.Term.Leader)
 	assert.Len(t, event.Term.Candidates, 2)
@@ -216,7 +211,7 @@ func TestElectionOperations(t *testing.T) {
 	assert.Equal(t, election2.ID(), term.Candidates[0])
 
 	event = <-ch
-	assert.Equal(t, EventChanged, event.Type)
+	assert.Equal(t, EventChange, event.Type)
 	assert.Equal(t, uint64(6), event.Term.ID)
 	assert.Equal(t, election2.ID(), event.Term.Leader)
 	assert.Len(t, event.Term.Candidates, 2)
@@ -226,7 +221,7 @@ func TestElectionOperations(t *testing.T) {
 	assert.NoError(t, err)
 
 	event = <-ch
-	assert.Equal(t, EventChanged, event.Type)
+	assert.Equal(t, EventChange, event.Type)
 	assert.Equal(t, uint64(7), event.Term.ID)
 	assert.Equal(t, election1.ID(), event.Term.Leader)
 	assert.Len(t, event.Term.Candidates, 1)
@@ -237,10 +232,10 @@ func TestElectionOperations(t *testing.T) {
 	err = election3.Close(context.Background())
 	assert.NoError(t, err)
 
-	election1, err = New(context.TODO(), name, sessions1)
+	election1, err = New(context.TODO(), "test", conns[0], WithClientID("client-1"))
 	assert.NoError(t, err)
 
-	election2, err = New(context.TODO(), name, sessions2)
+	election2, err = New(context.TODO(), "test", conns[1], WithClientID("client-2"))
 	assert.NoError(t, err)
 
 	term, err = election1.GetTerm(context.TODO())
@@ -259,7 +254,7 @@ func TestElectionOperations(t *testing.T) {
 	assert.Error(t, err)
 	assert.True(t, errors.IsNotFound(err))
 
-	election, err := New(context.TODO(), name, sessions3)
+	election, err := New(context.TODO(), "test", conns[2], WithClientID("client-3"))
 	assert.NoError(t, err)
 
 	term, err = election.GetTerm(context.TODO())

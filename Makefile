@@ -1,6 +1,8 @@
 export CGO_ENABLED=0
 export GO111MODULE=on
 
+PARENT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../)
+
 .PHONY: build
 
 all: build
@@ -16,6 +18,14 @@ test: build license_check linters
 coverage: # @HELP generate unit test coverage data
 coverage: build linters license_check
 	./build/bin/coveralls-coverage
+
+primitives: # @HELP compile the protobuf files (using protoc-go Docker)
+	docker run -it \
+		-v $(PARENT_DIR)/atomix-api:/go/src/github.com/atomix/api \
+		-v `pwd`:/go/src/github.com/atomix/go-client \
+		-w /go/src/github.com/atomix/go-client \
+		--entrypoint build/bin/generate-primitives.sh \
+		atomix/protoc-gen-atomix:latest
 
 linters: # @HELP examines Go source code and reports coding problems
 	golangci-lint run

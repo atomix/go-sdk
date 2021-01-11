@@ -16,23 +16,26 @@ package list
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/client/errors"
-	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/test"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
+	listrsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/list"
+	listproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/list"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestListOperations(t *testing.T) {
-	partitions, closers := test.StartTestPartitions(3)
-	defer test.StopTestPartitions(closers)
+	test := test.New().
+		SetPartitions(1).
+		SetSessions(3).
+		SetStorage(listrsm.RegisterService).
+		SetProxy(listproxy.RegisterProxy)
 
-	sessions, err := test.OpenSessions(partitions)
+	conns, err := test.Start()
 	assert.NoError(t, err)
-	defer test.CloseSessions(sessions)
+	defer test.Stop()
 
-	name := primitive.NewName("default", "test", "default", "test")
-	list, err := New(context.TODO(), name, sessions)
+	list, err := New(context.TODO(), "test", conns[0])
 	assert.NoError(t, err)
 	assert.NotNil(t, list)
 
@@ -86,34 +89,34 @@ func TestListOperations(t *testing.T) {
 	_, ok = <-ch
 	assert.False(t, ok)
 
-	events := make(chan *Event)
+	events := make(chan Event)
 	err = list.Watch(context.TODO(), events)
 	assert.NoError(t, err)
 
 	done := make(chan struct{})
 	go func() {
 		event := <-events
-		assert.Equal(t, EventInserted, event.Type)
+		assert.Equal(t, EventAdd, event.Type)
 		assert.Equal(t, 3, event.Index)
 		assert.Equal(t, "Hello world!", string(event.Value))
 
 		event = <-events
-		assert.Equal(t, EventInserted, event.Type)
+		assert.Equal(t, EventAdd, event.Type)
 		assert.Equal(t, 2, event.Index)
 		assert.Equal(t, "Hello world again!", string(event.Value))
 
 		event = <-events
-		assert.Equal(t, EventRemoved, event.Type)
+		assert.Equal(t, EventRemove, event.Type)
 		assert.Equal(t, 1, event.Index)
 		assert.Equal(t, "baz", string(event.Value))
 
 		event = <-events
-		assert.Equal(t, EventRemoved, event.Type)
+		assert.Equal(t, EventRemove, event.Type)
 		assert.Equal(t, 1, event.Index)
 		assert.Equal(t, "Hello world again!", string(event.Value))
 
 		event = <-events
-		assert.Equal(t, EventInserted, event.Type)
+		assert.Equal(t, EventAdd, event.Type)
 		assert.Equal(t, 1, event.Index)
 		assert.Equal(t, "Not hello world!", string(event.Value))
 
@@ -138,10 +141,10 @@ func TestListOperations(t *testing.T) {
 	err = list.Close(context.Background())
 	assert.NoError(t, err)
 
-	list1, err := New(context.TODO(), name, sessions)
+	list1, err := New(context.TODO(), "test", conns[1])
 	assert.NoError(t, err)
 
-	list2, err := New(context.TODO(), name, sessions)
+	list2, err := New(context.TODO(), "test", conns[2])
 	assert.NoError(t, err)
 
 	size, err = list1.Len(context.TODO())
@@ -158,7 +161,7 @@ func TestListOperations(t *testing.T) {
 	assert.Error(t, err)
 	assert.True(t, errors.IsNotFound(err))
 
-	list, err = New(context.TODO(), name, sessions)
+	list, err = New(context.TODO(), "test", conns[0])
 	assert.NoError(t, err)
 
 	size, err = list.Len(context.TODO())
@@ -171,52 +174,4 @@ func TestListOperations(t *testing.T) {
 	assert.NoError(t, list.Append(context.TODO(), []byte("4")))
 	assert.NoError(t, list.Append(context.TODO(), []byte("5")))
 	assert.NoError(t, list.Append(context.TODO(), []byte("6")))
-
-	slice, err := list.Slice(context.TODO(), 1, 4)
-	assert.NoError(t, err)
-	size, err = slice.Len(context.TODO())
-	assert.NoError(t, err)
-	assert.Equal(t, 3, size)
-	value, err = slice.Get(context.TODO(), 0)
-	assert.NoError(t, err)
-	assert.Equal(t, "2", string(value))
-	value, err = slice.Get(context.TODO(), 2)
-	assert.NoError(t, err)
-	assert.Equal(t, "4", string(value))
-
-	ch = make(chan []byte)
-	err = slice.Items(context.TODO(), ch)
-	assert.NoError(t, err)
-
-	assert.Equal(t, "2", string(<-ch))
-	assert.Equal(t, "3", string(<-ch))
-	assert.Equal(t, "4", string(<-ch))
-
-	_, ok = <-ch
-	assert.False(t, ok)
-
-	slice, err = list.SliceFrom(context.TODO(), 1)
-	assert.NoError(t, err)
-	size, err = slice.Len(context.TODO())
-	assert.NoError(t, err)
-	assert.Equal(t, 5, size)
-	value, err = slice.Get(context.TODO(), 0)
-	assert.NoError(t, err)
-	assert.Equal(t, "2", string(value))
-	value, err = slice.Get(context.TODO(), 2)
-	assert.NoError(t, err)
-	assert.Equal(t, "4", string(value))
-
-	ch = make(chan []byte)
-	err = slice.Items(context.TODO(), ch)
-	assert.NoError(t, err)
-
-	assert.Equal(t, "2", string(<-ch))
-	assert.Equal(t, "3", string(<-ch))
-	assert.Equal(t, "4", string(<-ch))
-	assert.Equal(t, "5", string(<-ch))
-	assert.Equal(t, "6", string(<-ch))
-
-	_, ok = <-ch
-	assert.False(t, ok)
 }

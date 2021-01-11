@@ -15,15 +15,56 @@
 package lock
 
 import (
-	api "github.com/atomix/api/proto/atomix/lock"
+	api "github.com/atomix/api/go/atomix/primitive/lock"
+	"github.com/atomix/go-client/pkg/client/meta"
+	"github.com/google/uuid"
 	"time"
 )
+
+// Option is a lock option
+type Option interface {
+	apply(options *options)
+}
+
+// options is lock options
+type options struct {
+	clientID string
+}
+
+func applyOptions(opts ...Option) options {
+	id, err := uuid.NewUUID()
+	if err != nil {
+		panic(err)
+	}
+	options := &options{
+		clientID: id.String(),
+	}
+	for _, opt := range opts {
+		opt.apply(options)
+	}
+	return *options
+}
+
+// WithClientID sets the client identifier
+func WithClientID(id string) Option {
+	return &clientIDOption{
+		clientID: id,
+	}
+}
+
+type clientIDOption struct {
+	clientID string
+}
+
+func (o *clientIDOption) apply(options *options) {
+	options.clientID = o.clientID
+}
 
 // LockOption is an option for Lock calls
 //nolint:golint
 type LockOption interface {
-	beforeLock(request *api.LockRequest)
-	afterLock(response *api.LockResponse)
+	beforeLock(input *api.LockInput)
+	afterLock(output *api.LockOutput)
 }
 
 // WithTimeout sets the lock timeout
@@ -35,48 +76,48 @@ type timeoutOption struct {
 	timeout time.Duration
 }
 
-func (o timeoutOption) beforeLock(request *api.LockRequest) {
-	request.Timeout = &o.timeout
+func (o timeoutOption) beforeLock(input *api.LockInput) {
+	input.Timeout = &o.timeout
 }
 
-func (o timeoutOption) afterLock(response *api.LockResponse) {
+func (o timeoutOption) afterLock(output *api.LockOutput) {
 
 }
 
 // UnlockOption is an option for Unlock calls
 type UnlockOption interface {
-	beforeUnlock(request *api.UnlockRequest)
-	afterUnlock(response *api.UnlockResponse)
+	beforeUnlock(input *api.UnlockInput)
+	afterUnlock(output *api.UnlockOutput)
 }
 
 // IsLockedOption is an option for IsLocked calls
 type IsLockedOption interface {
-	beforeIsLocked(request *api.IsLockedRequest)
-	afterIsLocked(response *api.IsLockedResponse)
+	beforeIsLocked(input *api.IsLockedInput)
+	afterIsLocked(output *api.IsLockedOutput)
 }
 
-// IfVersion sets the lock version to check
-func IfVersion(version uint64) IfVersionOption {
-	return IfVersionOption{version: version}
+// IfMatch sets the lock version to check
+func IfMatch(meta meta.ObjectMeta) MatchOption {
+	return MatchOption{meta: meta}
 }
 
-// IfVersionOption is a lock option for checking the version
-type IfVersionOption struct {
-	version uint64
+// MatchOption is a lock option for checking the version
+type MatchOption struct {
+	meta meta.ObjectMeta
 }
 
-func (o IfVersionOption) beforeUnlock(request *api.UnlockRequest) {
-	request.Version = o.version
+func (o MatchOption) beforeUnlock(input *api.UnlockInput) {
+	input.Meta = o.meta.Proto()
 }
 
-func (o IfVersionOption) afterUnlock(response *api.UnlockResponse) {
+func (o MatchOption) afterUnlock(output *api.UnlockOutput) {
 
 }
 
-func (o IfVersionOption) beforeIsLocked(request *api.IsLockedRequest) {
-	request.Version = o.version
+func (o MatchOption) beforeIsLocked(input *api.IsLockedInput) {
+	input.Meta = o.meta.Proto()
 }
 
-func (o IfVersionOption) afterIsLocked(response *api.IsLockedResponse) {
+func (o MatchOption) afterIsLocked(output *api.IsLockedOutput) {
 
 }

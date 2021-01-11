@@ -16,23 +16,26 @@ package counter
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/client/errors"
-	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/test"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
+	counterrsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/counter"
+	counterproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/counter"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestCounterOperations(t *testing.T) {
-	partitions, closers := test.StartTestPartitions(3)
-	defer test.StopTestPartitions(closers)
+	test := test.New().
+		SetPartitions(1).
+		SetSessions(3).
+		SetStorage(counterrsm.RegisterService).
+		SetProxy(counterproxy.RegisterProxy)
 
-	sessions, err := test.OpenSessions(partitions)
+	conns, err := test.Start()
 	assert.NoError(t, err)
-	defer test.CloseSessions(sessions)
+	defer test.Stop()
 
-	name := primitive.NewName("default", "test", "default", "test")
-	counter, err := New(context.TODO(), name, sessions)
+	counter, err := New(context.TODO(), "test", conns[0])
 	assert.NoError(t, err)
 	assert.NotNil(t, counter)
 
@@ -73,10 +76,10 @@ func TestCounterOperations(t *testing.T) {
 	err = counter.Close(context.Background())
 	assert.NoError(t, err)
 
-	counter1, err := New(context.TODO(), name, sessions)
+	counter1, err := New(context.TODO(), "test", conns[1])
 	assert.NoError(t, err)
 
-	counter2, err := New(context.TODO(), name, sessions)
+	counter2, err := New(context.TODO(), "test", conns[2])
 	assert.NoError(t, err)
 
 	value, err = counter1.Get(context.TODO())
@@ -93,7 +96,7 @@ func TestCounterOperations(t *testing.T) {
 	assert.Error(t, err)
 	assert.True(t, errors.IsNotFound(err))
 
-	counter, err = New(context.TODO(), name, sessions)
+	counter, err = New(context.TODO(), "test", conns[0])
 	assert.NoError(t, err)
 
 	value, err = counter.Get(context.TODO())

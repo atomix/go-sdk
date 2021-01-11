@@ -16,23 +16,26 @@ package _map //nolint:golint
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/client/errors"
-	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/test"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
+	maprsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/map"
+	mapproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/map"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestMapOperations(t *testing.T) {
-	partitions, closers := test.StartTestPartitions(3)
-	defer test.StopTestPartitions(closers)
+	test := test.New().
+		SetPartitions(1).
+		SetSessions(3).
+		SetStorage(maprsm.RegisterService).
+		SetProxy(mapproxy.RegisterProxy)
 
-	sessions, err := test.OpenSessions(partitions)
+	conns, err := test.Start()
 	assert.NoError(t, err)
-	defer test.CloseSessions(sessions)
+	defer test.Stop()
 
-	name := primitive.NewName("default", "test", "default", "test")
-	_map, err := New(context.TODO(), name, sessions)
+	_map, err := New(context.TODO(), "test", conns[0])
 	assert.NoError(t, err)
 
 	kv, err := _map.Get(context.Background(), "foo")
@@ -121,22 +124,24 @@ func TestMapOperations(t *testing.T) {
 }
 
 func TestMapStreams(t *testing.T) {
-	partitions, closers := test.StartTestPartitions(3)
-	defer test.StopTestPartitions(closers)
+	test := test.New().
+		SetPartitions(1).
+		SetSessions(3).
+		SetStorage(maprsm.RegisterService).
+		SetProxy(mapproxy.RegisterProxy)
 
-	sessions, err := test.OpenSessions(partitions)
+	conns, err := test.Start()
 	assert.NoError(t, err)
-	defer test.CloseSessions(sessions)
+	defer test.Stop()
 
-	name := primitive.NewName("default", "test", "default", "test")
-	_map, err := New(context.TODO(), name, sessions)
+	_map, err := New(context.TODO(), "test", conns[0])
 	assert.NoError(t, err)
 
 	kv, err := _map.Put(context.Background(), "foo", []byte{1})
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 
-	c := make(chan *Event)
+	c := make(chan Event)
 	latch := make(chan struct{})
 	go func() {
 		e := <-c
@@ -157,7 +162,7 @@ func TestMapStreams(t *testing.T) {
 	err = _map.Watch(context.Background(), c)
 	assert.NoError(t, err)
 
-	keyCh := make(chan *Event)
+	keyCh := make(chan Event)
 	err = _map.Watch(context.Background(), keyCh, WithFilter(Filter{
 		Key: "foo",
 	}))
@@ -172,7 +177,7 @@ func TestMapStreams(t *testing.T) {
 	event := <-keyCh
 	assert.NotNil(t, event)
 	assert.Equal(t, "foo", event.Entry.Key)
-	assert.Equal(t, kv.Version, event.Entry.Version)
+	assert.True(t, kv.Timestamp.Equal(event.Entry.Timestamp))
 
 	kv, err = _map.Put(context.Background(), "bar", []byte{3})
 	assert.NoError(t, err)
@@ -195,17 +200,17 @@ func TestMapStreams(t *testing.T) {
 	event = <-keyCh
 	assert.NotNil(t, event)
 	assert.Equal(t, "foo", event.Entry.Key)
-	assert.Equal(t, kv.Version, event.Entry.Version)
+	assert.True(t, kv.Timestamp.Equal(event.Entry.Timestamp))
 
 	<-latch
 
 	err = _map.Close(context.Background())
 	assert.NoError(t, err)
 
-	map1, err := New(context.TODO(), name, sessions)
+	map1, err := New(context.TODO(), "test", conns[1])
 	assert.NoError(t, err)
 
-	map2, err := New(context.TODO(), name, sessions)
+	map2, err := New(context.TODO(), "test", conns[2])
 	assert.NoError(t, err)
 
 	size, err := map1.Len(context.TODO())
@@ -222,7 +227,7 @@ func TestMapStreams(t *testing.T) {
 	assert.Error(t, err)
 	assert.True(t, errors.IsNotFound(err))
 
-	_map, err = New(context.TODO(), name, sessions)
+	_map, err = New(context.TODO(), "test", conns[0])
 	assert.NoError(t, err)
 
 	size, err = _map.Len(context.TODO())

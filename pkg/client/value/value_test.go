@@ -16,23 +16,26 @@ package value
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/client/errors"
-	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/test"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
+	valuersm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/value"
+	valueproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/value"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestValue(t *testing.T) {
-	partitions, closers := test.StartTestPartitions(3)
-	defer test.StopTestPartitions(closers)
+	test := test.New().
+		SetPartitions(1).
+		SetSessions(3).
+		SetStorage(valuersm.RegisterService).
+		SetProxy(valueproxy.RegisterProxy)
 
-	sessions, err := test.OpenSessions(partitions)
+	conns, err := test.Start()
 	assert.NoError(t, err)
-	defer test.CloseSessions(sessions)
+	defer test.Stop()
 
-	name := primitive.NewName("default", "test", "default", "test")
-	value, err := New(context.TODO(), name, sessions)
+	value, err := New(context.TODO(), "test", conns[0])
 	assert.NoError(t, err)
 	assert.NotNil(t, value)
 
@@ -41,7 +44,7 @@ func TestValue(t *testing.T) {
 	assert.Nil(t, val)
 	assert.Equal(t, uint64(0), version)
 
-	ch := make(chan *Event)
+	ch := make(chan Event)
 
 	err = value.Watch(context.TODO(), ch)
 	assert.NoError(t, err)
@@ -86,27 +89,27 @@ func TestValue(t *testing.T) {
 	assert.Equal(t, "baz", string(val))
 
 	event := <-ch
-	assert.Equal(t, EventUpdated, event.Type)
+	assert.Equal(t, EventUpdate, event.Type)
 	assert.Equal(t, uint64(1), event.Version)
 	assert.Equal(t, "foo", string(event.Value))
 
 	event = <-ch
-	assert.Equal(t, EventUpdated, event.Type)
+	assert.Equal(t, EventUpdate, event.Type)
 	assert.Equal(t, uint64(2), event.Version)
 	assert.Equal(t, "bar", string(event.Value))
 
 	event = <-ch
-	assert.Equal(t, EventUpdated, event.Type)
+	assert.Equal(t, EventUpdate, event.Type)
 	assert.Equal(t, uint64(3), event.Version)
 	assert.Equal(t, "baz", string(event.Value))
 
 	err = value.Close(context.Background())
 	assert.NoError(t, err)
 
-	value1, err := New(context.TODO(), name, sessions)
+	value1, err := New(context.TODO(), "test", conns[1])
 	assert.NoError(t, err)
 
-	value2, err := New(context.TODO(), name, sessions)
+	value2, err := New(context.TODO(), "test", conns[2])
 	assert.NoError(t, err)
 
 	val, _, err = value1.Get(context.TODO())
@@ -123,7 +126,7 @@ func TestValue(t *testing.T) {
 	assert.Error(t, err)
 	assert.True(t, errors.IsNotFound(err))
 
-	value, err = New(context.TODO(), name, sessions)
+	value, err = New(context.TODO(), "test", conns[0])
 	assert.NoError(t, err)
 
 	val, _, err = value.Get(context.TODO())

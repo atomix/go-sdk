@@ -16,23 +16,26 @@ package set
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/client/errors"
-	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/test"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
+	setrsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/set"
+	setproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/set"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestSetOperations(t *testing.T) {
-	partitions, closers := test.StartTestPartitions(3)
-	defer test.StopTestPartitions(closers)
+	test := test.New().
+		SetPartitions(1).
+		SetSessions(3).
+		SetStorage(setrsm.RegisterService).
+		SetProxy(setproxy.RegisterProxy)
 
-	sessions, err := test.OpenSessions(partitions)
+	conns, err := test.Start()
 	assert.NoError(t, err)
-	defer test.CloseSessions(sessions)
+	defer test.Stop()
 
-	name := primitive.NewName("default", "test", "default", "test")
-	set, err := New(context.TODO(), name, sessions)
+	set, err := New(context.TODO(), "test", conns[0])
 	assert.NoError(t, err)
 	assert.NotNil(t, set)
 
@@ -93,7 +96,7 @@ func TestSetOperations(t *testing.T) {
 	_, ok = <-ch
 	assert.False(t, ok)
 
-	events := make(chan *Event)
+	events := make(chan Event)
 	err = set.Watch(context.TODO(), events, WithReplay())
 	assert.NoError(t, err)
 
@@ -114,15 +117,15 @@ func TestSetOperations(t *testing.T) {
 		done <- true
 
 		event = <-events
-		assert.Equal(t, EventAdded, event.Type)
+		assert.Equal(t, EventAdd, event.Type)
 		assert.Equal(t, "Hello world!", event.Value)
 
 		event = <-events
-		assert.Equal(t, EventAdded, event.Type)
+		assert.Equal(t, EventAdd, event.Type)
 		assert.Equal(t, "Hello world again!", event.Value)
 
 		event = <-events
-		assert.Equal(t, EventRemoved, event.Type)
+		assert.Equal(t, EventRemove, event.Type)
 		assert.Equal(t, "baz", event.Value)
 
 		close(done)
@@ -151,10 +154,10 @@ func TestSetOperations(t *testing.T) {
 	err = set.Close(context.Background())
 	assert.NoError(t, err)
 
-	set1, err := New(context.TODO(), name, sessions)
+	set1, err := New(context.TODO(), "test", conns[1])
 	assert.NoError(t, err)
 
-	set2, err := New(context.TODO(), name, sessions)
+	set2, err := New(context.TODO(), "test", conns[2])
 	assert.NoError(t, err)
 
 	size, err = set1.Len(context.TODO())
@@ -171,7 +174,7 @@ func TestSetOperations(t *testing.T) {
 	assert.Error(t, err)
 	assert.True(t, errors.IsNotFound(err))
 
-	set, err = New(context.TODO(), name, sessions)
+	set, err = New(context.TODO(), "test", conns[0])
 	assert.NoError(t, err)
 
 	size, err = set.Len(context.TODO())

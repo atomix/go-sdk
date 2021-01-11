@@ -17,15 +17,19 @@ package _map //nolint:golint
 import (
 	"context"
 	"fmt"
+	api "github.com/atomix/api/go/atomix/primitive/map"
+	"github.com/atomix/go-client/pkg/client/meta"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-client/pkg/client/util"
-	"math"
-	"sync"
-	"time"
+	"github.com/atomix/go-framework/pkg/atomix/client"
+	mapclient "github.com/atomix/go-framework/pkg/atomix/client/map"
+	"github.com/atomix/go-framework/pkg/atomix/util/logging"
+	"google.golang.org/grpc"
 )
 
-// Type is the map type
-const Type primitive.Type = "Map"
+// Type is the counter type
+const Type = primitive.Type(mapclient.PrimitiveType)
+
+var log = logging.GetLogger("atomix", "client", "map")
 
 // Client provides an API for creating Maps
 type Client interface {
@@ -55,55 +59,58 @@ type Map interface {
 	// Entries lists the entries in the map
 	// This is a non-blocking method. If the method returns without error, key/value paids will be pushed on to the
 	// given channel and the channel will be closed once all entries have been read from the map.
-	Entries(ctx context.Context, ch chan<- *Entry) error
+	Entries(ctx context.Context, ch chan<- Entry) error
 
 	// Watch watches the map for changes
 	// This is a non-blocking method. If the method returns without error, map events will be pushed onto
 	// the given channel in the order in which they occur.
-	Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error
+	Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) error
 }
 
 // Version is an entry version
 type Version uint64
 
+func newEntry(entry *api.Entry) *Entry {
+	if entry == nil {
+		return nil
+	}
+	return &Entry{
+		ObjectMeta: meta.New(entry.Meta),
+		Key:        entry.Key,
+		Value:      entry.Value,
+	}
+}
+
 // Entry is a versioned key/value pair
 type Entry struct {
-	// Version is the unique, monotonically increasing version number for the key/value pair. The version is
-	// suitable for use in optimistic locking.
-	Version Version
+	meta.ObjectMeta
 
 	// Key is the key of the pair
 	Key string
 
 	// Value is the value of the pair
 	Value []byte
-
-	// Created is the time at which the key was created
-	Created time.Time
-
-	// Updated is the time at which the key was last updated
-	Updated time.Time
 }
 
 func (kv Entry) String() string {
-	return fmt.Sprintf("key: %s\nvalue: %s\nversion: %d", kv.Key, string(kv.Value), kv.Version)
+	return fmt.Sprintf("key: %s\nvalue: %s", kv.Key, string(kv.Value))
 }
 
 // EventType is the type of a map event
 type EventType string
 
 const (
-	// EventNone indicates the event is not a change event
-	EventNone EventType = ""
+	// EventInsert indicates a key was newly created in the map
+	EventInsert EventType = "insert"
 
-	// EventInserted indicates a key was newly created in the map
-	EventInserted EventType = "inserted"
+	// EventUpdate indicates the value of an existing key was changed
+	EventUpdate EventType = "update"
 
-	// EventUpdated indicates the value of an existing key was changed
-	EventUpdated EventType = "updated"
+	// EventRemove indicates a key was removed from the map
+	EventRemove EventType = "remove"
 
-	// EventRemoved indicates a key was removed from the map
-	EventRemoved EventType = "removed"
+	// EventReplay indicates a key was replayed
+	EventReplay EventType = "remove"
 )
 
 // Event is a map change event
@@ -112,158 +119,150 @@ type Event struct {
 	Type EventType
 
 	// Entry is the event entry
-	Entry *Entry
+	Entry Entry
 }
 
 // New creates a new partitioned Map
-func New(ctx context.Context, name primitive.Name, sessions []*primitive.Session, opts ...Option) (Map, error) {
-	options := &options{}
-	for _, opt := range opts {
-		opt.apply(options)
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Map, error) {
+	options := applyOptions(opts...)
+	m := &_map{
+		client: mapclient.NewClient(client.ID(options.clientID), name, conn),
 	}
-
-	results, err := util.ExecuteOrderedAsync(len(sessions), func(i int) (interface{}, error) {
-		if options.cached {
-			return newPartition(ctx, name, sessions[i], WithCache(int(math.Max(float64(options.cacheSize/len(sessions)), 1))))
-		}
-		return newPartition(ctx, name, sessions[i])
-	})
-	if err != nil {
+	if err := m.create(ctx); err != nil {
 		return nil, err
 	}
-
-	maps := make([]Map, len(results))
-	for i, result := range results {
-		maps[i] = result.(Map)
-	}
-
-	return &_map{
-		name:       name,
-		partitions: maps,
-	}, nil
+	return m, nil
 }
 
-// _map is the default single-partition implementation of Map
 type _map struct {
-	name       primitive.Name
-	partitions []Map
+	client mapclient.Client
 }
 
-func (m *_map) Name() primitive.Name {
-	return m.name
+func (m *_map) Type() primitive.Type {
+	return Type
 }
 
-func (m *_map) getPartition(key string) (Map, error) {
-	i, err := util.GetPartitionIndex(key, len(m.partitions))
-	if err != nil {
-		return nil, err
-	}
-	return m.partitions[i], nil
+func (m *_map) Name() string {
+	return m.client.Name()
 }
 
 func (m *_map) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*Entry, error) {
-	session, err := m.getPartition(key)
+	input := &api.PutInput{
+		Key:   key,
+		Value: value,
+	}
+	for i := range opts {
+		opts[i].beforePut(input)
+	}
+	output, err := m.client.Put(ctx, input)
 	if err != nil {
 		return nil, err
 	}
-	return session.Put(ctx, key, value, opts...)
+	for i := range opts {
+		opts[i].afterPut(output)
+	}
+	return newEntry(output.Entry), nil
 }
 
 func (m *_map) Get(ctx context.Context, key string, opts ...GetOption) (*Entry, error) {
-	session, err := m.getPartition(key)
+	input := &api.GetInput{
+		Key: key,
+	}
+	for i := range opts {
+		opts[i].beforeGet(input)
+	}
+	output, err := m.client.Get(ctx, input)
 	if err != nil {
 		return nil, err
 	}
-	entry, err := session.Get(ctx, key, opts...)
-	if err != nil {
-		return nil, err
-	} else if entry.Value == nil {
-		return nil, nil
+	for i := range opts {
+		opts[i].afterGet(output)
 	}
-	return entry, nil
+	return newEntry(output.Entry), nil
 }
 
 func (m *_map) Remove(ctx context.Context, key string, opts ...RemoveOption) (*Entry, error) {
-	session, err := m.getPartition(key)
+	input := &api.RemoveInput{
+		Key: key,
+	}
+	for i := range opts {
+		opts[i].beforeRemove(input)
+	}
+	output, err := m.client.Remove(ctx, input)
 	if err != nil {
 		return nil, err
 	}
-	return session.Remove(ctx, key, opts...)
+	for i := range opts {
+		opts[i].afterRemove(output)
+	}
+	return newEntry(output.Entry), nil
 }
 
 func (m *_map) Len(ctx context.Context) (int, error) {
-	results, err := util.ExecuteAsync(len(m.partitions), func(i int) (interface{}, error) {
-		return m.partitions[i].Len(ctx)
-	})
+	output, err := m.client.Size(ctx)
 	if err != nil {
 		return 0, err
 	}
-
-	total := 0
-	for _, result := range results {
-		total += result.(int)
-	}
-	return total, nil
-}
-
-func (m *_map) Entries(ctx context.Context, ch chan<- *Entry) error {
-	n := len(m.partitions)
-	wg := sync.WaitGroup{}
-	wg.Add(n)
-
-	go func() {
-		wg.Wait()
-		close(ch)
-	}()
-
-	return util.IterAsync(n, func(i int) error {
-		partitionCh := make(chan *Entry)
-		go func() {
-			for kv := range partitionCh {
-				ch <- kv
-			}
-			wg.Done()
-		}()
-		return m.partitions[i].Entries(ctx, partitionCh)
-	})
+	return int(output.Size_), nil
 }
 
 func (m *_map) Clear(ctx context.Context) error {
-	return util.IterAsync(len(m.partitions), func(i int) error {
-		return m.partitions[i].Clear(ctx)
-	})
+	return m.client.Clear(ctx)
 }
 
-func (m *_map) Watch(ctx context.Context, ch chan<- *Event, opts ...WatchOption) error {
-	n := len(m.partitions)
-	wg := &sync.WaitGroup{}
-	wg.Add(n)
-
+func (m *_map) Entries(ctx context.Context, ch chan<- Entry) error {
+	input := &api.EntriesInput{}
+	outputCh := make(chan api.EntriesOutput)
+	if err := m.client.Entries(ctx, input, outputCh); err != nil {
+		return err
+	}
 	go func() {
-		wg.Wait()
-		close(ch)
+		for output := range outputCh {
+			ch <- *newEntry(&output.Entry)
+		}
 	}()
+	return nil
+}
 
-	return util.IterAsync(n, func(i int) error {
-		partitionCh := make(chan *Event)
-		go func() {
-			for event := range partitionCh {
-				ch <- event
+func (m *_map) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) error {
+	input := &api.EventsInput{}
+	for _, opt := range opts {
+		opt.beforeWatch(input)
+	}
+	outputCh := make(chan api.EventsOutput)
+	if err := m.client.Events(ctx, input, outputCh); err != nil {
+		return err
+	}
+	go func() {
+		for output := range outputCh {
+			var eventType EventType
+			switch output.Type {
+			case api.EventsOutput_INSERT:
+				eventType = EventInsert
+			case api.EventsOutput_UPDATE:
+				eventType = EventUpdate
+			case api.EventsOutput_REMOVE:
+				eventType = EventRemove
+			case api.EventsOutput_REPLAY:
+				eventType = EventReplay
 			}
-			wg.Done()
-		}()
-		return m.partitions[i].Watch(ctx, partitionCh, opts...)
-	})
+			ch <- Event{
+				Type:  eventType,
+				Entry: *newEntry(&output.Entry),
+			}
+		}
+	}()
+	return nil
+}
+
+func (m *_map) create(ctx context.Context) error {
+	return m.client.Create(ctx)
 }
 
 func (m *_map) Close(ctx context.Context) error {
-	return util.IterAsync(len(m.partitions), func(i int) error {
-		return m.partitions[i].Close(ctx)
-	})
+	return m.client.Close(ctx)
 }
 
 func (m *_map) Delete(ctx context.Context) error {
-	return util.IterAsync(len(m.partitions), func(i int) error {
-		return m.partitions[i].Delete(ctx)
-	})
+	return m.client.Delete(ctx)
 }

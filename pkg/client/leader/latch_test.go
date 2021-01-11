@@ -16,43 +16,38 @@ package leader
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/client/errors"
-	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/test"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
+	leaderrsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/leader"
+	leaderproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/leader"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestLatchOperations(t *testing.T) {
-	partitions, closers := test.StartTestPartitions(3)
-	defer test.StopTestPartitions(closers)
+	test := test.New().
+		SetPartitions(1).
+		SetSessions(3).
+		SetStorage(leaderrsm.RegisterService).
+		SetProxy(leaderproxy.RegisterProxy)
 
-	sessions1, err := test.OpenSessions(partitions)
+	conns, err := test.Start()
 	assert.NoError(t, err)
-	defer test.CloseSessions(sessions1)
+	defer test.Stop()
 
-	sessions2, err := test.OpenSessions(partitions)
-	assert.NoError(t, err)
-	defer test.CloseSessions(sessions2)
-
-	sessions3, err := test.OpenSessions(partitions)
-	assert.NoError(t, err)
-	defer test.CloseSessions(sessions3)
-
-	name := primitive.NewName("default", "test", "default", "test")
-	latch1, err := New(context.TODO(), name, sessions1)
+	latch1, err := New(context.TODO(), "test", conns[0])
 	assert.NoError(t, err)
 	assert.NotNil(t, latch1)
 
-	latch2, err := New(context.TODO(), name, sessions2)
+	latch2, err := New(context.TODO(), "test", conns[1])
 	assert.NoError(t, err)
 	assert.NotNil(t, latch2)
 
-	latch3, err := New(context.TODO(), name, sessions3)
+	latch3, err := New(context.TODO(), "test", conns[2])
 	assert.NoError(t, err)
 	assert.NotNil(t, latch3)
 
-	ch := make(chan *Event)
+	ch := make(chan Event)
 	err = latch3.Watch(context.TODO(), ch)
 	assert.NoError(t, err)
 
@@ -62,7 +57,7 @@ func TestLatchOperations(t *testing.T) {
 	assert.Equal(t, "", term.Leader)
 	assert.Len(t, term.Participants, 0)
 
-	term, err = latch1.Join(context.TODO())
+	term, err = latch1.Latch(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(1), term.ID)
 	assert.Equal(t, latch1.ID(), term.Leader)
@@ -70,13 +65,13 @@ func TestLatchOperations(t *testing.T) {
 	assert.Equal(t, latch1.ID(), term.Participants[0])
 
 	event := <-ch
-	assert.Equal(t, EventChanged, event.Type)
+	assert.Equal(t, EventChange, event.Type)
 	assert.Equal(t, uint64(1), event.Leadership.ID)
 	assert.Equal(t, latch1.ID(), event.Leadership.Leader)
 	assert.Len(t, event.Leadership.Participants, 1)
 	assert.Equal(t, latch1.ID(), event.Leadership.Participants[0])
 
-	term, err = latch2.Join(context.TODO())
+	term, err = latch2.Latch(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(1), term.ID)
 	assert.Equal(t, latch1.ID(), term.Leader)
@@ -85,14 +80,14 @@ func TestLatchOperations(t *testing.T) {
 	assert.Equal(t, latch2.ID(), term.Participants[1])
 
 	event = <-ch
-	assert.Equal(t, EventChanged, event.Type)
+	assert.Equal(t, EventChange, event.Type)
 	assert.Equal(t, uint64(1), event.Leadership.ID)
 	assert.Equal(t, latch1.ID(), event.Leadership.Leader)
 	assert.Len(t, event.Leadership.Participants, 2)
 	assert.Equal(t, latch1.ID(), event.Leadership.Participants[0])
 	assert.Equal(t, latch2.ID(), event.Leadership.Participants[1])
 
-	term, err = latch3.Join(context.TODO())
+	term, err = latch3.Latch(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(1), term.ID)
 	assert.Equal(t, latch1.ID(), term.Leader)
@@ -102,7 +97,7 @@ func TestLatchOperations(t *testing.T) {
 	assert.Equal(t, latch3.ID(), term.Participants[2])
 
 	event = <-ch
-	assert.Equal(t, EventChanged, event.Type)
+	assert.Equal(t, EventChange, event.Type)
 	assert.Equal(t, uint64(1), event.Leadership.ID)
 	assert.Equal(t, latch1.ID(), event.Leadership.Leader)
 	assert.Len(t, event.Leadership.Participants, 3)
@@ -114,7 +109,7 @@ func TestLatchOperations(t *testing.T) {
 	assert.NoError(t, err)
 
 	event = <-ch
-	assert.Equal(t, EventChanged, event.Type)
+	assert.Equal(t, EventChange, event.Type)
 	assert.Equal(t, uint64(2), event.Leadership.ID)
 	assert.Equal(t, latch2.ID(), event.Leadership.Leader)
 	assert.Len(t, event.Leadership.Participants, 2)
@@ -126,10 +121,10 @@ func TestLatchOperations(t *testing.T) {
 	err = latch3.Close(context.Background())
 	assert.NoError(t, err)
 
-	latch1, err = New(context.TODO(), name, sessions1)
+	latch1, err = New(context.TODO(), "test", conns[0])
 	assert.NoError(t, err)
 
-	latch2, err = New(context.TODO(), name, sessions2)
+	latch2, err = New(context.TODO(), "test", conns[1])
 	assert.NoError(t, err)
 
 	term, err = latch1.Get(context.TODO())
@@ -148,7 +143,7 @@ func TestLatchOperations(t *testing.T) {
 	assert.Error(t, err)
 	assert.True(t, errors.IsNotFound(err))
 
-	latch, err := New(context.TODO(), name, sessions3)
+	latch, err := New(context.TODO(), "test", conns[2])
 	assert.NoError(t, err)
 
 	term, err = latch.Get(context.TODO())

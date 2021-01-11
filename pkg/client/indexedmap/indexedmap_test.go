@@ -16,24 +16,27 @@ package indexedmap
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/client/errors"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
+	indexedmaprsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/indexedmap"
+	indexedmapproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/indexedmap"
 	"testing"
 
-	"github.com/atomix/go-client/pkg/client/primitive"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestIndexedMapOperations(t *testing.T) {
-	partitions, closers := test.StartTestPartitions(3)
-	defer test.StopTestPartitions(closers)
+	test := test.New().
+		SetPartitions(1).
+		SetSessions(3).
+		SetStorage(indexedmaprsm.RegisterService).
+		SetProxy(indexedmapproxy.RegisterProxy)
 
-	sessions, err := test.OpenSessions(partitions)
+	conns, err := test.Start()
 	assert.NoError(t, err)
-	defer test.CloseSessions(sessions)
+	defer test.Stop()
 
-	name := primitive.NewName("default", "test", "default", "test")
-	_map, err := New(context.TODO(), name, sessions)
+	_map, err := New(context.TODO(), "test", conns[0])
 	assert.NoError(t, err)
 
 	kv, err := _map.Get(context.Background(), "foo")
@@ -160,45 +163,27 @@ func TestIndexedMapOperations(t *testing.T) {
 	kv, err = _map.Put(context.Background(), "foo", []byte("bar"))
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
-
-	kv1, err := _map.Get(context.Background(), "foo")
-	assert.NoError(t, err)
-	assert.NotNil(t, kv)
-
-	_, err = _map.Replace(context.Background(), "foo", []byte("baz"), IfVersion(1))
-	assert.Error(t, err)
-
-	kv2, err := _map.Replace(context.Background(), "foo", []byte("baz"), IfVersion(kv1.Version))
-	assert.NoError(t, err)
-	assert.NotEqual(t, kv1.Version, kv2.Version)
-	assert.Equal(t, "baz", string(kv2.Value))
-
-	_, err = _map.Remove(context.Background(), "foo", IfVersion(1))
-	assert.Error(t, err)
-
-	removed, err := _map.Remove(context.Background(), "foo", IfVersion(kv2.Version))
-	assert.NoError(t, err)
-	assert.NotNil(t, removed)
-	assert.Equal(t, kv2.Version, removed.Version)
 }
 
 func TestIndexedMapStreams(t *testing.T) {
-	partitions, closers := test.StartTestPartitions(3)
-	defer test.StopTestPartitions(closers)
+	test := test.New().
+		SetPartitions(1).
+		SetSessions(3).
+		SetStorage(indexedmaprsm.RegisterService).
+		SetProxy(indexedmapproxy.RegisterProxy)
 
-	sessions, err := test.OpenSessions(partitions)
+	conns, err := test.Start()
 	assert.NoError(t, err)
-	defer test.CloseSessions(sessions)
+	defer test.Stop()
 
-	name := primitive.NewName("default", "test", "default", "test")
-	_map, err := New(context.TODO(), name, sessions)
+	_map, err := New(context.TODO(), "test", conns[0])
 	assert.NoError(t, err)
 
 	kv, err := _map.Put(context.Background(), "foo", []byte{1})
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 
-	c := make(chan *Event)
+	c := make(chan Event)
 	latch := make(chan struct{})
 	go func() {
 		e := <-c
@@ -219,7 +204,7 @@ func TestIndexedMapStreams(t *testing.T) {
 	err = _map.Watch(context.Background(), c)
 	assert.NoError(t, err)
 
-	keyCh := make(chan *Event)
+	keyCh := make(chan Event)
 	err = _map.Watch(context.Background(), keyCh, WithFilter(Filter{
 		Key: "foo",
 	}))
@@ -236,7 +221,7 @@ func TestIndexedMapStreams(t *testing.T) {
 	assert.Equal(t, "foo", event.Entry.Key)
 	assert.Equal(t, kv.Version, event.Entry.Version)
 
-	indexCh := make(chan *Event)
+	indexCh := make(chan Event)
 	err = _map.Watch(context.Background(), indexCh, WithFilter(Filter{
 		Index: kv.Index,
 	}))
@@ -270,7 +255,7 @@ func TestIndexedMapStreams(t *testing.T) {
 	assert.Equal(t, "foo", event.Entry.Key)
 	assert.Equal(t, kv.Version, event.Entry.Version)
 
-	chanEntry := make(chan *Entry)
+	chanEntry := make(chan Entry)
 	go func() {
 		e := <-chanEntry
 		assert.Equal(t, "foo", string(e.Key))
@@ -291,10 +276,10 @@ func TestIndexedMapStreams(t *testing.T) {
 	err = _map.Close(context.Background())
 	assert.NoError(t, err)
 
-	map1, err := New(context.TODO(), name, sessions)
+	map1, err := New(context.TODO(), "test", conns[1])
 	assert.NoError(t, err)
 
-	map2, err := New(context.TODO(), name, sessions)
+	map2, err := New(context.TODO(), "test", conns[2])
 	assert.NoError(t, err)
 
 	size, err := map1.Len(context.TODO())
@@ -311,7 +296,7 @@ func TestIndexedMapStreams(t *testing.T) {
 	assert.Error(t, err)
 	assert.True(t, errors.IsNotFound(err))
 
-	_map, err = New(context.TODO(), name, sessions)
+	_map, err = New(context.TODO(), "test", conns[0])
 	assert.NoError(t, err)
 
 	size, err = _map.Len(context.TODO())
