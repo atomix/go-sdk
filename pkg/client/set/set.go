@@ -162,6 +162,7 @@ func (s *set) Elements(ctx context.Context, ch chan<- string) error {
 		return err
 	}
 	go func() {
+		defer close(ch)
 		for output := range outputCh {
 			ch <- output.Value
 		}
@@ -179,6 +180,7 @@ func (s *set) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) e
 		return err
 	}
 	go func() {
+		defer close(ch)
 		for output := range outputCh {
 			var eventType EventType
 			switch output.Type {

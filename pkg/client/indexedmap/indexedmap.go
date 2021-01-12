@@ -428,6 +428,7 @@ func (m *indexedMap) Entries(ctx context.Context, ch chan<- Entry) error {
 		return err
 	}
 	go func() {
+		defer close(ch)
 		for output := range outputCh {
 			ch <- *newEntry(&output.Entry)
 		}
@@ -445,6 +446,7 @@ func (m *indexedMap) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOp
 		return err
 	}
 	go func() {
+		defer close(ch)
 		for output := range outputCh {
 			var eventType EventType
 			switch output.Type {

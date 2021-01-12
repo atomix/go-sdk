@@ -185,6 +185,7 @@ func (l *list) Items(ctx context.Context, ch chan<- []byte) error {
 		return err
 	}
 	go func() {
+		defer close(ch)
 		for output := range outputCh {
 			if bytes, err := base64.StdEncoding.DecodeString(output.Value); err == nil {
 				ch <- bytes
@@ -204,6 +205,7 @@ func (l *list) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) 
 		return err
 	}
 	go func() {
+		defer close(ch)
 		for output := range outputCh {
 			var t EventType
 			switch output.Type {

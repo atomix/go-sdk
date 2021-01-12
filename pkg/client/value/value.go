@@ -127,6 +127,7 @@ func (v *value) Watch(ctx context.Context, ch chan<- Event) error {
 		return err
 	}
 	go func() {
+		defer close(ch)
 		for output := range outputCh {
 			switch output.Type {
 			case api.EventsOutput_UPDATE:

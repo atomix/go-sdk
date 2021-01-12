@@ -217,6 +217,7 @@ func (m *_map) Entries(ctx context.Context, ch chan<- Entry) error {
 		return err
 	}
 	go func() {
+		defer close(ch)
 		for output := range outputCh {
 			ch <- *newEntry(&output.Entry)
 		}
@@ -234,6 +235,7 @@ func (m *_map) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) 
 		return err
 	}
 	go func() {
+		defer close(ch)
 		for output := range outputCh {
 			var eventType EventType
 			switch output.Type {
