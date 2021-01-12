@@ -29,7 +29,7 @@ func New(meta metaapi.ObjectMeta) ObjectMeta {
 	if meta.Timestamp != nil {
 		switch t := meta.Timestamp.(type) {
 		case *metaapi.ObjectMeta_PhysicalTimestamp:
-			timestamp = NewWallClockTimestamp(WallClockTime(t.PhysicalTimestamp.Time))
+			timestamp = NewPhysicalTimestamp(PhysicalTime(t.PhysicalTimestamp.Time))
 		case *metaapi.ObjectMeta_LogicalTimestamp:
 			timestamp = NewLogicalTimestamp(LogicalTime(t.LogicalTimestamp.Time))
 		case *metaapi.ObjectMeta_VectorTimestamp:
@@ -50,10 +50,20 @@ func New(meta metaapi.ObjectMeta) ObjectMeta {
 	}
 }
 
+// Object is an interface for objects
+type Object interface {
+	// Meta returns the object metadata
+	Meta() ObjectMeta
+}
+
 // ObjectMeta contains metadata about an object
 type ObjectMeta struct {
-	Revision Revision
-	Timestamp
+	Revision  Revision
+	Timestamp Timestamp
+}
+
+func (m ObjectMeta) Meta() ObjectMeta {
+	return m
 }
 
 func (m ObjectMeta) Proto() metaapi.ObjectMeta {
@@ -64,7 +74,41 @@ func (m ObjectMeta) Proto() metaapi.ObjectMeta {
 		}
 	}
 	if m.Timestamp != nil {
-		m.Timestamp.proto(&meta)
+		switch t := m.Timestamp.(type) {
+		case PhysicalTimestamp:
+			meta.Timestamp = &metaapi.ObjectMeta_PhysicalTimestamp{
+				PhysicalTimestamp: &metaapi.PhysicalTimestamp{
+					Time: metaapi.PhysicalTime(t.Time),
+				},
+			}
+		case LogicalTimestamp:
+			meta.Timestamp = &metaapi.ObjectMeta_LogicalTimestamp{
+				LogicalTimestamp: &metaapi.LogicalTimestamp{
+					Time: metaapi.LogicalTime(t.Time),
+				},
+			}
+		case VectorTimestamp:
+			times := make([]metaapi.LogicalTime, len(t.Times))
+			for i, time := range t.Times {
+				times[i] = metaapi.LogicalTime(time)
+			}
+			meta.Timestamp = &metaapi.ObjectMeta_VectorTimestamp{
+				VectorTimestamp: &metaapi.VectorTimestamp{
+					Time: times,
+				},
+			}
+		case EpochTimestamp:
+			meta.Timestamp = &metaapi.ObjectMeta_EpochTimestamp{
+				EpochTimestamp: &metaapi.EpochTimestamp{
+					Epoch: metaapi.Epoch{
+						Num: metaapi.EpochNum(t.Epoch),
+					},
+					Sequence: metaapi.Sequence{
+						Num: metaapi.SequenceNum(t.Time),
+					},
+				},
+			}
+		}
 	}
 	return meta
 }

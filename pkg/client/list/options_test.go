@@ -15,13 +15,13 @@
 package list
 
 import (
-	api "github.com/atomix/api/proto/atomix/list"
+	api "github.com/atomix/api/go/atomix/primitive/list"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestOptions(t *testing.T) {
-	request := &api.EventRequest{}
+	request := &api.EventsInput{}
 	assert.False(t, request.Replay)
 	WithReplay().beforeWatch(request)
 	assert.True(t, request.Replay)

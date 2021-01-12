@@ -16,6 +16,7 @@ package lock
 
 import (
 	"context"
+	"github.com/atomix/go-client/pkg/client/meta"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	lockrsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/lock"
@@ -53,7 +54,7 @@ func TestLock(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, locked)
 
-	var v2 uint64
+	var v2 meta.ObjectMeta
 	c := make(chan struct{})
 	go func() {
 		_, err := l2.Lock(context.Background())
@@ -73,11 +74,11 @@ func TestLock(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, locked)
 
-	locked, err = l1.IsLocked(context.Background(), IfVersion(v1))
+	locked, err = l1.IsLocked(context.Background(), IfMatch(v1))
 	assert.NoError(t, err)
 	assert.False(t, locked)
 
-	locked, err = l1.IsLocked(context.Background(), IfVersion(v2))
+	locked, err = l1.IsLocked(context.Background(), IfMatch(v2))
 	assert.NoError(t, err)
 	assert.True(t, locked)
 

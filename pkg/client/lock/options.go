@@ -97,17 +97,17 @@ type IsLockedOption interface {
 }
 
 // IfMatch sets the lock version to check
-func IfMatch(meta meta.ObjectMeta) MatchOption {
-	return MatchOption{meta: meta}
+func IfMatch(object meta.Object) MatchOption {
+	return MatchOption{object: object}
 }
 
 // MatchOption is a lock option for checking the version
 type MatchOption struct {
-	meta meta.ObjectMeta
+	object meta.Object
 }
 
 func (o MatchOption) beforeUnlock(input *api.UnlockInput) {
-	input.Meta = o.meta.Proto()
+	input.Meta = o.object.Meta().Proto()
 }
 
 func (o MatchOption) afterUnlock(output *api.UnlockOutput) {
@@ -115,7 +115,7 @@ func (o MatchOption) afterUnlock(output *api.UnlockOutput) {
 }
 
 func (o MatchOption) beforeIsLocked(input *api.IsLockedInput) {
-	input.Meta = o.meta.Proto()
+	input.Meta = o.object.Meta().Proto()
 }
 
 func (o MatchOption) afterIsLocked(output *api.IsLockedOutput) {

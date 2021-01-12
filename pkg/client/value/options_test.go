@@ -15,17 +15,15 @@
 package value
 
 import (
-	api "github.com/atomix/api/proto/atomix/value"
+	metaapi "github.com/atomix/api/go/atomix/primitive/meta"
+	api "github.com/atomix/api/go/atomix/primitive/value"
+	"github.com/atomix/go-client/pkg/client/meta"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestOptions(t *testing.T) {
-	request := &api.SetRequest{}
-	assert.Nil(t, request.ExpectValue)
-	assert.Equal(t, uint64(0), request.ExpectVersion)
-	IfValue([]byte("foo")).beforeSet(request)
-	IfVersion(uint64(1)).beforeSet(request)
-	assert.Equal(t, "foo", string(request.ExpectValue))
-	assert.Equal(t, uint64(1), request.ExpectVersion)
+	input := &api.SetInput{}
+	IfMatch(meta.ObjectMeta{Revision: 1}).beforeSet(input)
+	assert.Equal(t, metaapi.RevisionNum(1), input.Value.Meta.Revision.Num)
 }

@@ -16,6 +16,7 @@ package _map //nolint:golint
 
 import (
 	"context"
+	"github.com/atomix/go-client/pkg/client/meta"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	maprsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/map"
@@ -52,23 +53,22 @@ func TestMapOperations(t *testing.T) {
 	assert.NotNil(t, kv)
 	assert.Equal(t, "bar", string(kv.Value))
 
-	kv, err = _map.Get(context.Background(), "foo")
+	kv1, err := _map.Get(context.Background(), "foo")
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "foo", kv.Key)
 	assert.Equal(t, "bar", string(kv.Value))
-	version := kv.Version
 
 	size, err = _map.Len(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, 1, size)
 
-	kv, err = _map.Remove(context.Background(), "foo")
+	kv2, err := _map.Remove(context.Background(), "foo")
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "foo", kv.Key)
 	assert.Equal(t, "bar", string(kv.Value))
-	assert.Equal(t, version, kv.Version)
+	assert.Equal(t, kv1.Revision, kv2.Revision)
 
 	size, err = _map.Len(context.Background())
 	assert.NoError(t, err)
@@ -100,27 +100,27 @@ func TestMapOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 
-	kv1, err := _map.Get(context.Background(), "foo")
+	kv1, err = _map.Get(context.Background(), "foo")
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 
-	_, err = _map.Put(context.Background(), "foo", []byte("baz"), IfVersion(1))
+	_, err = _map.Put(context.Background(), "foo", []byte("baz"), IfMatch(kv1))
 	assert.Error(t, err)
 	assert.True(t, errors.IsConflict(err))
 
-	kv2, err := _map.Put(context.Background(), "foo", []byte("baz"), IfVersion(kv1.Version))
+	kv2, err = _map.Put(context.Background(), "foo", []byte("baz"), IfMatch(kv1))
 	assert.NoError(t, err)
-	assert.NotEqual(t, kv1.Version, kv2.Version)
+	assert.NotEqual(t, kv1.Revision, kv2.Revision)
 	assert.Equal(t, "baz", string(kv2.Value))
 
-	_, err = _map.Remove(context.Background(), "foo", IfVersion(1))
+	_, err = _map.Remove(context.Background(), "foo", IfMatch(meta.ObjectMeta{}))
 	assert.Error(t, err)
 	assert.True(t, errors.IsConflict(err))
 
-	removed, err := _map.Remove(context.Background(), "foo", IfVersion(kv2.Version))
+	removed, err := _map.Remove(context.Background(), "foo", IfMatch(kv2))
 	assert.NoError(t, err)
 	assert.NotNil(t, removed)
-	assert.Equal(t, kv2.Version, removed.Version)
+	assert.Equal(t, kv2.Revision, removed.Revision)
 }
 
 func TestMapStreams(t *testing.T) {

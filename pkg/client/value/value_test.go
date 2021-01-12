@@ -16,6 +16,7 @@ package value
 
 import (
 	"context"
+	"github.com/atomix/go-client/pkg/client/meta"
 	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	valuersm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/value"
@@ -49,11 +50,7 @@ func TestValue(t *testing.T) {
 	err = value.Watch(context.TODO(), ch)
 	assert.NoError(t, err)
 
-	_, err = value.Set(context.TODO(), []byte("foo"), IfVersion(1))
-	assert.Error(t, err)
-	assert.True(t, errors.IsConflict(err))
-
-	_, err = value.Set(context.TODO(), []byte("foo"), IfValue([]byte("bar")))
+	_, err = value.Set(context.TODO(), []byte("foo"), IfMatch(meta.ObjectMeta{Revision: 1}))
 	assert.Error(t, err)
 	assert.True(t, errors.IsConflict(err))
 
@@ -66,11 +63,11 @@ func TestValue(t *testing.T) {
 	assert.Equal(t, uint64(1), version)
 	assert.Equal(t, "foo", string(val))
 
-	_, err = value.Set(context.TODO(), []byte("foo"), IfVersion(2))
+	_, err = value.Set(context.TODO(), []byte("foo"), IfMatch(meta.ObjectMeta{Revision: 2}))
 	assert.Error(t, err)
 	assert.True(t, errors.IsConflict(err))
 
-	version, err = value.Set(context.TODO(), []byte("bar"), IfVersion(1))
+	version, err = value.Set(context.TODO(), []byte("bar"), IfMatch(meta.ObjectMeta{Revision: 1}))
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(2), version)
 
@@ -90,17 +87,17 @@ func TestValue(t *testing.T) {
 
 	event := <-ch
 	assert.Equal(t, EventUpdate, event.Type)
-	assert.Equal(t, uint64(1), event.Version)
+	assert.Equal(t, meta.Revision(1), event.Revision)
 	assert.Equal(t, "foo", string(event.Value))
 
 	event = <-ch
 	assert.Equal(t, EventUpdate, event.Type)
-	assert.Equal(t, uint64(2), event.Version)
+	assert.Equal(t, meta.Revision(2), event.Revision)
 	assert.Equal(t, "bar", string(event.Value))
 
 	event = <-ch
 	assert.Equal(t, EventUpdate, event.Type)
-	assert.Equal(t, uint64(3), event.Version)
+	assert.Equal(t, meta.Revision(3), event.Revision)
 	assert.Equal(t, "baz", string(event.Value))
 
 	err = value.Close(context.Background())

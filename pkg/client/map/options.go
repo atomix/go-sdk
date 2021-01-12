@@ -72,19 +72,19 @@ type RemoveOption interface {
 }
 
 // IfMatch sets the required version for optimistic concurrency control
-func IfMatch(meta meta.ObjectMeta) MatchOption {
-	return MatchOption{meta: meta}
+func IfMatch(object meta.Object) MatchOption {
+	return MatchOption{object: object}
 }
 
 // MatchOption is an implementation of PutOption and RemoveOption to specify the version for concurrency control
 type MatchOption struct {
 	PutOption
 	RemoveOption
-	meta meta.ObjectMeta
+	object meta.Object
 }
 
 func (o MatchOption) beforePut(input *api.PutInput) {
-	input.Meta = o.meta.Proto()
+	input.Meta = o.object.Meta().Proto()
 }
 
 func (o MatchOption) afterPut(output *api.PutOutput) {
@@ -92,7 +92,7 @@ func (o MatchOption) afterPut(output *api.PutOutput) {
 }
 
 func (o MatchOption) beforeRemove(input *api.RemoveInput) {
-	input.Meta = o.meta.Proto()
+	input.Meta = o.object.Meta().Proto()
 }
 
 func (o MatchOption) afterRemove(output *api.RemoveOutput) {

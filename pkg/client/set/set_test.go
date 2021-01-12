@@ -103,15 +103,15 @@ func TestSetOperations(t *testing.T) {
 	done := make(chan bool)
 	go func() {
 		event := <-events
-		assert.Equal(t, EventNone, event.Type)
+		assert.Equal(t, EventReplay, event.Type)
 		assert.Contains(t, []string{"foo", "bar", "baz"}, event.Value)
 
 		event = <-events
-		assert.Equal(t, EventNone, event.Type)
+		assert.Equal(t, EventReplay, event.Type)
 		assert.Contains(t, []string{"foo", "bar", "baz"}, event.Value)
 
 		event = <-events
-		assert.Equal(t, EventNone, event.Type)
+		assert.Equal(t, EventReplay, event.Type)
 		assert.Contains(t, []string{"foo", "bar", "baz"}, event.Value)
 
 		done <- true

@@ -15,28 +15,24 @@
 package indexedmap
 
 import (
-	api "github.com/atomix/api/proto/atomix/indexedmap"
+	api "github.com/atomix/api/go/atomix/primitive/indexedmap"
+	"github.com/atomix/go-client/pkg/client/meta"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestOptions(t *testing.T) {
-	putRequest := &api.PutRequest{}
-	assert.Equal(t, uint64(0), putRequest.Version)
-	IfVersion(1).beforePut(putRequest)
-	assert.Equal(t, uint64(1), putRequest.Version)
+	putRequest := &api.PutInput{}
+	assert.Equal(t, uint64(0), putRequest.Entry.Value.Meta.Revision.Num)
+	IfMatch(meta.ObjectMeta{Revision: 1}).beforePut(putRequest)
+	assert.Equal(t, uint64(1), putRequest.Entry.Value.Meta.Revision.Num)
 
-	removeRequest := &api.RemoveRequest{}
-	assert.Equal(t, uint64(0), removeRequest.Version)
-	IfVersion(2).beforeRemove(removeRequest)
-	assert.Equal(t, uint64(2), removeRequest.Version)
+	removeRequest := &api.RemoveInput{}
+	assert.Equal(t, uint64(0), removeRequest.Entry.Value.Meta.Revision.Num)
+	IfMatch(meta.ObjectMeta{Revision: 2}).beforeRemove(removeRequest)
+	assert.Equal(t, uint64(2), removeRequest.Entry.Value.Meta.Revision.Num)
 
-	getResponse := &api.GetResponse{}
-	assert.Nil(t, getResponse.Value)
-	WithDefault([]byte("foo")).afterGet(getResponse)
-	assert.Equal(t, "foo", string(getResponse.Value))
-
-	eventRequest := &api.EventRequest{}
+	eventRequest := &api.EventsInput{}
 	assert.False(t, eventRequest.Replay)
 	WithReplay().beforeWatch(eventRequest)
 	assert.True(t, eventRequest.Replay)

@@ -53,27 +53,27 @@ func TestLatchOperations(t *testing.T) {
 
 	term, err := latch1.Get(context.TODO())
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(0), term.ID)
+	assert.Equal(t, uint64(0), term.Revision)
 	assert.Equal(t, "", term.Leader)
 	assert.Len(t, term.Participants, 0)
 
 	term, err = latch1.Latch(context.TODO())
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(1), term.ID)
+	assert.Equal(t, uint64(1), term.Revision)
 	assert.Equal(t, latch1.ID(), term.Leader)
 	assert.Len(t, term.Participants, 1)
 	assert.Equal(t, latch1.ID(), term.Participants[0])
 
 	event := <-ch
 	assert.Equal(t, EventChange, event.Type)
-	assert.Equal(t, uint64(1), event.Leadership.ID)
+	assert.Equal(t, uint64(1), event.Leadership.Revision)
 	assert.Equal(t, latch1.ID(), event.Leadership.Leader)
 	assert.Len(t, event.Leadership.Participants, 1)
 	assert.Equal(t, latch1.ID(), event.Leadership.Participants[0])
 
 	term, err = latch2.Latch(context.TODO())
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(1), term.ID)
+	assert.Equal(t, uint64(1), term.Revision)
 	assert.Equal(t, latch1.ID(), term.Leader)
 	assert.Len(t, term.Participants, 2)
 	assert.Equal(t, latch1.ID(), term.Participants[0])
@@ -81,7 +81,7 @@ func TestLatchOperations(t *testing.T) {
 
 	event = <-ch
 	assert.Equal(t, EventChange, event.Type)
-	assert.Equal(t, uint64(1), event.Leadership.ID)
+	assert.Equal(t, uint64(1), event.Leadership.Revision)
 	assert.Equal(t, latch1.ID(), event.Leadership.Leader)
 	assert.Len(t, event.Leadership.Participants, 2)
 	assert.Equal(t, latch1.ID(), event.Leadership.Participants[0])
@@ -89,7 +89,7 @@ func TestLatchOperations(t *testing.T) {
 
 	term, err = latch3.Latch(context.TODO())
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(1), term.ID)
+	assert.Equal(t, uint64(1), term.Revision)
 	assert.Equal(t, latch1.ID(), term.Leader)
 	assert.Len(t, term.Participants, 3)
 	assert.Equal(t, latch1.ID(), term.Participants[0])
@@ -98,7 +98,7 @@ func TestLatchOperations(t *testing.T) {
 
 	event = <-ch
 	assert.Equal(t, EventChange, event.Type)
-	assert.Equal(t, uint64(1), event.Leadership.ID)
+	assert.Equal(t, uint64(1), event.Leadership.Revision)
 	assert.Equal(t, latch1.ID(), event.Leadership.Leader)
 	assert.Len(t, event.Leadership.Participants, 3)
 	assert.Equal(t, latch1.ID(), event.Leadership.Participants[0])
@@ -110,7 +110,7 @@ func TestLatchOperations(t *testing.T) {
 
 	event = <-ch
 	assert.Equal(t, EventChange, event.Type)
-	assert.Equal(t, uint64(2), event.Leadership.ID)
+	assert.Equal(t, uint64(2), event.Leadership.Revision)
 	assert.Equal(t, latch2.ID(), event.Leadership.Leader)
 	assert.Len(t, event.Leadership.Participants, 2)
 	assert.Equal(t, latch2.ID(), event.Leadership.Participants[0])
@@ -129,7 +129,7 @@ func TestLatchOperations(t *testing.T) {
 
 	term, err = latch1.Get(context.TODO())
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(3), term.ID)
+	assert.Equal(t, uint64(3), term.Revision)
 	assert.Equal(t, "", term.Leader)
 	assert.Len(t, term.Participants, 0)
 
@@ -148,7 +148,7 @@ func TestLatchOperations(t *testing.T) {
 
 	term, err = latch.Get(context.TODO())
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(0), term.ID)
+	assert.Equal(t, uint64(0), term.Revision)
 	assert.Equal(t, "", term.Leader)
 	assert.Len(t, term.Participants, 0)
 }

@@ -53,27 +53,27 @@ func TestElectionOperations(t *testing.T) {
 
 	term, err := election1.GetTerm(context.TODO())
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(0), term.ID)
+	assert.Equal(t, uint64(0), term.Revision)
 	assert.Equal(t, "", term.Leader)
 	assert.Len(t, term.Candidates, 0)
 
 	term, err = election1.Enter(context.TODO())
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(1), term.ID)
+	assert.Equal(t, uint64(1), term.Revision)
 	assert.Equal(t, election1.ID(), term.Leader)
 	assert.Len(t, term.Candidates, 1)
 	assert.Equal(t, election1.ID(), term.Candidates[0])
 
 	event := <-ch
 	assert.Equal(t, EventChange, event.Type)
-	assert.Equal(t, uint64(1), event.Term.ID)
+	assert.Equal(t, uint64(1), event.Term.Revision)
 	assert.Equal(t, election1.ID(), event.Term.Leader)
 	assert.Len(t, event.Term.Candidates, 1)
 	assert.Equal(t, election1.ID(), event.Term.Candidates[0])
 
 	term, err = election2.Enter(context.TODO())
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(1), term.ID)
+	assert.Equal(t, uint64(1), term.Revision)
 	assert.Equal(t, election1.ID(), term.Leader)
 	assert.Len(t, term.Candidates, 2)
 	assert.Equal(t, election1.ID(), term.Candidates[0])
@@ -81,7 +81,7 @@ func TestElectionOperations(t *testing.T) {
 
 	event = <-ch
 	assert.Equal(t, EventChange, event.Type)
-	assert.Equal(t, uint64(1), event.Term.ID)
+	assert.Equal(t, uint64(1), event.Term.Revision)
 	assert.Equal(t, election1.ID(), event.Term.Leader)
 	assert.Len(t, event.Term.Candidates, 2)
 	assert.Equal(t, election1.ID(), event.Term.Candidates[0])
@@ -89,7 +89,7 @@ func TestElectionOperations(t *testing.T) {
 
 	term, err = election3.Enter(context.TODO())
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(1), term.ID)
+	assert.Equal(t, uint64(1), term.Revision)
 	assert.Equal(t, election1.ID(), term.Leader)
 	assert.Len(t, term.Candidates, 3)
 	assert.Equal(t, election1.ID(), term.Candidates[0])
@@ -98,7 +98,7 @@ func TestElectionOperations(t *testing.T) {
 
 	event = <-ch
 	assert.Equal(t, EventChange, event.Type)
-	assert.Equal(t, uint64(1), event.Term.ID)
+	assert.Equal(t, uint64(1), event.Term.Revision)
 	assert.Equal(t, election1.ID(), event.Term.Leader)
 	assert.Len(t, event.Term.Candidates, 3)
 	assert.Equal(t, election1.ID(), event.Term.Candidates[0])
@@ -107,7 +107,7 @@ func TestElectionOperations(t *testing.T) {
 
 	term, err = election3.Promote(context.TODO(), election3.ID())
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(1), term.ID)
+	assert.Equal(t, uint64(1), term.Revision)
 	assert.Equal(t, election1.ID(), term.Leader)
 	assert.Len(t, term.Candidates, 3)
 	assert.Equal(t, election1.ID(), term.Candidates[0])
@@ -116,7 +116,7 @@ func TestElectionOperations(t *testing.T) {
 
 	event = <-ch
 	assert.Equal(t, EventChange, event.Type)
-	assert.Equal(t, uint64(1), event.Term.ID)
+	assert.Equal(t, uint64(1), event.Term.Revision)
 	assert.Equal(t, election1.ID(), event.Term.Leader)
 	assert.Len(t, event.Term.Candidates, 3)
 	assert.Equal(t, election1.ID(), event.Term.Candidates[0])
@@ -125,7 +125,7 @@ func TestElectionOperations(t *testing.T) {
 
 	term, err = election3.Promote(context.TODO(), election3.ID())
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(2), term.ID)
+	assert.Equal(t, uint64(2), term.Revision)
 	assert.Equal(t, election3.ID(), term.Leader)
 	assert.Len(t, term.Candidates, 3)
 	assert.Equal(t, election3.ID(), term.Candidates[0])
@@ -134,7 +134,7 @@ func TestElectionOperations(t *testing.T) {
 
 	event = <-ch
 	assert.Equal(t, EventChange, event.Type)
-	assert.Equal(t, uint64(2), event.Term.ID)
+	assert.Equal(t, uint64(2), event.Term.Revision)
 	assert.Equal(t, election3.ID(), event.Term.Leader)
 	assert.Len(t, event.Term.Candidates, 3)
 	assert.Equal(t, election3.ID(), event.Term.Candidates[0])
@@ -143,7 +143,7 @@ func TestElectionOperations(t *testing.T) {
 
 	term, err = election2.Anoint(context.TODO(), election2.ID())
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(3), term.ID)
+	assert.Equal(t, uint64(3), term.Revision)
 	assert.Equal(t, election2.ID(), term.Leader)
 	assert.Len(t, term.Candidates, 3)
 	assert.Equal(t, election2.ID(), term.Candidates[0])
@@ -152,7 +152,7 @@ func TestElectionOperations(t *testing.T) {
 
 	event = <-ch
 	assert.Equal(t, EventChange, event.Type)
-	assert.Equal(t, uint64(3), event.Term.ID)
+	assert.Equal(t, uint64(3), event.Term.Revision)
 	assert.Equal(t, election2.ID(), event.Term.Leader)
 	assert.Len(t, event.Term.Candidates, 3)
 	assert.Equal(t, election2.ID(), event.Term.Candidates[0])
@@ -161,7 +161,7 @@ func TestElectionOperations(t *testing.T) {
 
 	term, err = election2.Leave(context.TODO())
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(4), term.ID)
+	assert.Equal(t, uint64(4), term.Revision)
 	assert.Equal(t, election3.ID(), term.Leader)
 	assert.Len(t, term.Candidates, 2)
 	assert.Equal(t, election3.ID(), term.Candidates[0])
@@ -169,7 +169,7 @@ func TestElectionOperations(t *testing.T) {
 
 	event = <-ch
 	assert.Equal(t, EventChange, event.Type)
-	assert.Equal(t, uint64(4), event.Term.ID)
+	assert.Equal(t, uint64(4), event.Term.Revision)
 	assert.Equal(t, election3.ID(), event.Term.Leader)
 	assert.Len(t, event.Term.Candidates, 2)
 	assert.Equal(t, election3.ID(), event.Term.Candidates[0])
@@ -177,42 +177,42 @@ func TestElectionOperations(t *testing.T) {
 
 	term, err = election3.Evict(context.TODO(), election3.ID())
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(5), term.ID)
+	assert.Equal(t, uint64(5), term.Revision)
 	assert.Equal(t, election1.ID(), term.Leader)
 	assert.Len(t, term.Candidates, 1)
 	assert.Equal(t, election1.ID(), term.Candidates[0])
 
 	event = <-ch
 	assert.Equal(t, EventChange, event.Type)
-	assert.Equal(t, uint64(5), event.Term.ID)
+	assert.Equal(t, uint64(5), event.Term.Revision)
 	assert.Equal(t, election1.ID(), event.Term.Leader)
 	assert.Len(t, event.Term.Candidates, 1)
 	assert.Equal(t, election1.ID(), event.Term.Candidates[0])
 
 	term, err = election2.Enter(context.TODO())
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(5), term.ID)
+	assert.Equal(t, uint64(5), term.Revision)
 	assert.Equal(t, election1.ID(), term.Leader)
 	assert.Len(t, term.Candidates, 2)
 	assert.Equal(t, election1.ID(), term.Candidates[0])
 
 	event = <-ch
 	assert.Equal(t, EventChange, event.Type)
-	assert.Equal(t, uint64(5), event.Term.ID)
+	assert.Equal(t, uint64(5), event.Term.Revision)
 	assert.Equal(t, election1.ID(), event.Term.Leader)
 	assert.Len(t, event.Term.Candidates, 2)
 	assert.Equal(t, election1.ID(), event.Term.Candidates[0])
 
 	term, err = election1.Anoint(context.TODO(), election2.ID())
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(6), term.ID)
+	assert.Equal(t, uint64(6), term.Revision)
 	assert.Equal(t, election2.ID(), term.Leader)
 	assert.Len(t, term.Candidates, 2)
 	assert.Equal(t, election2.ID(), term.Candidates[0])
 
 	event = <-ch
 	assert.Equal(t, EventChange, event.Type)
-	assert.Equal(t, uint64(6), event.Term.ID)
+	assert.Equal(t, uint64(6), event.Term.Revision)
 	assert.Equal(t, election2.ID(), event.Term.Leader)
 	assert.Len(t, event.Term.Candidates, 2)
 	assert.Equal(t, election2.ID(), event.Term.Candidates[0])
@@ -222,7 +222,7 @@ func TestElectionOperations(t *testing.T) {
 
 	event = <-ch
 	assert.Equal(t, EventChange, event.Type)
-	assert.Equal(t, uint64(7), event.Term.ID)
+	assert.Equal(t, uint64(7), event.Term.Revision)
 	assert.Equal(t, election1.ID(), event.Term.Leader)
 	assert.Len(t, event.Term.Candidates, 1)
 	assert.Equal(t, election1.ID(), event.Term.Candidates[0])
@@ -240,7 +240,7 @@ func TestElectionOperations(t *testing.T) {
 
 	term, err = election1.GetTerm(context.TODO())
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(7), term.ID)
+	assert.Equal(t, uint64(7), term.Revision)
 	assert.Equal(t, "", term.Leader)
 	assert.Len(t, term.Candidates, 0)
 
@@ -259,7 +259,7 @@ func TestElectionOperations(t *testing.T) {
 
 	term, err = election.GetTerm(context.TODO())
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(0), term.ID)
+	assert.Equal(t, uint64(0), term.Revision)
 	assert.Equal(t, "", term.Leader)
 	assert.Len(t, term.Candidates, 0)
 }

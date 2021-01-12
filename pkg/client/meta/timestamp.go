@@ -15,7 +15,6 @@
 package meta
 
 import (
-	metaapi "github.com/atomix/api/go/atomix/primitive/meta"
 	"time"
 )
 
@@ -24,7 +23,6 @@ type Timestamp interface {
 	Before(Timestamp) bool
 	After(Timestamp) bool
 	Equal(Timestamp) bool
-	proto(*metaapi.ObjectMeta)
 }
 
 type LogicalTime uint64
@@ -61,14 +59,6 @@ func (t LogicalTimestamp) Equal(u Timestamp) bool {
 		panic("not a logical timestamp")
 	}
 	return t.Time == v.Time
-}
-
-func (t LogicalTimestamp) proto(meta *metaapi.ObjectMeta) {
-	meta.Timestamp = &metaapi.ObjectMeta_LogicalTimestamp{
-		LogicalTimestamp: &metaapi.LogicalTimestamp{
-			Time: metaapi.LogicalTime(t.Time),
-		},
-	}
 }
 
 func NewVectorTimestamp(times []LogicalTime, i int) Timestamp {
@@ -122,60 +112,40 @@ func (t VectorTimestamp) Equal(u Timestamp) bool {
 	return true
 }
 
-func (t VectorTimestamp) proto(meta *metaapi.ObjectMeta) {
-	times := make([]metaapi.LogicalTime, len(t.Times))
-	for i, time := range t.Times {
-		times[i] = metaapi.LogicalTime(time)
-	}
-	meta.Timestamp = &metaapi.ObjectMeta_VectorTimestamp{
-		VectorTimestamp: &metaapi.VectorTimestamp{
-			Time: times,
-		},
-	}
-}
+type PhysicalTime time.Time
 
-type WallClockTime time.Time
-
-func NewWallClockTimestamp(time WallClockTime) Timestamp {
-	return &WallClockTimestamp{
+func NewPhysicalTimestamp(time PhysicalTime) Timestamp {
+	return &PhysicalTimestamp{
 		Time: time,
 	}
 }
 
-type WallClockTimestamp struct {
-	Time WallClockTime
+type PhysicalTimestamp struct {
+	Time PhysicalTime
 }
 
-func (t WallClockTimestamp) Before(u Timestamp) bool {
-	v, ok := u.(WallClockTimestamp)
+func (t PhysicalTimestamp) Before(u Timestamp) bool {
+	v, ok := u.(PhysicalTimestamp)
 	if !ok {
 		panic("not a wall clock timestamp")
 	}
 	return time.Time(t.Time).Before(time.Time(v.Time))
 }
 
-func (t WallClockTimestamp) After(u Timestamp) bool {
-	v, ok := u.(WallClockTimestamp)
+func (t PhysicalTimestamp) After(u Timestamp) bool {
+	v, ok := u.(PhysicalTimestamp)
 	if !ok {
 		panic("not a wall clock timestamp")
 	}
 	return time.Time(t.Time).After(time.Time(v.Time))
 }
 
-func (t WallClockTimestamp) Equal(u Timestamp) bool {
-	v, ok := u.(WallClockTimestamp)
+func (t PhysicalTimestamp) Equal(u Timestamp) bool {
+	v, ok := u.(PhysicalTimestamp)
 	if !ok {
 		panic("not a wall clock timestamp")
 	}
 	return time.Time(t.Time).Equal(time.Time(v.Time))
-}
-
-func (t WallClockTimestamp) proto(meta *metaapi.ObjectMeta) {
-	meta.Timestamp = &metaapi.ObjectMeta_PhysicalTimestamp{
-		PhysicalTimestamp: &metaapi.PhysicalTimestamp{
-			Time: metaapi.PhysicalTime(t.Time),
-		},
-	}
 }
 
 type Epoch uint64
@@ -214,17 +184,4 @@ func (t EpochTimestamp) Equal(u Timestamp) bool {
 		panic("not an epoch timestamp")
 	}
 	return t.Epoch == v.Epoch && t.Time == v.Time
-}
-
-func (t EpochTimestamp) proto(meta *metaapi.ObjectMeta) {
-	meta.Timestamp = &metaapi.ObjectMeta_EpochTimestamp{
-		EpochTimestamp: &metaapi.EpochTimestamp{
-			Epoch: metaapi.Epoch{
-				Num: metaapi.EpochNum(t.Epoch),
-			},
-			Sequence: metaapi.Sequence{
-				Num: metaapi.SequenceNum(t.Time),
-			},
-		},
-	}
 }

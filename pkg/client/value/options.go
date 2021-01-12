@@ -66,16 +66,16 @@ type SetOption interface {
 }
 
 // IfMatch updates the value if the version matches the given version
-func IfMatch(meta meta.ObjectMeta) SetOption {
-	return matchOption{meta}
+func IfMatch(object meta.Object) SetOption {
+	return matchOption{object}
 }
 
 type matchOption struct {
-	meta meta.ObjectMeta
+	object meta.Object
 }
 
 func (o matchOption) beforeSet(input *api.SetInput) {
-	input.Value.Meta = o.meta.Proto()
+	input.Value.Meta = o.object.Meta().Proto()
 }
 
 func (o matchOption) afterSet(output *api.SetOutput) {
