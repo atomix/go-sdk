@@ -17,15 +17,18 @@ package value
 import (
 	"context"
 	api "github.com/atomix/api/go/atomix/primitive/value"
-	"github.com/atomix/go-client/pkg/client/meta"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-framework/pkg/atomix/client"
-	valueclient "github.com/atomix/go-framework/pkg/atomix/client/value"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
+	"github.com/atomix/go-framework/pkg/atomix/meta"
 	"google.golang.org/grpc"
+	"io"
 )
 
-// Type is the counter type
-const Type = primitive.Type(valueclient.PrimitiveType)
+var log = logging.GetLogger("atomix", "client", "value")
+
+// Type is the value type
+const Type primitive.Type = "Value"
 
 // Client provides an API for creating Values
 type Client interface {
@@ -69,11 +72,11 @@ type Event struct {
 // New creates a new Lock primitive for the given partitions
 // The value will be created in one of the given partitions.
 func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Value, error) {
-	options := applyOptions(opts...)
 	v := &value{
-		client: valueclient.NewClient(client.ID(options.clientID), name, conn),
+		Client: primitive.NewClient(Type, name, conn),
+		client: api.NewValueServiceClient(conn),
 	}
-	if err := v.create(ctx); err != nil {
+	if err := v.Create(ctx); err != nil {
 		return nil, err
 	}
 	return v, nil
@@ -81,75 +84,76 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option
 
 // value is the single partition implementation of Lock
 type value struct {
-	client valueclient.Client
-}
-
-func (v *value) Type() primitive.Type {
-	return Type
-}
-
-func (v *value) Name() string {
-	return v.client.Name()
+	*primitive.Client
+	client api.ValueServiceClient
 }
 
 func (v *value) Set(ctx context.Context, value []byte, opts ...SetOption) (meta.ObjectMeta, error) {
-	input := &api.SetInput{
-		Value: &api.Value{
+	request := &api.SetRequest{
+		Value: api.Value{
 			Value: value,
 		},
 	}
 	for i := range opts {
-		opts[i].beforeSet(input)
+		opts[i].beforeSet(request)
 	}
-	output, err := v.client.Set(ctx, input)
+	response, err := v.client.Set(v.AddHeaders(ctx), request)
 	if err != nil {
-		return meta.ObjectMeta{}, err
+		return meta.ObjectMeta{}, errors.From(err)
 	}
 	for i := range opts {
-		opts[i].afterSet(output)
+		opts[i].afterSet(response)
 	}
-	return meta.New(output.Meta), nil
+	return meta.New(response.Value.ObjectMeta), nil
 }
 
 func (v *value) Get(ctx context.Context) ([]byte, meta.ObjectMeta, error) {
-	input := &api.GetInput{}
-	output, err := v.client.Get(ctx, input)
+	request := &api.GetRequest{}
+	response, err := v.client.Get(v.AddHeaders(ctx), request)
 	if err != nil {
-		return nil, meta.ObjectMeta{}, err
+		return nil, meta.ObjectMeta{}, errors.From(err)
 	}
-	return output.Value.Value, meta.New(output.Value.Meta), nil
+	return response.Value.Value, meta.New(response.Value.ObjectMeta), nil
 }
 
 func (v *value) Watch(ctx context.Context, ch chan<- Event) error {
-	input := &api.EventsInput{}
-	outputCh := make(chan api.EventsOutput)
-	if err := v.client.Events(ctx, input, outputCh); err != nil {
-		return err
+	request := &api.EventsRequest{}
+	stream, err := v.client.Events(v.AddHeaders(ctx), request)
+	if err != nil {
+		return errors.From(err)
 	}
+
+	openCh := make(chan struct{})
 	go func() {
 		defer close(ch)
-		for output := range outputCh {
-			switch output.Type {
-			case api.EventsOutput_UPDATE:
-				ch <- Event{
-					ObjectMeta: meta.New(output.Value.Meta),
-					Type:       EventUpdate,
-					Value:      output.Value.Value,
+		open := false
+		for {
+			response, err := stream.Recv()
+			if err == io.EOF {
+				return
+			} else if err != nil {
+				log.Errorf("Watch failed: %v", err)
+			} else {
+				if !open {
+					close(openCh)
+					open = true
+				}
+				switch response.Event.Type {
+				case api.Event_UPDATE:
+					ch <- Event{
+						ObjectMeta: meta.New(response.Event.Value.ObjectMeta),
+						Type:       EventUpdate,
+						Value:      response.Event.Value.Value,
+					}
 				}
 			}
 		}
 	}()
-	return nil
-}
 
-func (v *value) create(ctx context.Context) error {
-	return v.client.Create(ctx)
-}
-
-func (v *value) Close(ctx context.Context) error {
-	return v.client.Close(ctx)
-}
-
-func (v *value) Delete(ctx context.Context) error {
-	return v.client.Delete(ctx)
+	select {
+	case <-openCh:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }

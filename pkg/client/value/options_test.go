@@ -17,13 +17,13 @@ package value
 import (
 	metaapi "github.com/atomix/api/go/atomix/primitive/meta"
 	api "github.com/atomix/api/go/atomix/primitive/value"
-	"github.com/atomix/go-client/pkg/client/meta"
+	"github.com/atomix/go-framework/pkg/atomix/meta"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestOptions(t *testing.T) {
-	input := &api.SetInput{}
-	IfMatch(meta.ObjectMeta{Revision: 1}).beforeSet(input)
-	assert.Equal(t, metaapi.RevisionNum(1), input.Value.Meta.Revision.Num)
+	request := &api.SetRequest{}
+	IfMatch(meta.ObjectMeta{Revision: 1}).beforeSet(request)
+	assert.Equal(t, metaapi.RevisionNum(1), request.Value.ObjectMeta.Revision.Num)
 }

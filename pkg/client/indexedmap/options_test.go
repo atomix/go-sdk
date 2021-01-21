@@ -16,23 +16,23 @@ package indexedmap
 
 import (
 	api "github.com/atomix/api/go/atomix/primitive/indexedmap"
-	"github.com/atomix/go-client/pkg/client/meta"
+	"github.com/atomix/go-framework/pkg/atomix/meta"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestOptions(t *testing.T) {
-	putRequest := &api.PutInput{}
-	assert.Equal(t, uint64(0), putRequest.Entry.Value.Meta.Revision.Num)
+	putRequest := &api.PutRequest{}
+	assert.Equal(t, uint64(0), putRequest.Entry.Value.ObjectMeta.Revision.Num)
 	IfMatch(meta.ObjectMeta{Revision: 1}).beforePut(putRequest)
-	assert.Equal(t, uint64(1), putRequest.Entry.Value.Meta.Revision.Num)
+	assert.Equal(t, uint64(1), putRequest.Entry.Value.ObjectMeta.Revision.Num)
 
-	removeRequest := &api.RemoveInput{}
-	assert.Equal(t, uint64(0), removeRequest.Entry.Value.Meta.Revision.Num)
+	removeRequest := &api.RemoveRequest{}
+	assert.Equal(t, uint64(0), removeRequest.Entry.Value.ObjectMeta.Revision.Num)
 	IfMatch(meta.ObjectMeta{Revision: 2}).beforeRemove(removeRequest)
-	assert.Equal(t, uint64(2), removeRequest.Entry.Value.Meta.Revision.Num)
+	assert.Equal(t, uint64(2), removeRequest.Entry.Value.ObjectMeta.Revision.Num)
 
-	eventRequest := &api.EventsInput{}
+	eventRequest := &api.EventsRequest{}
 	assert.False(t, eventRequest.Replay)
 	WithReplay().beforeWatch(eventRequest)
 	assert.True(t, eventRequest.Replay)

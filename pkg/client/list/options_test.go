@@ -21,7 +21,7 @@ import (
 )
 
 func TestOptions(t *testing.T) {
-	request := &api.EventsInput{}
+	request := &api.EventsRequest{}
 	assert.False(t, request.Replay)
 	WithReplay().beforeWatch(request)
 	assert.True(t, request.Replay)

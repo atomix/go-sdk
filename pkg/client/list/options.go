@@ -60,8 +60,8 @@ func (o *clientIDOption) apply(options *options) {
 
 // WatchOption is an option for list Watch calls
 type WatchOption interface {
-	beforeWatch(input *api.EventsInput)
-	afterWatch(output *api.EventsOutput)
+	beforeWatch(request *api.EventsRequest)
+	afterWatch(response *api.EventsResponse)
 }
 
 // WithReplay returns a Watch option to replay entries
@@ -71,10 +71,10 @@ func WithReplay() WatchOption {
 
 type replayOption struct{}
 
-func (o replayOption) beforeWatch(input *api.EventsInput) {
-	input.Replay = true
+func (o replayOption) beforeWatch(request *api.EventsRequest) {
+	request.Replay = true
 }
 
-func (o replayOption) afterWatch(output *api.EventsOutput) {
+func (o replayOption) afterWatch(response *api.EventsResponse) {
 
 }

@@ -18,16 +18,17 @@ import (
 	"context"
 	"fmt"
 	api "github.com/atomix/api/go/atomix/primitive/indexedmap"
-	"github.com/atomix/go-client/pkg/client/meta"
+	metaapi "github.com/atomix/api/go/atomix/primitive/meta"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-framework/pkg/atomix/client"
-	indexedmapclient "github.com/atomix/go-framework/pkg/atomix/client/indexedmap"
-	"github.com/atomix/go-framework/pkg/atomix/util/logging"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
+	"github.com/atomix/go-framework/pkg/atomix/meta"
 	"google.golang.org/grpc"
+	"io"
 )
 
-// Type is the counter type
-const Type = primitive.Type(indexedmapclient.PrimitiveType)
+// Type is the indexed map type
+const Type primitive.Type = "IndexedMap"
 
 var log = logging.GetLogger("atomix", "client", "indexedmap")
 
@@ -160,11 +161,11 @@ type Event struct {
 
 // New creates a new IndexedMap primitive
 func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (IndexedMap, error) {
-	options := applyOptions(opts...)
 	m := &indexedMap{
-		client: indexedmapclient.NewClient(client.ID(options.clientID), name, conn),
+		Client: primitive.NewClient(Type, name, conn),
+		client: api.NewIndexedMapServiceClient(conn),
 	}
-	if err := m.create(ctx); err != nil {
+	if err := m.Create(ctx); err != nil {
 		return nil, err
 	}
 	return m, nil
@@ -172,15 +173,8 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option
 
 // indexedMap is the default single-partition implementation of Map
 type indexedMap struct {
-	client indexedmapclient.Client
-}
-
-func (m *indexedMap) Type() primitive.Type {
-	return Type
-}
-
-func (m *indexedMap) Name() string {
-	return m.client.Name()
+	*primitive.Client
+	client api.IndexedMapServiceClient
 }
 
 func newEntry(entry *api.Entry) *Entry {
@@ -188,36 +182,44 @@ func newEntry(entry *api.Entry) *Entry {
 		return nil
 	}
 	return &Entry{
-		ObjectMeta: meta.New(entry.Value.Meta),
-		Index:      Index(entry.Pos.Index),
-		Key:        entry.Pos.Key,
+		ObjectMeta: meta.New(entry.Value.ObjectMeta),
+		Index:      Index(entry.Index),
+		Key:        entry.Key,
 		Value:      entry.Value.Value,
 	}
 }
 
 func (m *indexedMap) Append(ctx context.Context, key string, value []byte) (*Entry, error) {
-	input := &api.PutInput{
+	request := &api.PutRequest{
 		Entry: api.Entry{
-			Pos: api.Position{
+			Position: api.Position{
 				Key: key,
 			},
 			Value: api.Value{
 				Value: value,
 			},
 		},
-		IfEmpty: true,
+		Preconditions: []api.Precondition{
+			{
+				Precondition: &api.Precondition_Metadata{
+					Metadata: &metaapi.ObjectMeta{
+						Type: metaapi.ObjectMeta_TOMBSTONE,
+					},
+				},
+			},
+		},
 	}
-	output, err := m.client.Put(ctx, input)
+	response, err := m.client.Put(ctx, request)
 	if err != nil {
 		return nil, err
 	}
-	return newEntry(output.Entry), nil
+	return newEntry(response.Entry), nil
 }
 
 func (m *indexedMap) Put(ctx context.Context, key string, value []byte) (*Entry, error) {
-	input := &api.PutInput{
+	request := &api.PutRequest{
 		Entry: api.Entry{
-			Pos: api.Position{
+			Position: api.Position{
 				Key: key,
 			},
 			Value: api.Value{
@@ -225,17 +227,17 @@ func (m *indexedMap) Put(ctx context.Context, key string, value []byte) (*Entry,
 			},
 		},
 	}
-	output, err := m.client.Put(ctx, input)
+	response, err := m.client.Put(ctx, request)
 	if err != nil {
 		return nil, err
 	}
-	return newEntry(output.Entry), nil
+	return newEntry(response.Entry), nil
 }
 
 func (m *indexedMap) Set(ctx context.Context, index Index, key string, value []byte, opts ...SetOption) (*Entry, error) {
-	input := &api.PutInput{
+	request := &api.PutRequest{
 		Entry: api.Entry{
-			Pos: api.Position{
+			Position: api.Position{
 				Index: uint64(index),
 				Key:   key,
 			},
@@ -245,242 +247,279 @@ func (m *indexedMap) Set(ctx context.Context, index Index, key string, value []b
 		},
 	}
 	for i := range opts {
-		opts[i].beforePut(input)
+		opts[i].beforePut(request)
 	}
-	output, err := m.client.Put(ctx, input)
+	response, err := m.client.Put(ctx, request)
 	if err != nil {
 		return nil, err
 	}
 	for i := range opts {
-		opts[i].afterPut(output)
+		opts[i].afterPut(response)
 	}
-	return newEntry(output.Entry), nil
+	return newEntry(response.Entry), nil
 }
 
 func (m *indexedMap) Get(ctx context.Context, key string, opts ...GetOption) (*Entry, error) {
-	input := &api.GetInput{
+	request := &api.GetRequest{
 		Key: key,
 	}
 	for i := range opts {
-		opts[i].beforeGet(input)
+		opts[i].beforeGet(request)
 	}
-	output, err := m.client.Get(ctx, input)
+	response, err := m.client.Get(ctx, request)
 	if err != nil {
 		return nil, err
 	}
 	for i := range opts {
-		opts[i].afterGet(output)
+		opts[i].afterGet(response)
 	}
-	return newEntry(output.Entry), nil
+	return newEntry(response.Entry), nil
 }
 
 func (m *indexedMap) GetIndex(ctx context.Context, index Index, opts ...GetOption) (*Entry, error) {
-	input := &api.GetInput{
+	request := &api.GetRequest{
 		Index: uint64(index),
 	}
 	for i := range opts {
-		opts[i].beforeGet(input)
+		opts[i].beforeGet(request)
 	}
-	output, err := m.client.Get(ctx, input)
+	response, err := m.client.Get(ctx, request)
 	if err != nil {
 		return nil, err
 	}
 	for i := range opts {
-		opts[i].afterGet(output)
+		opts[i].afterGet(response)
 	}
-	return newEntry(output.Entry), nil
+	return newEntry(response.Entry), nil
 }
 
 func (m *indexedMap) FirstIndex(ctx context.Context) (Index, error) {
-	output, err := m.client.FirstEntry(ctx)
+	request := &api.FirstEntryRequest{}
+	response, err := m.client.FirstEntry(ctx, request)
 	if err != nil {
 		return 0, err
 	}
-	return Index(output.Entry.Pos.Index), nil
+	return Index(response.Entry.Index), nil
 }
 
 func (m *indexedMap) LastIndex(ctx context.Context) (Index, error) {
-	output, err := m.client.LastEntry(ctx)
+	request := &api.LastEntryRequest{}
+	response, err := m.client.LastEntry(ctx, request)
 	if err != nil {
 		return 0, err
 	}
-	return Index(output.Entry.Pos.Index), nil
+	return Index(response.Entry.Index), nil
 }
 
 func (m *indexedMap) PrevIndex(ctx context.Context, index Index) (Index, error) {
-	input := &api.PrevEntryInput{
+	request := &api.PrevEntryRequest{
 		Index: uint64(index),
 	}
-	output, err := m.client.PrevEntry(ctx, input)
+	response, err := m.client.PrevEntry(ctx, request)
 	if err != nil {
 		return 0, err
 	}
-	return Index(output.Entry.Pos.Index), nil
+	return Index(response.Entry.Index), nil
 }
 
 func (m *indexedMap) NextIndex(ctx context.Context, index Index) (Index, error) {
-	input := &api.NextEntryInput{
+	request := &api.NextEntryRequest{
 		Index: uint64(index),
 	}
-	output, err := m.client.NextEntry(ctx, input)
+	response, err := m.client.NextEntry(ctx, request)
 	if err != nil {
 		return 0, err
 	}
-	return Index(output.Entry.Pos.Index), nil
+	return Index(response.Entry.Index), nil
 }
 
 func (m *indexedMap) FirstEntry(ctx context.Context) (*Entry, error) {
-	output, err := m.client.FirstEntry(ctx)
+	request := &api.FirstEntryRequest{}
+	response, err := m.client.FirstEntry(ctx, request)
 	if err != nil {
 		return nil, err
 	}
-	return newEntry(output.Entry), nil
+	return newEntry(response.Entry), nil
 }
 
 func (m *indexedMap) LastEntry(ctx context.Context) (*Entry, error) {
-	output, err := m.client.LastEntry(ctx)
+	request := &api.LastEntryRequest{}
+	response, err := m.client.LastEntry(ctx, request)
 	if err != nil {
 		return nil, err
 	}
-	return newEntry(output.Entry), nil
+	return newEntry(response.Entry), nil
 }
 
 func (m *indexedMap) PrevEntry(ctx context.Context, index Index) (*Entry, error) {
-	input := &api.PrevEntryInput{
+	request := &api.PrevEntryRequest{
 		Index: uint64(index),
 	}
-	output, err := m.client.PrevEntry(ctx, input)
+	response, err := m.client.PrevEntry(ctx, request)
 	if err != nil {
 		return nil, err
 	}
-	return newEntry(output.Entry), nil
+	return newEntry(response.Entry), nil
 }
 
 func (m *indexedMap) NextEntry(ctx context.Context, index Index) (*Entry, error) {
-	input := &api.NextEntryInput{
+	request := &api.NextEntryRequest{
 		Index: uint64(index),
 	}
-	output, err := m.client.NextEntry(ctx, input)
+	response, err := m.client.NextEntry(ctx, request)
 	if err != nil {
 		return nil, err
 	}
-	return newEntry(output.Entry), nil
+	return newEntry(response.Entry), nil
 }
 
 func (m *indexedMap) Remove(ctx context.Context, key string, opts ...RemoveOption) (*Entry, error) {
-	input := &api.RemoveInput{
+	request := &api.RemoveRequest{
 		Entry: &api.Entry{
-			Pos: api.Position{
+			Position: api.Position{
 				Key: key,
 			},
 		},
 	}
 	for i := range opts {
-		opts[i].beforeRemove(input)
+		opts[i].beforeRemove(request)
 	}
-	output, err := m.client.Remove(ctx, input)
+	response, err := m.client.Remove(ctx, request)
 	if err != nil {
 		return nil, err
 	}
 	for i := range opts {
-		opts[i].afterRemove(output)
+		opts[i].afterRemove(response)
 	}
-	return newEntry(output.Entry), nil
+	return newEntry(response.Entry), nil
 }
 
 func (m *indexedMap) RemoveIndex(ctx context.Context, index Index, opts ...RemoveOption) (*Entry, error) {
-	input := &api.RemoveInput{
+	request := &api.RemoveRequest{
 		Entry: &api.Entry{
-			Pos: api.Position{
+			Position: api.Position{
 				Index: uint64(index),
 			},
 		},
 	}
 	for i := range opts {
-		opts[i].beforeRemove(input)
+		opts[i].beforeRemove(request)
 	}
-	output, err := m.client.Remove(ctx, input)
+	response, err := m.client.Remove(ctx, request)
 	if err != nil {
 		return nil, err
 	}
 	for i := range opts {
-		opts[i].afterRemove(output)
+		opts[i].afterRemove(response)
 	}
-	return newEntry(output.Entry), nil
+	return newEntry(response.Entry), nil
 }
 
 func (m *indexedMap) Len(ctx context.Context) (int, error) {
-	output, err := m.client.Size(ctx)
+	request := &api.SizeRequest{}
+	response, err := m.client.Size(m.AddHeaders(ctx), request)
 	if err != nil {
-		return 0, err
+		return 0, errors.From(err)
 	}
-	return int(output.Size_), nil
+	return int(response.Size_), nil
 }
 
 func (m *indexedMap) Clear(ctx context.Context) error {
-	return m.client.Clear(ctx)
+	request := &api.ClearRequest{}
+	_, err := m.client.Clear(m.AddHeaders(ctx), request)
+	if err != nil {
+		return errors.From(err)
+	}
+	return nil
 }
 
 func (m *indexedMap) Entries(ctx context.Context, ch chan<- Entry) error {
-	input := &api.EntriesInput{}
-	outputCh := make(chan api.EntriesOutput)
-	if err := m.client.Entries(ctx, input, outputCh); err != nil {
-		return err
+	request := &api.EntriesRequest{}
+	stream, err := m.client.Entries(m.AddHeaders(ctx), request)
+	if err != nil {
+		return errors.From(err)
 	}
+
+	openCh := make(chan struct{})
 	go func() {
 		defer close(ch)
-		for output := range outputCh {
-			ch <- *newEntry(&output.Entry)
+		open := false
+		for {
+			response, err := stream.Recv()
+			if err == io.EOF {
+				return
+			} else if err != nil {
+				log.Errorf("Entries failed: %v", err)
+			} else {
+				if !open {
+					close(openCh)
+					open = true
+				}
+				ch <- *newEntry(&response.Entry)
+			}
 		}
 	}()
-	return nil
+
+	select {
+	case <-openCh:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (m *indexedMap) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) error {
-	input := &api.EventsInput{}
-	for _, opt := range opts {
-		opt.beforeWatch(input)
+	request := &api.EventsRequest{}
+	stream, err := m.client.Events(m.AddHeaders(ctx), request)
+	if err != nil {
+		return errors.From(err)
 	}
-	outputCh := make(chan api.EventsOutput)
-	if err := m.client.Events(ctx, input, outputCh); err != nil {
-		return err
-	}
+
+	openCh := make(chan struct{})
 	go func() {
 		defer close(ch)
-		for output := range outputCh {
-			var eventType EventType
-			switch output.Type {
-			case api.EventsOutput_INSERT:
-				eventType = EventInsert
-			case api.EventsOutput_UPDATE:
-				eventType = EventUpdate
-			case api.EventsOutput_REMOVE:
-				eventType = EventRemove
-			case api.EventsOutput_REPLAY:
-				eventType = EventReplay
-			}
-			ch <- Event{
-				Type: eventType,
-				Entry: Entry{
-					ObjectMeta: meta.New(output.Entry.Value.Meta),
-					Key:        output.Entry.Pos.Key,
-					Value:      output.Entry.Value.Value,
-					Index:      Index(output.Entry.Pos.Index),
-				},
+		open := false
+		for {
+			response, err := stream.Recv()
+			if err == io.EOF {
+				return
+			} else if err != nil {
+				log.Errorf("Watch failed: %v", err)
+			} else {
+				if !open {
+					close(openCh)
+					open = true
+				}
+				switch response.Event.Type {
+				case api.Event_INSERT:
+					ch <- Event{
+						Type:  EventInsert,
+						Entry: *newEntry(&response.Event.Entry),
+					}
+				case api.Event_UPDATE:
+					ch <- Event{
+						Type:  EventUpdate,
+						Entry: *newEntry(&response.Event.Entry),
+					}
+				case api.Event_REMOVE:
+					ch <- Event{
+						Type:  EventRemove,
+						Entry: *newEntry(&response.Event.Entry),
+					}
+				case api.Event_REPLAY:
+					ch <- Event{
+						Type:  EventReplay,
+						Entry: *newEntry(&response.Event.Entry),
+					}
+				}
 			}
 		}
 	}()
-	return nil
-}
 
-func (m *indexedMap) create(ctx context.Context) error {
-	return m.client.Create(ctx)
-}
-
-func (m *indexedMap) Close(ctx context.Context) error {
-	return m.client.Close(ctx)
-}
-
-func (m *indexedMap) Delete(ctx context.Context) error {
-	return m.client.Delete(ctx)
+	select {
+	case <-openCh:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }

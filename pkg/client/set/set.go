@@ -18,13 +18,16 @@ import (
 	"context"
 	api "github.com/atomix/api/go/atomix/primitive/set"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-framework/pkg/atomix/client"
-	setclient "github.com/atomix/go-framework/pkg/atomix/client/set"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"google.golang.org/grpc"
+	"io"
 )
 
-// Type is the counter type
-const Type = primitive.Type(setclient.PrimitiveType)
+var log = logging.GetLogger("atomix", "client", "set")
+
+// Type is the set type
+const Type primitive.Type = "Set"
 
 // Client provides an API for creating Sets
 type Client interface {
@@ -88,126 +91,168 @@ type Event struct {
 
 // New creates a new partitioned set primitive
 func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Set, error) {
-	options := applyOptions(opts...)
 	s := &set{
-		client: setclient.NewClient(client.ID(options.clientID), name, conn),
+		Client: primitive.NewClient(Type, name, conn),
+		client: api.NewSetServiceClient(conn),
 	}
-	if err := s.create(ctx); err != nil {
+	if err := s.Create(ctx); err != nil {
 		return nil, err
 	}
 	return s, nil
 }
 
 type set struct {
-	client setclient.Client
-}
-
-func (s *set) Type() primitive.Type {
-	return Type
-}
-
-func (s *set) Name() string {
-	return s.client.Name()
+	*primitive.Client
+	client api.SetServiceClient
 }
 
 func (s *set) Add(ctx context.Context, value string) (bool, error) {
-	input := &api.AddInput{
-		Value: value,
+	request := &api.AddRequest{
+		Element: api.Element{
+			Value: value,
+		},
 	}
-	output, err := s.client.Add(ctx, input)
+	_, err := s.client.Add(s.AddHeaders(ctx), request)
 	if err != nil {
+		err = errors.From(err)
+		if errors.IsAlreadyExists(err) {
+			return false, nil
+		}
 		return false, err
 	}
-	return output.Added, nil
+	return true, nil
 }
 
 func (s *set) Remove(ctx context.Context, value string) (bool, error) {
-	input := &api.RemoveInput{
-		Value: value,
+	request := &api.RemoveRequest{
+		Element: api.Element{
+			Value: value,
+		},
 	}
-	output, err := s.client.Remove(ctx, input)
+	_, err := s.client.Remove(s.AddHeaders(ctx), request)
 	if err != nil {
+		err = errors.From(err)
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
 		return false, err
 	}
-	return output.Removed, nil
+	return true, nil
 }
 
 func (s *set) Contains(ctx context.Context, value string) (bool, error) {
-	input := &api.ContainsInput{
-		Value: value,
+	request := &api.ContainsRequest{
+		Element: api.Element{
+			Value: value,
+		},
 	}
-	output, err := s.client.Contains(ctx, input)
+	response, err := s.client.Contains(s.AddHeaders(ctx), request)
 	if err != nil {
-		return false, err
+		return false, errors.From(err)
 	}
-	return output.Contains, nil
+	return response.Contains, nil
 }
 
 func (s *set) Len(ctx context.Context) (int, error) {
-	output, err := s.client.Size(ctx)
+	request := &api.SizeRequest{}
+	response, err := s.client.Size(s.AddHeaders(ctx), request)
 	if err != nil {
-		return 0, err
+		return 0, errors.From(err)
 	}
-	return int(output.Size_), nil
+	return int(response.Size_), nil
 }
 
 func (s *set) Clear(ctx context.Context) error {
-	return s.client.Clear(ctx)
+	request := &api.ClearRequest{}
+	_, err := s.client.Clear(s.AddHeaders(ctx), request)
+	if err != nil {
+		return errors.From(err)
+	}
+	return nil
 }
 
 func (s *set) Elements(ctx context.Context, ch chan<- string) error {
-	input := &api.ElementsInput{}
-	outputCh := make(chan api.ElementsOutput)
-	if err := s.client.Elements(ctx, input, outputCh); err != nil {
-		return err
+	request := &api.ElementsRequest{}
+	stream, err := s.client.Elements(s.AddHeaders(ctx), request)
+	if err != nil {
+		return errors.From(err)
 	}
+
+	openCh := make(chan struct{})
 	go func() {
 		defer close(ch)
-		for output := range outputCh {
-			ch <- output.Value
+		open := false
+		for {
+			response, err := stream.Recv()
+			if err == io.EOF {
+				return
+			} else if err != nil {
+				log.Errorf("Elements failed: %v", err)
+			} else {
+				if !open {
+					close(openCh)
+					open = true
+				}
+				ch <- response.Element.Value
+			}
 		}
 	}()
-	return nil
+
+	select {
+	case <-openCh:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (s *set) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) error {
-	input := &api.EventsInput{}
-	for _, opt := range opts {
-		opt.beforeWatch(input)
+	request := &api.EventsRequest{}
+	stream, err := s.client.Events(s.AddHeaders(ctx), request)
+	if err != nil {
+		return errors.From(err)
 	}
-	outputCh := make(chan api.EventsOutput)
-	if err := s.client.Events(ctx, input, outputCh); err != nil {
-		return err
-	}
+
+	openCh := make(chan struct{})
 	go func() {
 		defer close(ch)
-		for output := range outputCh {
-			var eventType EventType
-			switch output.Type {
-			case api.EventsOutput_ADD:
-				eventType = EventAdd
-			case api.EventsOutput_REMOVE:
-				eventType = EventRemove
-			case api.EventsOutput_REPLAY:
-				eventType = EventReplay
-			}
-			ch <- Event{
-				Type:  eventType,
-				Value: output.Value,
+		open := false
+		for {
+			response, err := stream.Recv()
+			if err == io.EOF {
+				return
+			} else if err != nil {
+				log.Errorf("Watch failed: %v", err)
+			} else {
+				if !open {
+					close(openCh)
+					open = true
+				}
+				switch response.Event.Type {
+				case api.Event_ADD:
+					ch <- Event{
+						Type:  EventAdd,
+						Value: response.Event.Element.Value,
+					}
+				case api.Event_REMOVE:
+					ch <- Event{
+						Type:  EventRemove,
+						Value: response.Event.Element.Value,
+					}
+				case api.Event_REPLAY:
+					ch <- Event{
+						Type:  EventReplay,
+						Value: response.Event.Element.Value,
+					}
+				}
 			}
 		}
 	}()
-	return nil
-}
 
-func (s *set) create(ctx context.Context) error {
-	return s.client.Create(ctx)
-}
-
-func (s *set) Close(ctx context.Context) error {
-	return s.client.Close(ctx)
-}
-
-func (s *set) Delete(ctx context.Context) error {
-	return s.client.Delete(ctx)
+	select {
+	case <-openCh:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }

@@ -17,15 +17,13 @@ package lock
 import (
 	"context"
 	api "github.com/atomix/api/go/atomix/primitive/lock"
-	"github.com/atomix/go-client/pkg/client/meta"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-framework/pkg/atomix/client"
-	lockclient "github.com/atomix/go-framework/pkg/atomix/client/lock"
+	"github.com/atomix/go-framework/pkg/atomix/meta"
 	"google.golang.org/grpc"
 )
 
-// Type is the counter type
-const Type = primitive.Type(lockclient.PrimitiveType)
+// Type is the lock type
+const Type primitive.Type = "Lock"
 
 // Client provides an API for creating Locks
 type Client interface {
@@ -38,23 +36,34 @@ type Lock interface {
 	primitive.Primitive
 
 	// Lock acquires the lock
-	Lock(ctx context.Context, opts ...LockOption) (meta.ObjectMeta, error)
+	Lock(ctx context.Context, opts ...LockOption) (Status, error)
 
 	// Unlock releases the lock
-	Unlock(ctx context.Context, opts ...UnlockOption) (bool, error)
+	Unlock(ctx context.Context, opts ...UnlockOption) error
 
-	// IsLocked returns a bool indicating whether the lock is held
-	IsLocked(ctx context.Context, opts ...IsLockedOption) (bool, error)
+	// Get gets the lock status
+	Get(ctx context.Context, opts ...GetOption) (Status, error)
 }
+
+// Status is the lock status
+type Status struct {
+	meta.ObjectMeta
+	State State
+}
+
+type State string
+
+const StateLocked State = "locked"
+const StateUnlocked State = "unlocked"
 
 // New creates a new Lock primitive for the given partitions
 // The lock will be created in one of the given partitions.
 func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Lock, error) {
-	options := applyOptions(opts...)
 	l := &lock{
-		client: lockclient.NewClient(client.ID(options.clientID), name, conn),
+		Client: primitive.NewClient(Type, name, conn),
+		client: api.NewLockServiceClient(conn),
 	}
-	if err := l.create(ctx); err != nil {
+	if err := l.Create(ctx); err != nil {
 		return nil, err
 	}
 	return l, nil
@@ -62,73 +71,71 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option
 
 // lock is the single partition implementation of Lock
 type lock struct {
-	client lockclient.Client
+	*primitive.Client
+	client api.LockServiceClient
 }
 
-func (l *lock) Type() primitive.Type {
-	return Type
-}
-
-func (l *lock) Name() string {
-	return l.client.Name()
-}
-
-func (l *lock) Lock(ctx context.Context, opts ...LockOption) (meta.ObjectMeta, error) {
-	input := &api.LockInput{
-	}
+func (l *lock) Lock(ctx context.Context, opts ...LockOption) (Status, error) {
+	request := &api.LockRequest{}
 	for i := range opts {
-		opts[i].beforeLock(input)
+		opts[i].beforeLock(request)
 	}
-	output, err := l.client.Lock(ctx, input)
+	response, err := l.client.Lock(ctx, request)
 	if err != nil {
-		return meta.ObjectMeta{}, err
+		return Status{}, err
 	}
 	for i := range opts {
-		opts[i].afterLock(output)
+		opts[i].afterLock(response)
 	}
-	return meta.New(output.Meta), nil
+	var state State
+	switch response.Lock.State {
+	case api.Lock_LOCKED:
+		state = StateLocked
+	case api.Lock_UNLOCKED:
+		state = StateUnlocked
+	}
+	return Status{
+		ObjectMeta: meta.New(response.Lock.ObjectMeta),
+		State:      state,
+	}, nil
 }
 
-func (l *lock) Unlock(ctx context.Context, opts ...UnlockOption) (bool, error) {
-	input := &api.UnlockInput{
-	}
+func (l *lock) Unlock(ctx context.Context, opts ...UnlockOption) error {
+	request := &api.UnlockRequest{}
 	for i := range opts {
-		opts[i].beforeUnlock(input)
+		opts[i].beforeUnlock(request)
 	}
-	output, err := l.client.Unlock(ctx, input)
+	response, err := l.client.Unlock(ctx, request)
 	if err != nil {
-		return false, err
+		return err
 	}
 	for i := range opts {
-		opts[i].afterUnlock(output)
+		opts[i].afterUnlock(response)
 	}
-	return output.Unlocked, nil
+	return nil
 }
 
-func (l *lock) IsLocked(ctx context.Context, opts ...IsLockedOption) (bool, error) {
-	input := &api.IsLockedInput{
-	}
+func (l *lock) Get(ctx context.Context, opts ...GetOption) (Status, error) {
+	request := &api.GetLockRequest{}
 	for i := range opts {
-		opts[i].beforeIsLocked(input)
+		opts[i].beforeGet(request)
 	}
-	output, err := l.client.IsLocked(ctx, input)
+	response, err := l.client.GetLock(ctx, request)
 	if err != nil {
-		return false, err
+		return Status{}, err
 	}
 	for i := range opts {
-		opts[i].afterIsLocked(output)
+		opts[i].afterGet(response)
 	}
-	return output.IsLocked, nil
-}
-
-func (l *lock) create(ctx context.Context) error {
-	return l.client.Create(ctx)
-}
-
-func (l *lock) Close(ctx context.Context) error {
-	return l.client.Close(ctx)
-}
-
-func (l *lock) Delete(ctx context.Context) error {
-	return l.client.Delete(ctx)
+	var state State
+	switch response.Lock.State {
+	case api.Lock_LOCKED:
+		state = StateLocked
+	case api.Lock_UNLOCKED:
+		state = StateUnlocked
+	}
+	return Status{
+		ObjectMeta: meta.New(response.Lock.ObjectMeta),
+		State:      state,
+	}, nil
 }

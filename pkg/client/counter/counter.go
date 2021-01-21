@@ -18,16 +18,14 @@ import (
 	"context"
 	api "github.com/atomix/api/go/atomix/primitive/counter"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-framework/pkg/atomix/client"
-	counterclient "github.com/atomix/go-framework/pkg/atomix/client/counter"
-	"github.com/atomix/go-framework/pkg/atomix/util/logging"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"google.golang.org/grpc"
 )
 
 var log = logging.GetLogger("atomix", "client", "counter")
 
 // Type is the counter type
-const Type = primitive.Type(counterclient.PrimitiveType)
+const Type primitive.Type = "Counter"
 
 // Client provides an API for creating Counters
 type Client interface {
@@ -54,11 +52,11 @@ type Counter interface {
 
 // New creates a new counter for the given partitions
 func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Counter, error) {
-	options := applyOptions(opts...)
 	c := &counter{
-		client: counterclient.NewClient(client.ID(options.clientID), name, conn),
+		Client: primitive.NewClient(Type, name, conn),
+		client: api.NewCounterServiceClient(conn),
 	}
-	if err := c.create(ctx); err != nil {
+	if err := c.Create(ctx); err != nil {
 		return nil, err
 	}
 	return c, nil
@@ -66,19 +64,12 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option
 
 // counter is the single partition implementation of Counter
 type counter struct {
-	client counterclient.Client
-}
-
-func (c *counter) Type() primitive.Type {
-	return Type
-}
-
-func (c *counter) Name() string {
-	return c.client.Name()
+	*primitive.Client
+	client api.CounterServiceClient
 }
 
 func (c *counter) Get(ctx context.Context) (int64, error) {
-	request := &api.GetInput{}
+	request := &api.GetRequest{}
 	response, err := c.client.Get(ctx, request)
 	if err != nil {
 		return 0, err
@@ -87,7 +78,7 @@ func (c *counter) Get(ctx context.Context) (int64, error) {
 }
 
 func (c *counter) Set(ctx context.Context, value int64) error {
-	request := &api.SetInput{
+	request := &api.SetRequest{
 		Value: value,
 	}
 	_, err := c.client.Set(ctx, request)
@@ -95,35 +86,23 @@ func (c *counter) Set(ctx context.Context, value int64) error {
 }
 
 func (c *counter) Increment(ctx context.Context, delta int64) (int64, error) {
-	request := &api.IncrementInput{
+	request := &api.IncrementRequest{
 		Delta: delta,
 	}
 	response, err := c.client.Increment(ctx, request)
 	if err != nil {
 		return 0, err
 	}
-	return response.NextValue, nil
+	return response.Value, nil
 }
 
 func (c *counter) Decrement(ctx context.Context, delta int64) (int64, error) {
-	request := &api.DecrementInput{
+	request := &api.DecrementRequest{
 		Delta: delta,
 	}
 	response, err := c.client.Decrement(ctx, request)
 	if err != nil {
 		return 0, err
 	}
-	return response.NextValue, nil
-}
-
-func (c *counter) create(ctx context.Context) error {
-	return c.client.Create(ctx)
-}
-
-func (c *counter) Close(ctx context.Context) error {
-	return c.client.Close(ctx)
-}
-
-func (c *counter) Delete(ctx context.Context) error {
-	return c.client.Delete(ctx)
+	return response.Value, nil
 }

@@ -17,15 +17,18 @@ package leader
 import (
 	"context"
 	api "github.com/atomix/api/go/atomix/primitive/leader"
-	"github.com/atomix/go-client/pkg/client/meta"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-framework/pkg/atomix/client"
-	leaderclient "github.com/atomix/go-framework/pkg/atomix/client/leader"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
+	"github.com/atomix/go-framework/pkg/atomix/meta"
 	"google.golang.org/grpc"
+	"io"
 )
 
-// Type is the leader latch type
-const Type = primitive.Type(leaderclient.PrimitiveType)
+var log = logging.GetLogger("atomix", "client", "leader")
+
+// Type is the latch type
+const Type primitive.Type = "LeaderLatch"
 
 // Client provides an API for creating Latches
 type Client interface {
@@ -50,13 +53,13 @@ type Latch interface {
 	Watch(ctx context.Context, c chan<- Event) error
 }
 
-// newLeadership returns a new leadership from the output latch
+// newLeadership returns a new leadership from the response latch
 func newLatch(term *api.Latch) *Leadership {
 	if term == nil {
 		return nil
 	}
 	return &Leadership{
-		ObjectMeta:   meta.New(term.Meta),
+		ObjectMeta:   meta.New(term.ObjectMeta),
 		Leader:       term.Leader,
 		Participants: term.Participants,
 	}
@@ -93,11 +96,11 @@ type Event struct {
 
 // New creates a new latch primitive
 func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Latch, error) {
-	options := applyOptions(opts...)
 	l := &latch{
-		client: leaderclient.NewClient(client.ID(options.clientID), name, conn),
+		Client: primitive.NewClient(Type, name, conn),
+		client: api.NewLeaderLatchServiceClient(conn),
 	}
-	if err := l.create(ctx); err != nil {
+	if err := l.Create(ctx); err != nil {
 		return nil, err
 	}
 	return l, nil
@@ -105,70 +108,71 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option
 
 // latch is the default single-partition implementation of Latch
 type latch struct {
+	*primitive.Client
 	id     string
-	client leaderclient.Client
+	client api.LeaderLatchServiceClient
 }
 
 func (l *latch) ID() string {
-	return string(l.client.ID())
-}
-
-func (l *latch) Type() primitive.Type {
-	return Type
-}
-
-func (l *latch) Name() string {
-	return l.client.Name()
+	return l.id
 }
 
 func (l *latch) Get(ctx context.Context) (*Leadership, error) {
-	input := &api.GetInput{
+	request := &api.GetRequest{
 	}
-	output, err := l.client.Get(ctx, input)
+	response, err := l.client.Get(ctx, request)
 	if err != nil {
 		return nil, err
 	}
-	return newLatch(output.Latch), nil
+	return newLatch(&response.Latch), nil
 }
 
 func (l *latch) Latch(ctx context.Context) (*Leadership, error) {
-	input := &api.LatchInput{}
-	output, err := l.client.Latch(ctx, input)
+	request := &api.LatchRequest{}
+	response, err := l.client.Latch(ctx, request)
 	if err != nil {
 		return nil, err
 	}
-	return newLatch(output.Latch), nil
+	return newLatch(&response.Latch), nil
 }
 
 func (l *latch) Watch(ctx context.Context, ch chan<- Event) error {
-	input := &api.EventsInput{}
-	outputCh := make(chan api.EventsOutput)
-	if err := l.client.Events(ctx, input, outputCh); err != nil {
-		return err
+	request := &api.EventsRequest{}
+	stream, err := l.client.Events(l.AddHeaders(ctx), request)
+	if err != nil {
+		return errors.From(err)
 	}
+
+	openCh := make(chan struct{})
 	go func() {
 		defer close(ch)
-		for output := range outputCh {
-			switch output.Type {
-			case api.EventsOutput_CHANGE:
-				ch <- Event{
-					Type:       EventChange,
-					Leadership: *newLatch(output.Latch),
+		open := false
+		for {
+			response, err := stream.Recv()
+			if err == io.EOF {
+				return
+			} else if err != nil {
+				log.Errorf("Watch failed: %v", err)
+			} else {
+				if !open {
+					close(openCh)
+					open = true
+				}
+				switch response.Event.Type {
+				case api.Event_CHANGE:
+					ch <- Event{
+						Type:       EventChange,
+						Leadership: *newLatch(&response.Event.Latch),
+					}
 				}
 			}
 		}
 	}()
-	return nil
-}
 
-func (l *latch) create(ctx context.Context) error {
-	return l.client.Create(ctx)
-}
-
-func (l *latch) Close(ctx context.Context) error {
-	return l.client.Close(ctx)
-}
-
-func (l *latch) Delete(ctx context.Context) error {
-	return l.client.Delete(ctx)
+	select {
+	case <-openCh:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }

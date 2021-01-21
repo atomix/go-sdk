@@ -17,25 +17,25 @@ package lock
 import (
 	api "github.com/atomix/api/go/atomix/primitive/lock"
 	metaapi "github.com/atomix/api/go/atomix/primitive/meta"
-	"github.com/atomix/go-client/pkg/client/meta"
+	"github.com/atomix/go-framework/pkg/atomix/meta"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
 )
 
 func TestOptions(t *testing.T) {
-	lockRequest := &api.LockInput{}
+	lockRequest := &api.LockRequest{}
 	assert.Nil(t, lockRequest.Timeout)
 	WithTimeout(5 * time.Second).beforeLock(lockRequest)
 	assert.Equal(t, 5*time.Second, *lockRequest.Timeout)
 
-	unlockRequest := &api.UnlockInput{}
-	assert.Equal(t, metaapi.RevisionNum(0), unlockRequest.Meta.Revision.Num)
+	unlockRequest := &api.UnlockRequest{}
+	assert.Equal(t, metaapi.RevisionNum(0), unlockRequest.Lock.ObjectMeta.Revision.Num)
 	IfMatch(meta.ObjectMeta{Revision: 1}).beforeUnlock(unlockRequest)
-	assert.Equal(t, metaapi.RevisionNum(1), unlockRequest.Meta.Revision.Num)
+	assert.Equal(t, metaapi.RevisionNum(1), unlockRequest.Lock.ObjectMeta.Revision.Num)
 
-	isLockedRequest := &api.IsLockedInput{}
-	assert.Equal(t, metaapi.RevisionNum(0), isLockedRequest.Meta.Revision.Num)
-	IfMatch(meta.ObjectMeta{Revision: 2}).beforeIsLocked(isLockedRequest)
-	assert.Equal(t, metaapi.RevisionNum(2), isLockedRequest.Meta.Revision.Num)
+	getLockRequest := &api.GetLockRequest{}
+	assert.Equal(t, metaapi.RevisionNum(0), getLockRequest.Lock.ObjectMeta.Revision.Num)
+	IfMatch(meta.ObjectMeta{Revision: 2}).beforeGet(getLockRequest)
+	assert.Equal(t, metaapi.RevisionNum(2), getLockRequest.Lock.ObjectMeta.Revision.Num)
 }

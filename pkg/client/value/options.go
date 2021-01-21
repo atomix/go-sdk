@@ -16,7 +16,7 @@ package value
 
 import (
 	api "github.com/atomix/api/go/atomix/primitive/value"
-	"github.com/atomix/go-client/pkg/client/meta"
+	"github.com/atomix/go-framework/pkg/atomix/meta"
 	"github.com/google/uuid"
 )
 
@@ -61,8 +61,8 @@ func (o *clientIDOption) apply(options *options) {
 
 // SetOption is an option for Set calls
 type SetOption interface {
-	beforeSet(input *api.SetInput)
-	afterSet(output *api.SetOutput)
+	beforeSet(request *api.SetRequest)
+	afterSet(response *api.SetResponse)
 }
 
 // IfMatch updates the value if the version matches the given version
@@ -74,10 +74,10 @@ type matchOption struct {
 	object meta.Object
 }
 
-func (o matchOption) beforeSet(input *api.SetInput) {
-	input.Value.Meta = o.object.Meta().Proto()
+func (o matchOption) beforeSet(request *api.SetRequest) {
+	request.Value.ObjectMeta = o.object.Meta().Proto()
 }
 
-func (o matchOption) afterSet(output *api.SetOutput) {
+func (o matchOption) afterSet(response *api.SetResponse) {
 
 }

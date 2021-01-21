@@ -17,18 +17,18 @@ package election
 import (
 	"context"
 	api "github.com/atomix/api/go/atomix/primitive/election"
-	"github.com/atomix/go-client/pkg/client/meta"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-framework/pkg/atomix/client"
-	electionclient "github.com/atomix/go-framework/pkg/atomix/client/election"
-	"github.com/atomix/go-framework/pkg/atomix/util/logging"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
+	"github.com/atomix/go-framework/pkg/atomix/meta"
 	"google.golang.org/grpc"
+	"io"
 )
 
-// Type is the election primitive type
-const Type = primitive.Type(electionclient.PrimitiveType)
-
 var log = logging.GetLogger("atomix", "client", "election")
+
+// Type is the election type
+const Type primitive.Type = "Election"
 
 // Client provides an API for creating Elections
 type Client interface {
@@ -65,13 +65,13 @@ type Election interface {
 	Watch(ctx context.Context, ch chan<- Event) error
 }
 
-// newTerm returns a new term from the output term
+// newTerm returns a new term from the response term
 func newTerm(term *api.Term) *Term {
 	if term == nil {
 		return nil
 	}
 	return &Term{
-		ObjectMeta: meta.New(term.Meta),
+		ObjectMeta: meta.New(term.ObjectMeta),
 		Leader:     term.Leader,
 		Candidates: term.Candidates,
 	}
@@ -110,9 +110,11 @@ type Event struct {
 func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Election, error) {
 	options := applyOptions(opts...)
 	e := &election{
-		client: electionclient.NewClient(client.ID(options.clientID), name, conn),
+		Client: primitive.NewClient(Type, name, conn),
+		id:     options.clientID,
+		client: api.NewLeaderElectionServiceClient(conn),
 	}
-	if err := e.create(ctx); err != nil {
+	if err := e.Create(ctx); err != nil {
 		return nil, err
 	}
 	return e, nil
@@ -120,110 +122,112 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option
 
 // election is the single partition implementation of Election
 type election struct {
-	client electionclient.Client
-}
-
-func (e *election) Type() primitive.Type {
-	return Type
+	*primitive.Client
+	id     string
+	client api.LeaderElectionServiceClient
 }
 
 func (e *election) ID() string {
-	return string(e.client.ID())
-}
-
-func (e *election) Name() string {
-	return e.client.Name()
+	return e.id
 }
 
 func (e *election) GetTerm(ctx context.Context) (*Term, error) {
-	input := &api.GetTermInput{}
-	output, err := e.client.GetTerm(ctx, input)
+	request := &api.GetTermRequest{}
+	response, err := e.client.GetTerm(ctx, request)
 	if err != nil {
 		return nil, err
 	}
-	return newTerm(output.Term), nil
+	return newTerm(&response.Term), nil
 }
 
 func (e *election) Enter(ctx context.Context) (*Term, error) {
-	input := &api.EnterInput{}
-	output, err := e.client.Enter(ctx, input)
+	request := &api.EnterRequest{}
+	response, err := e.client.Enter(ctx, request)
 	if err != nil {
 		return nil, err
 	}
-	return newTerm(output.Term), nil
+	return newTerm(&response.Term), nil
 }
 
 func (e *election) Leave(ctx context.Context) (*Term, error) {
-	input := &api.WithdrawInput{}
-	output, err := e.client.Withdraw(ctx, input)
+	request := &api.WithdrawRequest{}
+	response, err := e.client.Withdraw(ctx, request)
 	if err != nil {
 		return nil, err
 	}
-	return newTerm(output.Term), nil
+	return newTerm(&response.Term), nil
 }
 
 func (e *election) Anoint(ctx context.Context, id string) (*Term, error) {
-	input := &api.AnointInput{
+	request := &api.AnointRequest{
 		CandidateID: id,
 	}
-	output, err := e.client.Anoint(ctx, input)
+	response, err := e.client.Anoint(ctx, request)
 	if err != nil {
 		return nil, err
 	}
-	return newTerm(output.Term), nil
+	return newTerm(&response.Term), nil
 }
 
 func (e *election) Promote(ctx context.Context, id string) (*Term, error) {
-	input := &api.PromoteInput{
+	request := &api.PromoteRequest{
 		CandidateID: id,
 	}
-	output, err := e.client.Promote(ctx, input)
+	response, err := e.client.Promote(ctx, request)
 	if err != nil {
 		return nil, err
 	}
-	return newTerm(output.Term), nil
+	return newTerm(&response.Term), nil
 }
 
 func (e *election) Evict(ctx context.Context, id string) (*Term, error) {
-	input := &api.EvictInput{
+	request := &api.EvictRequest{
 		CandidateID: id,
 	}
-	output, err := e.client.Evict(ctx, input)
+	response, err := e.client.Evict(ctx, request)
 	if err != nil {
 		return nil, err
 	}
-	return newTerm(output.Term), nil
+	return newTerm(&response.Term), nil
 }
 
 func (e *election) Watch(ctx context.Context, ch chan<- Event) error {
-	outputCh := make(chan api.EventsOutput)
-	input := &api.EventsInput{}
-	if err := e.client.Events(ctx, input, outputCh); err != nil {
-		return err
+	request := &api.EventsRequest{}
+	stream, err := e.client.Events(e.AddHeaders(ctx), request)
+	if err != nil {
+		return errors.From(err)
 	}
+
+	openCh := make(chan struct{})
 	go func() {
 		defer close(ch)
-		for output := range outputCh {
-			switch output.Type {
-			case api.EventsOutput_CHANGED:
-				ch <- Event{
-					Type: EventChange,
-					Term: *newTerm(output.Term),
+		open := false
+		for {
+			response, err := stream.Recv()
+			if err == io.EOF {
+				return
+			} else if err != nil {
+				log.Errorf("Watch failed: %v", err)
+			} else {
+				if !open {
+					close(openCh)
+					open = true
+				}
+				switch response.Event.Type {
+				case api.Event_CHANGED:
+					ch <- Event{
+						Type: EventChange,
+						Term: *newTerm(&response.Event.Term),
+					}
 				}
 			}
 		}
 	}()
-	return nil
-}
 
-func (e *election) create(ctx context.Context) error {
-	return e.client.Create(ctx)
-}
-
-func (e *election) Close(ctx context.Context) error {
-	return e.client.Close(ctx)
-}
-
-func (e *election) Delete(ctx context.Context) error {
-	return e.client.Delete(ctx)
+	select {
+	case <-openCh:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }

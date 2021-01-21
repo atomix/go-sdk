@@ -16,7 +16,8 @@ package indexedmap
 
 import (
 	api "github.com/atomix/api/go/atomix/primitive/indexedmap"
-	"github.com/atomix/go-client/pkg/client/meta"
+	metaapi "github.com/atomix/api/go/atomix/primitive/meta"
+	"github.com/atomix/go-framework/pkg/atomix/meta"
 	"github.com/google/uuid"
 )
 
@@ -61,14 +62,14 @@ func (o *clientIDOption) apply(options *options) {
 
 // SetOption is an option for the Put method
 type SetOption interface {
-	beforePut(input *api.PutInput)
-	afterPut(output *api.PutOutput)
+	beforePut(request *api.PutRequest)
+	afterPut(response *api.PutResponse)
 }
 
 // RemoveOption is an option for the Remove method
 type RemoveOption interface {
-	beforeRemove(input *api.RemoveInput)
-	afterRemove(output *api.RemoveOutput)
+	beforeRemove(request *api.RemoveRequest)
+	afterRemove(response *api.RemoveResponse)
 }
 
 // IfMatch sets the required version for optimistic concurrency control
@@ -83,19 +84,19 @@ type MatchOption struct {
 	object meta.Object
 }
 
-func (o MatchOption) beforePut(input *api.PutInput) {
-	input.Entry.Value.Meta = o.object.Meta().Proto()
+func (o MatchOption) beforePut(request *api.PutRequest) {
+	request.Entry.Value.ObjectMeta = o.object.Meta().Proto()
 }
 
-func (o MatchOption) afterPut(output *api.PutOutput) {
+func (o MatchOption) afterPut(response *api.PutResponse) {
 
 }
 
-func (o MatchOption) beforeRemove(input *api.RemoveInput) {
-	input.Entry.Value.Meta = o.object.Meta().Proto()
+func (o MatchOption) beforeRemove(request *api.RemoveRequest) {
+	request.Entry.Value.ObjectMeta = o.object.Meta().Proto()
 }
 
-func (o MatchOption) afterRemove(output *api.RemoveOutput) {
+func (o MatchOption) afterRemove(response *api.RemoveResponse) {
 
 }
 
@@ -108,24 +109,30 @@ func IfNotSet() SetOption {
 type NotSetOption struct {
 }
 
-func (o NotSetOption) beforePut(input *api.PutInput) {
-	input.IfEmpty = true
+func (o NotSetOption) beforePut(request *api.PutRequest) {
+	request.Preconditions = append(request.Preconditions, api.Precondition{
+		Precondition: &api.Precondition_Metadata{
+			Metadata: &metaapi.ObjectMeta{
+				Type: metaapi.ObjectMeta_TOMBSTONE,
+			},
+		},
+	})
 }
 
-func (o NotSetOption) afterPut(output *api.PutOutput) {
+func (o NotSetOption) afterPut(response *api.PutResponse) {
 
 }
 
 // GetOption is an option for the Get method
 type GetOption interface {
-	beforeGet(input *api.GetInput)
-	afterGet(output *api.GetOutput)
+	beforeGet(request *api.GetRequest)
+	afterGet(response *api.GetResponse)
 }
 
 // WatchOption is an option for the Watch method
 type WatchOption interface {
-	beforeWatch(input *api.EventsInput)
-	afterWatch(output *api.EventsOutput)
+	beforeWatch(request *api.EventsRequest)
+	afterWatch(response *api.EventsResponse)
 }
 
 // WithReplay returns a watch option that enables replay of watch events
@@ -135,11 +142,11 @@ func WithReplay() WatchOption {
 
 type replayOption struct{}
 
-func (o replayOption) beforeWatch(input *api.EventsInput) {
-	input.Replay = true
+func (o replayOption) beforeWatch(request *api.EventsRequest) {
+	request.Replay = true
 }
 
-func (o replayOption) afterWatch(output *api.EventsOutput) {
+func (o replayOption) afterWatch(response *api.EventsResponse) {
 
 }
 
@@ -147,16 +154,16 @@ type filterOption struct {
 	filter Filter
 }
 
-func (o filterOption) beforeWatch(input *api.EventsInput) {
+func (o filterOption) beforeWatch(request *api.EventsRequest) {
 	if o.filter.Key != "" {
-		input.Pos.Key = o.filter.Key
+		request.Pos.Key = o.filter.Key
 	}
 	if o.filter.Index > 0 {
-		input.Pos.Index = uint64(o.filter.Index)
+		request.Pos.Index = uint64(o.filter.Index)
 	}
 }
 
-func (o filterOption) afterWatch(output *api.EventsOutput) {
+func (o filterOption) afterWatch(response *api.EventsResponse) {
 }
 
 // WithFilter returns a watch option that filters the watch events

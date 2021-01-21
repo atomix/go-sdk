@@ -19,13 +19,16 @@ import (
 	"encoding/base64"
 	api "github.com/atomix/api/go/atomix/primitive/list"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-framework/pkg/atomix/client"
-	listclient "github.com/atomix/go-framework/pkg/atomix/client/list"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"google.golang.org/grpc"
+	"io"
 )
 
-// Type is the counter type
-const Type = primitive.Type(listclient.PrimitiveType)
+var log = logging.GetLogger("atomix", "client", "list")
+
+// Type is the list type
+const Type primitive.Type = "List"
 
 // Client provides an API for creating Lists
 type Client interface {
@@ -99,11 +102,11 @@ type Event struct {
 
 // New creates a new list primitive
 func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (List, error) {
-	options := applyOptions(opts...)
 	l := &list{
-		client: listclient.NewClient(client.ID(options.clientID), name, conn),
+		Client: primitive.NewClient(Type, name, conn),
+		client: api.NewListServiceClient(conn),
 	}
-	if err := l.create(ctx); err != nil {
+	if err := l.Create(ctx); err != nil {
 		return nil, err
 	}
 	return l, nil
@@ -111,135 +114,181 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option
 
 // list is the single partition implementation of List
 type list struct {
-	client listclient.Client
-}
-
-func (l *list) Type() primitive.Type {
-	return Type
-}
-
-func (l *list) Name() string {
-	return l.client.Name()
+	*primitive.Client
+	client api.ListServiceClient
 }
 
 func (l *list) Append(ctx context.Context, value []byte) error {
-	input := &api.AppendInput{
-		Value: base64.StdEncoding.EncodeToString(value),
+	request := &api.AppendRequest{
+		Value: api.Value{
+			Value: base64.StdEncoding.EncodeToString(value),
+		},
 	}
-	_, err := l.client.Append(ctx, input)
+	_, err := l.client.Append(ctx, request)
 	return err
 }
 
 func (l *list) Insert(ctx context.Context, index int, value []byte) error {
-	input := &api.InsertInput{
-		Index: uint32(index),
-		Value: base64.StdEncoding.EncodeToString(value),
+	request := &api.InsertRequest{
+		Item: api.Item{
+			Index: uint32(index),
+			Value: api.Value{
+				Value: base64.StdEncoding.EncodeToString(value),
+			},
+		},
 	}
-	_, err := l.client.Insert(ctx, input)
+	_, err := l.client.Insert(ctx, request)
 	return err
 }
 
 func (l *list) Set(ctx context.Context, index int, value []byte) error {
-	input := &api.SetInput{
-		Index: uint32(index),
-		Value: base64.StdEncoding.EncodeToString(value),
+	request := &api.SetRequest{
+		Item: api.Item{
+			Index: uint32(index),
+			Value: api.Value{
+				Value: base64.StdEncoding.EncodeToString(value),
+			},
+		},
 	}
-	_, err := l.client.Set(ctx, input)
+	_, err := l.client.Set(ctx, request)
 	return err
 }
 
 func (l *list) Get(ctx context.Context, index int) ([]byte, error) {
-	input := &api.GetInput{
+	request := &api.GetRequest{
 		Index: uint32(index),
 	}
-	output, err := l.client.Get(ctx, input)
+	response, err := l.client.Get(ctx, request)
 	if err != nil {
 		return nil, err
 	}
-	return base64.StdEncoding.DecodeString(output.Value)
+	return base64.StdEncoding.DecodeString(response.Item.Value.Value)
 }
 
 func (l *list) Remove(ctx context.Context, index int) ([]byte, error) {
-	input := &api.RemoveInput{
+	request := &api.RemoveRequest{
 		Index: uint32(index),
 	}
-	output, err := l.client.Remove(ctx, input)
+	response, err := l.client.Remove(ctx, request)
 	if err != nil {
 		return nil, err
 	}
-	return base64.StdEncoding.DecodeString(output.Value)
+	return base64.StdEncoding.DecodeString(response.Item.Value.Value)
 }
 
 func (l *list) Len(ctx context.Context) (int, error) {
-	output, err := l.client.Size(ctx)
+	request := &api.SizeRequest{}
+	response, err := l.client.Size(l.AddHeaders(ctx), request)
 	if err != nil {
-		return 0, err
+		return 0, errors.From(err)
 	}
-	return int(output.Size_), nil
+	return int(response.Size_), nil
 }
 
 func (l *list) Items(ctx context.Context, ch chan<- []byte) error {
-	input := &api.ElementsInput{}
-	outputCh := make(chan api.ElementsOutput)
-	if err := l.client.Elements(ctx, input, outputCh); err != nil {
-		return err
+	request := &api.ElementsRequest{}
+	stream, err := l.client.Elements(l.AddHeaders(ctx), request)
+	if err != nil {
+		return errors.From(err)
 	}
-	go func() {
-		defer close(ch)
-		for output := range outputCh {
-			if bytes, err := base64.StdEncoding.DecodeString(output.Value); err == nil {
-				ch <- bytes
-			}
-		}
-	}()
-	return nil
-}
 
-func (l *list) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) error {
-	input := &api.EventsInput{}
-	for _, opt := range opts {
-		opt.beforeWatch(input)
-	}
-	outputCh := make(chan api.EventsOutput)
-	if err := l.client.Events(ctx, input, outputCh); err != nil {
-		return err
-	}
+	openCh := make(chan struct{})
 	go func() {
 		defer close(ch)
-		for output := range outputCh {
-			var t EventType
-			switch output.Type {
-			case api.EventsOutput_ADD:
-				t = EventAdd
-			case api.EventsOutput_REMOVE:
-				t = EventRemove
-			case api.EventsOutput_REPLAY:
-				t = EventReplay
-			}
-			if bytes, err := base64.StdEncoding.DecodeString(output.Value); err == nil {
-				ch <- Event{
-					Type:  t,
-					Index: int(output.Index),
-					Value: bytes,
+		open := false
+		for {
+			response, err := stream.Recv()
+			if err == io.EOF {
+				return
+			} else if err != nil {
+				log.Errorf("Entries failed: %v", err)
+			} else {
+				if !open {
+					close(openCh)
+					open = true
+				}
+				bytes, err := base64.StdEncoding.DecodeString(response.Item.Value.Value)
+				if err != nil {
+					log.Errorf("Failed to decode list item: %v", err)
+				} else {
+					ch <- bytes
 				}
 			}
 		}
 	}()
-	return nil
+
+	select {
+	case <-openCh:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (l *list) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) error {
+	request := &api.EventsRequest{}
+	stream, err := l.client.Events(l.AddHeaders(ctx), request)
+	if err != nil {
+		return errors.From(err)
+	}
+
+	openCh := make(chan struct{})
+	go func() {
+		defer close(ch)
+		open := false
+		for {
+			response, err := stream.Recv()
+			if err == io.EOF {
+				return
+			} else if err != nil {
+				log.Errorf("Watch failed: %v", err)
+			} else {
+				bytes, err := base64.StdEncoding.DecodeString(response.Event.Item.Value.Value)
+				if err != nil {
+					log.Errorf("Failed to decode list item: %v", err)
+				} else {
+					if !open {
+						close(openCh)
+						open = true
+					}
+					switch response.Event.Type {
+					case api.Event_ADD:
+						ch <- Event{
+							Type:  EventAdd,
+							Index: int(response.Event.Item.Index),
+							Value: bytes,
+						}
+					case api.Event_REMOVE:
+						ch <- Event{
+							Type:  EventRemove,
+							Index: int(response.Event.Item.Index),
+							Value: bytes,
+						}
+					case api.Event_REPLAY:
+						ch <- Event{
+							Type:  EventReplay,
+							Index: int(response.Event.Item.Index),
+							Value: bytes,
+						}
+					}
+				}
+			}
+		}
+	}()
+
+	select {
+	case <-openCh:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (l *list) Clear(ctx context.Context) error {
-	return l.client.Clear(ctx)
-}
-
-func (l *list) create(ctx context.Context) error {
-	return l.client.Create(ctx)
-}
-
-func (l *list) Close(ctx context.Context) error {
-	return l.client.Close(ctx)
-}
-
-func (l *list) Delete(ctx context.Context) error {
-	return l.client.Delete(ctx)
+	request := &api.ClearRequest{}
+	_, err := l.client.Clear(l.AddHeaders(ctx), request)
+	if err != nil {
+		return errors.From(err)
+	}
+	return nil
 }

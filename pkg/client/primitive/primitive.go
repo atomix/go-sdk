@@ -16,6 +16,10 @@ package primitive
 
 import (
 	"context"
+	primitiveapi "github.com/atomix/api/go/atomix/primitive"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 // Type is the type of a primitive
@@ -34,4 +38,62 @@ type Primitive interface {
 
 	// Delete deletes the primitive state from the cluster
 	Delete(ctx context.Context) error
+}
+
+func NewClient(t Type, n string, conn *grpc.ClientConn) *Client {
+	return &Client{
+		primitiveType: t,
+		name:          n,
+		client:        primitiveapi.NewPrimitiveServiceClient(conn),
+	}
+}
+
+const (
+	primitiveTypeHeader = "Primitive-Type"
+	primitiveNameHeader = "Primitive-Name"
+)
+
+type Client struct {
+	primitiveType Type
+	name          string
+	client        primitiveapi.PrimitiveServiceClient
+}
+
+func (c *Client) Type() Type {
+	return c.primitiveType
+}
+
+func (c *Client) Name() string {
+	return c.name
+}
+
+func (c *Client) AddHeaders(ctx context.Context) context.Context {
+	return metadata.AppendToOutgoingContext(ctx, primitiveTypeHeader, string(c.primitiveType), primitiveNameHeader, c.name)
+}
+
+func (c *Client) Create(ctx context.Context) error {
+	request := &primitiveapi.CreateRequest{
+		Type: string(c.Type()),
+		Name: c.name,
+	}
+	_, err := c.client.Create(ctx, request)
+	return errors.From(err)
+}
+
+func (c *Client) Close(ctx context.Context) error {
+	request := &primitiveapi.CloseRequest{
+		Type: string(c.Type()),
+		Name: c.name,
+	}
+	_, err := c.client.Close(ctx, request)
+	return errors.From(err)
+}
+
+func (c *Client) Delete(ctx context.Context) error {
+	request := &primitiveapi.DeleteRequest{
+		Type: string(c.Type()),
+		Name: c.name,
+	}
+	_, err := c.client.Delete(ctx, request)
+	return errors.From(err)
 }

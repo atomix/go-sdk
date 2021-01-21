@@ -18,16 +18,16 @@ import (
 	"context"
 	"fmt"
 	api "github.com/atomix/api/go/atomix/primitive/map"
-	"github.com/atomix/go-client/pkg/client/meta"
 	"github.com/atomix/go-client/pkg/client/primitive"
-	"github.com/atomix/go-framework/pkg/atomix/client"
-	mapclient "github.com/atomix/go-framework/pkg/atomix/client/map"
-	"github.com/atomix/go-framework/pkg/atomix/util/logging"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
+	"github.com/atomix/go-framework/pkg/atomix/meta"
 	"google.golang.org/grpc"
+	"io"
 )
 
-// Type is the counter type
-const Type = primitive.Type(mapclient.PrimitiveType)
+// Type is the map type
+const Type primitive.Type = "Map"
 
 var log = logging.GetLogger("atomix", "client", "map")
 
@@ -75,9 +75,9 @@ func newEntry(entry *api.Entry) *Entry {
 		return nil
 	}
 	return &Entry{
-		ObjectMeta: meta.New(entry.Meta),
-		Key:        entry.Key,
-		Value:      entry.Value,
+		ObjectMeta: meta.New(entry.Key.ObjectMeta),
+		Key:        entry.Key.Key,
+		Value:      entry.Value.Value,
 	}
 }
 
@@ -124,147 +124,190 @@ type Event struct {
 
 // New creates a new partitioned Map
 func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Map, error) {
-	options := applyOptions(opts...)
 	m := &_map{
-		client: mapclient.NewClient(client.ID(options.clientID), name, conn),
+		Client: primitive.NewClient(Type, name, conn),
+		client: api.NewMapServiceClient(conn),
 	}
-	if err := m.create(ctx); err != nil {
+	if err := m.Create(ctx); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
 type _map struct {
-	client mapclient.Client
-}
-
-func (m *_map) Type() primitive.Type {
-	return Type
-}
-
-func (m *_map) Name() string {
-	return m.client.Name()
+	*primitive.Client
+	client api.MapServiceClient
 }
 
 func (m *_map) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*Entry, error) {
-	input := &api.PutInput{
-		Key:   key,
-		Value: value,
+	request := &api.PutRequest{
+		Entry: api.Entry{
+			Key: api.Key{
+				Key: key,
+			},
+			Value: &api.Value{
+				Value: value,
+			},
+		},
 	}
 	for i := range opts {
-		opts[i].beforePut(input)
+		opts[i].beforePut(request)
 	}
-	output, err := m.client.Put(ctx, input)
+	response, err := m.client.Put(ctx, request)
 	if err != nil {
 		return nil, err
 	}
 	for i := range opts {
-		opts[i].afterPut(output)
+		opts[i].afterPut(response)
 	}
-	return newEntry(output.Entry), nil
+	return newEntry(&response.Entry), nil
 }
 
 func (m *_map) Get(ctx context.Context, key string, opts ...GetOption) (*Entry, error) {
-	input := &api.GetInput{
+	request := &api.GetRequest{
 		Key: key,
 	}
 	for i := range opts {
-		opts[i].beforeGet(input)
+		opts[i].beforeGet(request)
 	}
-	output, err := m.client.Get(ctx, input)
+	response, err := m.client.Get(ctx, request)
 	if err != nil {
 		return nil, err
 	}
 	for i := range opts {
-		opts[i].afterGet(output)
+		opts[i].afterGet(response)
 	}
-	return newEntry(output.Entry), nil
+	return newEntry(&response.Entry), nil
 }
 
 func (m *_map) Remove(ctx context.Context, key string, opts ...RemoveOption) (*Entry, error) {
-	input := &api.RemoveInput{
-		Key: key,
+	request := &api.RemoveRequest{
+		Key: api.Key{
+			Key: key,
+		},
 	}
 	for i := range opts {
-		opts[i].beforeRemove(input)
+		opts[i].beforeRemove(request)
 	}
-	output, err := m.client.Remove(ctx, input)
+	response, err := m.client.Remove(ctx, request)
 	if err != nil {
 		return nil, err
 	}
 	for i := range opts {
-		opts[i].afterRemove(output)
+		opts[i].afterRemove(response)
 	}
-	return newEntry(output.Entry), nil
+	return newEntry(&response.Entry), nil
 }
 
 func (m *_map) Len(ctx context.Context) (int, error) {
-	output, err := m.client.Size(ctx)
+	request := &api.SizeRequest{}
+	response, err := m.client.Size(m.AddHeaders(ctx), request)
 	if err != nil {
-		return 0, err
+		return 0, errors.From(err)
 	}
-	return int(output.Size_), nil
+	return int(response.Size_), nil
 }
 
 func (m *_map) Clear(ctx context.Context) error {
-	return m.client.Clear(ctx)
+	request := &api.ClearRequest{}
+	_, err := m.client.Clear(m.AddHeaders(ctx), request)
+	if err != nil {
+		return errors.From(err)
+	}
+	return nil
 }
 
 func (m *_map) Entries(ctx context.Context, ch chan<- Entry) error {
-	input := &api.EntriesInput{}
-	outputCh := make(chan api.EntriesOutput)
-	if err := m.client.Entries(ctx, input, outputCh); err != nil {
-		return err
+	request := &api.EntriesRequest{}
+	stream, err := m.client.Entries(m.AddHeaders(ctx), request)
+	if err != nil {
+		return errors.From(err)
 	}
+
+	openCh := make(chan struct{})
 	go func() {
 		defer close(ch)
-		for output := range outputCh {
-			ch <- *newEntry(&output.Entry)
+		open := false
+		for {
+			response, err := stream.Recv()
+			if err == io.EOF {
+				return
+			} else if err != nil {
+				log.Errorf("Entries failed: %v", err)
+			} else {
+				if !open {
+					close(openCh)
+					open = true
+				}
+				ch <- Entry{
+					ObjectMeta: meta.New(response.Entry.Key.ObjectMeta),
+					Key:        response.Entry.Key.Key,
+					Value:      response.Entry.Value.Value,
+				}
+			}
 		}
 	}()
-	return nil
+
+	select {
+	case <-openCh:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (m *_map) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) error {
-	input := &api.EventsInput{}
-	for _, opt := range opts {
-		opt.beforeWatch(input)
+	request := &api.EventsRequest{}
+	stream, err := m.client.Events(m.AddHeaders(ctx), request)
+	if err != nil {
+		return errors.From(err)
 	}
-	outputCh := make(chan api.EventsOutput)
-	if err := m.client.Events(ctx, input, outputCh); err != nil {
-		return err
-	}
+
+	openCh := make(chan struct{})
 	go func() {
 		defer close(ch)
-		for output := range outputCh {
-			var eventType EventType
-			switch output.Type {
-			case api.EventsOutput_INSERT:
-				eventType = EventInsert
-			case api.EventsOutput_UPDATE:
-				eventType = EventUpdate
-			case api.EventsOutput_REMOVE:
-				eventType = EventRemove
-			case api.EventsOutput_REPLAY:
-				eventType = EventReplay
-			}
-			ch <- Event{
-				Type:  eventType,
-				Entry: *newEntry(&output.Entry),
+		open := false
+		for {
+			response, err := stream.Recv()
+			if err == io.EOF {
+				return
+			} else if err != nil {
+				log.Errorf("Watch failed: %v", err)
+			} else {
+				if !open {
+					close(openCh)
+					open = true
+				}
+				switch response.Event.Type {
+				case api.Event_INSERT:
+					ch <- Event{
+						Type:  EventInsert,
+						Entry: *newEntry(&response.Event.Entry),
+					}
+				case api.Event_UPDATE:
+					ch <- Event{
+						Type:  EventUpdate,
+						Entry: *newEntry(&response.Event.Entry),
+					}
+				case api.Event_REMOVE:
+					ch <- Event{
+						Type:  EventRemove,
+						Entry: *newEntry(&response.Event.Entry),
+					}
+				case api.Event_REPLAY:
+					ch <- Event{
+						Type:  EventReplay,
+						Entry: *newEntry(&response.Event.Entry),
+					}
+				}
 			}
 		}
 	}()
-	return nil
-}
 
-func (m *_map) create(ctx context.Context) error {
-	return m.client.Create(ctx)
-}
-
-func (m *_map) Close(ctx context.Context) error {
-	return m.client.Close(ctx)
-}
-
-func (m *_map) Delete(ctx context.Context) error {
-	return m.client.Delete(ctx)
+	select {
+	case <-openCh:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }

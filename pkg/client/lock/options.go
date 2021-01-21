@@ -16,7 +16,7 @@ package lock
 
 import (
 	api "github.com/atomix/api/go/atomix/primitive/lock"
-	"github.com/atomix/go-client/pkg/client/meta"
+	"github.com/atomix/go-framework/pkg/atomix/meta"
 	"github.com/google/uuid"
 	"time"
 )
@@ -63,8 +63,8 @@ func (o *clientIDOption) apply(options *options) {
 // LockOption is an option for Lock calls
 //nolint:golint
 type LockOption interface {
-	beforeLock(input *api.LockInput)
-	afterLock(output *api.LockOutput)
+	beforeLock(request *api.LockRequest)
+	afterLock(response *api.LockResponse)
 }
 
 // WithTimeout sets the lock timeout
@@ -76,24 +76,24 @@ type timeoutOption struct {
 	timeout time.Duration
 }
 
-func (o timeoutOption) beforeLock(input *api.LockInput) {
-	input.Timeout = &o.timeout
+func (o timeoutOption) beforeLock(request *api.LockRequest) {
+	request.Timeout = &o.timeout
 }
 
-func (o timeoutOption) afterLock(output *api.LockOutput) {
+func (o timeoutOption) afterLock(response *api.LockResponse) {
 
 }
 
 // UnlockOption is an option for Unlock calls
 type UnlockOption interface {
-	beforeUnlock(input *api.UnlockInput)
-	afterUnlock(output *api.UnlockOutput)
+	beforeUnlock(request *api.UnlockRequest)
+	afterUnlock(response *api.UnlockResponse)
 }
 
-// IsLockedOption is an option for IsLocked calls
-type IsLockedOption interface {
-	beforeIsLocked(input *api.IsLockedInput)
-	afterIsLocked(output *api.IsLockedOutput)
+// GetOption is an option for IsLocked calls
+type GetOption interface {
+	beforeGet(request *api.GetLockRequest)
+	afterGet(response *api.GetLockResponse)
 }
 
 // IfMatch sets the lock version to check
@@ -106,18 +106,18 @@ type MatchOption struct {
 	object meta.Object
 }
 
-func (o MatchOption) beforeUnlock(input *api.UnlockInput) {
-	input.Meta = o.object.Meta().Proto()
+func (o MatchOption) beforeUnlock(request *api.UnlockRequest) {
+	request.Lock.ObjectMeta = o.object.Meta().Proto()
 }
 
-func (o MatchOption) afterUnlock(output *api.UnlockOutput) {
+func (o MatchOption) afterUnlock(response *api.UnlockResponse) {
 
 }
 
-func (o MatchOption) beforeIsLocked(input *api.IsLockedInput) {
-	input.Meta = o.object.Meta().Proto()
+func (o MatchOption) beforeGet(request *api.GetLockRequest) {
+	request.Lock.ObjectMeta = o.object.Meta().Proto()
 }
 
-func (o MatchOption) afterIsLocked(output *api.IsLockedOutput) {
+func (o MatchOption) afterGet(response *api.GetLockResponse) {
 
 }
