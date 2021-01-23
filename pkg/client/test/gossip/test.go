@@ -12,36 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package test
+package gossip
 
 import (
 	"fmt"
 	protocolapi "github.com/atomix/api/go/atomix/protocol"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
-	rsmprotocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
-	rsmproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
-	"github.com/atomix/go-local/pkg/atomix/local"
+	gossipprotocol "github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
+	gossipproxy "github.com/atomix/go-framework/pkg/atomix/proxy/gossip"
 	"google.golang.org/grpc"
 )
 
-// New creates a new test
-func New() *Test {
+// NewTest creates a new test
+func NewTest() *Test {
 	return &Test{
 		partitions:      1,
-		sessions:        1,
-		registerProxy:   func(node *rsmproxy.Node) {},
-		registerStorage: func(node *rsmprotocol.Node) {},
+		clients:         1,
+		registerProxy:   func(node *gossipproxy.Node) {},
+		registerStorage: func(node *gossipprotocol.Node) {},
 	}
 }
 
 // Test is a test context
 type Test struct {
 	partitions      int
-	sessions        int
-	registerProxy   func(node *rsmproxy.Node)
-	proxies         []*rsmproxy.Node
-	registerStorage func(node *rsmprotocol.Node)
-	storage         *rsmprotocol.Node
+	clients         int
+	registerProxy   func(node *gossipproxy.Node)
+	proxies         []*gossipproxy.Node
+	registerServer  func(node *gossipprotocol.Node)
+	registerStorage func(node *gossipprotocol.Node)
+	storage         *gossipprotocol.Node
 	conns           []*grpc.ClientConn
 }
 
@@ -50,17 +50,22 @@ func (t *Test) SetPartitions(partitions int) *Test {
 	return t
 }
 
-func (t *Test) SetSessions(sessions int) *Test {
-	t.sessions = sessions
+func (t *Test) SetClients(clients int) *Test {
+	t.clients = clients
 	return t
 }
 
-func (t *Test) SetProxy(f func(node *rsmproxy.Node)) *Test {
+func (t *Test) SetProxy(f func(node *gossipproxy.Node)) *Test {
 	t.registerProxy = f
 	return t
 }
 
-func (t *Test) SetStorage(f func(node *rsmprotocol.Node)) *Test {
+func (t *Test) SetServer(f func(node *gossipprotocol.Node)) *Test {
+	t.registerServer = f
+	return t
+}
+
+func (t *Test) SetStorage(f func(node *gossipprotocol.Node)) *Test {
 	t.registerStorage = f
 	return t
 }
@@ -86,17 +91,18 @@ func (t *Test) Start() ([]*grpc.ClientConn, error) {
 		})
 	}
 
-	t.storage = rsmprotocol.NewNode(cluster.NewCluster(config, cluster.WithMemberID("replica-1")), local.NewProtocol())
+	t.storage = gossipprotocol.NewNode(cluster.NewCluster(config, cluster.WithMemberID("replica-1")))
+	t.registerServer(t.storage)
 	t.registerStorage(t.storage)
 	if err := t.storage.Start(); err != nil {
 		return nil, err
 	}
 
-	t.proxies = make([]*rsmproxy.Node, 0, t.sessions)
-	t.conns = make([]*grpc.ClientConn, 0, t.sessions)
-	for i := 1; i <= t.sessions; i++ {
+	t.proxies = make([]*gossipproxy.Node, 0, t.clients)
+	t.conns = make([]*grpc.ClientConn, 0, t.clients)
+	for i := 1; i <= t.clients; i++ {
 		port := 5700 + i
-		proxy := rsmproxy.NewNode(cluster.NewCluster(config, cluster.WithMemberID("proxy-1"), cluster.WithHost("localhost"), cluster.WithPort(port)))
+		proxy := gossipproxy.NewNode(cluster.NewCluster(config, cluster.WithMemberID("proxy-1"), cluster.WithHost("localhost"), cluster.WithPort(port)))
 		t.registerProxy(proxy)
 		if err := proxy.Start(); err != nil {
 			return nil, err

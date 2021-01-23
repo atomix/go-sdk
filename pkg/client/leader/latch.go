@@ -122,7 +122,7 @@ func (l *latch) Get(ctx context.Context) (*Leadership, error) {
 	}
 	response, err := l.client.Get(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return newLatch(&response.Latch), nil
 }
@@ -131,7 +131,7 @@ func (l *latch) Latch(ctx context.Context) (*Leadership, error) {
 	request := &api.LatchRequest{}
 	response, err := l.client.Latch(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return newLatch(&response.Latch), nil
 }

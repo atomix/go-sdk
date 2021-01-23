@@ -16,7 +16,7 @@ package election
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/client/test"
+	"github.com/atomix/go-client/pkg/client/test/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	electionrsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/election"
 	electionproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/election"
@@ -25,7 +25,7 @@ import (
 )
 
 func TestElectionOperations(t *testing.T) {
-	test := test.New().
+	test := rsm.NewTest().
 		SetPartitions(1).
 		SetSessions(3).
 		SetStorage(electionrsm.RegisterService).

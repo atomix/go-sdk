@@ -16,9 +16,9 @@ package _map //nolint:golint
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/client/meta"
-	"github.com/atomix/go-client/pkg/client/test"
+	"github.com/atomix/go-client/pkg/client/test/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
+	"github.com/atomix/go-framework/pkg/atomix/meta"
 	maprsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/map"
 	mapproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/map"
 	"github.com/stretchr/testify/assert"
@@ -26,7 +26,7 @@ import (
 )
 
 func TestMapOperations(t *testing.T) {
-	test := test.New().
+	test := rsm.NewTest().
 		SetPartitions(1).
 		SetSessions(3).
 		SetStorage(maprsm.RegisterService).
@@ -124,7 +124,7 @@ func TestMapOperations(t *testing.T) {
 }
 
 func TestMapStreams(t *testing.T) {
-	test := test.New().
+	test := rsm.NewTest().
 		SetPartitions(1).
 		SetSessions(3).
 		SetStorage(maprsm.RegisterService).

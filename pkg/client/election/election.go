@@ -135,7 +135,7 @@ func (e *election) GetTerm(ctx context.Context) (*Term, error) {
 	request := &api.GetTermRequest{}
 	response, err := e.client.GetTerm(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return newTerm(&response.Term), nil
 }
@@ -144,7 +144,7 @@ func (e *election) Enter(ctx context.Context) (*Term, error) {
 	request := &api.EnterRequest{}
 	response, err := e.client.Enter(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return newTerm(&response.Term), nil
 }
@@ -153,7 +153,7 @@ func (e *election) Leave(ctx context.Context) (*Term, error) {
 	request := &api.WithdrawRequest{}
 	response, err := e.client.Withdraw(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return newTerm(&response.Term), nil
 }
@@ -164,7 +164,7 @@ func (e *election) Anoint(ctx context.Context, id string) (*Term, error) {
 	}
 	response, err := e.client.Anoint(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return newTerm(&response.Term), nil
 }
@@ -175,7 +175,7 @@ func (e *election) Promote(ctx context.Context, id string) (*Term, error) {
 	}
 	response, err := e.client.Promote(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return newTerm(&response.Term), nil
 }
@@ -186,7 +186,7 @@ func (e *election) Evict(ctx context.Context, id string) (*Term, error) {
 	}
 	response, err := e.client.Evict(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return newTerm(&response.Term), nil
 }

@@ -125,7 +125,10 @@ func (l *list) Append(ctx context.Context, value []byte) error {
 		},
 	}
 	_, err := l.client.Append(ctx, request)
-	return err
+	if err != nil {
+		return errors.From(err)
+	}
+	return nil
 }
 
 func (l *list) Insert(ctx context.Context, index int, value []byte) error {
@@ -138,7 +141,10 @@ func (l *list) Insert(ctx context.Context, index int, value []byte) error {
 		},
 	}
 	_, err := l.client.Insert(ctx, request)
-	return err
+	if err != nil {
+		return errors.From(err)
+	}
+	return nil
 }
 
 func (l *list) Set(ctx context.Context, index int, value []byte) error {
@@ -151,7 +157,10 @@ func (l *list) Set(ctx context.Context, index int, value []byte) error {
 		},
 	}
 	_, err := l.client.Set(ctx, request)
-	return err
+	if err != nil {
+		return errors.From(err)
+	}
+	return nil
 }
 
 func (l *list) Get(ctx context.Context, index int) ([]byte, error) {
@@ -160,7 +169,7 @@ func (l *list) Get(ctx context.Context, index int) ([]byte, error) {
 	}
 	response, err := l.client.Get(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return base64.StdEncoding.DecodeString(response.Item.Value.Value)
 }
@@ -171,7 +180,7 @@ func (l *list) Remove(ctx context.Context, index int) ([]byte, error) {
 	}
 	response, err := l.client.Remove(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return base64.StdEncoding.DecodeString(response.Item.Value.Value)
 }

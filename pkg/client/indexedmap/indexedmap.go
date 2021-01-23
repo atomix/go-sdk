@@ -211,7 +211,7 @@ func (m *indexedMap) Append(ctx context.Context, key string, value []byte) (*Ent
 	}
 	response, err := m.client.Put(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return newEntry(response.Entry), nil
 }
@@ -229,7 +229,7 @@ func (m *indexedMap) Put(ctx context.Context, key string, value []byte) (*Entry,
 	}
 	response, err := m.client.Put(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return newEntry(response.Entry), nil
 }
@@ -251,7 +251,7 @@ func (m *indexedMap) Set(ctx context.Context, index Index, key string, value []b
 	}
 	response, err := m.client.Put(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	for i := range opts {
 		opts[i].afterPut(response)
@@ -268,7 +268,7 @@ func (m *indexedMap) Get(ctx context.Context, key string, opts ...GetOption) (*E
 	}
 	response, err := m.client.Get(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	for i := range opts {
 		opts[i].afterGet(response)
@@ -285,7 +285,7 @@ func (m *indexedMap) GetIndex(ctx context.Context, index Index, opts ...GetOptio
 	}
 	response, err := m.client.Get(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	for i := range opts {
 		opts[i].afterGet(response)
@@ -297,7 +297,7 @@ func (m *indexedMap) FirstIndex(ctx context.Context) (Index, error) {
 	request := &api.FirstEntryRequest{}
 	response, err := m.client.FirstEntry(ctx, request)
 	if err != nil {
-		return 0, err
+		return 0, errors.From(err)
 	}
 	return Index(response.Entry.Index), nil
 }
@@ -306,7 +306,7 @@ func (m *indexedMap) LastIndex(ctx context.Context) (Index, error) {
 	request := &api.LastEntryRequest{}
 	response, err := m.client.LastEntry(ctx, request)
 	if err != nil {
-		return 0, err
+		return 0, errors.From(err)
 	}
 	return Index(response.Entry.Index), nil
 }
@@ -317,7 +317,7 @@ func (m *indexedMap) PrevIndex(ctx context.Context, index Index) (Index, error) 
 	}
 	response, err := m.client.PrevEntry(ctx, request)
 	if err != nil {
-		return 0, err
+		return 0, errors.From(err)
 	}
 	return Index(response.Entry.Index), nil
 }
@@ -328,7 +328,7 @@ func (m *indexedMap) NextIndex(ctx context.Context, index Index) (Index, error) 
 	}
 	response, err := m.client.NextEntry(ctx, request)
 	if err != nil {
-		return 0, err
+		return 0, errors.From(err)
 	}
 	return Index(response.Entry.Index), nil
 }
@@ -337,7 +337,7 @@ func (m *indexedMap) FirstEntry(ctx context.Context) (*Entry, error) {
 	request := &api.FirstEntryRequest{}
 	response, err := m.client.FirstEntry(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return newEntry(response.Entry), nil
 }
@@ -346,7 +346,7 @@ func (m *indexedMap) LastEntry(ctx context.Context) (*Entry, error) {
 	request := &api.LastEntryRequest{}
 	response, err := m.client.LastEntry(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return newEntry(response.Entry), nil
 }
@@ -357,7 +357,7 @@ func (m *indexedMap) PrevEntry(ctx context.Context, index Index) (*Entry, error)
 	}
 	response, err := m.client.PrevEntry(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return newEntry(response.Entry), nil
 }
@@ -368,7 +368,7 @@ func (m *indexedMap) NextEntry(ctx context.Context, index Index) (*Entry, error)
 	}
 	response, err := m.client.NextEntry(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	return newEntry(response.Entry), nil
 }
@@ -386,7 +386,7 @@ func (m *indexedMap) Remove(ctx context.Context, key string, opts ...RemoveOptio
 	}
 	response, err := m.client.Remove(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	for i := range opts {
 		opts[i].afterRemove(response)
@@ -407,7 +407,7 @@ func (m *indexedMap) RemoveIndex(ctx context.Context, index Index, opts ...Remov
 	}
 	response, err := m.client.Remove(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	for i := range opts {
 		opts[i].afterRemove(response)

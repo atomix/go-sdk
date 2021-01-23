@@ -16,7 +16,7 @@ package leader
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/client/test"
+	"github.com/atomix/go-client/pkg/client/test/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	leaderrsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/leader"
 	leaderproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/leader"
@@ -25,7 +25,7 @@ import (
 )
 
 func TestLatchOperations(t *testing.T) {
-	test := test.New().
+	test := rsm.NewTest().
 		SetPartitions(1).
 		SetSessions(3).
 		SetStorage(leaderrsm.RegisterService).

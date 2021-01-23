@@ -18,6 +18,7 @@ import (
 	"context"
 	api "github.com/atomix/api/go/atomix/primitive/lock"
 	"github.com/atomix/go-client/pkg/client/primitive"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/meta"
 	"google.golang.org/grpc"
 )
@@ -82,7 +83,7 @@ func (l *lock) Lock(ctx context.Context, opts ...LockOption) (Status, error) {
 	}
 	response, err := l.client.Lock(ctx, request)
 	if err != nil {
-		return Status{}, err
+		return Status{}, errors.From(err)
 	}
 	for i := range opts {
 		opts[i].afterLock(response)
@@ -107,7 +108,7 @@ func (l *lock) Unlock(ctx context.Context, opts ...UnlockOption) error {
 	}
 	response, err := l.client.Unlock(ctx, request)
 	if err != nil {
-		return err
+		return errors.From(err)
 	}
 	for i := range opts {
 		opts[i].afterUnlock(response)
@@ -122,7 +123,7 @@ func (l *lock) Get(ctx context.Context, opts ...GetOption) (Status, error) {
 	}
 	response, err := l.client.GetLock(ctx, request)
 	if err != nil {
-		return Status{}, err
+		return Status{}, errors.From(err)
 	}
 	for i := range opts {
 		opts[i].afterGet(response)

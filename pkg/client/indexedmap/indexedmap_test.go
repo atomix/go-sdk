@@ -16,17 +16,17 @@ package indexedmap
 
 import (
 	"context"
+	"github.com/atomix/go-client/pkg/client/test/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	indexedmaprsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/indexedmap"
 	indexedmapproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/indexedmap"
 	"testing"
 
-	"github.com/atomix/go-client/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestIndexedMapOperations(t *testing.T) {
-	test := test.New().
+	test := rsm.NewTest().
 		SetPartitions(1).
 		SetSessions(3).
 		SetStorage(indexedmaprsm.RegisterService).
@@ -166,7 +166,7 @@ func TestIndexedMapOperations(t *testing.T) {
 }
 
 func TestIndexedMapStreams(t *testing.T) {
-	test := test.New().
+	test := rsm.NewTest().
 		SetPartitions(1).
 		SetSessions(3).
 		SetStorage(indexedmaprsm.RegisterService).

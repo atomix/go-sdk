@@ -16,7 +16,7 @@ package counter
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/client/test"
+	"github.com/atomix/go-client/pkg/client/test/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	counterrsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/counter"
 	counterproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/counter"
@@ -25,7 +25,7 @@ import (
 )
 
 func TestCounterOperations(t *testing.T) {
-	test := test.New().
+	test := rsm.NewTest().
 		SetPartitions(1).
 		SetSessions(3).
 		SetStorage(counterrsm.RegisterService).

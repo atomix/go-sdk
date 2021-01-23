@@ -76,7 +76,7 @@ func (c *Client) Create(ctx context.Context) error {
 		Type: string(c.Type()),
 		Name: c.name,
 	}
-	_, err := c.client.Create(ctx, request)
+	_, err := c.client.Create(c.AddHeaders(ctx), request)
 	return errors.From(err)
 }
 
@@ -85,7 +85,7 @@ func (c *Client) Close(ctx context.Context) error {
 		Type: string(c.Type()),
 		Name: c.name,
 	}
-	_, err := c.client.Close(ctx, request)
+	_, err := c.client.Close(c.AddHeaders(ctx), request)
 	return errors.From(err)
 }
 
@@ -94,6 +94,6 @@ func (c *Client) Delete(ctx context.Context) error {
 		Type: string(c.Type()),
 		Name: c.name,
 	}
-	_, err := c.client.Delete(ctx, request)
+	_, err := c.client.Delete(c.AddHeaders(ctx), request)
 	return errors.From(err)
 }

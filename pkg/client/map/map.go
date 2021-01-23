@@ -155,7 +155,7 @@ func (m *_map) Put(ctx context.Context, key string, value []byte, opts ...PutOpt
 	}
 	response, err := m.client.Put(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	for i := range opts {
 		opts[i].afterPut(response)
@@ -172,7 +172,7 @@ func (m *_map) Get(ctx context.Context, key string, opts ...GetOption) (*Entry, 
 	}
 	response, err := m.client.Get(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	for i := range opts {
 		opts[i].afterGet(response)
@@ -191,7 +191,7 @@ func (m *_map) Remove(ctx context.Context, key string, opts ...RemoveOption) (*E
 	}
 	response, err := m.client.Remove(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, errors.From(err)
 	}
 	for i := range opts {
 		opts[i].afterRemove(response)

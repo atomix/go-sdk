@@ -16,7 +16,7 @@ package list
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/client/test"
+	"github.com/atomix/go-client/pkg/client/test/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	listrsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/list"
 	listproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/list"
@@ -25,7 +25,7 @@ import (
 )
 
 func TestListOperations(t *testing.T) {
-	test := test.New().
+	test := rsm.NewTest().
 		SetPartitions(1).
 		SetSessions(3).
 		SetStorage(listrsm.RegisterService).

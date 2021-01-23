@@ -16,8 +16,7 @@ package lock
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/client/meta"
-	"github.com/atomix/go-client/pkg/client/test"
+	"github.com/atomix/go-client/pkg/client/test/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	lockrsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/lock"
 	lockproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/lock"
@@ -27,7 +26,7 @@ import (
 )
 
 func TestLock(t *testing.T) {
-	test := test.New().
+	test := rsm.NewTest().
 		SetPartitions(1).
 		SetSessions(3).
 		SetStorage(lockrsm.RegisterService).
@@ -46,15 +45,15 @@ func TestLock(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotEqual(t, 0, v1)
 
-	locked, err := l1.IsLocked(context.Background())
+	locked, err := l1.Get(context.Background())
 	assert.NoError(t, err)
-	assert.True(t, locked)
+	assert.Equal(t, StateLocked, locked.State)
 
-	locked, err = l2.IsLocked(context.Background())
+	locked, err = l2.Get(context.Background())
 	assert.NoError(t, err)
-	assert.True(t, locked)
+	assert.Equal(t, StateLocked, locked.State)
 
-	var v2 meta.ObjectMeta
+	var v2 Status
 	c := make(chan struct{})
 	go func() {
 		_, err := l2.Lock(context.Background())
@@ -62,25 +61,24 @@ func TestLock(t *testing.T) {
 		c <- struct{}{}
 	}()
 
-	success, err := l1.Unlock(context.Background())
+	err = l1.Unlock(context.Background())
 	assert.NoError(t, err)
-	assert.True(t, success)
 
 	<-c
 
 	assert.NotEqual(t, v1, v2)
 
-	locked, err = l1.IsLocked(context.Background())
+	locked, err = l1.Get(context.Background())
 	assert.NoError(t, err)
-	assert.True(t, locked)
+	assert.Equal(t, StateLocked, locked.State)
 
-	locked, err = l1.IsLocked(context.Background(), IfMatch(v1))
+	locked, err = l1.Get(context.Background(), IfMatch(v1))
 	assert.NoError(t, err)
-	assert.False(t, locked)
+	assert.Equal(t, StateUnlocked, locked.State)
 
-	locked, err = l1.IsLocked(context.Background(), IfMatch(v2))
+	locked, err = l1.Get(context.Background(), IfMatch(v2))
 	assert.NoError(t, err)
-	assert.True(t, locked)
+	assert.Equal(t, StateLocked, locked.State)
 
 	v2, err = l2.Lock(context.Background(), WithTimeout(1*time.Second))
 	assert.NoError(t, err)
@@ -99,7 +97,7 @@ func TestLock(t *testing.T) {
 	l, err := New(context.TODO(), "test", conns[2])
 	assert.NoError(t, err)
 
-	locked, err = l.IsLocked(context.TODO())
+	locked, err = l.Get(context.TODO())
 	assert.NoError(t, err)
-	assert.False(t, locked)
+	assert.Equal(t, StateUnlocked, locked.State)
 }

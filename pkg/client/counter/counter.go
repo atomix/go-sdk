@@ -18,6 +18,7 @@ import (
 	"context"
 	api "github.com/atomix/api/go/atomix/primitive/counter"
 	"github.com/atomix/go-client/pkg/client/primitive"
+	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/logging"
 	"google.golang.org/grpc"
 )
@@ -72,7 +73,7 @@ func (c *counter) Get(ctx context.Context) (int64, error) {
 	request := &api.GetRequest{}
 	response, err := c.client.Get(ctx, request)
 	if err != nil {
-		return 0, err
+		return 0, errors.From(err)
 	}
 	return response.Value, nil
 }
@@ -82,7 +83,10 @@ func (c *counter) Set(ctx context.Context, value int64) error {
 		Value: value,
 	}
 	_, err := c.client.Set(ctx, request)
-	return err
+	if err != nil {
+		return errors.From(err)
+	}
+	return nil
 }
 
 func (c *counter) Increment(ctx context.Context, delta int64) (int64, error) {
@@ -91,7 +95,7 @@ func (c *counter) Increment(ctx context.Context, delta int64) (int64, error) {
 	}
 	response, err := c.client.Increment(ctx, request)
 	if err != nil {
-		return 0, err
+		return 0, errors.From(err)
 	}
 	return response.Value, nil
 }
@@ -102,7 +106,7 @@ func (c *counter) Decrement(ctx context.Context, delta int64) (int64, error) {
 	}
 	response, err := c.client.Decrement(ctx, request)
 	if err != nil {
-		return 0, err
+		return 0, errors.From(err)
 	}
 	return response.Value, nil
 }
