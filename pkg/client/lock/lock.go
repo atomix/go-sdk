@@ -96,7 +96,7 @@ func (l *lock) Lock(ctx context.Context, opts ...LockOption) (Status, error) {
 		state = StateUnlocked
 	}
 	return Status{
-		ObjectMeta: meta.New(response.Lock.ObjectMeta),
+		ObjectMeta: meta.FromProto(response.Lock.ObjectMeta),
 		State:      state,
 	}, nil
 }
@@ -136,7 +136,7 @@ func (l *lock) Get(ctx context.Context, opts ...GetOption) (Status, error) {
 		state = StateUnlocked
 	}
 	return Status{
-		ObjectMeta: meta.New(response.Lock.ObjectMeta),
+		ObjectMeta: meta.FromProto(response.Lock.ObjectMeta),
 		State:      state,
 	}, nil
 }

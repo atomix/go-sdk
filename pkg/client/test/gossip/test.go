@@ -35,14 +35,20 @@ func NewTest() *Test {
 
 // Test is a test context
 type Test struct {
+	replicas        int
 	partitions      int
 	clients         int
 	registerProxy   func(node *gossipproxy.Node)
 	proxies         []*gossipproxy.Node
 	registerServer  func(node *gossipprotocol.Node)
 	registerStorage func(node *gossipprotocol.Node)
-	storage         *gossipprotocol.Node
+	nodes           []*gossipprotocol.Node
 	conns           []*grpc.ClientConn
+}
+
+func (t *Test) SetReplicas(replicas int) *Test {
+	t.replicas = replicas
+	return t
 }
 
 func (t *Test) SetPartitions(partitions int) *Test {
@@ -72,30 +78,38 @@ func (t *Test) SetStorage(f func(node *gossipprotocol.Node)) *Test {
 
 func (t *Test) Start() ([]*grpc.ClientConn, error) {
 	config := protocolapi.ProtocolConfig{
-		Replicas: []protocolapi.ProtocolReplica{
-			{
-				ID:           "replica-1",
-				NodeID:       "node-1",
-				Host:         "localhost",
-				APIPort:      5678,
-				ProtocolPort: 5679,
-			},
-		},
+		Replicas:   []protocolapi.ProtocolReplica{},
 		Partitions: []protocolapi.ProtocolPartition{},
+	}
+
+	replicas := make([]string, 0, t.replicas)
+	for i := 1; i <= t.replicas; i++ {
+		replica := fmt.Sprintf("replica-%d", i)
+		replicas = append(replicas, replica)
+		config.Replicas = append(config.Replicas, protocolapi.ProtocolReplica{
+			ID:           replica,
+			NodeID:       fmt.Sprintf("node-%d", i),
+			Host:         "localhost",
+			APIPort:      int32(5600 + i),
+			ProtocolPort: int32(5700 + i),
+		})
 	}
 
 	for i := 1; i <= t.partitions; i++ {
 		config.Partitions = append(config.Partitions, protocolapi.ProtocolPartition{
 			PartitionID: uint32(i),
-			Replicas:    []string{"replica-1"},
+			Replicas:    replicas,
 		})
 	}
 
-	t.storage = gossipprotocol.NewNode(cluster.NewCluster(config, cluster.WithMemberID("replica-1")))
-	t.registerServer(t.storage)
-	t.registerStorage(t.storage)
-	if err := t.storage.Start(); err != nil {
-		return nil, err
+	for i := 1; i <= t.replicas; i++ {
+		node := gossipprotocol.NewNode(cluster.NewCluster(config, cluster.WithMemberID(fmt.Sprintf("replica-%d", i))))
+		t.registerServer(node)
+		t.registerStorage(node)
+		if err := node.Start(); err != nil {
+			return nil, err
+		}
+		t.nodes = append(t.nodes, node)
 	}
 
 	t.proxies = make([]*gossipproxy.Node, 0, t.clients)
@@ -125,5 +139,8 @@ func (t *Test) Stop() error {
 	for _, proxy := range t.proxies {
 		proxy.Stop()
 	}
-	return t.storage.Stop()
+	for _, node := range t.nodes {
+		node.Stop()
+	}
+	return nil
 }

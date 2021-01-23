@@ -71,7 +71,7 @@ func newTerm(term *api.Term) *Term {
 		return nil
 	}
 	return &Term{
-		ObjectMeta: meta.New(term.ObjectMeta),
+		ObjectMeta: meta.FromProto(term.ObjectMeta),
 		Leader:     term.Leader,
 		Candidates: term.Candidates,
 	}

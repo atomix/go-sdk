@@ -24,6 +24,7 @@ import (
 	valuersm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/value"
 	gossipproxy "github.com/atomix/go-framework/pkg/atomix/proxy/gossip/value"
 	valueproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/value"
+	"github.com/atomix/go-framework/pkg/atomix/time"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -136,7 +137,8 @@ func TestRSMValue(t *testing.T) {
 
 func TestGossipValue(t *testing.T) {
 	test := gossip.NewTest().
-		SetPartitions(1).
+		SetReplicas(3).
+		SetPartitions(3).
 		SetClients(3).
 		SetServer(gossipvalue.RegisterServer).
 		SetStorage(gossipvalue.RegisterService).
@@ -153,7 +155,7 @@ func TestGossipValue(t *testing.T) {
 	val, version, err := value.Get(context.TODO())
 	assert.NoError(t, err)
 	assert.Nil(t, val)
-	assert.Equal(t, uint64(0), version)
+	assert.Equal(t, time.LogicalTime(0), version.Timestamp.(time.LogicalTimestamp).Time)
 
 	ch := make(chan Event)
 
@@ -166,11 +168,11 @@ func TestGossipValue(t *testing.T) {
 
 	version, err = value.Set(context.TODO(), []byte("foo"))
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(1), version)
+	assert.Equal(t, time.LogicalTime(1), version.Timestamp.(time.LogicalTimestamp).Time)
 
 	val, version, err = value.Get(context.TODO())
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(1), version)
+	assert.Equal(t, time.LogicalTime(1), version.Timestamp.(time.LogicalTimestamp).Time)
 	assert.Equal(t, "foo", string(val))
 
 	_, err = value.Set(context.TODO(), []byte("foo"), IfMatch(meta.ObjectMeta{Revision: 2}))
@@ -179,35 +181,35 @@ func TestGossipValue(t *testing.T) {
 
 	version, err = value.Set(context.TODO(), []byte("bar"), IfMatch(meta.ObjectMeta{Revision: 1}))
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(2), version)
+	assert.Equal(t, time.LogicalTime(2), version.Timestamp.(time.LogicalTimestamp).Time)
 
 	val, version, err = value.Get(context.TODO())
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(2), version)
+	assert.Equal(t, time.LogicalTime(2), version.Timestamp.(time.LogicalTimestamp).Time)
 	assert.Equal(t, "bar", string(val))
 
 	version, err = value.Set(context.TODO(), []byte("baz"))
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(3), version)
+	assert.Equal(t, time.LogicalTime(3), version.Timestamp.(time.LogicalTimestamp).Time)
 
 	val, version, err = value.Get(context.TODO())
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(3), version)
+	assert.Equal(t, time.LogicalTime(3), version.Timestamp.(time.LogicalTimestamp).Time)
 	assert.Equal(t, "baz", string(val))
 
 	event := <-ch
 	assert.Equal(t, EventUpdate, event.Type)
-	assert.Equal(t, meta.Revision(1), event.Revision)
+	assert.Equal(t, time.LogicalTime(1), event.Revision)
 	assert.Equal(t, "foo", string(event.Value))
 
 	event = <-ch
 	assert.Equal(t, EventUpdate, event.Type)
-	assert.Equal(t, meta.Revision(2), event.Revision)
+	assert.Equal(t, time.LogicalTime(2), event.Revision)
 	assert.Equal(t, "bar", string(event.Value))
 
 	event = <-ch
 	assert.Equal(t, EventUpdate, event.Type)
-	assert.Equal(t, meta.Revision(3), event.Revision)
+	assert.Equal(t, time.LogicalTime(3), event.Revision)
 	assert.Equal(t, "baz", string(event.Value))
 
 	err = value.Close(context.Background())

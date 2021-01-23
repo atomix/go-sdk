@@ -59,7 +59,7 @@ func newLatch(term *api.Latch) *Leadership {
 		return nil
 	}
 	return &Leadership{
-		ObjectMeta:   meta.New(term.ObjectMeta),
+		ObjectMeta:   meta.FromProto(term.ObjectMeta),
 		Leader:       term.Leader,
 		Participants: term.Participants,
 	}

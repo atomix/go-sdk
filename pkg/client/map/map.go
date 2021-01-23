@@ -75,7 +75,7 @@ func newEntry(entry *api.Entry) *Entry {
 		return nil
 	}
 	return &Entry{
-		ObjectMeta: meta.New(entry.Key.ObjectMeta),
+		ObjectMeta: meta.FromProto(entry.Key.ObjectMeta),
 		Key:        entry.Key.Key,
 		Value:      entry.Value.Value,
 	}
@@ -240,7 +240,7 @@ func (m *_map) Entries(ctx context.Context, ch chan<- Entry) error {
 					open = true
 				}
 				ch <- Entry{
-					ObjectMeta: meta.New(response.Entry.Key.ObjectMeta),
+					ObjectMeta: meta.FromProto(response.Entry.Key.ObjectMeta),
 					Key:        response.Entry.Key.Key,
 					Value:      response.Entry.Value.Value,
 				}

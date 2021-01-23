@@ -104,7 +104,7 @@ func (v *value) Set(ctx context.Context, value []byte, opts ...SetOption) (meta.
 	for i := range opts {
 		opts[i].afterSet(response)
 	}
-	return meta.New(response.Value.ObjectMeta), nil
+	return meta.FromProto(response.Value.ObjectMeta), nil
 }
 
 func (v *value) Get(ctx context.Context) ([]byte, meta.ObjectMeta, error) {
@@ -113,7 +113,7 @@ func (v *value) Get(ctx context.Context) ([]byte, meta.ObjectMeta, error) {
 	if err != nil {
 		return nil, meta.ObjectMeta{}, errors.From(err)
 	}
-	return response.Value.Value, meta.New(response.Value.ObjectMeta), nil
+	return response.Value.Value, meta.FromProto(response.Value.ObjectMeta), nil
 }
 
 func (v *value) Watch(ctx context.Context, ch chan<- Event) error {
@@ -141,7 +141,7 @@ func (v *value) Watch(ctx context.Context, ch chan<- Event) error {
 				switch response.Event.Type {
 				case api.Event_UPDATE:
 					ch <- Event{
-						ObjectMeta: meta.New(response.Event.Value.ObjectMeta),
+						ObjectMeta: meta.FromProto(response.Event.Value.ObjectMeta),
 						Type:       EventUpdate,
 						Value:      response.Event.Value.Value,
 					}

@@ -182,7 +182,7 @@ func newEntry(entry *api.Entry) *Entry {
 		return nil
 	}
 	return &Entry{
-		ObjectMeta: meta.New(entry.Value.ObjectMeta),
+		ObjectMeta: meta.FromProto(entry.Value.ObjectMeta),
 		Index:      Index(entry.Index),
 		Key:        entry.Key,
 		Value:      entry.Value.Value,

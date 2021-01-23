@@ -18,8 +18,8 @@ import (
 	"context"
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
+	"github.com/atomix/go-framework/pkg/atomix/headers"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
 )
 
 // Type is the type of a primitive
@@ -48,11 +48,6 @@ func NewClient(t Type, n string, conn *grpc.ClientConn) *Client {
 	}
 }
 
-const (
-	primitiveTypeHeader = "Primitive-Type"
-	primitiveNameHeader = "Primitive-Name"
-)
-
 type Client struct {
 	primitiveType Type
 	name          string
@@ -68,7 +63,9 @@ func (c *Client) Name() string {
 }
 
 func (c *Client) AddHeaders(ctx context.Context) context.Context {
-	return metadata.AppendToOutgoingContext(ctx, primitiveTypeHeader, string(c.primitiveType), primitiveNameHeader, c.name)
+	ctx = headers.PrimitiveType.SetString(ctx, string(c.primitiveType))
+	ctx = headers.PrimitiveName.SetString(ctx, c.name)
+	return ctx
 }
 
 func (c *Client) Create(ctx context.Context) error {
