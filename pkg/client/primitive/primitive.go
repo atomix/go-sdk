@@ -18,7 +18,6 @@ import (
 	"context"
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
-	"github.com/atomix/go-framework/pkg/atomix/headers"
 	"google.golang.org/grpc"
 )
 
@@ -62,10 +61,10 @@ func (c *Client) Name() string {
 	return c.name
 }
 
-func (c *Client) AddHeaders(ctx context.Context) context.Context {
-	ctx = headers.PrimitiveType.SetString(ctx, string(c.primitiveType))
-	ctx = headers.PrimitiveName.SetString(ctx, c.name)
-	return ctx
+func (c *Client) GetHeaders() primitiveapi.RequestHeaders {
+	return primitiveapi.RequestHeaders{
+		PrimitiveID: c.name,
+	}
 }
 
 func (c *Client) Create(ctx context.Context) error {
@@ -73,7 +72,7 @@ func (c *Client) Create(ctx context.Context) error {
 		Type: string(c.Type()),
 		Name: c.name,
 	}
-	_, err := c.client.Create(c.AddHeaders(ctx), request)
+	_, err := c.client.Create(ctx, request)
 	return errors.From(err)
 }
 
@@ -82,7 +81,7 @@ func (c *Client) Close(ctx context.Context) error {
 		Type: string(c.Type()),
 		Name: c.name,
 	}
-	_, err := c.client.Close(c.AddHeaders(ctx), request)
+	_, err := c.client.Close(ctx, request)
 	return errors.From(err)
 }
 
@@ -91,6 +90,6 @@ func (c *Client) Delete(ctx context.Context) error {
 		Type: string(c.Type()),
 		Name: c.name,
 	}
-	_, err := c.client.Delete(c.AddHeaders(ctx), request)
+	_, err := c.client.Delete(ctx, request)
 	return errors.From(err)
 }

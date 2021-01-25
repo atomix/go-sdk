@@ -70,7 +70,9 @@ type counter struct {
 }
 
 func (c *counter) Get(ctx context.Context) (int64, error) {
-	request := &api.GetRequest{}
+	request := &api.GetRequest{
+		Headers: c.GetHeaders(),
+	}
 	response, err := c.client.Get(ctx, request)
 	if err != nil {
 		return 0, errors.From(err)
@@ -80,7 +82,8 @@ func (c *counter) Get(ctx context.Context) (int64, error) {
 
 func (c *counter) Set(ctx context.Context, value int64) error {
 	request := &api.SetRequest{
-		Value: value,
+		Headers: c.GetHeaders(),
+		Value:   value,
 	}
 	_, err := c.client.Set(ctx, request)
 	if err != nil {
@@ -91,7 +94,8 @@ func (c *counter) Set(ctx context.Context, value int64) error {
 
 func (c *counter) Increment(ctx context.Context, delta int64) (int64, error) {
 	request := &api.IncrementRequest{
-		Delta: delta,
+		Headers: c.GetHeaders(),
+		Delta:   delta,
 	}
 	response, err := c.client.Increment(ctx, request)
 	if err != nil {
@@ -102,7 +106,8 @@ func (c *counter) Increment(ctx context.Context, delta int64) (int64, error) {
 
 func (c *counter) Decrement(ctx context.Context, delta int64) (int64, error) {
 	request := &api.DecrementRequest{
-		Delta: delta,
+		Headers: c.GetHeaders(),
+		Delta:   delta,
 	}
 	response, err := c.client.Decrement(ctx, request)
 	if err != nil {

@@ -90,6 +90,7 @@ type value struct {
 
 func (v *value) Set(ctx context.Context, value []byte, opts ...SetOption) (meta.ObjectMeta, error) {
 	request := &api.SetRequest{
+		Headers: v.GetHeaders(),
 		Value: api.Value{
 			Value: value,
 		},
@@ -97,7 +98,7 @@ func (v *value) Set(ctx context.Context, value []byte, opts ...SetOption) (meta.
 	for i := range opts {
 		opts[i].beforeSet(request)
 	}
-	response, err := v.client.Set(v.AddHeaders(ctx), request)
+	response, err := v.client.Set(ctx, request)
 	if err != nil {
 		return meta.ObjectMeta{}, errors.From(err)
 	}
@@ -108,8 +109,10 @@ func (v *value) Set(ctx context.Context, value []byte, opts ...SetOption) (meta.
 }
 
 func (v *value) Get(ctx context.Context) ([]byte, meta.ObjectMeta, error) {
-	request := &api.GetRequest{}
-	response, err := v.client.Get(v.AddHeaders(ctx), request)
+	request := &api.GetRequest{
+		Headers: v.GetHeaders(),
+	}
+	response, err := v.client.Get(ctx, request)
 	if err != nil {
 		return nil, meta.ObjectMeta{}, errors.From(err)
 	}
@@ -117,8 +120,10 @@ func (v *value) Get(ctx context.Context) ([]byte, meta.ObjectMeta, error) {
 }
 
 func (v *value) Watch(ctx context.Context, ch chan<- Event) error {
-	request := &api.EventsRequest{}
-	stream, err := v.client.Events(v.AddHeaders(ctx), request)
+	request := &api.EventsRequest{
+		Headers: v.GetHeaders(),
+	}
+	stream, err := v.client.Events(ctx, request)
 	if err != nil {
 		return errors.From(err)
 	}

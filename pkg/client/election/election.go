@@ -132,7 +132,9 @@ func (e *election) ID() string {
 }
 
 func (e *election) GetTerm(ctx context.Context) (*Term, error) {
-	request := &api.GetTermRequest{}
+	request := &api.GetTermRequest{
+		Headers: e.GetHeaders(),
+	}
 	response, err := e.client.GetTerm(ctx, request)
 	if err != nil {
 		return nil, errors.From(err)
@@ -141,7 +143,9 @@ func (e *election) GetTerm(ctx context.Context) (*Term, error) {
 }
 
 func (e *election) Enter(ctx context.Context) (*Term, error) {
-	request := &api.EnterRequest{}
+	request := &api.EnterRequest{
+		Headers: e.GetHeaders(),
+	}
 	response, err := e.client.Enter(ctx, request)
 	if err != nil {
 		return nil, errors.From(err)
@@ -150,7 +154,9 @@ func (e *election) Enter(ctx context.Context) (*Term, error) {
 }
 
 func (e *election) Leave(ctx context.Context) (*Term, error) {
-	request := &api.WithdrawRequest{}
+	request := &api.WithdrawRequest{
+		Headers: e.GetHeaders(),
+	}
 	response, err := e.client.Withdraw(ctx, request)
 	if err != nil {
 		return nil, errors.From(err)
@@ -160,6 +166,7 @@ func (e *election) Leave(ctx context.Context) (*Term, error) {
 
 func (e *election) Anoint(ctx context.Context, id string) (*Term, error) {
 	request := &api.AnointRequest{
+		Headers:     e.GetHeaders(),
 		CandidateID: id,
 	}
 	response, err := e.client.Anoint(ctx, request)
@@ -171,6 +178,7 @@ func (e *election) Anoint(ctx context.Context, id string) (*Term, error) {
 
 func (e *election) Promote(ctx context.Context, id string) (*Term, error) {
 	request := &api.PromoteRequest{
+		Headers:     e.GetHeaders(),
 		CandidateID: id,
 	}
 	response, err := e.client.Promote(ctx, request)
@@ -182,6 +190,7 @@ func (e *election) Promote(ctx context.Context, id string) (*Term, error) {
 
 func (e *election) Evict(ctx context.Context, id string) (*Term, error) {
 	request := &api.EvictRequest{
+		Headers:     e.GetHeaders(),
 		CandidateID: id,
 	}
 	response, err := e.client.Evict(ctx, request)
@@ -192,8 +201,10 @@ func (e *election) Evict(ctx context.Context, id string) (*Term, error) {
 }
 
 func (e *election) Watch(ctx context.Context, ch chan<- Event) error {
-	request := &api.EventsRequest{}
-	stream, err := e.client.Events(e.AddHeaders(ctx), request)
+	request := &api.EventsRequest{
+		Headers: e.GetHeaders(),
+	}
+	stream, err := e.client.Events(ctx, request)
 	if err != nil {
 		return errors.From(err)
 	}

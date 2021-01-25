@@ -77,7 +77,9 @@ type lock struct {
 }
 
 func (l *lock) Lock(ctx context.Context, opts ...LockOption) (Status, error) {
-	request := &api.LockRequest{}
+	request := &api.LockRequest{
+		Headers: l.GetHeaders(),
+	}
 	for i := range opts {
 		opts[i].beforeLock(request)
 	}
@@ -102,7 +104,9 @@ func (l *lock) Lock(ctx context.Context, opts ...LockOption) (Status, error) {
 }
 
 func (l *lock) Unlock(ctx context.Context, opts ...UnlockOption) error {
-	request := &api.UnlockRequest{}
+	request := &api.UnlockRequest{
+		Headers: l.GetHeaders(),
+	}
 	for i := range opts {
 		opts[i].beforeUnlock(request)
 	}
@@ -117,7 +121,9 @@ func (l *lock) Unlock(ctx context.Context, opts ...UnlockOption) error {
 }
 
 func (l *lock) Get(ctx context.Context, opts ...GetOption) (Status, error) {
-	request := &api.GetLockRequest{}
+	request := &api.GetLockRequest{
+		Headers: l.GetHeaders(),
+	}
 	for i := range opts {
 		opts[i].beforeGet(request)
 	}

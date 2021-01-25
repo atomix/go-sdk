@@ -120,6 +120,7 @@ type list struct {
 
 func (l *list) Append(ctx context.Context, value []byte) error {
 	request := &api.AppendRequest{
+		Headers: l.GetHeaders(),
 		Value: api.Value{
 			Value: base64.StdEncoding.EncodeToString(value),
 		},
@@ -133,6 +134,7 @@ func (l *list) Append(ctx context.Context, value []byte) error {
 
 func (l *list) Insert(ctx context.Context, index int, value []byte) error {
 	request := &api.InsertRequest{
+		Headers: l.GetHeaders(),
 		Item: api.Item{
 			Index: uint32(index),
 			Value: api.Value{
@@ -149,6 +151,7 @@ func (l *list) Insert(ctx context.Context, index int, value []byte) error {
 
 func (l *list) Set(ctx context.Context, index int, value []byte) error {
 	request := &api.SetRequest{
+		Headers: l.GetHeaders(),
 		Item: api.Item{
 			Index: uint32(index),
 			Value: api.Value{
@@ -165,7 +168,8 @@ func (l *list) Set(ctx context.Context, index int, value []byte) error {
 
 func (l *list) Get(ctx context.Context, index int) ([]byte, error) {
 	request := &api.GetRequest{
-		Index: uint32(index),
+		Headers: l.GetHeaders(),
+		Index:   uint32(index),
 	}
 	response, err := l.client.Get(ctx, request)
 	if err != nil {
@@ -176,7 +180,8 @@ func (l *list) Get(ctx context.Context, index int) ([]byte, error) {
 
 func (l *list) Remove(ctx context.Context, index int) ([]byte, error) {
 	request := &api.RemoveRequest{
-		Index: uint32(index),
+		Headers: l.GetHeaders(),
+		Index:   uint32(index),
 	}
 	response, err := l.client.Remove(ctx, request)
 	if err != nil {
@@ -186,8 +191,10 @@ func (l *list) Remove(ctx context.Context, index int) ([]byte, error) {
 }
 
 func (l *list) Len(ctx context.Context) (int, error) {
-	request := &api.SizeRequest{}
-	response, err := l.client.Size(l.AddHeaders(ctx), request)
+	request := &api.SizeRequest{
+		Headers: l.GetHeaders(),
+	}
+	response, err := l.client.Size(ctx, request)
 	if err != nil {
 		return 0, errors.From(err)
 	}
@@ -195,8 +202,10 @@ func (l *list) Len(ctx context.Context) (int, error) {
 }
 
 func (l *list) Items(ctx context.Context, ch chan<- []byte) error {
-	request := &api.ElementsRequest{}
-	stream, err := l.client.Elements(l.AddHeaders(ctx), request)
+	request := &api.ElementsRequest{
+		Headers: l.GetHeaders(),
+	}
+	stream, err := l.client.Elements(ctx, request)
 	if err != nil {
 		return errors.From(err)
 	}
@@ -235,8 +244,10 @@ func (l *list) Items(ctx context.Context, ch chan<- []byte) error {
 }
 
 func (l *list) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) error {
-	request := &api.EventsRequest{}
-	stream, err := l.client.Events(l.AddHeaders(ctx), request)
+	request := &api.EventsRequest{
+		Headers: l.GetHeaders(),
+	}
+	stream, err := l.client.Events(ctx, request)
 	if err != nil {
 		return errors.From(err)
 	}
@@ -294,8 +305,10 @@ func (l *list) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) 
 }
 
 func (l *list) Clear(ctx context.Context) error {
-	request := &api.ClearRequest{}
-	_, err := l.client.Clear(l.AddHeaders(ctx), request)
+	request := &api.ClearRequest{
+		Headers: l.GetHeaders(),
+	}
+	_, err := l.client.Clear(ctx, request)
 	if err != nil {
 		return errors.From(err)
 	}

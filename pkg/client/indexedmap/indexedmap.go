@@ -191,6 +191,7 @@ func newEntry(entry *api.Entry) *Entry {
 
 func (m *indexedMap) Append(ctx context.Context, key string, value []byte) (*Entry, error) {
 	request := &api.PutRequest{
+		Headers: m.GetHeaders(),
 		Entry: api.Entry{
 			Position: api.Position{
 				Key: key,
@@ -218,6 +219,7 @@ func (m *indexedMap) Append(ctx context.Context, key string, value []byte) (*Ent
 
 func (m *indexedMap) Put(ctx context.Context, key string, value []byte) (*Entry, error) {
 	request := &api.PutRequest{
+		Headers: m.GetHeaders(),
 		Entry: api.Entry{
 			Position: api.Position{
 				Key: key,
@@ -236,6 +238,7 @@ func (m *indexedMap) Put(ctx context.Context, key string, value []byte) (*Entry,
 
 func (m *indexedMap) Set(ctx context.Context, index Index, key string, value []byte, opts ...SetOption) (*Entry, error) {
 	request := &api.PutRequest{
+		Headers: m.GetHeaders(),
 		Entry: api.Entry{
 			Position: api.Position{
 				Index: uint64(index),
@@ -261,7 +264,10 @@ func (m *indexedMap) Set(ctx context.Context, index Index, key string, value []b
 
 func (m *indexedMap) Get(ctx context.Context, key string, opts ...GetOption) (*Entry, error) {
 	request := &api.GetRequest{
-		Key: key,
+		Headers: m.GetHeaders(),
+		Position: api.Position{
+			Key: key,
+		},
 	}
 	for i := range opts {
 		opts[i].beforeGet(request)
@@ -278,7 +284,10 @@ func (m *indexedMap) Get(ctx context.Context, key string, opts ...GetOption) (*E
 
 func (m *indexedMap) GetIndex(ctx context.Context, index Index, opts ...GetOption) (*Entry, error) {
 	request := &api.GetRequest{
-		Index: uint64(index),
+		Headers: m.GetHeaders(),
+		Position: api.Position{
+			Index: uint64(index),
+		},
 	}
 	for i := range opts {
 		opts[i].beforeGet(request)
@@ -294,7 +303,9 @@ func (m *indexedMap) GetIndex(ctx context.Context, index Index, opts ...GetOptio
 }
 
 func (m *indexedMap) FirstIndex(ctx context.Context) (Index, error) {
-	request := &api.FirstEntryRequest{}
+	request := &api.FirstEntryRequest{
+		Headers: m.GetHeaders(),
+	}
 	response, err := m.client.FirstEntry(ctx, request)
 	if err != nil {
 		return 0, errors.From(err)
@@ -303,7 +314,9 @@ func (m *indexedMap) FirstIndex(ctx context.Context) (Index, error) {
 }
 
 func (m *indexedMap) LastIndex(ctx context.Context) (Index, error) {
-	request := &api.LastEntryRequest{}
+	request := &api.LastEntryRequest{
+		Headers: m.GetHeaders(),
+	}
 	response, err := m.client.LastEntry(ctx, request)
 	if err != nil {
 		return 0, errors.From(err)
@@ -313,7 +326,8 @@ func (m *indexedMap) LastIndex(ctx context.Context) (Index, error) {
 
 func (m *indexedMap) PrevIndex(ctx context.Context, index Index) (Index, error) {
 	request := &api.PrevEntryRequest{
-		Index: uint64(index),
+		Headers: m.GetHeaders(),
+		Index:   uint64(index),
 	}
 	response, err := m.client.PrevEntry(ctx, request)
 	if err != nil {
@@ -324,7 +338,8 @@ func (m *indexedMap) PrevIndex(ctx context.Context, index Index) (Index, error) 
 
 func (m *indexedMap) NextIndex(ctx context.Context, index Index) (Index, error) {
 	request := &api.NextEntryRequest{
-		Index: uint64(index),
+		Headers: m.GetHeaders(),
+		Index:   uint64(index),
 	}
 	response, err := m.client.NextEntry(ctx, request)
 	if err != nil {
@@ -334,7 +349,9 @@ func (m *indexedMap) NextIndex(ctx context.Context, index Index) (Index, error) 
 }
 
 func (m *indexedMap) FirstEntry(ctx context.Context) (*Entry, error) {
-	request := &api.FirstEntryRequest{}
+	request := &api.FirstEntryRequest{
+		Headers: m.GetHeaders(),
+	}
 	response, err := m.client.FirstEntry(ctx, request)
 	if err != nil {
 		return nil, errors.From(err)
@@ -343,7 +360,9 @@ func (m *indexedMap) FirstEntry(ctx context.Context) (*Entry, error) {
 }
 
 func (m *indexedMap) LastEntry(ctx context.Context) (*Entry, error) {
-	request := &api.LastEntryRequest{}
+	request := &api.LastEntryRequest{
+		Headers: m.GetHeaders(),
+	}
 	response, err := m.client.LastEntry(ctx, request)
 	if err != nil {
 		return nil, errors.From(err)
@@ -353,7 +372,8 @@ func (m *indexedMap) LastEntry(ctx context.Context) (*Entry, error) {
 
 func (m *indexedMap) PrevEntry(ctx context.Context, index Index) (*Entry, error) {
 	request := &api.PrevEntryRequest{
-		Index: uint64(index),
+		Headers: m.GetHeaders(),
+		Index:   uint64(index),
 	}
 	response, err := m.client.PrevEntry(ctx, request)
 	if err != nil {
@@ -364,7 +384,8 @@ func (m *indexedMap) PrevEntry(ctx context.Context, index Index) (*Entry, error)
 
 func (m *indexedMap) NextEntry(ctx context.Context, index Index) (*Entry, error) {
 	request := &api.NextEntryRequest{
-		Index: uint64(index),
+		Headers: m.GetHeaders(),
+		Index:   uint64(index),
 	}
 	response, err := m.client.NextEntry(ctx, request)
 	if err != nil {
@@ -375,6 +396,7 @@ func (m *indexedMap) NextEntry(ctx context.Context, index Index) (*Entry, error)
 
 func (m *indexedMap) Remove(ctx context.Context, key string, opts ...RemoveOption) (*Entry, error) {
 	request := &api.RemoveRequest{
+		Headers: m.GetHeaders(),
 		Entry: &api.Entry{
 			Position: api.Position{
 				Key: key,
@@ -396,6 +418,7 @@ func (m *indexedMap) Remove(ctx context.Context, key string, opts ...RemoveOptio
 
 func (m *indexedMap) RemoveIndex(ctx context.Context, index Index, opts ...RemoveOption) (*Entry, error) {
 	request := &api.RemoveRequest{
+		Headers: m.GetHeaders(),
 		Entry: &api.Entry{
 			Position: api.Position{
 				Index: uint64(index),
@@ -416,8 +439,10 @@ func (m *indexedMap) RemoveIndex(ctx context.Context, index Index, opts ...Remov
 }
 
 func (m *indexedMap) Len(ctx context.Context) (int, error) {
-	request := &api.SizeRequest{}
-	response, err := m.client.Size(m.AddHeaders(ctx), request)
+	request := &api.SizeRequest{
+		Headers: m.GetHeaders(),
+	}
+	response, err := m.client.Size(ctx, request)
 	if err != nil {
 		return 0, errors.From(err)
 	}
@@ -425,8 +450,10 @@ func (m *indexedMap) Len(ctx context.Context) (int, error) {
 }
 
 func (m *indexedMap) Clear(ctx context.Context) error {
-	request := &api.ClearRequest{}
-	_, err := m.client.Clear(m.AddHeaders(ctx), request)
+	request := &api.ClearRequest{
+		Headers: m.GetHeaders(),
+	}
+	_, err := m.client.Clear(ctx, request)
 	if err != nil {
 		return errors.From(err)
 	}
@@ -434,8 +461,10 @@ func (m *indexedMap) Clear(ctx context.Context) error {
 }
 
 func (m *indexedMap) Entries(ctx context.Context, ch chan<- Entry) error {
-	request := &api.EntriesRequest{}
-	stream, err := m.client.Entries(m.AddHeaders(ctx), request)
+	request := &api.EntriesRequest{
+		Headers: m.GetHeaders(),
+	}
+	stream, err := m.client.Entries(ctx, request)
 	if err != nil {
 		return errors.From(err)
 	}
@@ -469,8 +498,10 @@ func (m *indexedMap) Entries(ctx context.Context, ch chan<- Entry) error {
 }
 
 func (m *indexedMap) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) error {
-	request := &api.EventsRequest{}
-	stream, err := m.client.Events(m.AddHeaders(ctx), request)
+	request := &api.EventsRequest{
+		Headers: m.GetHeaders(),
+	}
+	stream, err := m.client.Events(ctx, request)
 	if err != nil {
 		return errors.From(err)
 	}

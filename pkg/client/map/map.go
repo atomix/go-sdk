@@ -141,6 +141,7 @@ type _map struct {
 
 func (m *_map) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*Entry, error) {
 	request := &api.PutRequest{
+		Headers: m.GetHeaders(),
 		Entry: api.Entry{
 			Key: api.Key{
 				Key: key,
@@ -165,7 +166,8 @@ func (m *_map) Put(ctx context.Context, key string, value []byte, opts ...PutOpt
 
 func (m *_map) Get(ctx context.Context, key string, opts ...GetOption) (*Entry, error) {
 	request := &api.GetRequest{
-		Key: key,
+		Headers: m.GetHeaders(),
+		Key:     key,
 	}
 	for i := range opts {
 		opts[i].beforeGet(request)
@@ -182,6 +184,7 @@ func (m *_map) Get(ctx context.Context, key string, opts ...GetOption) (*Entry, 
 
 func (m *_map) Remove(ctx context.Context, key string, opts ...RemoveOption) (*Entry, error) {
 	request := &api.RemoveRequest{
+		Headers: m.GetHeaders(),
 		Key: api.Key{
 			Key: key,
 		},
@@ -200,8 +203,10 @@ func (m *_map) Remove(ctx context.Context, key string, opts ...RemoveOption) (*E
 }
 
 func (m *_map) Len(ctx context.Context) (int, error) {
-	request := &api.SizeRequest{}
-	response, err := m.client.Size(m.AddHeaders(ctx), request)
+	request := &api.SizeRequest{
+		Headers: m.GetHeaders(),
+	}
+	response, err := m.client.Size(ctx, request)
 	if err != nil {
 		return 0, errors.From(err)
 	}
@@ -209,8 +214,10 @@ func (m *_map) Len(ctx context.Context) (int, error) {
 }
 
 func (m *_map) Clear(ctx context.Context) error {
-	request := &api.ClearRequest{}
-	_, err := m.client.Clear(m.AddHeaders(ctx), request)
+	request := &api.ClearRequest{
+		Headers: m.GetHeaders(),
+	}
+	_, err := m.client.Clear(ctx, request)
 	if err != nil {
 		return errors.From(err)
 	}
@@ -218,8 +225,10 @@ func (m *_map) Clear(ctx context.Context) error {
 }
 
 func (m *_map) Entries(ctx context.Context, ch chan<- Entry) error {
-	request := &api.EntriesRequest{}
-	stream, err := m.client.Entries(m.AddHeaders(ctx), request)
+	request := &api.EntriesRequest{
+		Headers: m.GetHeaders(),
+	}
+	stream, err := m.client.Entries(ctx, request)
 	if err != nil {
 		return errors.From(err)
 	}
@@ -257,8 +266,10 @@ func (m *_map) Entries(ctx context.Context, ch chan<- Entry) error {
 }
 
 func (m *_map) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) error {
-	request := &api.EventsRequest{}
-	stream, err := m.client.Events(m.AddHeaders(ctx), request)
+	request := &api.EventsRequest{
+		Headers: m.GetHeaders(),
+	}
+	stream, err := m.client.Events(ctx, request)
 	if err != nil {
 		return errors.From(err)
 	}

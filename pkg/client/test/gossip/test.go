@@ -20,6 +20,7 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	gossipprotocol "github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
 	gossipproxy "github.com/atomix/go-framework/pkg/atomix/proxy/gossip"
+	"github.com/atomix/go-framework/pkg/atomix/time"
 	"google.golang.org/grpc"
 )
 
@@ -35,6 +36,7 @@ func NewTest() *Test {
 
 // Test is a test context
 type Test struct {
+	scheme          time.Scheme
 	replicas        int
 	partitions      int
 	clients         int
@@ -44,6 +46,11 @@ type Test struct {
 	registerStorage func(node *gossipprotocol.Node)
 	nodes           []*gossipprotocol.Node
 	conns           []*grpc.ClientConn
+}
+
+func (t *Test) SetScheme(scheme time.Scheme) *Test {
+	t.scheme = scheme
+	return t
 }
 
 func (t *Test) SetReplicas(replicas int) *Test {
@@ -103,7 +110,7 @@ func (t *Test) Start() ([]*grpc.ClientConn, error) {
 	}
 
 	for i := 1; i <= t.replicas; i++ {
-		node := gossipprotocol.NewNode(cluster.NewCluster(config, cluster.WithMemberID(fmt.Sprintf("replica-%d", i))))
+		node := gossipprotocol.NewNode(cluster.NewCluster(config, cluster.WithMemberID(fmt.Sprintf("replica-%d", i))), t.scheme)
 		t.registerServer(node)
 		t.registerStorage(node)
 		if err := node.Start(); err != nil {
@@ -116,7 +123,7 @@ func (t *Test) Start() ([]*grpc.ClientConn, error) {
 	t.conns = make([]*grpc.ClientConn, 0, t.clients)
 	for i := 1; i <= t.clients; i++ {
 		port := 5700 + i
-		proxy := gossipproxy.NewNode(cluster.NewCluster(config, cluster.WithMemberID("proxy-1"), cluster.WithHost("localhost"), cluster.WithPort(port)))
+		proxy := gossipproxy.NewNode(cluster.NewCluster(config, cluster.WithMemberID("proxy-1"), cluster.WithHost("localhost"), cluster.WithPort(port)), t.scheme)
 		t.registerProxy(proxy)
 		if err := proxy.Start(); err != nil {
 			return nil, err

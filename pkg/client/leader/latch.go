@@ -119,6 +119,7 @@ func (l *latch) ID() string {
 
 func (l *latch) Get(ctx context.Context) (*Leadership, error) {
 	request := &api.GetRequest{
+		Headers: l.GetHeaders(),
 	}
 	response, err := l.client.Get(ctx, request)
 	if err != nil {
@@ -128,7 +129,9 @@ func (l *latch) Get(ctx context.Context) (*Leadership, error) {
 }
 
 func (l *latch) Latch(ctx context.Context) (*Leadership, error) {
-	request := &api.LatchRequest{}
+	request := &api.LatchRequest{
+		Headers: l.GetHeaders(),
+	}
 	response, err := l.client.Latch(ctx, request)
 	if err != nil {
 		return nil, errors.From(err)
@@ -137,8 +140,10 @@ func (l *latch) Latch(ctx context.Context) (*Leadership, error) {
 }
 
 func (l *latch) Watch(ctx context.Context, ch chan<- Event) error {
-	request := &api.EventsRequest{}
-	stream, err := l.client.Events(l.AddHeaders(ctx), request)
+	request := &api.EventsRequest{
+		Headers: l.GetHeaders(),
+	}
+	stream, err := l.client.Events(ctx, request)
 	if err != nil {
 		return errors.From(err)
 	}

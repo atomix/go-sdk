@@ -27,6 +27,7 @@ import (
 	"github.com/atomix/go-framework/pkg/atomix/time"
 	"github.com/stretchr/testify/assert"
 	"testing"
+	time2 "time"
 )
 
 func TestRSMValue(t *testing.T) {
@@ -137,6 +138,7 @@ func TestRSMValue(t *testing.T) {
 
 func TestGossipValue(t *testing.T) {
 	test := gossip.NewTest().
+		SetScheme(time.LogicalScheme).
 		SetReplicas(3).
 		SetPartitions(3).
 		SetClients(3).
@@ -220,6 +222,8 @@ func TestGossipValue(t *testing.T) {
 
 	value2, err := New(context.TODO(), "test", conns[2])
 	assert.NoError(t, err)
+
+	time2.Sleep(time2.Second)
 
 	val, _, err = value1.Get(context.TODO())
 	assert.NoError(t, err)

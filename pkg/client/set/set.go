@@ -108,11 +108,12 @@ type set struct {
 
 func (s *set) Add(ctx context.Context, value string) (bool, error) {
 	request := &api.AddRequest{
+		Headers: s.GetHeaders(),
 		Element: api.Element{
 			Value: value,
 		},
 	}
-	_, err := s.client.Add(s.AddHeaders(ctx), request)
+	_, err := s.client.Add(ctx, request)
 	if err != nil {
 		err = errors.From(err)
 		if errors.IsAlreadyExists(err) {
@@ -125,11 +126,12 @@ func (s *set) Add(ctx context.Context, value string) (bool, error) {
 
 func (s *set) Remove(ctx context.Context, value string) (bool, error) {
 	request := &api.RemoveRequest{
+		Headers: s.GetHeaders(),
 		Element: api.Element{
 			Value: value,
 		},
 	}
-	_, err := s.client.Remove(s.AddHeaders(ctx), request)
+	_, err := s.client.Remove(ctx, request)
 	if err != nil {
 		err = errors.From(err)
 		if errors.IsNotFound(err) {
@@ -142,11 +144,12 @@ func (s *set) Remove(ctx context.Context, value string) (bool, error) {
 
 func (s *set) Contains(ctx context.Context, value string) (bool, error) {
 	request := &api.ContainsRequest{
+		Headers: s.GetHeaders(),
 		Element: api.Element{
 			Value: value,
 		},
 	}
-	response, err := s.client.Contains(s.AddHeaders(ctx), request)
+	response, err := s.client.Contains(ctx, request)
 	if err != nil {
 		return false, errors.From(err)
 	}
@@ -154,8 +157,10 @@ func (s *set) Contains(ctx context.Context, value string) (bool, error) {
 }
 
 func (s *set) Len(ctx context.Context) (int, error) {
-	request := &api.SizeRequest{}
-	response, err := s.client.Size(s.AddHeaders(ctx), request)
+	request := &api.SizeRequest{
+		Headers: s.GetHeaders(),
+	}
+	response, err := s.client.Size(ctx, request)
 	if err != nil {
 		return 0, errors.From(err)
 	}
@@ -163,8 +168,10 @@ func (s *set) Len(ctx context.Context) (int, error) {
 }
 
 func (s *set) Clear(ctx context.Context) error {
-	request := &api.ClearRequest{}
-	_, err := s.client.Clear(s.AddHeaders(ctx), request)
+	request := &api.ClearRequest{
+		Headers: s.GetHeaders(),
+	}
+	_, err := s.client.Clear(ctx, request)
 	if err != nil {
 		return errors.From(err)
 	}
@@ -172,8 +179,10 @@ func (s *set) Clear(ctx context.Context) error {
 }
 
 func (s *set) Elements(ctx context.Context, ch chan<- string) error {
-	request := &api.ElementsRequest{}
-	stream, err := s.client.Elements(s.AddHeaders(ctx), request)
+	request := &api.ElementsRequest{
+		Headers: s.GetHeaders(),
+	}
+	stream, err := s.client.Elements(ctx, request)
 	if err != nil {
 		return errors.From(err)
 	}
@@ -207,8 +216,10 @@ func (s *set) Elements(ctx context.Context, ch chan<- string) error {
 }
 
 func (s *set) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) error {
-	request := &api.EventsRequest{}
-	stream, err := s.client.Events(s.AddHeaders(ctx), request)
+	request := &api.EventsRequest{
+		Headers: s.GetHeaders(),
+	}
+	stream, err := s.client.Events(ctx, request)
 	if err != nil {
 		return errors.From(err)
 	}
