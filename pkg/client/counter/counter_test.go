@@ -16,12 +16,17 @@ package counter
 
 import (
 	"context"
+	"github.com/atomix/go-client/pkg/client/test/gossip"
 	"github.com/atomix/go-client/pkg/client/test/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
+	gossipvalue "github.com/atomix/go-framework/pkg/atomix/protocol/gossip/counter"
 	counterrsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/counter"
+	gossipproxy "github.com/atomix/go-framework/pkg/atomix/proxy/gossip/counter"
 	counterproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/counter"
+	atime "github.com/atomix/go-framework/pkg/atomix/time"
 	"github.com/stretchr/testify/assert"
 	"testing"
+	"time"
 )
 
 func TestCounterOperations(t *testing.T) {
@@ -102,4 +107,79 @@ func TestCounterOperations(t *testing.T) {
 	value, err = counter.Get(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, int64(0), value)
+}
+
+func TestGossipCounter(t *testing.T) {
+	test := gossip.NewTest().
+		SetScheme(atime.LogicalScheme).
+		SetReplicas(3).
+		SetPartitions(3).
+		SetClients(3).
+		SetServer(gossipvalue.RegisterServer).
+		SetStorage(gossipvalue.RegisterService).
+		SetProxy(gossipproxy.RegisterProxy)
+
+	conns, err := test.Start()
+	assert.NoError(t, err)
+	defer test.Stop()
+
+	counter1, err := New(context.TODO(), "test", conns[0])
+	assert.NoError(t, err)
+	assert.NotNil(t, counter1)
+
+	counter2, err := New(context.TODO(), "test", conns[1])
+	assert.NoError(t, err)
+	assert.NotNil(t, counter2)
+
+	value, err := counter1.Get(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, int64(0), value)
+
+	value, err = counter2.Get(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, int64(0), value)
+
+	value, err = counter1.Increment(context.TODO(), 1)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(1), value)
+
+	value, err = counter1.Get(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, int64(1), value)
+
+	value, err = counter2.Get(context.TODO())
+	assert.NoError(t, err)
+
+	time.Sleep(time.Second)
+
+	value, err = counter2.Get(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, int64(1), value)
+
+	value, err = counter2.Decrement(context.TODO(), 5)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(-4), value)
+
+	value, err = counter2.Get(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, int64(-4), value)
+
+	time.Sleep(time.Second)
+
+	value, err = counter1.Get(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, int64(-4), value)
+
+	err = counter1.Set(context.TODO(), 10)
+	assert.NoError(t, err)
+
+	value, err = counter1.Get(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, int64(10), value)
+
+	time.Sleep(time.Second)
+
+	value, err = counter2.Get(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, int64(10), value)
 }
