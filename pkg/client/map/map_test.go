@@ -16,13 +16,18 @@ package _map //nolint:golint
 
 import (
 	"context"
+	"github.com/atomix/go-client/pkg/client/test/gossip"
 	"github.com/atomix/go-client/pkg/client/test/rsm"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
 	"github.com/atomix/go-framework/pkg/atomix/meta"
+	gossipmap "github.com/atomix/go-framework/pkg/atomix/protocol/gossip/map"
 	maprsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/map"
+	gossipproxy "github.com/atomix/go-framework/pkg/atomix/proxy/gossip/map"
 	mapproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/map"
+	atime "github.com/atomix/go-framework/pkg/atomix/time"
 	"github.com/stretchr/testify/assert"
 	"testing"
+	"time"
 )
 
 func TestMapOperations(t *testing.T) {
@@ -233,4 +238,47 @@ func TestMapStreams(t *testing.T) {
 	size, err = _map.Len(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, 0, size)
+}
+
+func TestGossipMap(t *testing.T) {
+	test := gossip.NewTest().
+		SetScheme(atime.LogicalScheme).
+		SetReplicas(3).
+		SetPartitions(3).
+		SetClients(3).
+		SetServer(gossipmap.RegisterServer).
+		SetStorage(gossipmap.RegisterService).
+		SetProxy(gossipproxy.RegisterProxy)
+
+	conns, err := test.Start()
+	assert.NoError(t, err)
+	defer test.Stop()
+
+	map1, err := New(context.TODO(), "test", conns[0])
+	assert.NoError(t, err)
+	assert.NotNil(t, map1)
+
+	map2, err := New(context.TODO(), "test", conns[1])
+	assert.NoError(t, err)
+	assert.NotNil(t, map2)
+
+	entry, err := map1.Get(context.TODO(), "foo")
+	assert.True(t, errors.IsNotFound(err))
+	assert.Nil(t, entry)
+
+	entry, err = map2.Get(context.TODO(), "bar")
+	assert.True(t, errors.IsNotFound(err))
+	assert.Nil(t, entry)
+
+	entry, err = map1.Put(context.TODO(), "foo", []byte("bar"))
+	assert.NoError(t, err)
+	assert.Equal(t, "foo", entry.Key)
+	assert.Equal(t, "bar", string(entry.Value))
+
+	time.Sleep(time.Second)
+
+	entry, err = map2.Get(context.TODO(), "foo")
+	assert.NoError(t, err)
+	assert.Equal(t, "foo", entry.Key)
+	assert.Equal(t, "bar", string(entry.Value))
 }
