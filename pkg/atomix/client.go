@@ -80,10 +80,8 @@ func GetValue(ctx context.Context, name string, opts ...value.Option) (value.Val
 
 // NewClient creates a new Atomix client
 func NewClient(opts ...Option) Client {
-	var options Options
-	options.apply(opts...)
 	return &atomixClient{
-		options: options,
+		options: newOptions(opts...),
 		proxies: make(map[string]*grpc.ClientConn),
 	}
 }

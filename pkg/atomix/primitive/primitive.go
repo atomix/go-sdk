@@ -24,6 +24,10 @@ import (
 // Type is the type of a primitive
 type Type string
 
+func (t Type) String() string {
+	return string(t)
+}
+
 // Primitive is the base interface for primitives
 type Primitive interface {
 	// Type returns the primitive type

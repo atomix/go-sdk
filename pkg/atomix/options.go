@@ -14,15 +14,24 @@
 
 package atomix
 
+func newOptions(opts ...Option) Options {
+	options := Options{
+		Host: defaultHost,
+		Port: defaultPort,
+	}
+	options.apply(opts...)
+	return options
+}
+
 // Options is a set of options for configuring the Atomix client
 type Options struct {
 	Host string
 	Port int
 }
 
-func (o Options) apply(opts ...Option) {
+func (o *Options) apply(opts ...Option) {
 	for _, opt := range opts {
-		opt(&o)
+		opt(o)
 	}
 }
 

@@ -16,31 +16,61 @@ package counter
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/atomix/test/gossip"
-	"github.com/atomix/go-client/pkg/atomix/test/rsm"
+	primitiveapi "github.com/atomix/api/go/atomix/primitive"
+	"github.com/atomix/go-client/pkg/atomix/test"
+	"github.com/atomix/go-framework/pkg/atomix/cluster"
 	"github.com/atomix/go-framework/pkg/atomix/errors"
-	gossipvalue "github.com/atomix/go-framework/pkg/atomix/protocol/gossip/counter"
+	"github.com/atomix/go-framework/pkg/atomix/node"
+	gossipprotocol "github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
+	gossipcounterprotocol "github.com/atomix/go-framework/pkg/atomix/protocol/gossip/counter"
+	rsmprotocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
 	counterrsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/counter"
-	gossipproxy "github.com/atomix/go-framework/pkg/atomix/proxy/gossip/counter"
+	"github.com/atomix/go-framework/pkg/atomix/proxy"
+	gossipproxy "github.com/atomix/go-framework/pkg/atomix/proxy/gossip"
+	gossipcounterproxy "github.com/atomix/go-framework/pkg/atomix/proxy/gossip/counter"
+	rsmproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm"
 	counterproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/counter"
 	atime "github.com/atomix/go-framework/pkg/atomix/time"
+	"github.com/atomix/go-local/pkg/atomix/local"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
 )
 
 func TestCounterOperations(t *testing.T) {
-	test := rsm.NewTest().
-		SetPartitions(1).
-		SetSessions(3).
-		SetStorage(counterrsm.RegisterService).
-		SetProxy(counterproxy.RegisterProxy)
-
-	conns, err := test.Start()
-	assert.NoError(t, err)
+	test := test.NewTestCluster()
 	defer test.Stop()
+	test.Storage().AddPrimitive(primitiveapi.PrimitiveMeta{
+		Name:   "test",
+		Type:   Type.String(),
+		Driver: "test",
+	})
+	err := test.Storage().Start(func(c cluster.Cluster) node.Node {
+		node := rsmprotocol.NewNode(c, local.NewProtocol())
+		counterrsm.RegisterService(node)
+		return node
+	})
+	assert.NoError(t, err)
+	conn1, err := test.Node(1).Connect(func(c cluster.Cluster) proxy.Node {
+		node := rsmproxy.NewNode(c)
+		counterproxy.RegisterProxy(node)
+		return node
+	})
+	assert.NoError(t, err)
+	conn2, err := test.Node(2).Connect(func(c cluster.Cluster) proxy.Node {
+		node := rsmproxy.NewNode(c)
+		counterproxy.RegisterProxy(node)
+		return node
+	})
+	assert.NoError(t, err)
+	conn3, err := test.Node(3).Connect(func(c cluster.Cluster) proxy.Node {
+		node := rsmproxy.NewNode(c)
+		counterproxy.RegisterProxy(node)
+		return node
+	})
+	assert.NoError(t, err)
 
-	counter, err := New(context.TODO(), "test", conns[0])
+	counter, err := New(context.TODO(), "test", conn1)
 	assert.NoError(t, err)
 	assert.NotNil(t, counter)
 
@@ -81,10 +111,10 @@ func TestCounterOperations(t *testing.T) {
 	err = counter.Close(context.Background())
 	assert.NoError(t, err)
 
-	counter1, err := New(context.TODO(), "test", conns[1])
+	counter1, err := New(context.TODO(), "test", conn2)
 	assert.NoError(t, err)
 
-	counter2, err := New(context.TODO(), "test", conns[2])
+	counter2, err := New(context.TODO(), "test", conn3)
 	assert.NoError(t, err)
 
 	value, err = counter1.Get(context.TODO())
@@ -101,7 +131,7 @@ func TestCounterOperations(t *testing.T) {
 	assert.Error(t, err)
 	assert.True(t, errors.IsNotFound(err))
 
-	counter, err = New(context.TODO(), "test", conns[0])
+	counter, err = New(context.TODO(), "test", conn1)
 	assert.NoError(t, err)
 
 	value, err = counter.Get(context.TODO())
@@ -110,24 +140,37 @@ func TestCounterOperations(t *testing.T) {
 }
 
 func TestGossipCounter(t *testing.T) {
-	test := gossip.NewTest().
-		SetScheme(atime.LogicalScheme).
-		SetReplicas(3).
-		SetPartitions(3).
-		SetClients(3).
-		SetServer(gossipvalue.RegisterServer).
-		SetStorage(gossipvalue.RegisterService).
-		SetProxy(gossipproxy.RegisterProxy)
-
-	conns, err := test.Start()
-	assert.NoError(t, err)
+	test := test.NewTestCluster()
 	defer test.Stop()
+	test.Storage().AddPrimitive(primitiveapi.PrimitiveMeta{
+		Name:   "test",
+		Type:   Type.String(),
+		Driver: "test",
+	})
+	err := test.Storage().Start(func(c cluster.Cluster) node.Node {
+		node := gossipprotocol.NewNode(c, atime.LogicalScheme)
+		gossipcounterprotocol.RegisterService(node)
+		return node
+	})
+	assert.NoError(t, err)
+	conn1, err := test.Node(1).Connect(func(c cluster.Cluster) proxy.Node {
+		node := gossipproxy.NewNode(c, atime.LogicalScheme)
+		gossipcounterproxy.RegisterProxy(node)
+		return node
+	})
+	assert.NoError(t, err)
+	conn2, err := test.Node(2).Connect(func(c cluster.Cluster) proxy.Node {
+		node := gossipproxy.NewNode(c, atime.LogicalScheme)
+		gossipcounterproxy.RegisterProxy(node)
+		return node
+	})
+	assert.NoError(t, err)
 
-	counter1, err := New(context.TODO(), "test", conns[0])
+	counter1, err := New(context.TODO(), "test", conn1)
 	assert.NoError(t, err)
 	assert.NotNil(t, counter1)
 
-	counter2, err := New(context.TODO(), "test", conns[1])
+	counter2, err := New(context.TODO(), "test", conn2)
 	assert.NoError(t, err)
 	assert.NotNil(t, counter2)
 
