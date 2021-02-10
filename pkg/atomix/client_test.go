@@ -57,6 +57,16 @@ import (
 	rsmmapproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/map"
 	rsmsetproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/set"
 	rsmvalueproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/value"
+	counterproxyserver "github.com/atomix/go-framework/pkg/atomix/proxy/server/counter"
+	electionproxyserver "github.com/atomix/go-framework/pkg/atomix/proxy/server/election"
+	indexedmapproxyserver "github.com/atomix/go-framework/pkg/atomix/proxy/server/indexedmap"
+	leaderproxyserver "github.com/atomix/go-framework/pkg/atomix/proxy/server/leader"
+	listproxyserver "github.com/atomix/go-framework/pkg/atomix/proxy/server/list"
+	lockproxyserver "github.com/atomix/go-framework/pkg/atomix/proxy/server/lock"
+	logproxyserver "github.com/atomix/go-framework/pkg/atomix/proxy/server/log"
+	mapproxyserver "github.com/atomix/go-framework/pkg/atomix/proxy/server/map"
+	setproxyserver "github.com/atomix/go-framework/pkg/atomix/proxy/server/set"
+	valueproxyserver "github.com/atomix/go-framework/pkg/atomix/proxy/server/value"
 	"github.com/atomix/go-framework/pkg/atomix/time"
 	"github.com/atomix/go-local/pkg/atomix/local"
 	"github.com/stretchr/testify/assert"
@@ -123,6 +133,16 @@ func TestClient(t *testing.T) {
 	assert.NoError(t, err)
 
 	rsmProxy := rsmproxy.NewNode(cluster.NewCluster(rsmConfig, cluster.WithMemberID("rsm-proxy-1"), cluster.WithHost("localhost"), cluster.WithPort(6000)))
+	counterproxyserver.RegisterService(rsmProxy)
+	electionproxyserver.RegisterService(rsmProxy)
+	indexedmapproxyserver.RegisterService(rsmProxy)
+	leaderproxyserver.RegisterService(rsmProxy)
+	listproxyserver.RegisterService(rsmProxy)
+	lockproxyserver.RegisterService(rsmProxy)
+	logproxyserver.RegisterService(rsmProxy)
+	mapproxyserver.RegisterService(rsmProxy)
+	setproxyserver.RegisterService(rsmProxy)
+	valueproxyserver.RegisterService(rsmProxy)
 	rsmcounterproxy.RegisterProxy(rsmProxy)
 	rsmelectionproxy.RegisterProxy(rsmProxy)
 	rsmindexedmapproxy.RegisterProxy(rsmProxy)
@@ -207,6 +227,10 @@ func TestClient(t *testing.T) {
 	assert.NoError(t, err)
 
 	gossipProxy := gossipproxy.NewNode(cluster.NewCluster(gossipConfig, cluster.WithMemberID("gossip-proxy-1"), cluster.WithHost("localhost"), cluster.WithPort(6001)), time.LogicalScheme)
+	counterproxyserver.RegisterService(gossipProxy)
+	mapproxyserver.RegisterService(gossipProxy)
+	setproxyserver.RegisterService(gossipProxy)
+	valueproxyserver.RegisterService(gossipProxy)
 	gossipcounterproxy.RegisterProxy(gossipProxy)
 	gossipmapproxy.RegisterProxy(gossipProxy)
 	gossipsetproxy.RegisterProxy(gossipProxy)
@@ -281,23 +305,47 @@ func TestClient(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, rsmMap)
 
+	i, err := rsmMap.Len(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, 0, i)
+
 	rsmCachedMap, err := client.GetMap(context.TODO(), "rsm-cached-map")
 	assert.NoError(t, err)
 	assert.NotNil(t, rsmCachedMap)
+
+	i, err = rsmCachedMap.Len(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, 0, i)
 
 	rsmReadOnlyMap, err := client.GetMap(context.TODO(), "rsm-read-only-map")
 	assert.NoError(t, err)
 	assert.NotNil(t, rsmReadOnlyMap)
 
+	i, err = rsmReadOnlyMap.Len(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, 0, i)
+
 	gossipMap, err := client.GetMap(context.TODO(), "gossip-map")
 	assert.NoError(t, err)
 	assert.NotNil(t, gossipMap)
+
+	i, err = gossipMap.Len(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, 0, i)
 
 	gossipCachedMap, err := client.GetMap(context.TODO(), "gossip-cached-map")
 	assert.NoError(t, err)
 	assert.NotNil(t, gossipCachedMap)
 
+	i, err = gossipCachedMap.Len(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, 0, i)
+
 	gossipReadOnlyMap, err := client.GetMap(context.TODO(), "gossip-read-only-map")
 	assert.NoError(t, err)
 	assert.NotNil(t, gossipReadOnlyMap)
+
+	i, err = gossipReadOnlyMap.Len(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, 0, i)
 }
