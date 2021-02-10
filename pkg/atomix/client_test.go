@@ -75,6 +75,12 @@ import (
 )
 
 func TestClient(t *testing.T) {
+	coordConfig := protocolapi.ProtocolReplica{
+		ID:           "coordinator",
+		Host:         "localhost",
+		ProtocolPort: 5678,
+		APIPort:      5678,
+	}
 	coordCluster := cluster.NewCluster(
 		protocolapi.ProtocolConfig{},
 		cluster.WithMemberID("coordinator"),
@@ -132,7 +138,7 @@ func TestClient(t *testing.T) {
 	err = rsmNode.Start()
 	assert.NoError(t, err)
 
-	rsmProxy := rsmproxy.NewNode(cluster.NewCluster(rsmConfig, cluster.WithMemberID("rsm-proxy-1"), cluster.WithHost("localhost"), cluster.WithPort(6000)))
+	rsmProxy := rsmproxy.NewNode(cluster.NewReplica(coordConfig), cluster.NewCluster(rsmConfig, cluster.WithMemberID("rsm-proxy-1"), cluster.WithHost("localhost"), cluster.WithPort(6000)))
 	counterproxyserver.RegisterService(rsmProxy)
 	electionproxyserver.RegisterService(rsmProxy)
 	indexedmapproxyserver.RegisterService(rsmProxy)
@@ -226,7 +232,7 @@ func TestClient(t *testing.T) {
 	err = gossipNode3.Start()
 	assert.NoError(t, err)
 
-	gossipProxy := gossipproxy.NewNode(cluster.NewCluster(gossipConfig, cluster.WithMemberID("gossip-proxy-1"), cluster.WithHost("localhost"), cluster.WithPort(6001)), time.LogicalScheme)
+	gossipProxy := gossipproxy.NewNode(cluster.NewReplica(coordConfig), cluster.NewCluster(gossipConfig, cluster.WithMemberID("gossip-proxy-1"), cluster.WithHost("localhost"), cluster.WithPort(6001)), time.LogicalScheme)
 	counterproxyserver.RegisterService(gossipProxy)
 	mapproxyserver.RegisterService(gossipProxy)
 	setproxyserver.RegisterService(gossipProxy)
