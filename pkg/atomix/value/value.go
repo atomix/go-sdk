@@ -30,8 +30,14 @@ var log = logging.GetLogger("atomix", "client", "value")
 // Type is the value type
 const Type primitive.Type = "Value"
 
-// Client provides an API for creating Values
-type Client interface {
+// ClusterClient provides an API for creating Values
+type ClusterClient interface {
+	// GetValue gets the Value instance of the given name
+	GetValue(ctx context.Context, namespace, name string, opts ...Option) (Value, error)
+}
+
+// NamespaceClient provides an API for creating Values
+type NamespaceClient interface {
 	// GetValue gets the Value instance of the given name
 	GetValue(ctx context.Context, name string, opts ...Option) (Value, error)
 }
@@ -71,9 +77,9 @@ type Event struct {
 
 // New creates a new Lock primitive for the given partitions
 // The value will be created in one of the given partitions.
-func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Value, error) {
+func New(ctx context.Context, namespace, name string, conn *grpc.ClientConn, opts ...Option) (Value, error) {
 	v := &value{
-		Client: primitive.NewClient(Type, name, conn),
+		Client: primitive.NewClient(Type, namespace, name, conn),
 		client: api.NewValueServiceClient(conn),
 	}
 	if err := v.Create(ctx); err != nil {

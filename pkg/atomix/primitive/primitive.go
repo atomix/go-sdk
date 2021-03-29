@@ -33,6 +33,9 @@ type Primitive interface {
 	// Type returns the primitive type
 	Type() Type
 
+	// Namespace returns the primitive namespace
+	Namespace() string
+
 	// Name returns the primitive name
 	Name() string
 
@@ -43,16 +46,18 @@ type Primitive interface {
 	Delete(ctx context.Context) error
 }
 
-func NewClient(t Type, n string, conn *grpc.ClientConn) *Client {
+func NewClient(primitiveType Type, namespace, name string, conn *grpc.ClientConn) *Client {
 	return &Client{
-		primitiveType: t,
-		name:          n,
+		primitiveType: primitiveType,
+		namespace:     namespace,
+		name:          name,
 		client:        primitiveapi.NewPrimitiveServiceClient(conn),
 	}
 }
 
 type Client struct {
 	primitiveType Type
+	namespace     string
 	name          string
 	client        primitiveapi.PrimitiveServiceClient
 }
@@ -61,20 +66,31 @@ func (c *Client) Type() Type {
 	return c.primitiveType
 }
 
+func (c *Client) Namespace() string {
+	return c.namespace
+}
+
 func (c *Client) Name() string {
 	return c.name
 }
 
+func (c *Client) getPrimitiveId() primitiveapi.PrimitiveId {
+	return primitiveapi.PrimitiveId{
+		Type:      c.primitiveType.String(),
+		Namespace: c.namespace,
+		Name:      c.name,
+	}
+}
+
 func (c *Client) GetHeaders() primitiveapi.RequestHeaders {
 	return primitiveapi.RequestHeaders{
-		PrimitiveID: c.name,
+		PrimitiveID: c.getPrimitiveId(),
 	}
 }
 
 func (c *Client) Create(ctx context.Context) error {
 	request := &primitiveapi.CreateRequest{
-		Type: string(c.Type()),
-		Name: c.name,
+		PrimitiveID: c.getPrimitiveId(),
 	}
 	_, err := c.client.Create(ctx, request)
 	return errors.From(err)
@@ -82,8 +98,7 @@ func (c *Client) Create(ctx context.Context) error {
 
 func (c *Client) Close(ctx context.Context) error {
 	request := &primitiveapi.CloseRequest{
-		Type: string(c.Type()),
-		Name: c.name,
+		PrimitiveID: c.getPrimitiveId(),
 	}
 	_, err := c.client.Close(ctx, request)
 	return errors.From(err)
@@ -91,8 +106,7 @@ func (c *Client) Close(ctx context.Context) error {
 
 func (c *Client) Delete(ctx context.Context) error {
 	request := &primitiveapi.DeleteRequest{
-		Type: string(c.Type()),
-		Name: c.name,
+		PrimitiveID: c.getPrimitiveId(),
 	}
 	_, err := c.client.Delete(ctx, request)
 	return errors.From(err)

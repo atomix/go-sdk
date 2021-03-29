@@ -28,8 +28,14 @@ var log = logging.GetLogger("atomix", "client", "counter")
 // Type is the counter type
 const Type primitive.Type = "Counter"
 
-// Client provides an API for creating Counters
-type Client interface {
+// ClusterClient provides an API for creating Counters
+type ClusterClient interface {
+	// GetCounter gets the Counter instance of the given name
+	GetCounter(ctx context.Context, namespace, name string, opts ...Option) (Counter, error)
+}
+
+// NamespaceClient provides an API for creating Counters
+type NamespaceClient interface {
 	// GetCounter gets the Counter instance of the given name
 	GetCounter(ctx context.Context, name string, opts ...Option) (Counter, error)
 }
@@ -52,9 +58,9 @@ type Counter interface {
 }
 
 // New creates a new counter for the given partitions
-func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Counter, error) {
+func New(ctx context.Context, namespace, name string, conn *grpc.ClientConn, opts ...Option) (Counter, error) {
 	c := &counter{
-		Client: primitive.NewClient(Type, name, conn),
+		Client: primitive.NewClient(Type, namespace, name, conn),
 		client: api.NewCounterServiceClient(conn),
 	}
 	if err := c.Create(ctx); err != nil {

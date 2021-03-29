@@ -23,7 +23,8 @@ type Option interface {
 
 // options is counter options
 type options struct {
-	clientID string
+	namespace string
+	clientID  string
 }
 
 func applyOptions(opts ...Option) options {
