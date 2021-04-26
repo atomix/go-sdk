@@ -17,40 +17,79 @@ package atomix
 import (
 	"context"
 	brokerapi "github.com/atomix/api/go/atomix/management/broker"
+	driverapi "github.com/atomix/api/go/atomix/management/driver"
+	primitiveapi "github.com/atomix/api/go/atomix/primitive"
 	protocolapi "github.com/atomix/api/go/atomix/protocol"
 	_map "github.com/atomix/go-client/pkg/atomix/map"
 	"github.com/atomix/go-framework/pkg/atomix/broker"
 	"github.com/atomix/go-framework/pkg/atomix/cluster"
-	gossipdriver "github.com/atomix/go-framework/pkg/atomix/driver/protocol/gossip"
-	rsmdriver "github.com/atomix/go-framework/pkg/atomix/driver/protocol/rsm"
-	gossipprotocol "github.com/atomix/go-framework/pkg/atomix/protocol/gossip"
-	gossipcounterprotocol "github.com/atomix/go-framework/pkg/atomix/protocol/gossip/counter"
-	gossipmapprotocol "github.com/atomix/go-framework/pkg/atomix/protocol/gossip/map"
-	gossipsetprotocol "github.com/atomix/go-framework/pkg/atomix/protocol/gossip/set"
-	gossipvalueprotocol "github.com/atomix/go-framework/pkg/atomix/protocol/gossip/value"
-	rsmprotocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm"
-	rsmcounterprotocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/counter"
-	rsmelectionprotocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/election"
-	rsmindexedmapprotocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/indexedmap"
-	rsmleaderprotocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/leader"
-	rsmlistprotocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/list"
-	rsmlockprotocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/lock"
-	rsmlogprotocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/log"
-	rsmmapprotocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/map"
-	rsmsetprotocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/set"
-	rsmvalueprotocol "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/value"
+	"github.com/atomix/go-framework/pkg/atomix/driver"
+	"github.com/atomix/go-framework/pkg/atomix/driver/proxy"
+	gossipdriver "github.com/atomix/go-framework/pkg/atomix/driver/proxy/gossip"
+	gossipcounterproxy "github.com/atomix/go-framework/pkg/atomix/driver/proxy/gossip/counter"
+	gossipmapproxy "github.com/atomix/go-framework/pkg/atomix/driver/proxy/gossip/map"
+	gossipsetproxy "github.com/atomix/go-framework/pkg/atomix/driver/proxy/gossip/set"
+	gossipvalueproxy "github.com/atomix/go-framework/pkg/atomix/driver/proxy/gossip/value"
+	rsmdriver "github.com/atomix/go-framework/pkg/atomix/driver/proxy/rsm"
+	rsmcounterproxy "github.com/atomix/go-framework/pkg/atomix/driver/proxy/rsm/counter"
+	rsmelectionproxy "github.com/atomix/go-framework/pkg/atomix/driver/proxy/rsm/election"
+	rsmindexedmapproxy "github.com/atomix/go-framework/pkg/atomix/driver/proxy/rsm/indexedmap"
+	rsmleaderproxy "github.com/atomix/go-framework/pkg/atomix/driver/proxy/rsm/leader"
+	rsmlistproxy "github.com/atomix/go-framework/pkg/atomix/driver/proxy/rsm/list"
+	rsmlockproxy "github.com/atomix/go-framework/pkg/atomix/driver/proxy/rsm/lock"
+	rsmlogproxy "github.com/atomix/go-framework/pkg/atomix/driver/proxy/rsm/log"
+	rsmmapproxy "github.com/atomix/go-framework/pkg/atomix/driver/proxy/rsm/map"
+	rsmsetproxy "github.com/atomix/go-framework/pkg/atomix/driver/proxy/rsm/set"
+	rsmvalueproxy "github.com/atomix/go-framework/pkg/atomix/driver/proxy/rsm/value"
+	"github.com/atomix/go-framework/pkg/atomix/logging"
+	gossipprotocol "github.com/atomix/go-framework/pkg/atomix/storage/protocol/gossip"
+	gossipcounterprotocol "github.com/atomix/go-framework/pkg/atomix/storage/protocol/gossip/counter"
+	gossipmapprotocol "github.com/atomix/go-framework/pkg/atomix/storage/protocol/gossip/map"
+	gossipsetprotocol "github.com/atomix/go-framework/pkg/atomix/storage/protocol/gossip/set"
+	gossipvalueprotocol "github.com/atomix/go-framework/pkg/atomix/storage/protocol/gossip/value"
+	rsmprotocol "github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm"
+	rsmcounterprotocol "github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm/counter"
+	rsmelectionprotocol "github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm/election"
+	rsmindexedmapprotocol "github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm/indexedmap"
+	rsmleaderprotocol "github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm/leader"
+	rsmlistprotocol "github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm/list"
+	rsmlockprotocol "github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm/lock"
+	rsmlogprotocol "github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm/log"
+	rsmmapprotocol "github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm/map"
+	rsmsetprotocol "github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm/set"
+	rsmvalueprotocol "github.com/atomix/go-framework/pkg/atomix/storage/protocol/rsm/value"
 	atime "github.com/atomix/go-framework/pkg/atomix/time"
 	"github.com/atomix/go-local/pkg/atomix/local"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"testing"
-	"time"
 )
 
-func TestClient(t *testing.T) {
-	brokerNode := broker.NewNode()
+func TestRSMMap(t *testing.T) {
+	logging.SetLevel(logging.DebugLevel)
+
+	/*
+	node := test.NewNode("foo")
+	node.NewBroker().Start()
+
+	test.Storage().RSM().SetSomething(...)
+	test.Storage().Gossip().SetSomethingElse(...)
+
+	test.Node("foo").Drivers().RSM().
+
+	node := test.NewNode("foo")
+	rsmDriver := node.NewDriver(protocol.RSM)
+	gossipDriver := node.NewDriver(protocol.Gossip)
+	 */
+
+	brokerNode := broker.NewBroker(broker.WithPort(5678))
 	err := brokerNode.Start()
 	assert.NoError(t, err)
+
+	brokerConn, err := grpc.Dial("localhost:5678", grpc.WithInsecure())
+	assert.NoError(t, err)
+	defer brokerConn.Close()
+	brokerClient := brokerapi.NewBrokerClient(brokerConn)
 
 	rsmConfig := protocolapi.ProtocolConfig{
 		Replicas: []protocolapi.ProtocolReplica{
@@ -83,20 +122,123 @@ func TestClient(t *testing.T) {
 	err = rsmNode.Start()
 	assert.NoError(t, err)
 
-	rsmCluster := cluster.NewCluster(rsmConfig, cluster.WithMemberID("rsm"), cluster.WithPort(55680))
-	rsmDriver := rsmdriver.NewNode(rsmCluster)
-	rsmdriver.RegisterCounterProxy(rsmDriver)
-	rsmdriver.RegisterElectionProxy(rsmDriver)
-	rsmdriver.RegisterIndexedMapProxy(rsmDriver)
-	rsmdriver.RegisterLockProxy(rsmDriver)
-	rsmdriver.RegisterLogProxy(rsmDriver)
-	rsmdriver.RegisterLeaderLatchProxy(rsmDriver)
-	rsmdriver.RegisterListProxy(rsmDriver)
-	rsmdriver.RegisterMapProxy(rsmDriver)
-	rsmdriver.RegisterSetProxy(rsmDriver)
-	rsmdriver.RegisterValueProxy(rsmDriver)
+	rsmProtocolFunc := func(rsmCluster cluster.Cluster) proxy.Protocol {
+		rsmProxyProtocol := rsmdriver.NewProtocol(rsmCluster)
+		rsmcounterproxy.Register(rsmProxyProtocol)
+		rsmelectionproxy.Register(rsmProxyProtocol)
+		rsmindexedmapproxy.Register(rsmProxyProtocol)
+		rsmleaderproxy.Register(rsmProxyProtocol)
+		rsmlistproxy.Register(rsmProxyProtocol)
+		rsmlockproxy.Register(rsmProxyProtocol)
+		rsmlogproxy.Register(rsmProxyProtocol)
+		rsmmapproxy.Register(rsmProxyProtocol)
+		rsmsetproxy.Register(rsmProxyProtocol)
+		rsmvalueproxy.Register(rsmProxyProtocol)
+		return rsmProxyProtocol
+	}
+
+	rsmDriver := driver.NewDriver(rsmProtocolFunc, driver.WithDriverID("rsm"), driver.WithPort(5252))
 	err = rsmDriver.Start()
 	assert.NoError(t, err)
+
+	rsmDriverConn, err := grpc.Dial("localhost:5252", grpc.WithInsecure())
+	assert.NoError(t, err)
+	defer rsmDriverConn.Close()
+	rsmDriverClient := driverapi.NewDriverClient(rsmDriverConn)
+
+	rsmAgentID := driverapi.AgentId{
+		Namespace: "test",
+		Name:      "rsm",
+	}
+	rsmAgentAddress := driverapi.AgentAddress{
+		Host: defaultHost,
+		Port: 55680,
+	}
+	rsmAgentConfig := driverapi.AgentConfig{
+		Protocol: rsmConfig,
+	}
+
+	_, err = rsmDriverClient.StartAgent(context.TODO(), &driverapi.StartAgentRequest{AgentID: rsmAgentID, Address: rsmAgentAddress, Config: rsmAgentConfig})
+	assert.NoError(t, err)
+
+	rsmAgentConn, err := grpc.Dial("localhost:55680", grpc.WithInsecure())
+	assert.NoError(t, err)
+	defer rsmAgentConn.Close()
+	rsmAgentClient := driverapi.NewAgentClient(rsmAgentConn)
+	rsmPrimitiveAddress := brokerapi.PrimitiveAddress{
+		Host: defaultHost,
+		Port: 55680,
+	}
+
+	rsmMapID := primitiveapi.PrimitiveId{
+		Type:      _map.Type.String(),
+		Namespace: "test",
+		Name:      "rsm-map",
+	}
+	_, err = brokerClient.RegisterPrimitive(context.TODO(), &brokerapi.RegisterPrimitiveRequest{PrimitiveID: brokerapi.PrimitiveId{rsmMapID}, Address: rsmPrimitiveAddress})
+	assert.NoError(t, err)
+
+	rsmMapOptions := driverapi.ProxyOptions{
+		Read:  true,
+		Write: true,
+	}
+	_, err = rsmAgentClient.CreateProxy(context.TODO(), &driverapi.CreateProxyRequest{ProxyID: driverapi.ProxyId{rsmMapID}, Options: rsmMapOptions})
+
+	rsmReadOnlyMapID := primitiveapi.PrimitiveId{
+		Type:      _map.Type.String(),
+		Namespace: "test",
+		Name:      "rsm-read-only-map",
+	}
+	_, err = brokerClient.RegisterPrimitive(context.TODO(), &brokerapi.RegisterPrimitiveRequest{PrimitiveID: brokerapi.PrimitiveId{rsmReadOnlyMapID}, Address: rsmPrimitiveAddress})
+	assert.NoError(t, err)
+
+	rsmReadOnlyMapOptions := driverapi.ProxyOptions{
+		Read:  true,
+		Write: false,
+	}
+	_, err = rsmAgentClient.CreateProxy(context.TODO(), &driverapi.CreateProxyRequest{ProxyID: driverapi.ProxyId{rsmReadOnlyMapID}, Options: rsmReadOnlyMapOptions})
+
+	err = brokerConn.Close()
+	assert.NoError(t, err)
+
+	client := NewClient().Namespace("test")
+
+	rsmMap, err := client.GetMap(context.TODO(), "rsm-map")
+	assert.NoError(t, err)
+	assert.NotNil(t, rsmMap)
+
+	_, err = rsmMap.Put(context.TODO(), "foo", []byte("bar"))
+	assert.NoError(t, err)
+
+	entry, err := rsmMap.Get(context.TODO(), "foo")
+	assert.NoError(t, err)
+	assert.Equal(t, "foo", entry.Key)
+	assert.Equal(t, "bar", string(entry.Value))
+
+	i, err := rsmMap.Len(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, 1, i)
+
+	rsmReadOnlyMap, err := client.GetMap(context.TODO(), "rsm-read-only-map")
+	assert.NoError(t, err)
+	assert.NotNil(t, rsmReadOnlyMap)
+
+	i, err = rsmReadOnlyMap.Len(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, 0, i)
+}
+
+func TestGossipMap(t *testing.T) {
+	logging.SetLevel(logging.DebugLevel)
+
+	brokerNode := broker.NewBroker(broker.WithPort(5678))
+	err := brokerNode.Start()
+	assert.NoError(t, err)
+
+	brokerConn, err := grpc.Dial("localhost:5678", grpc.WithInsecure())
+	assert.NoError(t, err)
+	defer brokerConn.Close()
+	brokerClient := brokerapi.NewBrokerClient(brokerConn)
 
 	gossipConfig := protocolapi.ProtocolConfig{
 		Replicas: []protocolapi.ProtocolReplica{
@@ -163,156 +305,96 @@ func TestClient(t *testing.T) {
 	err = gossipNode3.Start()
 	assert.NoError(t, err)
 
-	gossipCluster := cluster.NewCluster(gossipConfig, cluster.WithMemberID("gossip"), cluster.WithPort(55681))
-	gossipDriver := gossipdriver.NewNode(gossipCluster, atime.LogicalScheme)
-	gossipdriver.RegisterCounterProxy(gossipDriver)
-	gossipdriver.RegisterMapProxy(gossipDriver)
-	gossipdriver.RegisterSetProxy(gossipDriver)
-	gossipdriver.RegisterValueProxy(gossipDriver)
+	gossipProtocolFunc := func(gossipCluster cluster.Cluster) proxy.Protocol {
+		gossipProxyProtocol := gossipdriver.NewProtocol(gossipCluster, atime.LogicalScheme)
+		gossipcounterproxy.Register(gossipProxyProtocol)
+		gossipmapproxy.Register(gossipProxyProtocol)
+		gossipsetproxy.Register(gossipProxyProtocol)
+		gossipvalueproxy.Register(gossipProxyProtocol)
+		return gossipProxyProtocol
+	}
+
+	gossipDriver := driver.NewDriver(gossipProtocolFunc, driver.WithDriverID("gossip"), driver.WithPort(5353))
 	err = gossipDriver.Start()
 	assert.NoError(t, err)
 
-	brokerConn, err := grpc.Dial("localhost:5151", grpc.WithInsecure())
+	gossipDriverConn, err := grpc.Dial("localhost:5353", grpc.WithInsecure())
 	assert.NoError(t, err)
-	defer brokerConn.Close()
+	defer gossipDriverConn.Close()
+	gossipDriverClient := driverapi.NewDriverClient(gossipDriverConn)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-
-	driverManagementClient := brokerapi.NewDriverManagementServiceClient(brokerConn)
-
-	_, err = driverManagementClient.AddDriver(ctx, &brokerapi.AddDriverRequest{
-		Driver: brokerapi.DriverConfig{
-			ID: brokerapi.DriverId{
-				Type:      "rsm",
-				Namespace: "test",
-				Name:      "rsm",
-			},
-			Host: defaultHost,
-			Port: 55680,
-		},
-	})
-	assert.NoError(t, err)
-
-	_, err = driverManagementClient.AddDriver(ctx, &brokerapi.AddDriverRequest{
-		Driver: brokerapi.DriverConfig{
-			ID: brokerapi.DriverId{
-				Type:      "gossip",
-				Namespace: "test",
-				Name:      "gossip",
-			},
-			Host: defaultHost,
-			Port: 55681,
-		},
-	})
-	assert.NoError(t, err)
-
-	primitiveManagementClient := brokerapi.NewPrimitiveManagementServiceClient(brokerConn)
-
-	rsmMapConfig := brokerapi.PrimitiveConfig{
-		ID: brokerapi.PrimitiveId{
-			Type:      _map.Type.String(),
-			Namespace: "test",
-			Name:      "rsm-map",
-		},
-		Driver: brokerapi.DriverId{
-			Type:      "rsm",
-			Namespace: "test",
-			Name:      "rsm",
-		},
-		Proxy: brokerapi.ProxyConfig{
-			Read:  true,
-			Write: true,
-		},
+	gossipAgentID := driverapi.AgentId{
+		Namespace: "test",
+		Name:      "gossip",
 	}
-	_, err = primitiveManagementClient.AddPrimitive(context.TODO(), &brokerapi.AddPrimitiveRequest{Primitive: rsmMapConfig})
+	gossipAgentAddress := driverapi.AgentAddress{
+		Host: defaultHost,
+		Port: 55681,
+	}
+	gossipAgentConfig := driverapi.AgentConfig{
+		Protocol: gossipConfig,
+	}
+
+	_, err = gossipDriverClient.StartAgent(context.TODO(), &driverapi.StartAgentRequest{AgentID: gossipAgentID, Address: gossipAgentAddress, Config: gossipAgentConfig})
 	assert.NoError(t, err)
 
-	rsmReadOnlyMapConfig := brokerapi.PrimitiveConfig{
-		ID: brokerapi.PrimitiveId{
-			Type:      _map.Type.String(),
-			Namespace: "test",
-			Name:      "rsm-read-only-map",
-		},
-		Driver: brokerapi.DriverId{
-			Type:      "rsm",
-			Namespace: "test",
-			Name:      "rsm",
-		},
-		Proxy: brokerapi.ProxyConfig{
-			Read:  true,
-			Write: false,
-		},
+	gossipAgentConn, err := grpc.Dial("localhost:55681", grpc.WithInsecure())
+	assert.NoError(t, err)
+	defer gossipAgentConn.Close()
+	gossipAgentClient := driverapi.NewAgentClient(gossipAgentConn)
+	gossipPrimitiveAddress := brokerapi.PrimitiveAddress{
+		Host: defaultHost,
+		Port: 55681,
 	}
-	_, err = primitiveManagementClient.AddPrimitive(context.TODO(), &brokerapi.AddPrimitiveRequest{Primitive: rsmReadOnlyMapConfig})
+
+	gossipMapID := primitiveapi.PrimitiveId{
+		Type:      _map.Type.String(),
+		Namespace: "test",
+		Name:      "gossip-map",
+	}
+	_, err = brokerClient.RegisterPrimitive(context.TODO(), &brokerapi.RegisterPrimitiveRequest{PrimitiveID: brokerapi.PrimitiveId{gossipMapID}, Address: gossipPrimitiveAddress})
 	assert.NoError(t, err)
 
-	gossipMapConfig := brokerapi.PrimitiveConfig{
-		ID: brokerapi.PrimitiveId{
-			Type:      _map.Type.String(),
-			Namespace: "test",
-			Name:      "gossip-map",
-		},
-		Driver: brokerapi.DriverId{
-			Type:      "gossip",
-			Namespace: "test",
-			Name:      "gossip",
-		},
-		Proxy: brokerapi.ProxyConfig{
-			Read:  true,
-			Write: true,
-		},
+	gossipMapOptions := driverapi.ProxyOptions{
+		Read:  true,
+		Write: true,
 	}
-	_, err = primitiveManagementClient.AddPrimitive(context.TODO(), &brokerapi.AddPrimitiveRequest{Primitive: gossipMapConfig})
+	_, err = gossipAgentClient.CreateProxy(context.TODO(), &driverapi.CreateProxyRequest{ProxyID: driverapi.ProxyId{gossipMapID}, Options: gossipMapOptions})
+
+	gossipReadOnlyMapID := primitiveapi.PrimitiveId{
+		Type:      _map.Type.String(),
+		Namespace: "test",
+		Name:      "gossip-read-only-map",
+	}
+	_, err = brokerClient.RegisterPrimitive(context.TODO(), &brokerapi.RegisterPrimitiveRequest{PrimitiveID: brokerapi.PrimitiveId{gossipReadOnlyMapID}, Address: gossipPrimitiveAddress})
 	assert.NoError(t, err)
 
-	gossipReadOnlyMapConfig := brokerapi.PrimitiveConfig{
-		ID: brokerapi.PrimitiveId{
-			Type:      _map.Type.String(),
-			Namespace: "test",
-			Name:      "gossip-read-only-map",
-		},
-		Driver: brokerapi.DriverId{
-			Type:      "gossip",
-			Namespace: "test",
-			Name:      "gossip",
-		},
-		Proxy: brokerapi.ProxyConfig{
-			Read:  true,
-			Write: false,
-		},
+	gossipReadOnlyMapOptions := driverapi.ProxyOptions{
+		Read:  true,
+		Write: false,
 	}
-	_, err = primitiveManagementClient.AddPrimitive(context.TODO(), &brokerapi.AddPrimitiveRequest{Primitive: gossipReadOnlyMapConfig})
-	assert.NoError(t, err)
+	_, err = gossipAgentClient.CreateProxy(context.TODO(), &driverapi.CreateProxyRequest{ProxyID: driverapi.ProxyId{gossipReadOnlyMapID}, Options: gossipReadOnlyMapOptions})
 
 	err = brokerConn.Close()
 	assert.NoError(t, err)
 
 	client := NewClient().Namespace("test")
 
-	rsmMap, err := client.GetMap(context.TODO(), "rsm-map")
-	assert.NoError(t, err)
-	assert.NotNil(t, rsmMap)
-
-	i, err := rsmMap.Len(context.TODO())
-	assert.NoError(t, err)
-	assert.Equal(t, 0, i)
-
-	rsmReadOnlyMap, err := client.GetMap(context.TODO(), "rsm-read-only-map")
-	assert.NoError(t, err)
-	assert.NotNil(t, rsmReadOnlyMap)
-
-	i, err = rsmReadOnlyMap.Len(context.TODO())
-	assert.NoError(t, err)
-	assert.Equal(t, 0, i)
-
 	gossipMap, err := client.GetMap(context.TODO(), "gossip-map")
 	assert.NoError(t, err)
 	assert.NotNil(t, gossipMap)
 
-	i, err = gossipMap.Len(context.TODO())
+	_, err = gossipMap.Put(context.TODO(), "foo", []byte("bar"))
 	assert.NoError(t, err)
-	assert.Equal(t, 0, i)
+
+	entry, err := gossipMap.Get(context.TODO(), "foo")
+	assert.NoError(t, err)
+	assert.Equal(t, "foo", entry.Key)
+	assert.Equal(t, "bar", string(entry.Value))
+
+	i, err := gossipMap.Len(context.TODO())
+	assert.NoError(t, err)
+	assert.Equal(t, 1, i)
 
 	gossipReadOnlyMap, err := client.GetMap(context.TODO(), "gossip-read-only-map")
 	assert.NoError(t, err)

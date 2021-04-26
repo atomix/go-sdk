@@ -17,6 +17,7 @@ package atomix
 import (
 	"context"
 	"fmt"
+	brokerapi "github.com/atomix/api/go/atomix/management/broker"
 	primitiveapi "github.com/atomix/api/go/atomix/primitive"
 	"github.com/atomix/go-client/pkg/atomix/counter"
 	"github.com/atomix/go-client/pkg/atomix/election"
@@ -142,16 +143,18 @@ func (c *atomixClient) connect(ctx context.Context, primitive primitiveapi.Primi
 		brokerConn = conn
 	}
 
-	primitiveClient := primitiveapi.NewPrimitiveDiscoveryServiceClient(brokerConn)
-	request := &primitiveapi.LookupPrimitiveRequest{
-		PrimitiveID: primitive,
+	brokerClient := brokerapi.NewBrokerClient(brokerConn)
+	request := &brokerapi.LookupPrimitiveRequest{
+		PrimitiveID: brokerapi.PrimitiveId{
+			PrimitiveId: primitive,
+		},
 	}
-	response, err := primitiveClient.LookupPrimitive(ctx, request)
+	response, err := brokerClient.LookupPrimitive(ctx, request)
 	if err != nil {
 		return nil, errors.From(err)
 	}
 
-	driverConn, err = grpc.DialContext(ctx, fmt.Sprintf("%s:%d", response.Primitive.Host, response.Primitive.Port), grpc.WithInsecure())
+	driverConn, err = grpc.DialContext(ctx, fmt.Sprintf("%s:%d", response.Address.Host, response.Address.Port), grpc.WithInsecure())
 	if err != nil {
 		return nil, err
 	}

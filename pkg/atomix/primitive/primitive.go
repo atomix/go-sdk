@@ -51,7 +51,7 @@ func NewClient(primitiveType Type, namespace, name string, conn *grpc.ClientConn
 		primitiveType: primitiveType,
 		namespace:     namespace,
 		name:          name,
-		client:        primitiveapi.NewPrimitiveServiceClient(conn),
+		client:        primitiveapi.NewPrimitiveClient(conn),
 	}
 }
 
@@ -59,7 +59,7 @@ type Client struct {
 	primitiveType Type
 	namespace     string
 	name          string
-	client        primitiveapi.PrimitiveServiceClient
+	client        primitiveapi.PrimitiveClient
 }
 
 func (c *Client) Type() Type {
