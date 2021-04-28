@@ -31,14 +31,8 @@ const Type primitive.Type = "Map"
 
 var log = logging.GetLogger("atomix", "client", "map")
 
-// ClusterClient provides an API for creating Maps
-type ClusterClient interface {
-	// GetMap gets the Map instance of the given name
-	GetMap(ctx context.Context, namespace, name string, opts ...Option) (Map, error)
-}
-
-// NamespaceClient provides an API for creating Maps
-type NamespaceClient interface {
+// Client provides an API for creating Maps
+type Client interface {
 	// GetMap gets the Map instance of the given name
 	GetMap(ctx context.Context, name string, opts ...Option) (Map, error)
 }
@@ -129,9 +123,9 @@ type Event struct {
 }
 
 // New creates a new partitioned Map
-func New(ctx context.Context, namespace, name string, conn *grpc.ClientConn, opts ...Option) (Map, error) {
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Map, error) {
 	m := &_map{
-		Client: primitive.NewClient(Type, namespace, name, conn),
+		Client: primitive.NewClient(Type, name, conn),
 		client: api.NewMapServiceClient(conn),
 	}
 	if err := m.Create(ctx); err != nil {

@@ -30,14 +30,8 @@ var log = logging.GetLogger("atomix", "client", "election")
 // Type is the election type
 const Type primitive.Type = "Election"
 
-// ClusterClient provides an API for creating Elections
-type ClusterClient interface {
-	// GetElection gets the Election instance of the given name
-	GetElection(ctx context.Context, namespace, name string, opts ...Option) (Election, error)
-}
-
-// NamespaceClient provides an API for creating Elections
-type NamespaceClient interface {
+// Client provides an API for creating Elections
+type Client interface {
 	// GetElection gets the Election instance of the given name
 	GetElection(ctx context.Context, name string, opts ...Option) (Election, error)
 }
@@ -113,10 +107,10 @@ type Event struct {
 }
 
 // New creates a new election primitive
-func New(ctx context.Context, namespace, name string, conn *grpc.ClientConn, opts ...Option) (Election, error) {
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Election, error) {
 	options := applyOptions(opts...)
 	e := &election{
-		Client: primitive.NewClient(Type, namespace, name, conn),
+		Client: primitive.NewClient(Type, name, conn),
 		id:     options.clientID,
 		client: api.NewLeaderElectionServiceClient(conn),
 	}

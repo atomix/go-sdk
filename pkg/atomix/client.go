@@ -36,48 +36,48 @@ import (
 )
 
 // GetCounter gets the Counter instance of the given name
-func GetCounter(ctx context.Context, namespace string, name string, opts ...counter.Option) (counter.Counter, error) {
-	return getClient().GetCounter(ctx, namespace, name, opts...)
+func GetCounter(ctx context.Context, name string, opts ...counter.Option) (counter.Counter, error) {
+	return getClient().GetCounter(ctx, name, opts...)
 }
 
 // GetElection gets the Election instance of the given name
-func GetElection(ctx context.Context, namespace string, name string, opts ...election.Option) (election.Election, error) {
-	return getClient().GetElection(ctx, namespace, name, opts...)
+func GetElection(ctx context.Context, name string, opts ...election.Option) (election.Election, error) {
+	return getClient().GetElection(ctx, name, opts...)
 }
 
 // GetIndexedMap gets the IndexedMap instance of the given name
-func GetIndexedMap(ctx context.Context, namespace string, name string, opts ...indexedmap.Option) (indexedmap.IndexedMap, error) {
-	return getClient().GetIndexedMap(ctx, namespace, name, opts...)
+func GetIndexedMap(ctx context.Context, name string, opts ...indexedmap.Option) (indexedmap.IndexedMap, error) {
+	return getClient().GetIndexedMap(ctx, name, opts...)
 }
 
 // GetLatch gets the Latch instance of the given name
-func GetLatch(ctx context.Context, namespace string, name string, opts ...leader.Option) (leader.Latch, error) {
-	return getClient().GetLatch(ctx, namespace, name, opts...)
+func GetLatch(ctx context.Context, name string, opts ...leader.Option) (leader.Latch, error) {
+	return getClient().GetLatch(ctx, name, opts...)
 }
 
 // GetList gets the List instance of the given name
-func GetList(ctx context.Context, namespace string, name string, opts ...list.Option) (list.List, error) {
-	return getClient().GetList(ctx, namespace, name, opts...)
+func GetList(ctx context.Context, name string, opts ...list.Option) (list.List, error) {
+	return getClient().GetList(ctx, name, opts...)
 }
 
 // GetLock gets the Lock instance of the given name
-func GetLock(ctx context.Context, namespace string, name string, opts ...lock.Option) (lock.Lock, error) {
-	return getClient().GetLock(ctx, namespace, name, opts...)
+func GetLock(ctx context.Context, name string, opts ...lock.Option) (lock.Lock, error) {
+	return getClient().GetLock(ctx, name, opts...)
 }
 
 // GetMap gets the Map instance of the given name
-func GetMap(ctx context.Context, namespace string, name string, opts ..._map.Option) (_map.Map, error) {
-	return getClient().GetMap(ctx, namespace, name, opts...)
+func GetMap(ctx context.Context, name string, opts ..._map.Option) (_map.Map, error) {
+	return getClient().GetMap(ctx, name, opts...)
 }
 
 // GetSet gets the Set instance of the given name
-func GetSet(ctx context.Context, namespace string, name string, opts ...set.Option) (set.Set, error) {
-	return getClient().GetSet(ctx, namespace, name, opts...)
+func GetSet(ctx context.Context, name string, opts ...set.Option) (set.Set, error) {
+	return getClient().GetSet(ctx, name, opts...)
 }
 
 // GetValue gets the Value instance of the given name
-func GetValue(ctx context.Context, namespace string, name string, opts ...value.Option) (value.Value, error) {
-	return getClient().GetValue(ctx, namespace, name, opts...)
+func GetValue(ctx context.Context, name string, opts ...value.Option) (value.Value, error) {
+	return getClient().GetValue(ctx, name, opts...)
 }
 
 // NewClient creates a new Atomix client
@@ -90,16 +90,15 @@ func NewClient(opts ...Option) Client {
 
 // Client is an Atomix client
 type Client interface {
-	Namespace(namespace string) NamespaceClient
-	counter.ClusterClient
-	election.ClusterClient
-	indexedmap.ClusterClient
-	leader.ClusterClient
-	list.ClusterClient
-	lock.ClusterClient
-	_map.ClusterClient
-	set.ClusterClient
-	value.ClusterClient
+	counter.Client
+	election.Client
+	indexedmap.Client
+	leader.Client
+	list.Client
+	lock.Client
+	_map.Client
+	set.Client
+	value.Client
 	io.Closer
 }
 
@@ -108,13 +107,6 @@ type atomixClient struct {
 	brokerConn     *grpc.ClientConn
 	primitiveConns map[primitiveapi.PrimitiveId]*grpc.ClientConn
 	mu             sync.RWMutex
-}
-
-func (c *atomixClient) Namespace(namespace string) NamespaceClient {
-	return &namespaceClient{
-		client:    c,
-		namespace: namespace,
-	}
 }
 
 func (c *atomixClient) connect(ctx context.Context, primitive primitiveapi.PrimitiveId) (*grpc.ClientConn, error) {
@@ -162,84 +154,83 @@ func (c *atomixClient) connect(ctx context.Context, primitive primitiveapi.Primi
 	return driverConn, nil
 }
 
-func newPrimitiveID(t primitive.Type, namespace, name string) primitiveapi.PrimitiveId {
+func newPrimitiveID(t primitive.Type, name string) primitiveapi.PrimitiveId {
 	return primitiveapi.PrimitiveId{
-		Type:      t.String(),
-		Namespace: namespace,
-		Name:      name,
+		Type: t.String(),
+		Name: name,
 	}
 }
 
-func (c *atomixClient) GetCounter(ctx context.Context, namespace, name string, opts ...counter.Option) (counter.Counter, error) {
-	conn, err := c.connect(ctx, newPrimitiveID(counter.Type, namespace, name))
+func (c *atomixClient) GetCounter(ctx context.Context, name string, opts ...counter.Option) (counter.Counter, error) {
+	conn, err := c.connect(ctx, newPrimitiveID(counter.Type, name))
 	if err != nil {
 		return nil, err
 	}
-	return counter.New(ctx, namespace, name, conn, opts...)
+	return counter.New(ctx, name, conn, opts...)
 }
 
-func (c *atomixClient) GetElection(ctx context.Context, namespace, name string, opts ...election.Option) (election.Election, error) {
-	conn, err := c.connect(ctx, newPrimitiveID(election.Type, namespace, name))
+func (c *atomixClient) GetElection(ctx context.Context, name string, opts ...election.Option) (election.Election, error) {
+	conn, err := c.connect(ctx, newPrimitiveID(election.Type, name))
 	if err != nil {
 		return nil, err
 	}
-	return election.New(ctx, namespace, name, conn, opts...)
+	return election.New(ctx, name, conn, opts...)
 }
 
-func (c *atomixClient) GetIndexedMap(ctx context.Context, namespace, name string, opts ...indexedmap.Option) (indexedmap.IndexedMap, error) {
-	conn, err := c.connect(ctx, newPrimitiveID(indexedmap.Type, namespace, name))
+func (c *atomixClient) GetIndexedMap(ctx context.Context, name string, opts ...indexedmap.Option) (indexedmap.IndexedMap, error) {
+	conn, err := c.connect(ctx, newPrimitiveID(indexedmap.Type, name))
 	if err != nil {
 		return nil, err
 	}
-	return indexedmap.New(ctx, namespace, name, conn, opts...)
+	return indexedmap.New(ctx, name, conn, opts...)
 }
 
-func (c *atomixClient) GetLatch(ctx context.Context, namespace, name string, opts ...leader.Option) (leader.Latch, error) {
-	conn, err := c.connect(ctx, newPrimitiveID(leader.Type, namespace, name))
+func (c *atomixClient) GetLatch(ctx context.Context, name string, opts ...leader.Option) (leader.Latch, error) {
+	conn, err := c.connect(ctx, newPrimitiveID(leader.Type, name))
 	if err != nil {
 		return nil, err
 	}
-	return leader.New(ctx, namespace, name, conn, opts...)
+	return leader.New(ctx, name, conn, opts...)
 }
 
-func (c *atomixClient) GetList(ctx context.Context, namespace, name string, opts ...list.Option) (list.List, error) {
-	conn, err := c.connect(ctx, newPrimitiveID(list.Type, namespace, name))
+func (c *atomixClient) GetList(ctx context.Context, name string, opts ...list.Option) (list.List, error) {
+	conn, err := c.connect(ctx, newPrimitiveID(list.Type, name))
 	if err != nil {
 		return nil, err
 	}
-	return list.New(ctx, namespace, name, conn, opts...)
+	return list.New(ctx, name, conn, opts...)
 }
 
-func (c *atomixClient) GetLock(ctx context.Context, namespace, name string, opts ...lock.Option) (lock.Lock, error) {
-	conn, err := c.connect(ctx, newPrimitiveID(lock.Type, namespace, name))
+func (c *atomixClient) GetLock(ctx context.Context, name string, opts ...lock.Option) (lock.Lock, error) {
+	conn, err := c.connect(ctx, newPrimitiveID(lock.Type, name))
 	if err != nil {
 		return nil, err
 	}
-	return lock.New(ctx, namespace, name, conn, opts...)
+	return lock.New(ctx, name, conn, opts...)
 }
 
-func (c *atomixClient) GetMap(ctx context.Context, namespace, name string, opts ..._map.Option) (_map.Map, error) {
-	conn, err := c.connect(ctx, newPrimitiveID(_map.Type, namespace, name))
+func (c *atomixClient) GetMap(ctx context.Context, name string, opts ..._map.Option) (_map.Map, error) {
+	conn, err := c.connect(ctx, newPrimitiveID(_map.Type, name))
 	if err != nil {
 		return nil, err
 	}
-	return _map.New(ctx, namespace, name, conn, opts...)
+	return _map.New(ctx, name, conn, opts...)
 }
 
-func (c *atomixClient) GetSet(ctx context.Context, namespace, name string, opts ...set.Option) (set.Set, error) {
-	conn, err := c.connect(ctx, newPrimitiveID(set.Type, namespace, name))
+func (c *atomixClient) GetSet(ctx context.Context, name string, opts ...set.Option) (set.Set, error) {
+	conn, err := c.connect(ctx, newPrimitiveID(set.Type, name))
 	if err != nil {
 		return nil, err
 	}
-	return set.New(ctx, namespace, name, conn, opts...)
+	return set.New(ctx, name, conn, opts...)
 }
 
-func (c *atomixClient) GetValue(ctx context.Context, namespace, name string, opts ...value.Option) (value.Value, error) {
-	conn, err := c.connect(ctx, newPrimitiveID(value.Type, namespace, name))
+func (c *atomixClient) GetValue(ctx context.Context, name string, opts ...value.Option) (value.Value, error) {
+	conn, err := c.connect(ctx, newPrimitiveID(value.Type, name))
 	if err != nil {
 		return nil, err
 	}
-	return value.New(ctx, namespace, name, conn, opts...)
+	return value.New(ctx, name, conn, opts...)
 }
 
 func (c *atomixClient) Close() error {

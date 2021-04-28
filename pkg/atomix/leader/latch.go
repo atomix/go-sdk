@@ -30,14 +30,8 @@ var log = logging.GetLogger("atomix", "client", "leader")
 // Type is the latch type
 const Type primitive.Type = "LeaderLatch"
 
-// ClusterClient provides an API for creating Latches
-type ClusterClient interface {
-	// GetLatch gets the Latch instance of the given name
-	GetLatch(ctx context.Context, namespace, name string, opts ...Option) (Latch, error)
-}
-
-// NamespaceClient provides an API for creating Latches
-type NamespaceClient interface {
+// Client provides an API for creating Latches
+type Client interface {
 	// GetLatch gets the Latch instance of the given name
 	GetLatch(ctx context.Context, name string, opts ...Option) (Latch, error)
 }
@@ -101,9 +95,9 @@ type Event struct {
 }
 
 // New creates a new latch primitive
-func New(ctx context.Context, namespace, name string, conn *grpc.ClientConn, opts ...Option) (Latch, error) {
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Latch, error) {
 	l := &latch{
-		Client: primitive.NewClient(Type, namespace, name, conn),
+		Client: primitive.NewClient(Type, name, conn),
 		client: api.NewLeaderLatchServiceClient(conn),
 	}
 	if err := l.Create(ctx); err != nil {

@@ -38,14 +38,8 @@ type Index uint64
 // Version is the version of an entry
 type Version uint64
 
-// ClusterClient provides an API for creating IndexedMaps
-type ClusterClient interface {
-	// GetIndexedMap gets the IndexedMap instance of the given name
-	GetIndexedMap(ctx context.Context, namespace, name string, opts ...Option) (IndexedMap, error)
-}
-
-// NamespaceClient provides an API for creating IndexedMaps
-type NamespaceClient interface {
+// Client provides an API for creating IndexedMaps
+type Client interface {
 	// GetIndexedMap gets the IndexedMap instance of the given name
 	GetIndexedMap(ctx context.Context, name string, opts ...Option) (IndexedMap, error)
 }
@@ -166,9 +160,9 @@ type Event struct {
 }
 
 // New creates a new IndexedMap primitive
-func New(ctx context.Context, namespace, name string, conn *grpc.ClientConn, opts ...Option) (IndexedMap, error) {
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (IndexedMap, error) {
 	m := &indexedMap{
-		Client: primitive.NewClient(Type, namespace, name, conn),
+		Client: primitive.NewClient(Type, name, conn),
 		client: api.NewIndexedMapServiceClient(conn),
 	}
 	if err := m.Create(ctx); err != nil {

@@ -26,14 +26,8 @@ import (
 // Type is the lock type
 const Type primitive.Type = "Lock"
 
-// ClusterClient provides an API for creating Locks
-type ClusterClient interface {
-	// GetLock gets the Lock instance of the given name
-	GetLock(ctx context.Context, namespace, name string, opts ...Option) (Lock, error)
-}
-
-// NamespaceClient provides an API for creating Locks
-type NamespaceClient interface {
+// Client provides an API for creating Locks
+type Client interface {
 	// GetLock gets the Lock instance of the given name
 	GetLock(ctx context.Context, name string, opts ...Option) (Lock, error)
 }
@@ -65,9 +59,9 @@ const StateUnlocked State = "unlocked"
 
 // New creates a new Lock primitive for the given partitions
 // The lock will be created in one of the given partitions.
-func New(ctx context.Context, namespace, name string, conn *grpc.ClientConn, opts ...Option) (Lock, error) {
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Lock, error) {
 	l := &lock{
-		Client: primitive.NewClient(Type, namespace, name, conn),
+		Client: primitive.NewClient(Type, name, conn),
 		client: api.NewLockServiceClient(conn),
 	}
 	if err := l.Create(ctx); err != nil {

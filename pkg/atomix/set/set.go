@@ -29,14 +29,8 @@ var log = logging.GetLogger("atomix", "client", "set")
 // Type is the set type
 const Type primitive.Type = "Set"
 
-// ClusterClient provides an API for creating Sets
-type ClusterClient interface {
-	// GetSet gets the Set instance of the given name
-	GetSet(ctx context.Context, namespace, name string, opts ...Option) (Set, error)
-}
-
-// NamespaceClient provides an API for creating Sets
-type NamespaceClient interface {
+// Client provides an API for creating Sets
+type Client interface {
 	// GetSet gets the Set instance of the given name
 	GetSet(ctx context.Context, name string, opts ...Option) (Set, error)
 }
@@ -96,9 +90,9 @@ type Event struct {
 }
 
 // New creates a new partitioned set primitive
-func New(ctx context.Context, namespace, name string, conn *grpc.ClientConn, opts ...Option) (Set, error) {
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Set, error) {
 	s := &set{
-		Client: primitive.NewClient(Type, namespace, name, conn),
+		Client: primitive.NewClient(Type, name, conn),
 		client: api.NewSetServiceClient(conn),
 	}
 	if err := s.Create(ctx); err != nil {

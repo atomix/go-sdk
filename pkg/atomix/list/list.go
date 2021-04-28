@@ -30,14 +30,8 @@ var log = logging.GetLogger("atomix", "client", "list")
 // Type is the list type
 const Type primitive.Type = "List"
 
-// ClusterClient provides an API for creating Lists
-type ClusterClient interface {
-	// GetList gets the List instance of the given name
-	GetList(ctx context.Context, namespace, name string, opts ...Option) (List, error)
-}
-
-// NamespaceClient provides an API for creating Lists
-type NamespaceClient interface {
+// Client provides an API for creating Lists
+type Client interface {
 	// GetList gets the List instance of the given name
 	GetList(ctx context.Context, name string, opts ...Option) (List, error)
 }
@@ -107,9 +101,9 @@ type Event struct {
 }
 
 // New creates a new list primitive
-func New(ctx context.Context, namespace, name string, conn *grpc.ClientConn, opts ...Option) (List, error) {
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (List, error) {
 	l := &list{
-		Client: primitive.NewClient(Type, namespace, name, conn),
+		Client: primitive.NewClient(Type, name, conn),
 		client: api.NewListServiceClient(conn),
 	}
 	if err := l.Create(ctx); err != nil {
