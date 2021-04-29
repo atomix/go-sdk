@@ -15,8 +15,8 @@
 package indexedmap
 
 import (
-	api "github.com/atomix/api/go/atomix/primitive/indexedmap"
-	"github.com/atomix/go-framework/pkg/atomix/meta"
+	api "github.com/atomix/atomix-api/go/atomix/primitive/indexedmap"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

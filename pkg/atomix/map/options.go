@@ -15,9 +15,9 @@
 package _map //nolint:golint
 
 import (
-	api "github.com/atomix/api/go/atomix/primitive/map"
-	metaapi "github.com/atomix/api/go/atomix/primitive/meta"
-	"github.com/atomix/go-framework/pkg/atomix/meta"
+	api "github.com/atomix/atomix-api/go/atomix/primitive/map"
+	metaapi "github.com/atomix/atomix-api/go/atomix/primitive/meta"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
 	"github.com/google/uuid"
 )
 

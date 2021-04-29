@@ -16,10 +16,10 @@ package election
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/atomix/test/rsm"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	electionrsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/election"
-	electionproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/election"
+	"github.com/atomix/atomix-go-client/pkg/atomix/test/rsm"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	electionrsm "github.com/atomix/atomix-go-framework/pkg/atomix/protocol/rsm/election"
+	electionproxy "github.com/atomix/atomix-go-framework/pkg/atomix/proxy/rsm/election"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

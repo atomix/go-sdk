@@ -16,10 +16,10 @@ package set
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/atomix/test/rsm"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	setrsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/set"
-	setproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/set"
+	"github.com/atomix/atomix-go-client/pkg/atomix/test/rsm"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	setrsm "github.com/atomix/atomix-go-framework/pkg/atomix/protocol/rsm/set"
+	setproxy "github.com/atomix/atomix-go-framework/pkg/atomix/proxy/rsm/set"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

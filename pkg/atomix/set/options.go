@@ -15,7 +15,7 @@
 package set
 
 import (
-	api "github.com/atomix/api/go/atomix/primitive/set"
+	api "github.com/atomix/atomix-api/go/atomix/primitive/set"
 	"github.com/google/uuid"
 )
 

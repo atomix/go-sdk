@@ -16,10 +16,10 @@ package indexedmap
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/atomix/test/rsm"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	indexedmaprsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/indexedmap"
-	indexedmapproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/indexedmap"
+	"github.com/atomix/atomix-go-client/pkg/atomix/test/rsm"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	indexedmaprsm "github.com/atomix/atomix-go-framework/pkg/atomix/protocol/rsm/indexedmap"
+	indexedmapproxy "github.com/atomix/atomix-go-framework/pkg/atomix/proxy/rsm/indexedmap"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

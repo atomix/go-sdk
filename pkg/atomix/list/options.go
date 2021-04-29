@@ -15,7 +15,7 @@
 package list
 
 import (
-	api "github.com/atomix/api/go/atomix/primitive/list"
+	api "github.com/atomix/atomix-api/go/atomix/primitive/list"
 	"github.com/google/uuid"
 )
 

@@ -16,10 +16,10 @@ package leader
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/atomix/test/rsm"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	leaderrsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/leader"
-	leaderproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/leader"
+	"github.com/atomix/atomix-go-client/pkg/atomix/test/rsm"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	leaderrsm "github.com/atomix/atomix-go-framework/pkg/atomix/protocol/rsm/leader"
+	leaderproxy "github.com/atomix/atomix-go-framework/pkg/atomix/proxy/rsm/leader"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

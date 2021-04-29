@@ -5,7 +5,7 @@
 To install the Go client, use `go get`:
 
 ```bash
-$ GO111MODULE=on go get github.com/atomix/go-client
+$ GO111MODULE=on go get github.com/atomix/atomix-go-client
 ```
 
 ## Usage
@@ -13,7 +13,7 @@ $ GO111MODULE=on go get github.com/atomix/go-client
 To create a client call `client.New`, passing the controller host and port:
 
 ```go
-import "github.com/atomix/go-client/pkg/client"
+import "github.com/atomix/atomix-go-client/pkg/client"
 
 atomix, err := client.New("atomix-controller.kube-system.svc.cluster.local:5679")
 if err != nil {

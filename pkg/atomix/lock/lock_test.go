@@ -16,10 +16,10 @@ package lock
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/atomix/test/rsm"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
-	lockrsm "github.com/atomix/go-framework/pkg/atomix/protocol/rsm/lock"
-	lockproxy "github.com/atomix/go-framework/pkg/atomix/proxy/rsm/lock"
+	"github.com/atomix/atomix-go-client/pkg/atomix/test/rsm"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	lockrsm "github.com/atomix/atomix-go-framework/pkg/atomix/protocol/rsm/lock"
+	lockproxy "github.com/atomix/atomix-go-framework/pkg/atomix/proxy/rsm/lock"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"

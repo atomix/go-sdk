@@ -16,8 +16,8 @@ package primitive
 
 import (
 	"context"
-	primitiveapi "github.com/atomix/api/go/atomix/primitive"
-	"github.com/atomix/go-framework/pkg/atomix/errors"
+	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"google.golang.org/grpc"
 )
 
