@@ -24,6 +24,7 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/broker"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy"
 	gossipdriver "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/gossip"
 	gossipcounterproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/gossip/counter"
@@ -69,20 +70,20 @@ func TestRSMMap(t *testing.T) {
 	logging.SetLevel(logging.DebugLevel)
 
 	/*
-	node := test.NewNode("foo")
-	node.NewBroker().Start()
+		node := test.NewNode("foo")
+		node.NewBroker().Start()
 
-	test.Storage().RSM().SetSomething(...)
-	test.Storage().Gossip().SetSomethingElse(...)
+		test.Storage().RSM().SetSomething(...)
+		test.Storage().Gossip().SetSomethingElse(...)
 
-	test.Node("foo").Drivers().RSM().
+		test.Node("foo").Drivers().RSM().
 
-	node := test.NewNode("foo")
-	rsmDriver := node.NewDriver(protocol.RSM)
-	gossipDriver := node.NewDriver(protocol.Gossip)
-	 */
+		node := test.NewNode("foo")
+		rsmDriver := node.NewDriver(protocol.RSM)
+		gossipDriver := node.NewDriver(protocol.Gossip)
+	*/
 
-	brokerNode := broker.NewBroker(broker.WithPort(5678))
+	brokerNode := broker.NewBroker(broker.WithPort(5678), broker.WithNamespace("test"))
 	err := brokerNode.Start()
 	assert.NoError(t, err)
 
@@ -122,8 +123,8 @@ func TestRSMMap(t *testing.T) {
 	err = rsmNode.Start()
 	assert.NoError(t, err)
 
-	rsmProtocolFunc := func(rsmCluster cluster.Cluster) proxy.Protocol {
-		rsmProxyProtocol := rsmdriver.NewProtocol(rsmCluster)
+	rsmProtocolFunc := func(rsmCluster cluster.Cluster, driverEnv env.DriverEnv) proxy.Protocol {
+		rsmProxyProtocol := rsmdriver.NewProtocol(rsmCluster, driverEnv)
 		rsmcounterproxy.Register(rsmProxyProtocol)
 		rsmelectionproxy.Register(rsmProxyProtocol)
 		rsmindexedmapproxy.Register(rsmProxyProtocol)
@@ -137,7 +138,7 @@ func TestRSMMap(t *testing.T) {
 		return rsmProxyProtocol
 	}
 
-	rsmDriver := driver.NewDriver(rsmProtocolFunc, driver.WithDriverID("rsm"), driver.WithPort(5252))
+	rsmDriver := driver.NewDriver(rsmProtocolFunc, driver.WithNamespace("test"), driver.WithDriverID("rsm"), driver.WithPort(5252))
 	err = rsmDriver.Start()
 	assert.NoError(t, err)
 
@@ -201,7 +202,7 @@ func TestRSMMap(t *testing.T) {
 	err = brokerConn.Close()
 	assert.NoError(t, err)
 
-	client := NewClient().Namespace("test")
+	client := NewClient()
 
 	rsmMap, err := client.GetMap(context.TODO(), "rsm-map")
 	assert.NoError(t, err)
@@ -231,7 +232,7 @@ func TestRSMMap(t *testing.T) {
 func TestGossipMap(t *testing.T) {
 	logging.SetLevel(logging.DebugLevel)
 
-	brokerNode := broker.NewBroker(broker.WithPort(5678))
+	brokerNode := broker.NewBroker(broker.WithPort(5678), broker.WithNamespace("test"))
 	err := brokerNode.Start()
 	assert.NoError(t, err)
 
@@ -305,8 +306,8 @@ func TestGossipMap(t *testing.T) {
 	err = gossipNode3.Start()
 	assert.NoError(t, err)
 
-	gossipProtocolFunc := func(gossipCluster cluster.Cluster) proxy.Protocol {
-		gossipProxyProtocol := gossipdriver.NewProtocol(gossipCluster, atime.LogicalScheme)
+	gossipProtocolFunc := func(gossipCluster cluster.Cluster, driverEnv env.DriverEnv) proxy.Protocol {
+		gossipProxyProtocol := gossipdriver.NewProtocol(gossipCluster, driverEnv, atime.LogicalScheme)
 		gossipcounterproxy.Register(gossipProxyProtocol)
 		gossipmapproxy.Register(gossipProxyProtocol)
 		gossipsetproxy.Register(gossipProxyProtocol)
@@ -314,7 +315,7 @@ func TestGossipMap(t *testing.T) {
 		return gossipProxyProtocol
 	}
 
-	gossipDriver := driver.NewDriver(gossipProtocolFunc, driver.WithDriverID("gossip"), driver.WithPort(5353))
+	gossipDriver := driver.NewDriver(gossipProtocolFunc, driver.WithNamespace("test"), driver.WithDriverID("gossip"), driver.WithPort(5353))
 	err = gossipDriver.Start()
 	assert.NoError(t, err)
 
@@ -378,7 +379,7 @@ func TestGossipMap(t *testing.T) {
 	err = brokerConn.Close()
 	assert.NoError(t, err)
 
-	client := NewClient().Namespace("test")
+	client := NewClient()
 
 	gossipMap, err := client.GetMap(context.TODO(), "gossip-map")
 	assert.NoError(t, err)
