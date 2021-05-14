@@ -4,7 +4,7 @@ go 1.13
 
 require (
 	github.com/atomix/api v0.3.3
-	github.com/atomix/atomix-api/go v0.3.3
+	github.com/atomix/atomix-api/go v0.4.0
 	github.com/atomix/atomix-go-framework v0.5.1
 	github.com/atomix/atomix-go-local v0.5.1
 	github.com/cenkalti/backoff v2.2.1+incompatible

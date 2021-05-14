@@ -16,29 +16,39 @@ package lock
 
 import (
 	"context"
-	"github.com/atomix/atomix-go-client/pkg/atomix/test/rsm"
+	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
+	"github.com/atomix/atomix-go-client/pkg/atomix/test"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	lockrsm "github.com/atomix/atomix-go-framework/pkg/atomix/protocol/rsm/lock"
-	lockproxy "github.com/atomix/atomix-go-framework/pkg/atomix/proxy/rsm/lock"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
 )
 
 func TestLock(t *testing.T) {
-	test := rsm.NewTest().
-		SetPartitions(1).
-		SetSessions(3).
-		SetStorage(lockrsm.RegisterService).
-		SetProxy(lockproxy.RegisterProxy)
+	logging.SetLevel(logging.DebugLevel)
 
-	conns, err := test.Start()
-	assert.NoError(t, err)
-	defer test.Stop()
+	primitiveID := primitiveapi.PrimitiveId{
+		Type:      Type.String(),
+		Namespace: "test",
+		Name:      "TestLock",
+	}
 
-	l1, err := New(context.TODO(), "test", conns[0])
+	test := test.NewRSMTest()
+	assert.NoError(t, test.Start())
+
+	conn1, err := test.CreateProxy(primitiveID)
 	assert.NoError(t, err)
-	l2, err := New(context.TODO(), "test", conns[1])
+
+	conn2, err := test.CreateProxy(primitiveID)
+	assert.NoError(t, err)
+
+	conn3, err := test.CreateProxy(primitiveID)
+	assert.NoError(t, err)
+
+	l1, err := New(context.TODO(), "TestLock", conn1)
+	assert.NoError(t, err)
+	l2, err := New(context.TODO(), "TestLock", conn2)
 	assert.NoError(t, err)
 
 	v1, err := l1.Lock(context.Background())
@@ -94,10 +104,12 @@ func TestLock(t *testing.T) {
 	assert.Error(t, err)
 	assert.True(t, errors.IsNotFound(err))
 
-	l, err := New(context.TODO(), "test", conns[2])
+	l, err := New(context.TODO(), "TestLock", conn3)
 	assert.NoError(t, err)
 
 	locked, err = l.Get(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, StateUnlocked, locked.State)
+
+	assert.NoError(t, test.Stop())
 }

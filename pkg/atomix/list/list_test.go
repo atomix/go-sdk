@@ -16,26 +16,36 @@ package list
 
 import (
 	"context"
-	"github.com/atomix/atomix-go-client/pkg/atomix/test/rsm"
+	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
+	"github.com/atomix/atomix-go-client/pkg/atomix/test"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	listrsm "github.com/atomix/atomix-go-framework/pkg/atomix/protocol/rsm/list"
-	listproxy "github.com/atomix/atomix-go-framework/pkg/atomix/proxy/rsm/list"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestListOperations(t *testing.T) {
-	test := rsm.NewTest().
-		SetPartitions(1).
-		SetSessions(3).
-		SetStorage(listrsm.RegisterService).
-		SetProxy(listproxy.RegisterProxy)
+	logging.SetLevel(logging.DebugLevel)
 
-	conns, err := test.Start()
+	primitiveID := primitiveapi.PrimitiveId{
+		Type:      Type.String(),
+		Namespace: "test",
+		Name:      "TestListOperations",
+	}
+
+	test := test.NewRSMTest()
+	assert.NoError(t, test.Start())
+
+	conn1, err := test.CreateProxy(primitiveID)
 	assert.NoError(t, err)
-	defer test.Stop()
 
-	list, err := New(context.TODO(), "test", conns[0])
+	conn2, err := test.CreateProxy(primitiveID)
+	assert.NoError(t, err)
+
+	conn3, err := test.CreateProxy(primitiveID)
+	assert.NoError(t, err)
+
+	list, err := New(context.TODO(), "TestListOperations", conn1)
 	assert.NoError(t, err)
 	assert.NotNil(t, list)
 
@@ -141,10 +151,10 @@ func TestListOperations(t *testing.T) {
 	err = list.Close(context.Background())
 	assert.NoError(t, err)
 
-	list1, err := New(context.TODO(), "test", conns[1])
+	list1, err := New(context.TODO(), "TestListOperations", conn2)
 	assert.NoError(t, err)
 
-	list2, err := New(context.TODO(), "test", conns[2])
+	list2, err := New(context.TODO(), "TestListOperations", conn3)
 	assert.NoError(t, err)
 
 	size, err = list1.Len(context.TODO())
@@ -161,7 +171,7 @@ func TestListOperations(t *testing.T) {
 	assert.Error(t, err)
 	assert.True(t, errors.IsNotFound(err))
 
-	list, err = New(context.TODO(), "test", conns[0])
+	list, err = New(context.TODO(), "TestListOperations", conn1)
 	assert.NoError(t, err)
 
 	size, err = list.Len(context.TODO())
@@ -174,4 +184,6 @@ func TestListOperations(t *testing.T) {
 	assert.NoError(t, list.Append(context.TODO(), []byte("4")))
 	assert.NoError(t, list.Append(context.TODO(), []byte("5")))
 	assert.NoError(t, list.Append(context.TODO(), []byte("6")))
+
+	assert.NoError(t, test.Stop())
 }

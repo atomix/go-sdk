@@ -16,34 +16,44 @@ package leader
 
 import (
 	"context"
-	"github.com/atomix/atomix-go-client/pkg/atomix/test/rsm"
+	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
+	"github.com/atomix/atomix-go-client/pkg/atomix/test"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	leaderrsm "github.com/atomix/atomix-go-framework/pkg/atomix/protocol/rsm/leader"
-	leaderproxy "github.com/atomix/atomix-go-framework/pkg/atomix/proxy/rsm/leader"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestLatchOperations(t *testing.T) {
-	test := rsm.NewTest().
-		SetPartitions(1).
-		SetSessions(3).
-		SetStorage(leaderrsm.RegisterService).
-		SetProxy(leaderproxy.RegisterProxy)
+	logging.SetLevel(logging.DebugLevel)
 
-	conns, err := test.Start()
+	primitiveID := primitiveapi.PrimitiveId{
+		Type:      Type.String(),
+		Namespace: "test",
+		Name:      "TestLatchOperations",
+	}
+
+	test := test.NewRSMTest()
+	assert.NoError(t, test.Start())
+
+	conn1, err := test.CreateProxy(primitiveID)
 	assert.NoError(t, err)
-	defer test.Stop()
 
-	latch1, err := New(context.TODO(), "test", conns[0])
+	conn2, err := test.CreateProxy(primitiveID)
+	assert.NoError(t, err)
+
+	conn3, err := test.CreateProxy(primitiveID)
+	assert.NoError(t, err)
+
+	latch1, err := New(context.TODO(), "TestLatchOperations", conn1)
 	assert.NoError(t, err)
 	assert.NotNil(t, latch1)
 
-	latch2, err := New(context.TODO(), "test", conns[1])
+	latch2, err := New(context.TODO(), "TestLatchOperations", conn2)
 	assert.NoError(t, err)
 	assert.NotNil(t, latch2)
 
-	latch3, err := New(context.TODO(), "test", conns[2])
+	latch3, err := New(context.TODO(), "TestLatchOperations", conn3)
 	assert.NoError(t, err)
 	assert.NotNil(t, latch3)
 
@@ -121,10 +131,10 @@ func TestLatchOperations(t *testing.T) {
 	err = latch3.Close(context.Background())
 	assert.NoError(t, err)
 
-	latch1, err = New(context.TODO(), "test", conns[0])
+	latch1, err = New(context.TODO(), "TestLatchOperations", conn1)
 	assert.NoError(t, err)
 
-	latch2, err = New(context.TODO(), "test", conns[1])
+	latch2, err = New(context.TODO(), "TestLatchOperations", conn2)
 	assert.NoError(t, err)
 
 	term, err = latch1.Get(context.TODO())
@@ -143,7 +153,7 @@ func TestLatchOperations(t *testing.T) {
 	assert.Error(t, err)
 	assert.True(t, errors.IsNotFound(err))
 
-	latch, err := New(context.TODO(), "test", conns[2])
+	latch, err := New(context.TODO(), "TestLatchOperations", conn3)
 	assert.NoError(t, err)
 
 	term, err = latch.Get(context.TODO())
@@ -151,4 +161,6 @@ func TestLatchOperations(t *testing.T) {
 	assert.Equal(t, uint64(0), term.Revision)
 	assert.Equal(t, "", term.Leader)
 	assert.Len(t, term.Participants, 0)
+
+	assert.NoError(t, test.Stop())
 }

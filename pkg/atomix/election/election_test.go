@@ -16,34 +16,44 @@ package election
 
 import (
 	"context"
-	"github.com/atomix/atomix-go-client/pkg/atomix/test/rsm"
+	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
+	"github.com/atomix/atomix-go-client/pkg/atomix/test"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	electionrsm "github.com/atomix/atomix-go-framework/pkg/atomix/protocol/rsm/election"
-	electionproxy "github.com/atomix/atomix-go-framework/pkg/atomix/proxy/rsm/election"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestElectionOperations(t *testing.T) {
-	test := rsm.NewTest().
-		SetPartitions(1).
-		SetSessions(3).
-		SetStorage(electionrsm.RegisterService).
-		SetProxy(electionproxy.RegisterProxy)
+	logging.SetLevel(logging.DebugLevel)
 
-	conns, err := test.Start()
+	primitiveID := primitiveapi.PrimitiveId{
+		Type:      Type.String(),
+		Namespace: "test",
+		Name:      "TestElectionOperations",
+	}
+
+	test := test.NewRSMTest()
+	assert.NoError(t, test.Start())
+
+	conn1, err := test.CreateProxy(primitiveID)
 	assert.NoError(t, err)
-	defer test.Stop()
 
-	election1, err := New(context.TODO(), "test", conns[0], WithClientID("client-1"))
+	conn2, err := test.CreateProxy(primitiveID)
+	assert.NoError(t, err)
+
+	conn3, err := test.CreateProxy(primitiveID)
+	assert.NoError(t, err)
+
+	election1, err := New(context.TODO(), "TestElectionOperations", conn1, WithClientID("client-1"))
 	assert.NoError(t, err)
 	assert.NotNil(t, election1)
 
-	election2, err := New(context.TODO(), "test", conns[1], WithClientID("client-2"))
+	election2, err := New(context.TODO(), "TestElectionOperations", conn2, WithClientID("client-2"))
 	assert.NoError(t, err)
 	assert.NotNil(t, election2)
 
-	election3, err := New(context.TODO(), "test", conns[2], WithClientID("client-3"))
+	election3, err := New(context.TODO(), "TestElectionOperations", conn3, WithClientID("client-3"))
 	assert.NoError(t, err)
 	assert.NotNil(t, election3)
 
@@ -232,10 +242,10 @@ func TestElectionOperations(t *testing.T) {
 	err = election3.Close(context.Background())
 	assert.NoError(t, err)
 
-	election1, err = New(context.TODO(), "test", conns[0], WithClientID("client-1"))
+	election1, err = New(context.TODO(), "TestElectionOperations", conn1, WithClientID("client-1"))
 	assert.NoError(t, err)
 
-	election2, err = New(context.TODO(), "test", conns[1], WithClientID("client-2"))
+	election2, err = New(context.TODO(), "TestElectionOperations", conn2, WithClientID("client-2"))
 	assert.NoError(t, err)
 
 	term, err = election1.GetTerm(context.TODO())
@@ -254,7 +264,7 @@ func TestElectionOperations(t *testing.T) {
 	assert.Error(t, err)
 	assert.True(t, errors.IsNotFound(err))
 
-	election, err := New(context.TODO(), "test", conns[2], WithClientID("client-3"))
+	election, err := New(context.TODO(), "TestElectionOperations", conn3, WithClientID("client-3"))
 	assert.NoError(t, err)
 
 	term, err = election.GetTerm(context.TODO())
@@ -262,4 +272,6 @@ func TestElectionOperations(t *testing.T) {
 	assert.Equal(t, uint64(0), term.Revision)
 	assert.Equal(t, "", term.Leader)
 	assert.Len(t, term.Candidates, 0)
+
+	assert.NoError(t, test.Stop())
 }

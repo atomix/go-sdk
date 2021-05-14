@@ -16,32 +16,31 @@ package _map //nolint:golint
 
 import (
 	"context"
-	"github.com/atomix/atomix-go-client/pkg/atomix/test/gossip"
-	"github.com/atomix/atomix-go-client/pkg/atomix/test/rsm"
+	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
+	"github.com/atomix/atomix-go-client/pkg/atomix/test"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
-	gossipmap "github.com/atomix/atomix-go-framework/pkg/atomix/protocol/gossip/map"
-	maprsm "github.com/atomix/atomix-go-framework/pkg/atomix/protocol/rsm/map"
-	gossipproxy "github.com/atomix/atomix-go-framework/pkg/atomix/proxy/gossip/map"
-	mapproxy "github.com/atomix/atomix-go-framework/pkg/atomix/proxy/rsm/map"
-	atime "github.com/atomix/atomix-go-framework/pkg/atomix/time"
 	"github.com/stretchr/testify/assert"
 	"testing"
-	"time"
 )
 
 func TestMapOperations(t *testing.T) {
-	test := rsm.NewTest().
-		SetPartitions(1).
-		SetSessions(3).
-		SetStorage(maprsm.RegisterService).
-		SetProxy(mapproxy.RegisterProxy)
+	logging.SetLevel(logging.DebugLevel)
 
-	conns, err := test.Start()
+	primitiveID := primitiveapi.PrimitiveId{
+		Type:      Type.String(),
+		Namespace: "test",
+		Name:      "TestMapOperations",
+	}
+
+	test := test.NewRSMTest()
+	assert.NoError(t, test.Start())
+
+	conn1, err := test.CreateProxy(primitiveID)
 	assert.NoError(t, err)
-	defer test.Stop()
 
-	_map, err := New(context.TODO(), "test", conns[0])
+	_map, err := New(context.TODO(), "TestMapOperations", conn1)
 	assert.NoError(t, err)
 
 	kv, err := _map.Get(context.Background(), "foo")
@@ -126,20 +125,32 @@ func TestMapOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, removed)
 	assert.Equal(t, kv2.Revision, removed.Revision)
+
+	assert.NoError(t, test.Stop())
 }
 
 func TestMapStreams(t *testing.T) {
-	test := rsm.NewTest().
-		SetPartitions(1).
-		SetSessions(3).
-		SetStorage(maprsm.RegisterService).
-		SetProxy(mapproxy.RegisterProxy)
+	logging.SetLevel(logging.DebugLevel)
 
-	conns, err := test.Start()
+	primitiveID := primitiveapi.PrimitiveId{
+		Type:      Type.String(),
+		Namespace: "test",
+		Name:      "TestMapOperations",
+	}
+
+	test := test.NewRSMTest()
+	assert.NoError(t, test.Start())
+
+	conn1, err := test.CreateProxy(primitiveID)
 	assert.NoError(t, err)
-	defer test.Stop()
 
-	_map, err := New(context.TODO(), "test", conns[0])
+	conn2, err := test.CreateProxy(primitiveID)
+	assert.NoError(t, err)
+
+	conn3, err := test.CreateProxy(primitiveID)
+	assert.NoError(t, err)
+
+	_map, err := New(context.TODO(), "TestMapStreams", conn1)
 	assert.NoError(t, err)
 
 	kv, err := _map.Put(context.Background(), "foo", []byte{1})
@@ -212,10 +223,10 @@ func TestMapStreams(t *testing.T) {
 	err = _map.Close(context.Background())
 	assert.NoError(t, err)
 
-	map1, err := New(context.TODO(), "test", conns[1])
+	map1, err := New(context.TODO(), "TestMapStreams", conn2)
 	assert.NoError(t, err)
 
-	map2, err := New(context.TODO(), "test", conns[2])
+	map2, err := New(context.TODO(), "TestMapStreams", conn3)
 	assert.NoError(t, err)
 
 	size, err := map1.Len(context.TODO())
@@ -232,53 +243,12 @@ func TestMapStreams(t *testing.T) {
 	assert.Error(t, err)
 	assert.True(t, errors.IsNotFound(err))
 
-	_map, err = New(context.TODO(), "test", conns[0])
+	_map, err = New(context.TODO(), "TestMapStreams", conn1)
 	assert.NoError(t, err)
 
 	size, err = _map.Len(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, 0, size)
-}
 
-func TestGossipMap(t *testing.T) {
-	test := gossip.NewTest().
-		SetScheme(atime.LogicalScheme).
-		SetReplicas(3).
-		SetPartitions(3).
-		SetClients(3).
-		SetServer(gossipmap.RegisterServer).
-		SetStorage(gossipmap.RegisterService).
-		SetProxy(gossipproxy.RegisterProxy)
-
-	conns, err := test.Start()
-	assert.NoError(t, err)
-	defer test.Stop()
-
-	map1, err := New(context.TODO(), "test", conns[0])
-	assert.NoError(t, err)
-	assert.NotNil(t, map1)
-
-	map2, err := New(context.TODO(), "test", conns[1])
-	assert.NoError(t, err)
-	assert.NotNil(t, map2)
-
-	entry, err := map1.Get(context.TODO(), "foo")
-	assert.True(t, errors.IsNotFound(err))
-	assert.Nil(t, entry)
-
-	entry, err = map2.Get(context.TODO(), "bar")
-	assert.True(t, errors.IsNotFound(err))
-	assert.Nil(t, entry)
-
-	entry, err = map1.Put(context.TODO(), "foo", []byte("bar"))
-	assert.NoError(t, err)
-	assert.Equal(t, "foo", entry.Key)
-	assert.Equal(t, "bar", string(entry.Value))
-
-	time.Sleep(time.Second)
-
-	entry, err = map2.Get(context.TODO(), "foo")
-	assert.NoError(t, err)
-	assert.Equal(t, "foo", entry.Key)
-	assert.Equal(t, "bar", string(entry.Value))
+	assert.NoError(t, test.Stop())
 }

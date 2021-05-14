@@ -16,27 +16,31 @@ package indexedmap
 
 import (
 	"context"
-	"github.com/atomix/atomix-go-client/pkg/atomix/test/rsm"
+	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
+	"github.com/atomix/atomix-go-client/pkg/atomix/test"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	indexedmaprsm "github.com/atomix/atomix-go-framework/pkg/atomix/protocol/rsm/indexedmap"
-	indexedmapproxy "github.com/atomix/atomix-go-framework/pkg/atomix/proxy/rsm/indexedmap"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestIndexedMapOperations(t *testing.T) {
-	test := rsm.NewTest().
-		SetPartitions(1).
-		SetSessions(3).
-		SetStorage(indexedmaprsm.RegisterService).
-		SetProxy(indexedmapproxy.RegisterProxy)
+	logging.SetLevel(logging.DebugLevel)
 
-	conns, err := test.Start()
+	primitiveID := primitiveapi.PrimitiveId{
+		Type:      Type.String(),
+		Namespace: "test",
+		Name:      "TestIndexedMapOperations",
+	}
+
+	test := test.NewRSMTest()
+	assert.NoError(t, test.Start())
+
+	conn1, err := test.CreateProxy(primitiveID)
 	assert.NoError(t, err)
-	defer test.Stop()
 
-	_map, err := New(context.TODO(), "test", conns[0])
+	_map, err := New(context.TODO(), "TestIndexedMapOperations", conn1)
 	assert.NoError(t, err)
 
 	kv, err := _map.Get(context.Background(), "foo")
@@ -163,20 +167,32 @@ func TestIndexedMapOperations(t *testing.T) {
 	kv, err = _map.Put(context.Background(), "foo", []byte("bar"))
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
+
+	assert.NoError(t, test.Stop())
 }
 
 func TestIndexedMapStreams(t *testing.T) {
-	test := rsm.NewTest().
-		SetPartitions(1).
-		SetSessions(3).
-		SetStorage(indexedmaprsm.RegisterService).
-		SetProxy(indexedmapproxy.RegisterProxy)
+	logging.SetLevel(logging.DebugLevel)
 
-	conns, err := test.Start()
+	primitiveID := primitiveapi.PrimitiveId{
+		Type:      Type.String(),
+		Namespace: "test",
+		Name:      "TestIndexedMapStreams",
+	}
+
+	test := test.NewRSMTest()
+	assert.NoError(t, test.Start())
+
+	conn1, err := test.CreateProxy(primitiveID)
 	assert.NoError(t, err)
-	defer test.Stop()
 
-	_map, err := New(context.TODO(), "test", conns[0])
+	conn2, err := test.CreateProxy(primitiveID)
+	assert.NoError(t, err)
+
+	conn3, err := test.CreateProxy(primitiveID)
+	assert.NoError(t, err)
+
+	_map, err := New(context.TODO(), "TestIndexedMapOperations", conn1)
 	assert.NoError(t, err)
 
 	kv, err := _map.Put(context.Background(), "foo", []byte{1})
@@ -276,10 +292,10 @@ func TestIndexedMapStreams(t *testing.T) {
 	err = _map.Close(context.Background())
 	assert.NoError(t, err)
 
-	map1, err := New(context.TODO(), "test", conns[1])
+	map1, err := New(context.TODO(), "TestIndexedMapOperations", conn2)
 	assert.NoError(t, err)
 
-	map2, err := New(context.TODO(), "test", conns[2])
+	map2, err := New(context.TODO(), "TestIndexedMapOperations", conn3)
 	assert.NoError(t, err)
 
 	size, err := map1.Len(context.TODO())
@@ -296,10 +312,12 @@ func TestIndexedMapStreams(t *testing.T) {
 	assert.Error(t, err)
 	assert.True(t, errors.IsNotFound(err))
 
-	_map, err = New(context.TODO(), "test", conns[0])
+	_map, err = New(context.TODO(), "TestIndexedMapOperations", conn1)
 	assert.NoError(t, err)
 
 	size, err = _map.Len(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, 0, size)
+
+	assert.NoError(t, test.Stop())
 }

@@ -16,26 +16,36 @@ package set
 
 import (
 	"context"
-	"github.com/atomix/atomix-go-client/pkg/atomix/test/rsm"
+	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
+	"github.com/atomix/atomix-go-client/pkg/atomix/test"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	setrsm "github.com/atomix/atomix-go-framework/pkg/atomix/protocol/rsm/set"
-	setproxy "github.com/atomix/atomix-go-framework/pkg/atomix/proxy/rsm/set"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestSetOperations(t *testing.T) {
-	test := rsm.NewTest().
-		SetPartitions(1).
-		SetSessions(3).
-		SetStorage(setrsm.RegisterService).
-		SetProxy(setproxy.RegisterProxy)
+	logging.SetLevel(logging.DebugLevel)
 
-	conns, err := test.Start()
+	primitiveID := primitiveapi.PrimitiveId{
+		Type:      Type.String(),
+		Namespace: "test",
+		Name:      "TestSetOperations",
+	}
+
+	test := test.NewRSMTest()
+	assert.NoError(t, test.Start())
+
+	conn1, err := test.CreateProxy(primitiveID)
 	assert.NoError(t, err)
-	defer test.Stop()
 
-	set, err := New(context.TODO(), "test", conns[0])
+	conn2, err := test.CreateProxy(primitiveID)
+	assert.NoError(t, err)
+
+	conn3, err := test.CreateProxy(primitiveID)
+	assert.NoError(t, err)
+
+	set, err := New(context.TODO(), "TestSetOperations", conn1)
 	assert.NoError(t, err)
 	assert.NotNil(t, set)
 
@@ -154,10 +164,10 @@ func TestSetOperations(t *testing.T) {
 	err = set.Close(context.Background())
 	assert.NoError(t, err)
 
-	set1, err := New(context.TODO(), "test", conns[1])
+	set1, err := New(context.TODO(), "TestSetOperations", conn2)
 	assert.NoError(t, err)
 
-	set2, err := New(context.TODO(), "test", conns[2])
+	set2, err := New(context.TODO(), "TestSetOperations", conn3)
 	assert.NoError(t, err)
 
 	size, err = set1.Len(context.TODO())
@@ -174,10 +184,12 @@ func TestSetOperations(t *testing.T) {
 	assert.Error(t, err)
 	assert.True(t, errors.IsNotFound(err))
 
-	set, err = New(context.TODO(), "test", conns[0])
+	set, err = New(context.TODO(), "TestSetOperations", conn1)
 	assert.NoError(t, err)
 
 	size, err = set.Len(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, 0, size)
+
+	assert.NoError(t, test.Stop())
 }
