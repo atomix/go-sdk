@@ -85,7 +85,12 @@ type MatchOption struct {
 }
 
 func (o MatchOption) beforePut(request *api.PutRequest) {
-	request.Entry.Key.ObjectMeta = o.object.Meta().Proto()
+	proto := o.object.Meta().Proto()
+	request.Preconditions = append(request.Preconditions, api.Precondition{
+		Precondition: &api.Precondition_Metadata{
+			Metadata: &proto,
+		},
+	})
 }
 
 func (o MatchOption) afterPut(response *api.PutResponse) {
@@ -93,7 +98,12 @@ func (o MatchOption) afterPut(response *api.PutResponse) {
 }
 
 func (o MatchOption) beforeRemove(request *api.RemoveRequest) {
-	request.Key.ObjectMeta = o.object.Meta().Proto()
+	proto := o.object.Meta().Proto()
+	request.Preconditions = append(request.Preconditions, api.Precondition{
+		Precondition: &api.Precondition_Metadata{
+			Metadata: &proto,
+		},
+	})
 }
 
 func (o MatchOption) afterRemove(response *api.RemoveResponse) {

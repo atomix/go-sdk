@@ -108,14 +108,14 @@ func TestMapOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 
-	_, err = _map.Put(context.Background(), "foo", []byte("baz"), IfMatch(kv1))
-	assert.Error(t, err)
-	assert.True(t, errors.IsConflict(err))
-
 	kv2, err = _map.Put(context.Background(), "foo", []byte("baz"), IfMatch(kv1))
 	assert.NoError(t, err)
 	assert.NotEqual(t, kv1.Revision, kv2.Revision)
 	assert.Equal(t, "baz", string(kv2.Value))
+
+	_, err = _map.Put(context.Background(), "foo", []byte("bar"), IfMatch(kv1))
+	assert.Error(t, err)
+	assert.True(t, errors.IsConflict(err))
 
 	_, err = _map.Remove(context.Background(), "foo", IfMatch(meta.ObjectMeta{}))
 	assert.Error(t, err)
@@ -135,7 +135,7 @@ func TestMapStreams(t *testing.T) {
 	primitiveID := primitiveapi.PrimitiveId{
 		Type:      Type.String(),
 		Namespace: "test",
-		Name:      "TestMapOperations",
+		Name:      "TestMapStreams",
 	}
 
 	test := test.NewRSMTest()
@@ -193,7 +193,7 @@ func TestMapStreams(t *testing.T) {
 	event := <-keyCh
 	assert.NotNil(t, event)
 	assert.Equal(t, "foo", event.Entry.Key)
-	assert.True(t, kv.Timestamp.Equal(event.Entry.Timestamp))
+	assert.Equal(t, kv.Revision, event.Entry.Revision)
 
 	kv, err = _map.Put(context.Background(), "bar", []byte{3})
 	assert.NoError(t, err)
@@ -216,7 +216,7 @@ func TestMapStreams(t *testing.T) {
 	event = <-keyCh
 	assert.NotNil(t, event)
 	assert.Equal(t, "foo", event.Entry.Key)
-	assert.True(t, kv.Timestamp.Equal(event.Entry.Timestamp))
+	assert.Equal(t, kv.Revision, event.Entry.Revision)
 
 	<-latch
 

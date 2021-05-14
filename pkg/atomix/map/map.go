@@ -269,6 +269,10 @@ func (m *_map) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) 
 	request := &api.EventsRequest{
 		Headers: m.GetHeaders(),
 	}
+	for i := range opts {
+		opts[i].beforeWatch(request)
+	}
+
 	stream, err := m.client.Events(ctx, request)
 	if err != nil {
 		return errors.From(err)
@@ -289,6 +293,11 @@ func (m *_map) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) 
 					close(openCh)
 					open = true
 				}
+
+				for i := range opts {
+					opts[i].afterWatch(response)
+				}
+
 				switch response.Event.Type {
 				case api.Event_INSERT:
 					ch <- Event{
