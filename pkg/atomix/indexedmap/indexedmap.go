@@ -146,7 +146,7 @@ const (
 	// EventRemove indicates a key was removed from the map
 	EventRemove EventType = "remove"
 
-	// EventReplay indicats an entry was replayed
+	// EventReplay indicates an entry was replayed
 	EventReplay EventType = "replay"
 )
 

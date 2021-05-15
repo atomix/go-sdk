@@ -110,7 +110,7 @@ const (
 	EventRemove EventType = "remove"
 
 	// EventReplay indicates a key was replayed
-	EventReplay EventType = "remove"
+	EventReplay EventType = "replay"
 )
 
 // Event is a map change event
