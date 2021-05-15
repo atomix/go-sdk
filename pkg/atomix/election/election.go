@@ -144,7 +144,8 @@ func (e *election) GetTerm(ctx context.Context) (*Term, error) {
 
 func (e *election) Enter(ctx context.Context) (*Term, error) {
 	request := &api.EnterRequest{
-		Headers: e.GetHeaders(),
+		Headers:     e.GetHeaders(),
+		CandidateID: e.id,
 	}
 	response, err := e.client.Enter(ctx, request)
 	if err != nil {
@@ -155,7 +156,8 @@ func (e *election) Enter(ctx context.Context) (*Term, error) {
 
 func (e *election) Leave(ctx context.Context) (*Term, error) {
 	request := &api.WithdrawRequest{
-		Headers: e.GetHeaders(),
+		Headers:     e.GetHeaders(),
+		CandidateID: e.id,
 	}
 	response, err := e.client.Withdraw(ctx, request)
 	if err != nil {
