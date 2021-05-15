@@ -192,7 +192,7 @@ func TestIndexedMapStreams(t *testing.T) {
 	conn3, err := test.CreateProxy(primitiveID)
 	assert.NoError(t, err)
 
-	_map, err := New(context.TODO(), "TestIndexedMapOperations", conn1)
+	_map, err := New(context.TODO(), "TestIndexedMapStreams", conn1)
 	assert.NoError(t, err)
 
 	kv, err := _map.Put(context.Background(), "foo", []byte{1})
@@ -273,12 +273,15 @@ func TestIndexedMapStreams(t *testing.T) {
 
 	chanEntry := make(chan Entry)
 	go func() {
-		e := <-chanEntry
-		assert.Equal(t, "foo", string(e.Key))
-		e = <-chanEntry
-		assert.Equal(t, "bar", string(e.Key))
-		e = <-chanEntry
-		assert.Equal(t, "baz", string(e.Key))
+		e, ok := <-chanEntry
+		assert.True(t, ok)
+		assert.Equal(t, "foo", e.Key)
+		e, ok = <-chanEntry
+		assert.True(t, ok)
+		assert.Equal(t, "bar", e.Key)
+		e, ok = <-chanEntry
+		assert.True(t, ok)
+		assert.Equal(t, "baz", e.Key)
 		latch <- struct{}{}
 	}()
 
@@ -292,10 +295,10 @@ func TestIndexedMapStreams(t *testing.T) {
 	err = _map.Close(context.Background())
 	assert.NoError(t, err)
 
-	map1, err := New(context.TODO(), "TestIndexedMapOperations", conn2)
+	map1, err := New(context.TODO(), "TestIndexedMapStreams", conn2)
 	assert.NoError(t, err)
 
-	map2, err := New(context.TODO(), "TestIndexedMapOperations", conn3)
+	map2, err := New(context.TODO(), "TestIndexedMapStreams", conn3)
 	assert.NoError(t, err)
 
 	size, err := map1.Len(context.TODO())
@@ -312,7 +315,7 @@ func TestIndexedMapStreams(t *testing.T) {
 	assert.Error(t, err)
 	assert.True(t, errors.IsNotFound(err))
 
-	_map, err = New(context.TODO(), "TestIndexedMapOperations", conn1)
+	_map, err = New(context.TODO(), "TestIndexedMapStreams", conn1)
 	assert.NoError(t, err)
 
 	size, err = _map.Len(context.TODO())
