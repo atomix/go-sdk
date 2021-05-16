@@ -20,6 +20,7 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
+	"github.com/google/uuid"
 	"google.golang.org/grpc"
 )
 
@@ -60,9 +61,20 @@ const StateUnlocked State = "unlocked"
 // New creates a new Lock primitive for the given partitions
 // The lock will be created in one of the given partitions.
 func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Lock, error) {
+	options := newLockOptions{
+		clientID: uuid.New().String(),
+	}
+	popts := make([]primitive.Option, len(opts))
+	for i, opt := range opts {
+		popts[i] = opt.(primitive.Option)
+		if op, ok := opt.(Option); ok {
+			op.applyNewLock(&options)
+		}
+	}
 	l := &lock{
-		Client: primitive.NewClient(Type, name, conn),
-		client: api.NewLockServiceClient(conn),
+		Client:  primitive.NewClient(Type, name, conn, popts...),
+		client:  api.NewLockServiceClient(conn),
+		options: options,
 	}
 	if err := l.Create(ctx); err != nil {
 		return nil, err
@@ -73,7 +85,8 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option
 // lock is the single partition implementation of Lock
 type lock struct {
 	*primitive.Client
-	client api.LockServiceClient
+	client  api.LockServiceClient
+	options newLockOptions
 }
 
 func (l *lock) Lock(ctx context.Context, opts ...LockOption) (Status, error) {

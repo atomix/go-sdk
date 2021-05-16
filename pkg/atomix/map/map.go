@@ -22,6 +22,7 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
+	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"io"
 )
@@ -124,9 +125,20 @@ type Event struct {
 
 // New creates a new partitioned Map
 func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Map, error) {
+	options := newMapOptions{
+		clientID: uuid.New().String(),
+	}
+	popts := make([]primitive.Option, len(opts))
+	for i, opt := range opts {
+		popts[i] = opt.(primitive.Option)
+		if op, ok := opt.(Option); ok {
+			op.applyNewMap(&options)
+		}
+	}
 	m := &_map{
-		Client: primitive.NewClient(Type, name, conn),
-		client: api.NewMapServiceClient(conn),
+		Client:  primitive.NewClient(Type, name, conn, popts...),
+		client:  api.NewMapServiceClient(conn),
+		options: options,
 	}
 	if err := m.Create(ctx); err != nil {
 		return nil, err
@@ -136,7 +148,8 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option
 
 type _map struct {
 	*primitive.Client
-	client api.MapServiceClient
+	client  api.MapServiceClient
+	options newMapOptions
 }
 
 func (m *_map) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*Entry, error) {

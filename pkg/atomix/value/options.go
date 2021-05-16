@@ -16,32 +16,19 @@ package value
 
 import (
 	api "github.com/atomix/atomix-api/go/atomix/primitive/value"
+	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
-	"github.com/google/uuid"
 )
 
 // Option is a value option
 type Option interface {
-	apply(options *options)
+	primitive.Option
+	applyNewValue(options *newValueOptions)
 }
 
-// options is value options
-type options struct {
+// newValueOptions is value options
+type newValueOptions struct {
 	clientID string
-}
-
-func applyOptions(opts ...Option) options {
-	id, err := uuid.NewUUID()
-	if err != nil {
-		panic(err)
-	}
-	options := &options{
-		clientID: id.String(),
-	}
-	for _, opt := range opts {
-		opt.apply(options)
-	}
-	return *options
 }
 
 // WithClientID sets the client identifier
@@ -52,10 +39,11 @@ func WithClientID(id string) Option {
 }
 
 type clientIDOption struct {
+	primitive.EmptyOption
 	clientID string
 }
 
-func (o *clientIDOption) apply(options *options) {
+func (o *clientIDOption) applyNewValue(options *newValueOptions) {
 	options.clientID = o.clientID
 }
 

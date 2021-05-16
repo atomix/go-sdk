@@ -16,33 +16,20 @@ package lock
 
 import (
 	api "github.com/atomix/atomix-api/go/atomix/primitive/lock"
+	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
-	"github.com/google/uuid"
 	"time"
 )
 
 // Option is a lock option
 type Option interface {
-	apply(options *options)
+	primitive.Option
+	applyNewLock(options *newLockOptions)
 }
 
-// options is lock options
-type options struct {
+// newLockOptions is lock options
+type newLockOptions struct {
 	clientID string
-}
-
-func applyOptions(opts ...Option) options {
-	id, err := uuid.NewUUID()
-	if err != nil {
-		panic(err)
-	}
-	options := &options{
-		clientID: id.String(),
-	}
-	for _, opt := range opts {
-		opt.apply(options)
-	}
-	return *options
 }
 
 // WithClientID sets the client identifier
@@ -53,10 +40,11 @@ func WithClientID(id string) Option {
 }
 
 type clientIDOption struct {
+	primitive.EmptyOption
 	clientID string
 }
 
-func (o *clientIDOption) apply(options *options) {
+func (o *clientIDOption) applyNewLock(options *newLockOptions) {
 	options.clientID = o.clientID
 }
 

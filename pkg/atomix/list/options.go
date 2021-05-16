@@ -16,31 +16,18 @@ package list
 
 import (
 	api "github.com/atomix/atomix-api/go/atomix/primitive/list"
-	"github.com/google/uuid"
+	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 )
 
 // Option is a list option
 type Option interface {
-	apply(options *options)
+	primitive.Option
+	applyNewList(options *newListOptions)
 }
 
-// options is list options
-type options struct {
+// newListOptions is list options
+type newListOptions struct {
 	clientID string
-}
-
-func applyOptions(opts ...Option) options {
-	id, err := uuid.NewUUID()
-	if err != nil {
-		panic(err)
-	}
-	options := &options{
-		clientID: id.String(),
-	}
-	for _, opt := range opts {
-		opt.apply(options)
-	}
-	return *options
 }
 
 // WithClientID sets the client identifier
@@ -51,10 +38,11 @@ func WithClientID(id string) Option {
 }
 
 type clientIDOption struct {
+	primitive.EmptyOption
 	clientID string
 }
 
-func (o *clientIDOption) apply(options *options) {
+func (o *clientIDOption) applyNewList(options *newListOptions) {
 	options.clientID = o.clientID
 }
 

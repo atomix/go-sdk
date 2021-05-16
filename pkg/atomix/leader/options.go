@@ -14,30 +14,19 @@
 
 package leader
 
-import "github.com/google/uuid"
+import (
+	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
+)
 
-// Option is a latch option
+// Option is a leader latch option
 type Option interface {
-	apply(options *options)
+	primitive.Option
+	applyNewLatch(options *newLatchOptions)
 }
 
-// options is latch options
-type options struct {
+// newLatchOptions is leader latch options
+type newLatchOptions struct {
 	clientID string
-}
-
-func applyOptions(opts ...Option) options {
-	id, err := uuid.NewUUID()
-	if err != nil {
-		panic(err)
-	}
-	options := &options{
-		clientID: id.String(),
-	}
-	for _, opt := range opts {
-		opt.apply(options)
-	}
-	return *options
 }
 
 // WithClientID sets the client identifier
@@ -48,9 +37,10 @@ func WithClientID(id string) Option {
 }
 
 type clientIDOption struct {
+	primitive.EmptyOption
 	clientID string
 }
 
-func (o *clientIDOption) apply(options *options) {
+func (o *clientIDOption) applyNewLatch(options *newLatchOptions) {
 	options.clientID = o.clientID
 }

@@ -12,35 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package election
+package primitive
 
-import (
-	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
-)
-
-// Option is a election option
-type Option interface {
-	primitive.Option
-	applyNewElection(options *newElectionOptions)
+// newOptions is a set of primitive newOptions
+type newOptions struct {
+	cluster string
 }
 
-// newElectionOptions is election options
-type newElectionOptions struct {
-	clientID string
-}
-
-// WithClientID sets the client identifier
-func WithClientID(id string) Option {
-	return &clientIDOption{
-		clientID: id,
+// WithCluster sets the primitive cluster
+func WithCluster(cluster string) Option {
+	return &clusterOption{
+		cluster: cluster,
 	}
 }
 
-type clientIDOption struct {
-	primitive.EmptyOption
-	clientID string
+// clusterOption is a cluster option
+type clusterOption struct {
+	cluster string
 }
 
-func (o *clientIDOption) applyNewElection(options *newElectionOptions) {
-	options.clientID = o.clientID
+func (o *clusterOption) applyNew(options *newOptions) {
+	options.cluster = o.cluster
 }
+
+// Option is a primitive option
+type Option interface {
+	applyNew(*newOptions)
+}
+
+// EmptyOption is an empty primitive option
+type EmptyOption struct{}
+
+func (EmptyOption) applyNew(*newOptions) {}

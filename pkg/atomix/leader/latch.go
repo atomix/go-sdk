@@ -21,6 +21,7 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
+	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"io"
 )
@@ -96,9 +97,20 @@ type Event struct {
 
 // New creates a new latch primitive
 func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Latch, error) {
+	options := newLatchOptions{
+		clientID: uuid.New().String(),
+	}
+	popts := make([]primitive.Option, len(opts))
+	for i, opt := range opts {
+		popts[i] = opt.(primitive.Option)
+		if op, ok := opt.(Option); ok {
+			op.applyNewLatch(&options)
+		}
+	}
 	l := &latch{
-		Client: primitive.NewClient(Type, name, conn),
-		client: api.NewLeaderLatchServiceClient(conn),
+		Client:  primitive.NewClient(Type, name, conn, popts...),
+		client:  api.NewLeaderLatchServiceClient(conn),
+		options: options,
 	}
 	if err := l.Create(ctx); err != nil {
 		return nil, err
@@ -109,12 +121,12 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option
 // latch is the default single-partition implementation of Latch
 type latch struct {
 	*primitive.Client
-	id     string
-	client api.LeaderLatchServiceClient
+	client  api.LeaderLatchServiceClient
+	options newLatchOptions
 }
 
 func (l *latch) ID() string {
-	return l.id
+	return l.options.clientID
 }
 
 func (l *latch) Get(ctx context.Context) (*Leadership, error) {

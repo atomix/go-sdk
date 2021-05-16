@@ -20,6 +20,7 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"github.com/google/uuid"
 	"google.golang.org/grpc"
 )
 
@@ -53,9 +54,20 @@ type Counter interface {
 
 // New creates a new counter for the given partitions
 func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Counter, error) {
+	options := newCounterOptions{
+		clientID: uuid.New().String(),
+	}
+	popts := make([]primitive.Option, len(opts))
+	for i, opt := range opts {
+		popts[i] = opt.(primitive.Option)
+		if op, ok := opt.(Option); ok {
+			op.applyNewCounter(&options)
+		}
+	}
 	c := &counter{
-		Client: primitive.NewClient(Type, name, conn),
-		client: api.NewCounterServiceClient(conn),
+		Client:  primitive.NewClient(Type, name, conn, popts...),
+		client:  api.NewCounterServiceClient(conn),
+		options: options,
 	}
 	if err := c.Create(ctx); err != nil {
 		return nil, err
@@ -66,7 +78,8 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option
 // counter is the single partition implementation of Counter
 type counter struct {
 	*primitive.Client
-	client api.CounterServiceClient
+	client  api.CounterServiceClient
+	options newCounterOptions
 }
 
 func (c *counter) Get(ctx context.Context) (int64, error) {

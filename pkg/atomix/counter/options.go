@@ -14,31 +14,19 @@
 
 package counter
 
-import "github.com/google/uuid"
+import (
+	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
+)
 
 // Option is a counter option
 type Option interface {
-	apply(options *options)
+	primitive.Option
+	applyNewCounter(options *newCounterOptions)
 }
 
-// options is counter options
-type options struct {
-	namespace string
-	clientID  string
-}
-
-func applyOptions(opts ...Option) options {
-	id, err := uuid.NewUUID()
-	if err != nil {
-		panic(err)
-	}
-	options := &options{
-		clientID: id.String(),
-	}
-	for _, opt := range opts {
-		opt.apply(options)
-	}
-	return *options
+// newCounterOptions is counter options
+type newCounterOptions struct {
+	clientID string
 }
 
 // WithClientID sets the client identifier
@@ -49,9 +37,10 @@ func WithClientID(id string) Option {
 }
 
 type clientIDOption struct {
+	primitive.EmptyOption
 	clientID string
 }
 
-func (o *clientIDOption) apply(options *options) {
+func (o *clientIDOption) applyNewCounter(options *newCounterOptions) {
 	options.clientID = o.clientID
 }

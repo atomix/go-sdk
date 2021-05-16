@@ -43,11 +43,16 @@ type Primitive interface {
 	Delete(ctx context.Context) error
 }
 
-func NewClient(primitiveType Type, name string, conn *grpc.ClientConn) *Client {
+func NewClient(primitiveType Type, name string, conn *grpc.ClientConn, opts ...Option) *Client {
+	options := newOptions{}
+	for _, opt := range opts {
+		opt.applyNew(&options)
+	}
 	return &Client{
 		primitiveType: primitiveType,
 		name:          name,
 		client:        primitiveapi.NewPrimitiveClient(conn),
+		options:       options,
 	}
 }
 
@@ -55,6 +60,7 @@ type Client struct {
 	primitiveType Type
 	name          string
 	client        primitiveapi.PrimitiveClient
+	options       newOptions
 }
 
 func (c *Client) Type() Type {
@@ -75,6 +81,7 @@ func (c *Client) getPrimitiveId() primitiveapi.PrimitiveId {
 func (c *Client) GetHeaders() primitiveapi.RequestHeaders {
 	return primitiveapi.RequestHeaders{
 		PrimitiveID: c.getPrimitiveId(),
+		ClusterKey:  c.options.cluster,
 	}
 }
 
