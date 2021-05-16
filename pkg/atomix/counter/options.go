@@ -25,22 +25,4 @@ type Option interface {
 }
 
 // newCounterOptions is counter options
-type newCounterOptions struct {
-	clientID string
-}
-
-// WithClientID sets the client identifier
-func WithClientID(id string) Option {
-	return &clientIDOption{
-		clientID: id,
-	}
-}
-
-type clientIDOption struct {
-	primitive.EmptyOption
-	clientID string
-}
-
-func (o *clientIDOption) applyNewCounter(options *newCounterOptions) {
-	options.clientID = o.clientID
-}
+type newCounterOptions struct{}

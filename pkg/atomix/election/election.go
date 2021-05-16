@@ -21,7 +21,6 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
-	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"io"
 )
@@ -34,7 +33,7 @@ const Type primitive.Type = "Election"
 // Client provides an API for creating Elections
 type Client interface {
 	// GetElection gets the Election instance of the given name
-	GetElection(ctx context.Context, name string, opts ...Option) (Election, error)
+	GetElection(ctx context.Context, name string, opts ...primitive.Option) (Election, error)
 }
 
 // Election provides distributed leader election
@@ -108,19 +107,15 @@ type Event struct {
 }
 
 // New creates a new election primitive
-func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Election, error) {
-	options := newElectionOptions{
-		clientID: uuid.New().String(),
-	}
-	popts := make([]primitive.Option, len(opts))
-	for i, opt := range opts {
-		popts[i] = opt.(primitive.Option)
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...primitive.Option) (Election, error) {
+	options := newElectionOptions{}
+	for _, opt := range opts {
 		if op, ok := opt.(Option); ok {
 			op.applyNewElection(&options)
 		}
 	}
 	e := &election{
-		Client:  primitive.NewClient(Type, name, conn, popts...),
+		Client:  primitive.NewClient(Type, name, conn, opts...),
 		client:  api.NewLeaderElectionServiceClient(conn),
 		options: options,
 	}
@@ -138,7 +133,7 @@ type election struct {
 }
 
 func (e *election) ID() string {
-	return e.options.clientID
+	return e.SessionID()
 }
 
 func (e *election) GetTerm(ctx context.Context) (*Term, error) {
@@ -155,7 +150,7 @@ func (e *election) GetTerm(ctx context.Context) (*Term, error) {
 func (e *election) Enter(ctx context.Context) (*Term, error) {
 	request := &api.EnterRequest{
 		Headers:     e.GetHeaders(),
-		CandidateID: e.options.clientID,
+		CandidateID: e.SessionID(),
 	}
 	response, err := e.client.Enter(ctx, request)
 	if err != nil {
@@ -167,7 +162,7 @@ func (e *election) Enter(ctx context.Context) (*Term, error) {
 func (e *election) Leave(ctx context.Context) (*Term, error) {
 	request := &api.WithdrawRequest{
 		Headers:     e.GetHeaders(),
-		CandidateID: e.options.clientID,
+		CandidateID: e.SessionID(),
 	}
 	response, err := e.client.Withdraw(ctx, request)
 	if err != nil {

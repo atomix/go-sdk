@@ -22,7 +22,6 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
-	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"io"
 )
@@ -35,7 +34,7 @@ var log = logging.GetLogger("atomix", "client", "map")
 // Client provides an API for creating Maps
 type Client interface {
 	// GetMap gets the Map instance of the given name
-	GetMap(ctx context.Context, name string, opts ...Option) (Map, error)
+	GetMap(ctx context.Context, name string, opts ...primitive.Option) (Map, error)
 }
 
 // Map is a distributed set of keys and values
@@ -124,19 +123,15 @@ type Event struct {
 }
 
 // New creates a new partitioned Map
-func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Map, error) {
-	options := newMapOptions{
-		clientID: uuid.New().String(),
-	}
-	popts := make([]primitive.Option, len(opts))
-	for i, opt := range opts {
-		popts[i] = opt.(primitive.Option)
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...primitive.Option) (Map, error) {
+	options := newMapOptions{}
+	for _, opt := range opts {
 		if op, ok := opt.(Option); ok {
 			op.applyNewMap(&options)
 		}
 	}
 	m := &_map{
-		Client:  primitive.NewClient(Type, name, conn, popts...),
+		Client:  primitive.NewClient(Type, name, conn, opts...),
 		client:  api.NewMapServiceClient(conn),
 		options: options,
 	}

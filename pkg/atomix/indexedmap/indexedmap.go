@@ -23,7 +23,6 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
-	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"io"
 )
@@ -42,7 +41,7 @@ type Version uint64
 // Client provides an API for creating IndexedMaps
 type Client interface {
 	// GetIndexedMap gets the IndexedMap instance of the given name
-	GetIndexedMap(ctx context.Context, name string, opts ...Option) (IndexedMap, error)
+	GetIndexedMap(ctx context.Context, name string, opts ...primitive.Option) (IndexedMap, error)
 }
 
 // IndexedMap is a distributed linked map
@@ -161,19 +160,15 @@ type Event struct {
 }
 
 // New creates a new IndexedMap primitive
-func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (IndexedMap, error) {
-	options := newIndexedMapOptions{
-		clientID: uuid.New().String(),
-	}
-	popts := make([]primitive.Option, len(opts))
-	for i, opt := range opts {
-		popts[i] = opt.(primitive.Option)
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...primitive.Option) (IndexedMap, error) {
+	options := newIndexedMapOptions{}
+	for _, opt := range opts {
 		if op, ok := opt.(Option); ok {
 			op.applyNewIndexedMap(&options)
 		}
 	}
 	m := &indexedMap{
-		Client:  primitive.NewClient(Type, name, conn, popts...),
+		Client:  primitive.NewClient(Type, name, conn, opts...),
 		client:  api.NewIndexedMapServiceClient(conn),
 		options: options,
 	}

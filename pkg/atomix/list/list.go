@@ -21,7 +21,6 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
-	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"io"
 )
@@ -34,7 +33,7 @@ const Type primitive.Type = "List"
 // Client provides an API for creating Lists
 type Client interface {
 	// GetList gets the List instance of the given name
-	GetList(ctx context.Context, name string, opts ...Option) (List, error)
+	GetList(ctx context.Context, name string, opts ...primitive.Option) (List, error)
 }
 
 // List provides a distributed list data structure
@@ -102,19 +101,15 @@ type Event struct {
 }
 
 // New creates a new list primitive
-func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (List, error) {
-	options := newListOptions{
-		clientID: uuid.New().String(),
-	}
-	popts := make([]primitive.Option, len(opts))
-	for i, opt := range opts {
-		popts[i] = opt.(primitive.Option)
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...primitive.Option) (List, error) {
+	options := newListOptions{}
+	for _, opt := range opts {
 		if op, ok := opt.(Option); ok {
 			op.applyNewList(&options)
 		}
 	}
 	l := &list{
-		Client:  primitive.NewClient(Type, name, conn, popts...),
+		Client:  primitive.NewClient(Type, name, conn, opts...),
 		client:  api.NewListServiceClient(conn),
 		options: options,
 	}

@@ -20,7 +20,6 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
-	"github.com/google/uuid"
 	"google.golang.org/grpc"
 )
 
@@ -30,7 +29,7 @@ const Type primitive.Type = "Lock"
 // Client provides an API for creating Locks
 type Client interface {
 	// GetLock gets the Lock instance of the given name
-	GetLock(ctx context.Context, name string, opts ...Option) (Lock, error)
+	GetLock(ctx context.Context, name string, opts ...primitive.Option) (Lock, error)
 }
 
 // Lock provides distributed concurrency control
@@ -60,19 +59,15 @@ const StateUnlocked State = "unlocked"
 
 // New creates a new Lock primitive for the given partitions
 // The lock will be created in one of the given partitions.
-func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Lock, error) {
-	options := newLockOptions{
-		clientID: uuid.New().String(),
-	}
-	popts := make([]primitive.Option, len(opts))
-	for i, opt := range opts {
-		popts[i] = opt.(primitive.Option)
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...primitive.Option) (Lock, error) {
+	options := newLockOptions{}
+	for _, opt := range opts {
 		if op, ok := opt.(Option); ok {
 			op.applyNewLock(&options)
 		}
 	}
 	l := &lock{
-		Client:  primitive.NewClient(Type, name, conn, popts...),
+		Client:  primitive.NewClient(Type, name, conn, opts...),
 		client:  api.NewLockServiceClient(conn),
 		options: options,
 	}

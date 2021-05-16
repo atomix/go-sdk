@@ -20,7 +20,6 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
-	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"io"
 )
@@ -33,7 +32,7 @@ const Type primitive.Type = "Set"
 // Client provides an API for creating Sets
 type Client interface {
 	// GetSet gets the Set instance of the given name
-	GetSet(ctx context.Context, name string, opts ...Option) (Set, error)
+	GetSet(ctx context.Context, name string, opts ...primitive.Option) (Set, error)
 }
 
 // Set provides a distributed set data structure
@@ -91,20 +90,17 @@ type Event struct {
 }
 
 // New creates a new partitioned set primitive
-func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Set, error) {
-	options := newSetOptions{
-		clientID: uuid.New().String(),
-	}
-	popts := make([]primitive.Option, len(opts))
-	for i, opt := range opts {
-		popts[i] = opt.(primitive.Option)
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...primitive.Option) (Set, error) {
+	options := newSetOptions{}
+	for _, opt := range opts {
 		if op, ok := opt.(Option); ok {
 			op.applyNewSet(&options)
 		}
 	}
 	s := &set{
-		Client: primitive.NewClient(Type, name, conn, popts...),
-		client: api.NewSetServiceClient(conn),
+		Client:  primitive.NewClient(Type, name, conn, opts...),
+		client:  api.NewSetServiceClient(conn),
+		options: options,
 	}
 	if err := s.Create(ctx); err != nil {
 		return nil, err

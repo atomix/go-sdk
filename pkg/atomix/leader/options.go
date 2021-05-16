@@ -25,22 +25,4 @@ type Option interface {
 }
 
 // newLatchOptions is leader latch options
-type newLatchOptions struct {
-	clientID string
-}
-
-// WithClientID sets the client identifier
-func WithClientID(id string) Option {
-	return &clientIDOption{
-		clientID: id,
-	}
-}
-
-type clientIDOption struct {
-	primitive.EmptyOption
-	clientID string
-}
-
-func (o *clientIDOption) applyNewLatch(options *newLatchOptions) {
-	options.clientID = o.clientID
-}
+type newLatchOptions struct{}

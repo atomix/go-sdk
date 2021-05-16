@@ -20,7 +20,6 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
-	"github.com/google/uuid"
 	"google.golang.org/grpc"
 )
 
@@ -32,7 +31,7 @@ const Type primitive.Type = "Counter"
 // Client provides an API for creating Counters
 type Client interface {
 	// GetCounter gets the Counter instance of the given name
-	GetCounter(ctx context.Context, name string, opts ...Option) (Counter, error)
+	GetCounter(ctx context.Context, name string, opts ...primitive.Option) (Counter, error)
 }
 
 // Counter provides a distributed atomic counter
@@ -53,19 +52,15 @@ type Counter interface {
 }
 
 // New creates a new counter for the given partitions
-func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Counter, error) {
-	options := newCounterOptions{
-		clientID: uuid.New().String(),
-	}
-	popts := make([]primitive.Option, len(opts))
-	for i, opt := range opts {
-		popts[i] = opt.(primitive.Option)
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...primitive.Option) (Counter, error) {
+	options := newCounterOptions{}
+	for _, opt := range opts {
 		if op, ok := opt.(Option); ok {
 			op.applyNewCounter(&options)
 		}
 	}
 	c := &counter{
-		Client:  primitive.NewClient(Type, name, conn, popts...),
+		Client:  primitive.NewClient(Type, name, conn, opts...),
 		client:  api.NewCounterServiceClient(conn),
 		options: options,
 	}

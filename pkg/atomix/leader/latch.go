@@ -21,7 +21,6 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
-	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"io"
 )
@@ -34,7 +33,7 @@ const Type primitive.Type = "LeaderLatch"
 // Client provides an API for creating Latches
 type Client interface {
 	// GetLatch gets the Latch instance of the given name
-	GetLatch(ctx context.Context, name string, opts ...Option) (Latch, error)
+	GetLatch(ctx context.Context, name string, opts ...primitive.Option) (Latch, error)
 }
 
 // Latch provides distributed leader latch
@@ -96,19 +95,15 @@ type Event struct {
 }
 
 // New creates a new latch primitive
-func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Latch, error) {
-	options := newLatchOptions{
-		clientID: uuid.New().String(),
-	}
-	popts := make([]primitive.Option, len(opts))
-	for i, opt := range opts {
-		popts[i] = opt.(primitive.Option)
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...primitive.Option) (Latch, error) {
+	options := newLatchOptions{}
+	for _, opt := range opts {
 		if op, ok := opt.(Option); ok {
 			op.applyNewLatch(&options)
 		}
 	}
 	l := &latch{
-		Client:  primitive.NewClient(Type, name, conn, popts...),
+		Client:  primitive.NewClient(Type, name, conn, opts...),
 		client:  api.NewLeaderLatchServiceClient(conn),
 		options: options,
 	}
@@ -126,7 +121,7 @@ type latch struct {
 }
 
 func (l *latch) ID() string {
-	return l.options.clientID
+	return l.SessionID()
 }
 
 func (l *latch) Get(ctx context.Context) (*Leadership, error) {

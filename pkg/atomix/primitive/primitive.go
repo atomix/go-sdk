@@ -67,6 +67,10 @@ func (c *Client) Type() Type {
 	return c.primitiveType
 }
 
+func (c *Client) SessionID() string {
+	return c.options.sessionID
+}
+
 func (c *Client) Name() string {
 	return c.name
 }
@@ -81,7 +85,7 @@ func (c *Client) getPrimitiveId() primitiveapi.PrimitiveId {
 func (c *Client) GetHeaders() primitiveapi.RequestHeaders {
 	return primitiveapi.RequestHeaders{
 		PrimitiveID: c.getPrimitiveId(),
-		ClusterKey:  c.options.cluster,
+		ClusterKey:  c.options.clusterKey,
 	}
 }
 

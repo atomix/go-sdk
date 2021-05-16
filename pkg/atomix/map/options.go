@@ -28,25 +28,7 @@ type Option interface {
 }
 
 // newMapOptions is map options
-type newMapOptions struct {
-	clientID string
-}
-
-// WithClientID sets the client identifier
-func WithClientID(id string) Option {
-	return &clientIDOption{
-		clientID: id,
-	}
-}
-
-type clientIDOption struct {
-	primitive.EmptyOption
-	clientID string
-}
-
-func (o *clientIDOption) applyNewMap(options *newMapOptions) {
-	options.clientID = o.clientID
-}
+type newMapOptions struct{}
 
 // PutOption is an option for the Put method
 type PutOption interface {

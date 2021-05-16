@@ -28,25 +28,7 @@ type Option interface {
 }
 
 // newIndexedMapOptions is indexed map options
-type newIndexedMapOptions struct {
-	clientID string
-}
-
-// WithClientID sets the client identifier
-func WithClientID(id string) Option {
-	return &clientIDOption{
-		clientID: id,
-	}
-}
-
-type clientIDOption struct {
-	primitive.EmptyOption
-	clientID string
-}
-
-func (o *clientIDOption) applyNewIndexedMap(options *newIndexedMapOptions) {
-	options.clientID = o.clientID
-}
+type newIndexedMapOptions struct{}
 
 // SetOption is an option for the Put method
 type SetOption interface {

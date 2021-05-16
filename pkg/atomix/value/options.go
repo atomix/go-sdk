@@ -27,25 +27,7 @@ type Option interface {
 }
 
 // newValueOptions is value options
-type newValueOptions struct {
-	clientID string
-}
-
-// WithClientID sets the client identifier
-func WithClientID(id string) Option {
-	return &clientIDOption{
-		clientID: id,
-	}
-}
-
-type clientIDOption struct {
-	primitive.EmptyOption
-	clientID string
-}
-
-func (o *clientIDOption) applyNewValue(options *newValueOptions) {
-	options.clientID = o.clientID
-}
+type newValueOptions struct{}
 
 // SetOption is an option for Set calls
 type SetOption interface {

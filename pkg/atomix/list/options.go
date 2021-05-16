@@ -26,25 +26,7 @@ type Option interface {
 }
 
 // newListOptions is list options
-type newListOptions struct {
-	clientID string
-}
-
-// WithClientID sets the client identifier
-func WithClientID(id string) Option {
-	return &clientIDOption{
-		clientID: id,
-	}
-}
-
-type clientIDOption struct {
-	primitive.EmptyOption
-	clientID string
-}
-
-func (o *clientIDOption) applyNewList(options *newListOptions) {
-	options.clientID = o.clientID
-}
+type newListOptions struct{}
 
 // WatchOption is an option for list Watch calls
 type WatchOption interface {

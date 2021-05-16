@@ -28,25 +28,7 @@ type Option interface {
 }
 
 // newLockOptions is lock options
-type newLockOptions struct {
-	clientID string
-}
-
-// WithClientID sets the client identifier
-func WithClientID(id string) Option {
-	return &clientIDOption{
-		clientID: id,
-	}
-}
-
-type clientIDOption struct {
-	primitive.EmptyOption
-	clientID string
-}
-
-func (o *clientIDOption) applyNewLock(options *newLockOptions) {
-	options.clientID = o.clientID
-}
+type newLockOptions struct{}
 
 // LockOption is an option for Lock calls
 //nolint:golint

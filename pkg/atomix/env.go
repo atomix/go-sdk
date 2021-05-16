@@ -15,13 +15,17 @@
 package atomix
 
 import (
+	"github.com/google/uuid"
 	"os"
 	"strconv"
 	"sync"
 )
 
-const hostEnv = "ATOMIX_HOST"
-const portEnv = "ATOMIX_PORT"
+const (
+	clientIDEnv = "ATOMIX_CLIENT_ID"
+	hostEnv     = "ATOMIX_BROKER_HOST"
+	portEnv     = "ATOMIX_BROKER_PORT"
+)
 
 const defaultHost = "127.0.0.1"
 const defaultPort = 5678
@@ -40,6 +44,11 @@ func getClient() Client {
 	envClientMu.Lock()
 	defer envClientMu.Unlock()
 
+	clientID := os.Getenv(clientIDEnv)
+	if clientID == "" {
+		clientID = uuid.New().String()
+	}
+
 	host := os.Getenv(hostEnv)
 	if host == "" {
 		host = defaultHost
@@ -55,7 +64,7 @@ func getClient() Client {
 		port = i
 	}
 
-	client = NewClient(WithHost(host), WithPort(port))
+	client = NewClient(WithClientID(clientID), WithBrokerHost(host), WithBrokerPort(port))
 	envClient = client
 	return client
 }

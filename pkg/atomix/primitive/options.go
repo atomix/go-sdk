@@ -14,9 +14,20 @@
 
 package primitive
 
-// newOptions is a set of primitive newOptions
+// Option is a primitive option
+type Option interface {
+	applyNew(*newOptions)
+}
+
+// EmptyOption is an empty primitive option
+type EmptyOption struct{}
+
+func (EmptyOption) applyNew(*newOptions) {}
+
+// newOptions is a set of primitive options
 type newOptions struct {
-	cluster string
+	clusterKey string
+	sessionID  string
 }
 
 // WithClusterKey sets the primitive cluster key
@@ -32,15 +43,21 @@ type clusterKeyOption struct {
 }
 
 func (o *clusterKeyOption) applyNew(options *newOptions) {
-	options.cluster = o.clusterKey
+	options.clusterKey = o.clusterKey
 }
 
-// Option is a primitive option
-type Option interface {
-	applyNew(*newOptions)
+// WithSessionID sets the primitive session identifier
+func WithSessionID(sessionID string) Option {
+	return &sessionIDOption{
+		sessionID: sessionID,
+	}
 }
 
-// EmptyOption is an empty primitive option
-type EmptyOption struct{}
+// sessionIDOption is a session identifier option
+type sessionIDOption struct {
+	sessionID string
+}
 
-func (EmptyOption) applyNew(*newOptions) {}
+func (o *sessionIDOption) applyNew(options *newOptions) {
+	options.sessionID = o.sessionID
+}

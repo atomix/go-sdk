@@ -21,7 +21,6 @@ import (
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
-	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"io"
 )
@@ -34,7 +33,7 @@ const Type primitive.Type = "Value"
 // Client provides an API for creating Values
 type Client interface {
 	// GetValue gets the Value instance of the given name
-	GetValue(ctx context.Context, name string, opts ...Option) (Value, error)
+	GetValue(ctx context.Context, name string, opts ...primitive.Option) (Value, error)
 }
 
 // Value provides a simple atomic value
@@ -72,20 +71,17 @@ type Event struct {
 
 // New creates a new Lock primitive for the given partitions
 // The value will be created in one of the given partitions.
-func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Value, error) {
-	options := newValueOptions{
-		clientID: uuid.New().String(),
-	}
-	popts := make([]primitive.Option, len(opts))
-	for i, opt := range opts {
-		popts[i] = opt.(primitive.Option)
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...primitive.Option) (Value, error) {
+	options := newValueOptions{}
+	for _, opt := range opts {
 		if op, ok := opt.(Option); ok {
 			op.applyNewValue(&options)
 		}
 	}
 	v := &value{
-		Client: primitive.NewClient(Type, name, conn, popts...),
-		client: api.NewValueServiceClient(conn),
+		Client:  primitive.NewClient(Type, name, conn, opts...),
+		client:  api.NewValueServiceClient(conn),
+		options: options,
 	}
 	if err := v.Create(ctx); err != nil {
 		return nil, err

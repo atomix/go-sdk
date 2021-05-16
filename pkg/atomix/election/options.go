@@ -25,22 +25,4 @@ type Option interface {
 }
 
 // newElectionOptions is election options
-type newElectionOptions struct {
-	clientID string
-}
-
-// WithClientID sets the client identifier
-func WithClientID(id string) Option {
-	return &clientIDOption{
-		clientID: id,
-	}
-}
-
-type clientIDOption struct {
-	primitive.EmptyOption
-	clientID string
-}
-
-func (o *clientIDOption) applyNewElection(options *newElectionOptions) {
-	options.clientID = o.clientID
-}
+type newElectionOptions struct{}
