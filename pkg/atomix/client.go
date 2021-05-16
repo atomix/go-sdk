@@ -30,7 +30,9 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/atomix/set"
 	"github.com/atomix/atomix-go-client/pkg/atomix/value"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/util/retry"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"io"
 	"sync"
 )
@@ -127,7 +129,10 @@ func (c *atomixClient) connect(ctx context.Context, primitive primitiveapi.Primi
 
 	brokerConn := c.brokerConn
 	if brokerConn == nil {
-		conn, err := grpc.DialContext(ctx, fmt.Sprintf("%s:%d", c.options.Host, c.options.Port), grpc.WithInsecure())
+		conn, err := grpc.DialContext(ctx, fmt.Sprintf("%s:%d", c.options.Host, c.options.Port),
+			grpc.WithInsecure(),
+			grpc.WithUnaryInterceptor(retry.RetryingUnaryClientInterceptor()),
+			grpc.WithStreamInterceptor(retry.RetryingStreamClientInterceptor()))
 		if err != nil {
 			return nil, err
 		}
@@ -141,7 +146,7 @@ func (c *atomixClient) connect(ctx context.Context, primitive primitiveapi.Primi
 			PrimitiveId: primitive,
 		},
 	}
-	response, err := brokerClient.LookupPrimitive(ctx, request)
+	response, err := brokerClient.LookupPrimitive(ctx, request, retry.WithRetryOn(codes.Unavailable, codes.NotFound))
 	if err != nil {
 		return nil, errors.From(err)
 	}
