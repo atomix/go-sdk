@@ -19,20 +19,20 @@ type newOptions struct {
 	cluster string
 }
 
-// WithCluster sets the primitive cluster
-func WithCluster(cluster string) Option {
-	return &clusterOption{
-		cluster: cluster,
+// WithClusterKey sets the primitive cluster key
+func WithClusterKey(clusterKey string) Option {
+	return &clusterKeyOption{
+		clusterKey: clusterKey,
 	}
 }
 
-// clusterOption is a cluster option
-type clusterOption struct {
-	cluster string
+// clusterKeyOption is a cluster key option
+type clusterKeyOption struct {
+	clusterKey string
 }
 
-func (o *clusterOption) applyNew(options *newOptions) {
-	options.cluster = o.cluster
+func (o *clusterKeyOption) applyNew(options *newOptions) {
+	options.cluster = o.clusterKey
 }
 
 // Option is a primitive option
