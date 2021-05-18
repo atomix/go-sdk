@@ -45,6 +45,7 @@ import (
 	rsmmapproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/map"
 	rsmsetproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/set"
 	rsmvalueproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/value"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"google.golang.org/grpc"
 )
 
@@ -123,7 +124,7 @@ func (c *Client) getConn(ctx context.Context, primitive primitive.Type, name str
 	}
 	primitiveID := primitiveapi.PrimitiveId{Type: primitive.String(), Namespace: "test", Name: name}
 	_, err := agentClient.CreateProxy(ctx, &driverapi.CreateProxyRequest{ProxyID: driverapi.ProxyId{primitiveID}, Options: proxyOptions})
-	if err != nil {
+	if err != nil && !errors.IsAlreadyExists(errors.From(err)) {
 		return nil, err
 	}
 	return c.conn, nil
