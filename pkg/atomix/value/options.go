@@ -45,7 +45,12 @@ type matchOption struct {
 }
 
 func (o matchOption) beforeSet(request *api.SetRequest) {
-	request.Value.ObjectMeta = o.object.Meta().Proto()
+	proto := o.object.Meta().Proto()
+	request.Preconditions = append(request.Preconditions, api.Precondition{
+		Precondition: &api.Precondition_Metadata{
+			Metadata: &proto,
+		},
+	})
 }
 
 func (o matchOption) afterSet(response *api.SetResponse) {

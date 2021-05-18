@@ -227,6 +227,10 @@ func (s *set) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) e
 	request := &api.EventsRequest{
 		Headers: s.GetHeaders(),
 	}
+	for i := range opts {
+		opts[i].beforeWatch(request)
+	}
+
 	stream, err := s.client.Events(ctx, request)
 	if err != nil {
 		return errors.From(err)
@@ -238,17 +242,20 @@ func (s *set) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) e
 		open := false
 		for {
 			response, err := stream.Recv()
-			if err == io.EOF {
-				return
-			} else if err == context.Canceled || err == context.DeadlineExceeded {
+			if err == io.EOF || err == context.Canceled || errors.IsCanceled(errors.From(err)) {
 				return
 			} else if err != nil {
 				log.Errorf("Watch failed: %v", err)
+				return
 			} else {
 				if !open {
 					close(openCh)
 					open = true
 				}
+				for i := range opts {
+					opts[i].afterWatch(response)
+				}
+
 				switch response.Event.Type {
 				case api.Event_ADD:
 					ch <- Event{

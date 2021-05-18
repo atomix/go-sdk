@@ -25,7 +25,7 @@ import (
 	"testing"
 )
 
-func TestRSMValue(t *testing.T) {
+func TestValueOperations(t *testing.T) {
 	logging.SetLevel(logging.DebugLevel)
 
 	primitiveID := primitiveapi.PrimitiveId{
@@ -50,10 +50,10 @@ func TestRSMValue(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, value)
 
-	val, version, err := value.Get(context.TODO())
+	val, md, err := value.Get(context.TODO())
 	assert.NoError(t, err)
 	assert.Nil(t, val)
-	assert.Equal(t, meta.Revision(0), version.Revision)
+	assert.Equal(t, meta.Revision(0), md.Revision)
 
 	ch := make(chan Event)
 
@@ -64,35 +64,35 @@ func TestRSMValue(t *testing.T) {
 	assert.Error(t, err)
 	assert.True(t, errors.IsConflict(err))
 
-	version, err = value.Set(context.TODO(), []byte("foo"))
+	md, err = value.Set(context.TODO(), []byte("foo"))
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(1), version)
+	assert.Equal(t, meta.Revision(1), md.Revision)
 
-	val, version, err = value.Get(context.TODO())
+	val, md, err = value.Get(context.TODO())
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(1), version)
+	assert.Equal(t, meta.Revision(1), md.Revision)
 	assert.Equal(t, "foo", string(val))
 
 	_, err = value.Set(context.TODO(), []byte("foo"), IfMatch(meta.ObjectMeta{Revision: 2}))
 	assert.Error(t, err)
 	assert.True(t, errors.IsConflict(err))
 
-	version, err = value.Set(context.TODO(), []byte("bar"), IfMatch(meta.ObjectMeta{Revision: 1}))
+	md, err = value.Set(context.TODO(), []byte("bar"), IfMatch(meta.ObjectMeta{Revision: 1}))
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(2), version)
+	assert.Equal(t, meta.Revision(2), md.Revision)
 
-	val, version, err = value.Get(context.TODO())
+	val, md, err = value.Get(context.TODO())
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(2), version)
+	assert.Equal(t, meta.Revision(2), md.Revision)
 	assert.Equal(t, "bar", string(val))
 
-	version, err = value.Set(context.TODO(), []byte("baz"))
+	md, err = value.Set(context.TODO(), []byte("baz"))
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(3), version)
+	assert.Equal(t, meta.Revision(3), md.Revision)
 
-	val, version, err = value.Get(context.TODO())
+	val, md, err = value.Get(context.TODO())
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(3), version)
+	assert.Equal(t, meta.Revision(3), md.Revision)
 	assert.Equal(t, "baz", string(val))
 
 	event := <-ch

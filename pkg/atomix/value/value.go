@@ -142,12 +142,11 @@ func (v *value) Watch(ctx context.Context, ch chan<- Event) error {
 		open := false
 		for {
 			response, err := stream.Recv()
-			if err == io.EOF {
-				return
-			} else if err == context.Canceled || err == context.DeadlineExceeded {
+			if err == io.EOF || err == context.Canceled || errors.IsCanceled(errors.From(err)) {
 				return
 			} else if err != nil {
 				log.Errorf("Watch failed: %v", err)
+				return
 			} else {
 				if !open {
 					close(openCh)

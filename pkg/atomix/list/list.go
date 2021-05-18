@@ -255,6 +255,10 @@ func (l *list) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) 
 	request := &api.EventsRequest{
 		Headers: l.GetHeaders(),
 	}
+	for i := range opts {
+		opts[i].beforeWatch(request)
+	}
+
 	stream, err := l.client.Events(ctx, request)
 	if err != nil {
 		return errors.From(err)
@@ -266,21 +270,24 @@ func (l *list) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) 
 		open := false
 		for {
 			response, err := stream.Recv()
-			if err == io.EOF {
-				return
-			} else if err == context.Canceled || err == context.DeadlineExceeded {
+			if err == io.EOF || err == context.Canceled || errors.IsCanceled(errors.From(err)) {
 				return
 			} else if err != nil {
 				log.Errorf("Watch failed: %v", err)
+				return
 			} else {
+				if !open {
+					close(openCh)
+					open = true
+				}
+				for i := range opts {
+					opts[i].afterWatch(response)
+				}
+
 				bytes, err := base64.StdEncoding.DecodeString(response.Event.Item.Value.Value)
 				if err != nil {
 					log.Errorf("Failed to decode list item: %v", err)
 				} else {
-					if !open {
-						close(openCh)
-						open = true
-					}
 					switch response.Event.Type {
 					case api.Event_ADD:
 						ch <- Event{

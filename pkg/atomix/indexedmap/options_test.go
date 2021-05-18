@@ -23,14 +23,12 @@ import (
 
 func TestOptions(t *testing.T) {
 	putRequest := &api.PutRequest{}
-	assert.Equal(t, uint64(0), putRequest.Entry.Value.ObjectMeta.Revision.Num)
 	IfMatch(meta.ObjectMeta{Revision: 1}).beforePut(putRequest)
-	assert.Equal(t, uint64(1), putRequest.Entry.Value.ObjectMeta.Revision.Num)
+	assert.Equal(t, meta.Revision(1), meta.Revision(putRequest.Preconditions[0].GetMetadata().Revision.Num))
 
 	removeRequest := &api.RemoveRequest{}
-	assert.Equal(t, uint64(0), removeRequest.Entry.Value.ObjectMeta.Revision.Num)
 	IfMatch(meta.ObjectMeta{Revision: 2}).beforeRemove(removeRequest)
-	assert.Equal(t, uint64(2), removeRequest.Entry.Value.ObjectMeta.Revision.Num)
+	assert.Equal(t, meta.Revision(2), meta.Revision(removeRequest.Preconditions[0].GetMetadata().Revision.Num))
 
 	eventRequest := &api.EventsRequest{}
 	assert.False(t, eventRequest.Replay)
