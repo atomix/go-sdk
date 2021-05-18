@@ -20,6 +20,7 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/atomix/test"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -71,6 +72,7 @@ func TestIndexedMapOperations(t *testing.T) {
 	assert.Equal(t, "foo", kv.Key)
 	assert.Equal(t, Index(1), kv.Index)
 	assert.Equal(t, "bar", string(kv.Value))
+	assert.NotEqual(t, meta.Revision(0), kv.Revision)
 	version := kv.Revision
 
 	size, err = _map.Len(context.Background())
@@ -83,6 +85,7 @@ func TestIndexedMapOperations(t *testing.T) {
 	assert.Equal(t, Index(1), kv.Index)
 	assert.Equal(t, "foo", kv.Key)
 	assert.Equal(t, "bar", string(kv.Value))
+	assert.NotEqual(t, meta.Revision(0), kv.Revision)
 	assert.Equal(t, version, kv.Revision)
 
 	size, err = _map.Len(context.Background())
@@ -231,10 +234,12 @@ func TestIndexedMapStreams(t *testing.T) {
 	assert.NotNil(t, kv)
 	assert.Equal(t, "foo", kv.Key)
 	assert.Equal(t, byte(2), kv.Value[0])
+	assert.NotEqual(t, meta.Revision(0), kv.Revision)
 
 	event := <-keyCh
 	assert.NotNil(t, event)
 	assert.Equal(t, "foo", event.Entry.Key)
+	assert.NotEqual(t, meta.Revision(0), event.Entry.Revision)
 	assert.Equal(t, kv.Revision, event.Entry.Revision)
 
 	indexCh := make(chan Event)
@@ -264,11 +269,13 @@ func TestIndexedMapStreams(t *testing.T) {
 	event = <-keyCh
 	assert.NotNil(t, event)
 	assert.Equal(t, "foo", event.Entry.Key)
+	assert.NotEqual(t, meta.Revision(0), event.Entry.Revision)
 	assert.Equal(t, kv.Revision, event.Entry.Revision)
 
 	event = <-indexCh
 	assert.NotNil(t, event)
 	assert.Equal(t, "foo", event.Entry.Key)
+	assert.NotEqual(t, meta.Revision(0), event.Entry.Revision)
 	assert.Equal(t, kv.Revision, event.Entry.Revision)
 
 	chanEntry := make(chan Entry)
