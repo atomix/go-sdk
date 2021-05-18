@@ -163,6 +163,8 @@ func (l *latch) Watch(ctx context.Context, ch chan<- Event) error {
 			response, err := stream.Recv()
 			if err == io.EOF {
 				return
+			} else if err == context.Canceled || err == context.DeadlineExceeded {
+				return
 			} else if err != nil {
 				log.Errorf("Watch failed: %v", err)
 			} else {
