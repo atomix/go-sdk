@@ -71,7 +71,7 @@ func TestIndexedMapOperations(t *testing.T) {
 	assert.Equal(t, "foo", kv.Key)
 	assert.Equal(t, Index(1), kv.Index)
 	assert.Equal(t, "bar", string(kv.Value))
-	version := kv.Version
+	version := kv.Revision
 
 	size, err = _map.Len(context.Background())
 	assert.NoError(t, err)
@@ -83,7 +83,7 @@ func TestIndexedMapOperations(t *testing.T) {
 	assert.Equal(t, Index(1), kv.Index)
 	assert.Equal(t, "foo", kv.Key)
 	assert.Equal(t, "bar", string(kv.Value))
-	assert.Equal(t, version, kv.Version)
+	assert.Equal(t, version, kv.Revision)
 
 	size, err = _map.Len(context.Background())
 	assert.NoError(t, err)
@@ -235,7 +235,7 @@ func TestIndexedMapStreams(t *testing.T) {
 	event := <-keyCh
 	assert.NotNil(t, event)
 	assert.Equal(t, "foo", event.Entry.Key)
-	assert.Equal(t, kv.Version, event.Entry.Version)
+	assert.Equal(t, kv.Revision, event.Entry.Revision)
 
 	indexCh := make(chan Event)
 	err = _map.Watch(context.Background(), indexCh, WithFilter(Filter{
@@ -264,12 +264,12 @@ func TestIndexedMapStreams(t *testing.T) {
 	event = <-keyCh
 	assert.NotNil(t, event)
 	assert.Equal(t, "foo", event.Entry.Key)
-	assert.Equal(t, kv.Version, event.Entry.Version)
+	assert.Equal(t, kv.Revision, event.Entry.Revision)
 
 	event = <-indexCh
 	assert.NotNil(t, event)
 	assert.Equal(t, "foo", event.Entry.Key)
-	assert.Equal(t, kv.Version, event.Entry.Version)
+	assert.Equal(t, kv.Revision, event.Entry.Revision)
 
 	chanEntry := make(chan Entry)
 	go func() {

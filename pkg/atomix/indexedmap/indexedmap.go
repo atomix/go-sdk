@@ -118,10 +118,6 @@ type Entry struct {
 	// for the lifetime of a key.
 	Index Index
 
-	// Version is the unique, monotonically increasing version number for the key/value pair. The version is
-	// suitable for use in optimistic locking.
-	Version Version
-
 	// Key is the key of the pair
 	Key string
 
@@ -130,7 +126,7 @@ type Entry struct {
 }
 
 func (kv Entry) String() string {
-	return fmt.Sprintf("key: %s\nvalue: %s\nversion: %d", kv.Key, string(kv.Value), kv.Version)
+	return fmt.Sprintf("key: %s\nvalue: %s", kv.Key, string(kv.Value))
 }
 
 // EventType is the type of a map event
