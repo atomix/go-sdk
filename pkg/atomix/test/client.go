@@ -49,21 +49,21 @@ import (
 	"google.golang.org/grpc"
 )
 
-func newClient(clientID string, config protocolapi.ProtocolConfig) *Client {
-	return &Client{
+func newClient(clientID string, config protocolapi.ProtocolConfig) *testClient {
+	return &testClient{
 		id:     clientID,
 		config: config,
 	}
 }
 
-type Client struct {
+type testClient struct {
 	id     string
 	config protocolapi.ProtocolConfig
 	driver *driver.Driver
 	conn   *grpc.ClientConn
 }
 
-func (c *Client) connect(driverPort, agentPort int) error {
+func (c *testClient) connect(driverPort, agentPort int) error {
 	protocolFunc := func(rsmCluster cluster.Cluster, driverEnv env.DriverEnv) proxy.Protocol {
 		protocol := rsmdriver.NewProtocol(rsmCluster, driverEnv)
 		rsmcounterproxy.Register(protocol)
@@ -116,7 +116,7 @@ func (c *Client) connect(driverPort, agentPort int) error {
 	return nil
 }
 
-func (c *Client) getConn(ctx context.Context, primitive primitive.Type, name string) (*grpc.ClientConn, error) {
+func (c *testClient) getConn(ctx context.Context, primitive primitive.Type, name string) (*grpc.ClientConn, error) {
 	agentClient := driverapi.NewAgentClient(c.conn)
 	proxyOptions := driverapi.ProxyOptions{
 		Read:  true,
@@ -130,11 +130,11 @@ func (c *Client) getConn(ctx context.Context, primitive primitive.Type, name str
 	return c.conn, nil
 }
 
-func (c *Client) getOpts(opts ...primitive.Option) []primitive.Option {
+func (c *testClient) getOpts(opts ...primitive.Option) []primitive.Option {
 	return append([]primitive.Option{primitive.WithSessionID(c.id)}, opts...)
 }
 
-func (c *Client) GetCounter(ctx context.Context, name string, opts ...primitive.Option) (counter.Counter, error) {
+func (c *testClient) GetCounter(ctx context.Context, name string, opts ...primitive.Option) (counter.Counter, error) {
 	conn, err := c.getConn(ctx, counter.Type, name)
 	if err != nil {
 		return nil, err
@@ -142,7 +142,7 @@ func (c *Client) GetCounter(ctx context.Context, name string, opts ...primitive.
 	return counter.New(ctx, name, conn, c.getOpts(opts...)...)
 }
 
-func (c *Client) GetElection(ctx context.Context, name string, opts ...primitive.Option) (election.Election, error) {
+func (c *testClient) GetElection(ctx context.Context, name string, opts ...primitive.Option) (election.Election, error) {
 	conn, err := c.getConn(ctx, election.Type, name)
 	if err != nil {
 		return nil, err
@@ -150,7 +150,7 @@ func (c *Client) GetElection(ctx context.Context, name string, opts ...primitive
 	return election.New(ctx, name, conn, c.getOpts(opts...)...)
 }
 
-func (c *Client) GetIndexedMap(ctx context.Context, name string, opts ...primitive.Option) (indexedmap.IndexedMap, error) {
+func (c *testClient) GetIndexedMap(ctx context.Context, name string, opts ...primitive.Option) (indexedmap.IndexedMap, error) {
 	conn, err := c.getConn(ctx, indexedmap.Type, name)
 	if err != nil {
 		return nil, err
@@ -158,7 +158,7 @@ func (c *Client) GetIndexedMap(ctx context.Context, name string, opts ...primiti
 	return indexedmap.New(ctx, name, conn, c.getOpts(opts...)...)
 }
 
-func (c *Client) GetLatch(ctx context.Context, name string, opts ...primitive.Option) (leader.Latch, error) {
+func (c *testClient) GetLatch(ctx context.Context, name string, opts ...primitive.Option) (leader.Latch, error) {
 	conn, err := c.getConn(ctx, leader.Type, name)
 	if err != nil {
 		return nil, err
@@ -166,7 +166,7 @@ func (c *Client) GetLatch(ctx context.Context, name string, opts ...primitive.Op
 	return leader.New(ctx, name, conn, c.getOpts(opts...)...)
 }
 
-func (c *Client) GetList(ctx context.Context, name string, opts ...primitive.Option) (list.List, error) {
+func (c *testClient) GetList(ctx context.Context, name string, opts ...primitive.Option) (list.List, error) {
 	conn, err := c.getConn(ctx, list.Type, name)
 	if err != nil {
 		return nil, err
@@ -174,7 +174,7 @@ func (c *Client) GetList(ctx context.Context, name string, opts ...primitive.Opt
 	return list.New(ctx, name, conn, c.getOpts(opts...)...)
 }
 
-func (c *Client) GetLock(ctx context.Context, name string, opts ...primitive.Option) (lock.Lock, error) {
+func (c *testClient) GetLock(ctx context.Context, name string, opts ...primitive.Option) (lock.Lock, error) {
 	conn, err := c.getConn(ctx, lock.Type, name)
 	if err != nil {
 		return nil, err
@@ -182,7 +182,7 @@ func (c *Client) GetLock(ctx context.Context, name string, opts ...primitive.Opt
 	return lock.New(ctx, name, conn, c.getOpts(opts...)...)
 }
 
-func (c *Client) GetMap(ctx context.Context, name string, opts ...primitive.Option) (_map.Map, error) {
+func (c *testClient) GetMap(ctx context.Context, name string, opts ...primitive.Option) (_map.Map, error) {
 	conn, err := c.getConn(ctx, _map.Type, name)
 	if err != nil {
 		return nil, err
@@ -190,7 +190,7 @@ func (c *Client) GetMap(ctx context.Context, name string, opts ...primitive.Opti
 	return _map.New(ctx, name, conn, c.getOpts(opts...)...)
 }
 
-func (c *Client) GetSet(ctx context.Context, name string, opts ...primitive.Option) (set.Set, error) {
+func (c *testClient) GetSet(ctx context.Context, name string, opts ...primitive.Option) (set.Set, error) {
 	conn, err := c.getConn(ctx, set.Type, name)
 	if err != nil {
 		return nil, err
@@ -198,7 +198,7 @@ func (c *Client) GetSet(ctx context.Context, name string, opts ...primitive.Opti
 	return set.New(ctx, name, conn, c.getOpts(opts...)...)
 }
 
-func (c *Client) GetValue(ctx context.Context, name string, opts ...primitive.Option) (value.Value, error) {
+func (c *testClient) GetValue(ctx context.Context, name string, opts ...primitive.Option) (value.Value, error) {
 	conn, err := c.getConn(ctx, value.Type, name)
 	if err != nil {
 		return nil, err
@@ -206,7 +206,7 @@ func (c *Client) GetValue(ctx context.Context, name string, opts ...primitive.Op
 	return value.New(ctx, name, conn, c.getOpts(opts...)...)
 }
 
-func (c *Client) Close() error {
+func (c *testClient) Close() error {
 	if c.conn != nil {
 		c.conn.Close()
 	}

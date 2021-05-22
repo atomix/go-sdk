@@ -22,16 +22,19 @@ import (
 	"sync"
 )
 
+// Option is a test option
 type Option interface {
 	apply(*testOptions)
 }
 
+// testOptions is the set of all test options
 type testOptions struct {
 	replicas   int
 	partitions int
 	debug      bool
 }
 
+// WithReplicas sets the number of replicas to test
 func WithReplicas(replicas int) Option {
 	return replicasOption{
 		replicas: replicas,
@@ -46,6 +49,7 @@ func (o replicasOption) apply(options *testOptions) {
 	options.replicas = o.replicas
 }
 
+// WithPartitions sets the number of partitions to test
 func WithPartitions(partitions int) Option {
 	return partitionsOption{
 		partitions: partitions,
@@ -60,6 +64,7 @@ func (o partitionsOption) apply(options *testOptions) {
 	options.partitions = o.partitions
 }
 
+// WithDebugLogs sets whether to enable debug logs for the test
 func WithDebugLogs() Option {
 	return debugOption{
 		debug: true,
@@ -84,22 +89,19 @@ func NewTest(opts ...Option) *Test {
 		opt.apply(&options)
 	}
 	config := newTestConfig(options)
-	replicas := make([]*Replica, len(config.Replicas))
+	replicas := make([]*testReplica, len(config.Replicas))
 	for i, r := range config.Replicas {
 		replicas[i] = newReplica(r, config)
 	}
 	return &Test{
-		config:     config,
-		replicas:   replicas,
-		driverPort: 5252,
-		agentPort:  5353,
-		debug:      options.debug,
+		config:   config,
+		replicas: replicas,
+		debug:    options.debug,
 	}
 }
 
 func newTestConfig(options testOptions) protocolapi.ProtocolConfig {
 	var config protocolapi.ProtocolConfig
-	var replicaPort int32 = 7000
 	var replicas []string
 	for i := 1; i <= options.replicas; i++ {
 		replicaID := fmt.Sprintf("replica-%d", i)
@@ -108,10 +110,9 @@ func newTestConfig(options testOptions) protocolapi.ProtocolConfig {
 			ID:      replicaID,
 			NodeID:  nodeID,
 			Host:    "localhost",
-			APIPort: replicaPort,
+			APIPort: int32(nextPort()),
 		})
 		replicas = append(replicas, replicaID)
-		replicaPort++
 	}
 
 	for i := 1; i <= options.partitions; i++ {
@@ -125,15 +126,14 @@ func newTestConfig(options testOptions) protocolapi.ProtocolConfig {
 
 // Test is an Atomix test utility
 type Test struct {
-	config     protocolapi.ProtocolConfig
-	replicas   []*Replica
-	clients    []*Client
-	driverPort int
-	agentPort  int
-	debug      bool
-	mu         sync.Mutex
+	config   protocolapi.ProtocolConfig
+	replicas []*testReplica
+	clients  []*testClient
+	debug    bool
+	mu       sync.Mutex
 }
 
+// Start starts the test
 func (t *Test) Start() error {
 	if t.debug {
 		logging.SetLevel(logging.DebugLevel)
@@ -141,26 +141,28 @@ func (t *Test) Start() error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	for _, replica := range t.replicas {
-		if err := replica.Start(); err != nil {
+		if err := replica.start(); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
+// NewClient creates a new test client
 func (t *Test) NewClient(clientID string) (atomix.Client, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	client := newClient(clientID, t.config)
-	if err := client.connect(t.driverPort, t.agentPort); err != nil {
+	driverPort := nextPort()
+	agentPort := nextPort()
+	if err := client.connect(driverPort, agentPort); err != nil {
 		return nil, err
 	}
-	t.driverPort++
-	t.agentPort++
 	t.clients = append(t.clients, client)
 	return client, nil
 }
 
+// Stop stops the test
 func (t *Test) Stop() error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -170,9 +172,28 @@ func (t *Test) Stop() error {
 		}
 	}
 	for _, replica := range t.replicas {
-		if err := replica.Stop(); err != nil {
+		if err := replica.stop(); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+var ports = &portAllocator{port: 5000}
+
+func nextPort() int {
+	return ports.next()
+}
+
+type portAllocator struct {
+	port int
+	mu   sync.Mutex
+}
+
+func (p *portAllocator) next() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	port := p.port
+	p.port++
+	return port
 }

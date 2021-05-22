@@ -31,20 +31,20 @@ import (
 	"github.com/atomix/atomix-go-local/pkg/atomix/local"
 )
 
-func newReplica(replica protocolapi.ProtocolReplica, protocol protocolapi.ProtocolConfig) *Replica {
-	return &Replica{
+func newReplica(replica protocolapi.ProtocolReplica, protocol protocolapi.ProtocolConfig) *testReplica {
+	return &testReplica{
 		replica:  replica,
 		protocol: protocol,
 	}
 }
 
-type Replica struct {
+type testReplica struct {
 	replica  protocolapi.ProtocolReplica
 	protocol protocolapi.ProtocolConfig
 	node     *rsmprotocol.Node
 }
 
-func (r *Replica) Start() error {
+func (r *testReplica) start() error {
 	r.node = rsmprotocol.NewNode(cluster.NewCluster(r.protocol, cluster.WithMemberID(r.replica.ID)), local.NewProtocol())
 	rsmcounterprotocol.RegisterService(r.node)
 	rsmelectionprotocol.RegisterService(r.node)
@@ -63,7 +63,7 @@ func (r *Replica) Start() error {
 	return nil
 }
 
-func (r *Replica) Stop() error {
+func (r *testReplica) stop() error {
 	if r.node != nil {
 		err := r.node.Stop()
 		if err != nil {
