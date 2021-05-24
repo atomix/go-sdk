@@ -22,7 +22,6 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/atomix/counter"
 	"github.com/atomix/atomix-go-client/pkg/atomix/election"
 	"github.com/atomix/atomix-go-client/pkg/atomix/indexedmap"
-	"github.com/atomix/atomix-go-client/pkg/atomix/leader"
 	"github.com/atomix/atomix-go-client/pkg/atomix/list"
 	"github.com/atomix/atomix-go-client/pkg/atomix/lock"
 	_map "github.com/atomix/atomix-go-client/pkg/atomix/map"
@@ -51,11 +50,6 @@ func GetElection(ctx context.Context, name string, opts ...primitive.Option) (el
 // GetIndexedMap gets the IndexedMap instance of the given name
 func GetIndexedMap(ctx context.Context, name string, opts ...primitive.Option) (indexedmap.IndexedMap, error) {
 	return getClient().GetIndexedMap(ctx, name, opts...)
-}
-
-// GetLatch gets the Latch instance of the given name
-func GetLatch(ctx context.Context, name string, opts ...primitive.Option) (leader.Latch, error) {
-	return getClient().GetLatch(ctx, name, opts...)
 }
 
 // GetList gets the List instance of the given name
@@ -104,7 +98,6 @@ type Client interface {
 	counter.Client
 	election.Client
 	indexedmap.Client
-	leader.Client
 	list.Client
 	lock.Client
 	_map.Client
@@ -201,14 +194,6 @@ func (c *atomixClient) GetIndexedMap(ctx context.Context, name string, opts ...p
 		return nil, err
 	}
 	return indexedmap.New(ctx, name, conn, getPrimitiveOpts(c.options, opts...)...)
-}
-
-func (c *atomixClient) GetLatch(ctx context.Context, name string, opts ...primitive.Option) (leader.Latch, error) {
-	conn, err := c.connect(ctx, newPrimitiveID(leader.Type, name))
-	if err != nil {
-		return nil, err
-	}
-	return leader.New(ctx, name, conn, getPrimitiveOpts(c.options, opts...)...)
 }
 
 func (c *atomixClient) GetList(ctx context.Context, name string, opts ...primitive.Option) (list.List, error) {

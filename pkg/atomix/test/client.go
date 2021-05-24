@@ -23,7 +23,6 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/atomix/counter"
 	"github.com/atomix/atomix-go-client/pkg/atomix/election"
 	"github.com/atomix/atomix-go-client/pkg/atomix/indexedmap"
-	"github.com/atomix/atomix-go-client/pkg/atomix/leader"
 	"github.com/atomix/atomix-go-client/pkg/atomix/list"
 	"github.com/atomix/atomix-go-client/pkg/atomix/lock"
 	_map "github.com/atomix/atomix-go-client/pkg/atomix/map"
@@ -156,14 +155,6 @@ func (c *testClient) GetIndexedMap(ctx context.Context, name string, opts ...pri
 		return nil, err
 	}
 	return indexedmap.New(ctx, name, conn, c.getOpts(opts...)...)
-}
-
-func (c *testClient) GetLatch(ctx context.Context, name string, opts ...primitive.Option) (leader.Latch, error) {
-	conn, err := c.getConn(ctx, leader.Type, name)
-	if err != nil {
-		return nil, err
-	}
-	return leader.New(ctx, name, conn, c.getOpts(opts...)...)
 }
 
 func (c *testClient) GetList(ctx context.Context, name string, opts ...primitive.Option) (list.List, error) {
