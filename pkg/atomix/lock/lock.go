@@ -52,10 +52,15 @@ type Status struct {
 	State State
 }
 
-type State string
+// State is a lock state
+type State int
 
-const StateLocked State = "locked"
-const StateUnlocked State = "unlocked"
+const (
+	// StateLocked is the State in which the lock is locked
+	StateLocked State = iota
+	// StateUnlocked is the State in which the lock is not locked
+	StateUnlocked
+)
 
 // New creates a new Lock primitive for the given partitions
 // The lock will be created in one of the given partitions.

@@ -43,6 +43,7 @@ type Primitive interface {
 	Delete(ctx context.Context) error
 }
 
+// NewClient creates a new primitive client
 func NewClient(primitiveType Type, name string, conn *grpc.ClientConn, opts ...Option) *Client {
 	options := newOptions{}
 	for _, opt := range opts {
@@ -56,6 +57,7 @@ func NewClient(primitiveType Type, name string, conn *grpc.ClientConn, opts ...O
 	}
 }
 
+// Client is a base client for all primitives
 type Client struct {
 	primitiveType Type
 	name          string
@@ -63,32 +65,37 @@ type Client struct {
 	options       newOptions
 }
 
+// Type returns the primitive type
 func (c *Client) Type() Type {
 	return c.primitiveType
 }
 
+// SessionID returns the primitive session identifier
 func (c *Client) SessionID() string {
 	return c.options.sessionID
 }
 
+// Name returns the primitive name
 func (c *Client) Name() string {
 	return c.name
 }
 
-func (c *Client) getPrimitiveId() primitiveapi.PrimitiveId {
+func (c *Client) getPrimitiveID() primitiveapi.PrimitiveId {
 	return primitiveapi.PrimitiveId{
 		Type: c.primitiveType.String(),
 		Name: c.name,
 	}
 }
 
+// GetHeaders gets the primitive headers
 func (c *Client) GetHeaders() primitiveapi.RequestHeaders {
 	return primitiveapi.RequestHeaders{
-		PrimitiveID: c.getPrimitiveId(),
+		PrimitiveID: c.getPrimitiveID(),
 		ClusterKey:  c.options.clusterKey,
 	}
 }
 
+// Create creates an instance of the primitive
 func (c *Client) Create(ctx context.Context) error {
 	request := &primitiveapi.CreateRequest{
 		Headers: c.GetHeaders(),
@@ -97,6 +104,7 @@ func (c *Client) Create(ctx context.Context) error {
 	return errors.From(err)
 }
 
+// Close closes the primitive session
 func (c *Client) Close(ctx context.Context) error {
 	request := &primitiveapi.CloseRequest{
 		Headers: c.GetHeaders(),
@@ -105,6 +113,7 @@ func (c *Client) Close(ctx context.Context) error {
 	return errors.From(err)
 }
 
+// Delete deletes the primitive state
 func (c *Client) Delete(ctx context.Context) error {
 	request := &primitiveapi.DeleteRequest{
 		Headers: c.GetHeaders(),

@@ -19,11 +19,8 @@ import (
 	api "github.com/atomix/atomix-api/go/atomix/primitive/counter"
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"google.golang.org/grpc"
 )
-
-var log = logging.GetLogger("atomix", "client", "counter")
 
 // Type is the counter type
 const Type primitive.Type = "Counter"

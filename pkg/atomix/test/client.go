@@ -123,7 +123,7 @@ func (c *testClient) getConn(ctx context.Context, primitive primitive.Type, name
 		Write: true,
 	}
 	primitiveID := primitiveapi.PrimitiveId{Type: primitive.String(), Namespace: "test", Name: name}
-	_, err := agentClient.CreateProxy(ctx, &driverapi.CreateProxyRequest{ProxyID: driverapi.ProxyId{primitiveID}, Options: proxyOptions})
+	_, err := agentClient.CreateProxy(ctx, &driverapi.CreateProxyRequest{ProxyID: driverapi.ProxyId{PrimitiveId: primitiveID}, Options: proxyOptions})
 	if err != nil && !errors.IsAlreadyExists(errors.From(err)) {
 		return nil, err
 	}

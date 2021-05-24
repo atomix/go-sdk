@@ -50,6 +50,7 @@ import (
 	"google.golang.org/grpc"
 )
 
+// NewRSMTest creates a new RSM-based test
 func NewRSMTest() *RSMTest {
 	return &RSMTest{
 		config: protocolapi.ProtocolConfig{
@@ -71,12 +72,14 @@ func NewRSMTest() *RSMTest {
 	}
 }
 
+// RSMTest is an RSM-based primitive test
 type RSMTest struct {
 	config   protocolapi.ProtocolConfig
 	protocol *rsmprotocol.Node
 	drivers  []*driver.Driver
 }
 
+// Start starts the test cluster
 func (t *RSMTest) Start() error {
 	t.protocol = rsmprotocol.NewNode(cluster.NewCluster(t.config, cluster.WithMemberID("rsm-1")), local.NewProtocol())
 	rsmcounterprotocol.RegisterService(t.protocol)
@@ -96,6 +99,7 @@ func (t *RSMTest) Start() error {
 	return nil
 }
 
+// CreateProxy creates an RSM proxy and returns the connection
 func (t *RSMTest) CreateProxy(primitiveID primitiveapi.PrimitiveId) (*grpc.ClientConn, error) {
 	protocolFunc := func(rsmCluster cluster.Cluster, driverEnv env.DriverEnv) proxy.Protocol {
 		protocol := rsmdriver.NewProtocol(rsmCluster, driverEnv)
@@ -155,13 +159,14 @@ func (t *RSMTest) CreateProxy(primitiveID primitiveapi.PrimitiveId) (*grpc.Clien
 		Read:  true,
 		Write: true,
 	}
-	_, err = agentClient.CreateProxy(context.TODO(), &driverapi.CreateProxyRequest{ProxyID: driverapi.ProxyId{primitiveID}, Options: proxyOptions})
+	_, err = agentClient.CreateProxy(context.TODO(), &driverapi.CreateProxyRequest{ProxyID: driverapi.ProxyId{PrimitiveId: primitiveID}, Options: proxyOptions})
 	if err != nil {
 		return nil, err
 	}
 	return agentConn, nil
 }
 
+// Stop stops the RSM test cluster
 func (t *RSMTest) Stop() error {
 	for _, driver := range t.drivers {
 		err := driver.Stop()
