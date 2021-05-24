@@ -22,10 +22,10 @@ github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da/go.mod h1:Q73ZrmV
 github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310/go.mod h1:ufUuZ+zHj4x4TnLV4JWEpy2hxWSpsRywHrMgIH9cCH8=
 github.com/atomix/atomix-api/go v0.4.4 h1:6o0Pz62qlx2FmzCQxKTQ8vB6wpOI3+9UT2lZIvw4zak=
 github.com/atomix/atomix-api/go v0.4.4/go.mod h1:N6gtApjoC9bRS9m7dksdVQIWSKaNArAl5EiOoaTHnmw=
-github.com/atomix/atomix-go-framework v0.6.10 h1:5N6GolXOl8LUIU7ov+p9nkZS7qaHb8vkCn26cK3YdO4=
-github.com/atomix/atomix-go-framework v0.6.10/go.mod h1:EkESsxBGOTVYPghrcJSLa36a8Zq1Dnu8Mq56xcjXX/k=
-github.com/atomix/atomix-go-local v0.6.9 h1:gm0U9kN6govY03oweTJKn1PfRcXbEDplkN6tNSrstiM=
-github.com/atomix/atomix-go-local v0.6.9/go.mod h1:6H63U/ilUtxDObLUSIDQ5CreB0c9lhNoBT0qySlGTNY=
+github.com/atomix/atomix-go-framework v0.6.11 h1:XjT4UvTVkmtH/mOxUokVkeTwSiy6Mo/5eHWqd0qSHNU=
+github.com/atomix/atomix-go-framework v0.6.11/go.mod h1:EkESsxBGOTVYPghrcJSLa36a8Zq1Dnu8Mq56xcjXX/k=
+github.com/atomix/atomix-go-local v0.6.10 h1:OA0b36iSUAcO/T6LWJiwZB92+v+eNSza/RWEjgS9M9g=
+github.com/atomix/atomix-go-local v0.6.10/go.mod h1:rGqEHWm2JqBLbnUUKAYpCE2hMQjTQoKxz0ZpgpAsPD0=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+CedLV8=
 github.com/bgentry/speakeasy v0.1.0/go.mod h1:+zsyZBPWlz7T6j88CTgSN5bM796AkVf0kBD4zp0CCIs=

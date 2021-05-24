@@ -30,12 +30,10 @@ func TestOptions(t *testing.T) {
 	assert.Equal(t, 5*time.Second, *lockRequest.Timeout)
 
 	unlockRequest := &api.UnlockRequest{}
-	assert.Equal(t, metaapi.RevisionNum(0), unlockRequest.Lock.ObjectMeta.Revision.Num)
 	IfMatch(meta.ObjectMeta{Revision: 1}).beforeUnlock(unlockRequest)
 	assert.Equal(t, metaapi.RevisionNum(1), unlockRequest.Lock.ObjectMeta.Revision.Num)
 
 	getLockRequest := &api.GetLockRequest{}
-	assert.Equal(t, metaapi.RevisionNum(0), getLockRequest.Lock.ObjectMeta.Revision.Num)
 	IfMatch(meta.ObjectMeta{Revision: 2}).beforeGet(getLockRequest)
 	assert.Equal(t, metaapi.RevisionNum(2), getLockRequest.Lock.ObjectMeta.Revision.Num)
 }
