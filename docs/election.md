@@ -7,37 +7,32 @@ the `Election` interface.
 To create an `Election`, call `GetElection` on the database in which to create the election:
 
 ```go
-db, err := client.GetDatabase(context.TODO(), "raft")
+myElection, err := atomix.GetElection(context.Background(), "my-election")
 if err != nil {
 	...
 }
 
-election, err := db.GetElection(context.TODO(), "my-election")
-if err != nil {
-	...
-}
-
-defer election.Close(context.TODO())
+defer myElection.Close(context.Background())
 ```
 
 Each `Election` object has a globally unique node ID which is used to identify the client and
 can be read by calling `ID()`:
 
 ```go
-id := election.ID()
+id := myElection.ID()
 ```
 
-The election ID is used to differentiate candidates and can be explicitly assigned by passing additional
-options to the election getter:
+The election ID is used to differentiate candidates and can be explicitly assigned by specifying a
+session ID when getting the election instance:
 
 ```go
-election, err := database.GetElection(context.TODO(), "my-election", election.WithID("node-1"))
+myElection, err := atomix.GetElection(context.Background(), "my-election", primitive.WithSessionID("node-1"))
 ```
 
 The current election `Term` can be retrieved by calling `GetTerm`:
 
 ```go
-term, err := election.GetTerm(context.TODO())
+term, err := myElection.GetTerm(context.Background())
 if err != nil {
 	...
 }
@@ -52,7 +47,7 @@ including the current leader
 To enter the client into the election, call `Enter`:
 
 ```go
-term, err = election.Enter(context.TODO())
+term, err = myElection.Enter(context.Background())
 if err != nil {
 	...
 }
@@ -62,7 +57,7 @@ The `Enter` call will return the resulting `Term` struct which can be used to de
 client won the election:
 
 ```go
-if term.Leader == election.Id() {
+if term.Leader == myElection.ID() {
 	// This node is the leader
 }
 ```
@@ -70,23 +65,20 @@ if term.Leader == election.Id() {
 Clients can leave the election by calling `Leave`:
 
 ```go
-err = election.Leave(context.TODO())
+err = myElection.Leave(context.Background())
 if err != nil {
 	...
 }
 ```
 
-When the leader leaves an election, a new leader will be elected. Clients can receive election
-event notifications by passing a `chan *ElectionEvent` to `Listen`:
+When the leader leaves an election, a new leader will be elected. The `Watch` method can be used to
+watch the election for changes. When the leader or candidates changes, an event will be published 
+to all watchers.
 
 ```go
-ch := make(chan *election.ElectionEvent)
-election.Listen(context.TODO(), ch)
+ch := make(chan election.Event)
+err := myElection.Watch(context.Background(), ch)
 for event := range ch {
-	...
+    ...
 }
 ```
-
-Election events are guaranteed to be read from the channel in the order in which they occurred
-in the Atomix cluster. So if node `a` is elected leader before node `b`, all clients will
-receive a leader change event for node `a` before node `b`.

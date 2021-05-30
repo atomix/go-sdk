@@ -7,23 +7,18 @@ _Note that it's recommended distributed locking be used with a strongly consiste
 database that implements a protocol like `raft`.
 
 ```go
-db, err := client.GetDatabase(context.TODO(), "raft")
+myLock, err := atomix.GetLock(context.Background(), "my-lock")
 if err != nil {
 	...
 }
 
-lock, err := db.GetLock(context.TODO(), "my-lock")
-if err != nil {
-	...
-}
-
-defer lock.Close(context.TODO())
+defer myLock.Close(context.Background())
 ```
 
 To acquire the lock, call `Lock`:
 
 ```go
-version, err := lock.Lock(context.TODO())
+version, err := myLock.Lock(context.Background())
 if err != nil {
 	...
 }
@@ -35,7 +30,7 @@ client. A timeout can be provided by the `Context`:
 
 ```go
 ctx := context.WithTimeout(context.Background(), 10 * time.Second)
-version, err := lock.Lock(ctx)
+version, err := myLock.Lock(ctx)
 if err != nil {
 	...
 }
@@ -48,7 +43,7 @@ optimistic locking.
 To determine whether the lock is currently held by any client, call `IsLocked`:
 
 ```go
-locked, err := lock.IsLocked(context.TODO())
+locked, err := myLock.IsLocked(context.Background())
 if err != nil {
 	...
 }
@@ -58,7 +53,7 @@ A lock version number can also be passed using `WithVersion` to determine whethe
 lock is held by an owner with the given version number:
 
 ```go
-locked, err = lock.IsLocked(context.TODO(), atomixlock.WithVersion(version))
+locked, err = myLock.IsLocked(context.Background(), atomixlock.WithVersion(version))
 if err != nil {
 	...
 }
@@ -67,7 +62,7 @@ if err != nil {
 Once the client has finished with the lock, unlock it by calling `Unlock`:
 
 ```go
-unlocked, err := lock.Unlock(context.TODO())
+unlocked, err := myLock.Unlock(context.Background())
 if err != nil {
 	...
 }
@@ -77,7 +72,7 @@ Clients can also release any process's lock by passing the owner's lock version
 number:
 
 ```go
-unlocked, err = lock.Unlock(context.TODO(), atomixlock.WithVersion(version))
+unlocked, err = myLock.Unlock(context.Background(), lock.IfMatch(lock))
 if err != nil {
 	...
 }

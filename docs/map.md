@@ -10,43 +10,38 @@ values as a `KeyValue` object with the following fields:
 To create a distributed map, get a `Database` and call `GetMap` on the database:
 
 ```go
-db, err := client.GetDatabase(context.TODO(), "raft")
+myMap, err := atomix.GetMap(context.Background(), "my-map")
 if err != nil {
 	...
 }
 
-_map, err := db.GetMap(context.TODO(), "my-map")
-if err != nil {
-	...
-}
-
-defer _map.Close(context.TODO())
+defer myMap.Close(context.Background())
 ```
 
 To put a value in a map, call `Put`:
 
 ```go
-value, err := _map.Put(context.TODO(), "foo", []byte("bar"))
+entry, err := myMap.Put(context.Background(), "foo", []byte("bar"))
 if err != nil {
 	...
 }
 ```
 
-The returned `KeyValue` contains the `Version` of the entry that was written to the map. `Get` also
-returns the `KeyValue`:
+The returned `Entry` contains the metadata for the entry that was written to the map. `Get` also
+returns the `Entry`:
 
 ```go
-value, err = _map.Get(context.TODO(), "foo")
+entry, err = myMap.Get(context.Background(), "foo")
 if err != nil {
 	...
 }
 ```
 
-This entry `Version` can be used for optimistic locking when updating the entry using the
-`WithVersion` option:
+This entry metadata can be used for optimistic locking when updating the entry using the
+`IfMatch` option:
 
 ```go
-value, err := _map.Put(context.TODO(), "foo", []byte("baz"), atomixmap.WithVersion(value.Version))
+entry, err := myMap.Put(context.Background(), "foo", []byte("baz"), _map.IfMatch(entry.ObjectMeta))
 if err != nil {
 	...
 }
@@ -55,7 +50,7 @@ if err != nil {
 To remove a key from the map, call `Remove`:
 
 ```go
-value, err = _map.Remove(context.TODO(), "foo")
+entry, err = myMap.Remove(context.Background(), "foo")
 if err != nil {
 	...
 }
@@ -64,7 +59,7 @@ if err != nil {
 Again, optimistic locking can be used when removing an entry:
 
 ```go
-value, err = _map.Remove(context.TODO(), "foo", atomixmap.WithVersion(value.Version))
+entry, err = myMap.Remove(context.Background(), "foo", _map.IfMatch(entry.ObjectMeta))
 if err != nil {
 	...
 }
@@ -73,23 +68,18 @@ if err != nil {
 Call `Clear` to remove all entries from the map:
 
 ```go
-err = _map.Clear(context.TODO())
+err = myMap.Clear(context.Background())
 if err != nil {
 	...
 }
 ```
 
-Clients can also listen for update events from other clients by passing a `chan *MapEvent` to
-`Listen`:
+The `Watch` method can be used to watch the map for changes. When the map is modified an event will be published to all watchers.
 
 ```go
-ch := make(chan *_map.MapEvent)
-err := m.Listen(context.TODO(), ch)
+ch := make(chan _map.Event)
+err := myMap.Watch(context.Background(), ch)
 for event := range ch {
-	...
+    ...
 }
 ```
-
-Events read from the channel are guaranteed to be read in the order in which they occurred within 
-the partition from which they were produced. For example, if key `foo` is set to `bar` and then 
-to `baz`, _every client_ is guaranteed to see the event indicating the update to `bar` before `baz`.
