@@ -22,6 +22,14 @@ import (
 	"sync"
 )
 
+// Protocol is a test protocol implementation
+type Protocol interface {
+	// NewReplica creates a new test replica
+	NewReplica(replica protocolapi.ProtocolReplica, protocol protocolapi.ProtocolConfig) Replica
+	// NewClient creates a new test client
+	NewClient(clientID string, protocol protocolapi.ProtocolConfig) Client
+}
+
 // Option is a test option
 type Option interface {
 	apply(*testOptions)
@@ -80,7 +88,7 @@ func (o debugOption) apply(options *testOptions) {
 }
 
 // NewTest creates a new Atomix test
-func NewTest(opts ...Option) *Test {
+func NewTest(protocol Protocol, opts ...Option) *Test {
 	options := testOptions{
 		replicas:   1,
 		partitions: 1,
@@ -91,9 +99,10 @@ func NewTest(opts ...Option) *Test {
 	config := newTestConfig(options)
 	replicas := make([]*testReplica, len(config.Replicas))
 	for i, r := range config.Replicas {
-		replicas[i] = newReplica(r, config)
+		replicas[i] = newReplica(protocol.NewReplica(r, config))
 	}
 	return &Test{
+		protocol: protocol,
 		config:   config,
 		replicas: replicas,
 		debug:    options.debug,
@@ -126,6 +135,7 @@ func newTestConfig(options testOptions) protocolapi.ProtocolConfig {
 
 // Test is an Atomix test utility
 type Test struct {
+	protocol Protocol
 	config   protocolapi.ProtocolConfig
 	replicas []*testReplica
 	clients  []*testClient
@@ -141,7 +151,7 @@ func (t *Test) Start() error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	for _, replica := range t.replicas {
-		if err := replica.start(); err != nil {
+		if err := replica.Start(); err != nil {
 			return err
 		}
 	}
@@ -152,10 +162,10 @@ func (t *Test) Start() error {
 func (t *Test) NewClient(clientID string) (atomix.Client, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	client := newClient(clientID, t.config)
+	client := newClient(clientID, t.protocol.NewClient(clientID, t.config))
 	driverPort := nextPort()
 	agentPort := nextPort()
-	if err := client.connect(driverPort, agentPort); err != nil {
+	if err := client.Start(driverPort, agentPort); err != nil {
 		return nil, err
 	}
 	t.clients = append(t.clients, client)
@@ -167,12 +177,12 @@ func (t *Test) Stop() error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	for _, client := range t.clients {
-		if err := client.Close(); err != nil {
+		if err := client.Stop(); err != nil {
 			return err
 		}
 	}
 	for _, replica := range t.replicas {
-		if err := replica.stop(); err != nil {
+		if err := replica.Stop(); err != nil {
 			return err
 		}
 	}
