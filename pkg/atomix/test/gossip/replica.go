@@ -43,6 +43,12 @@ func (r *testReplica) Start() error {
 	gossipmapprotocol.RegisterService(r.node)
 	gossipsetprotocol.RegisterService(r.node)
 	gossipvalueprotocol.RegisterService(r.node)
+
+	gossipcounterprotocol.RegisterServer(r.node)
+	gossipmapprotocol.RegisterServer(r.node)
+	gossipsetprotocol.RegisterServer(r.node)
+	gossipvalueprotocol.RegisterServer(r.node)
+
 	err := r.node.Start()
 	if err != nil {
 		return err
