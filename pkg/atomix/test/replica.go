@@ -14,8 +14,11 @@
 
 package test
 
+// Replica is an interface for implementing a test protocol replica
 type Replica interface {
+	// Start starts the replica
 	Start() error
+	// Stop stops the replica
 	Stop() error
 }
 

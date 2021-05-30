@@ -28,9 +28,13 @@ import (
 	"google.golang.org/grpc"
 )
 
+// Client is an interface for implementing the client for a test protocol
 type Client interface {
+	// Start starts the client
 	Start(driverPort, agentPort int) error
+	// Connect connects the client to the given primitive server
 	Connect(ctx context.Context, primitive primitive.Type, name string) (*grpc.ClientConn, error)
+	// Stop stops the client
 	Stop() error
 }
 
