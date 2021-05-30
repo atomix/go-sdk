@@ -19,10 +19,15 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/atomix/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
+	"time"
 )
 
 func TestGossipTest(t *testing.T) {
-	test := test.NewTest(NewProtocol(), test.WithPartitions(1), test.WithReplicas(1))
+	test := test.NewTest(
+		NewProtocol(),
+		test.WithPartitions(3),
+		test.WithReplicas(3),
+		test.WithDebugLogs())
 	assert.NoError(t, test.Start())
 	defer test.Stop()
 
@@ -44,11 +49,15 @@ func TestGossipTest(t *testing.T) {
 	assert.Equal(t, "a", kv.Key)
 	assert.Equal(t, "b", string(kv.Value))
 
+	time.Sleep(time.Second)
+
 	kv, err = map2.Get(context.Background(), "a")
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "a", kv.Key)
 	assert.Equal(t, "b", string(kv.Value))
+
+	time.Sleep(time.Second)
 
 	kv, err = map1.Put(context.Background(), "b", []byte("c"))
 	assert.NoError(t, err)
@@ -56,17 +65,23 @@ func TestGossipTest(t *testing.T) {
 	assert.Equal(t, "b", kv.Key)
 	assert.Equal(t, "c", string(kv.Value))
 
+	time.Sleep(time.Second)
+
 	kv, err = map2.Put(context.Background(), "c", []byte("d"))
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "c", kv.Key)
 	assert.Equal(t, "d", string(kv.Value))
 
+	time.Sleep(time.Second)
+
 	kv, err = map1.Put(context.Background(), "d", []byte("e"))
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "d", kv.Key)
 	assert.Equal(t, "e", string(kv.Value))
+
+	time.Sleep(time.Second)
 
 	kv, err = map2.Put(context.Background(), "e", []byte("f"))
 	assert.NoError(t, err)
