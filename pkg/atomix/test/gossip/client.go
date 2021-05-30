@@ -31,21 +31,24 @@ import (
 	gossipsetproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/gossip/set"
 	gossipvalueproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/gossip/value"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/gogo/protobuf/jsonpb"
 	"google.golang.org/grpc"
 )
 
-func newClient(clientID string, config protocolapi.ProtocolConfig) *gossipClient {
+func newClient(clientID string, config protocolapi.ProtocolConfig, options gossipOptions) *gossipClient {
 	return &gossipClient{
-		id:     clientID,
-		config: config,
+		id:      clientID,
+		config:  config,
+		options: options,
 	}
 }
 
 type gossipClient struct {
-	id     string
-	config protocolapi.ProtocolConfig
-	driver *driver.Driver
-	conn   *grpc.ClientConn
+	id      string
+	config  protocolapi.ProtocolConfig
+	options gossipOptions
+	driver  *driver.Driver
+	conn    *grpc.ClientConn
 }
 
 func (c *gossipClient) Start(driverPort, agentPort int) error {
@@ -96,13 +99,20 @@ func (c *gossipClient) Start(driverPort, agentPort int) error {
 }
 
 func (c *gossipClient) Connect(ctx context.Context, primitive primitive.Type, name string) (*grpc.ClientConn, error) {
+	marshaler := jsonpb.Marshaler{}
+	bytes, err := marshaler.MarshalToString(&c.options.GossipConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	agentClient := driverapi.NewAgentClient(c.conn)
 	proxyOptions := driverapi.ProxyOptions{
-		Read:  true,
-		Write: true,
+		Read:   true,
+		Write:  true,
+		Config: []byte(bytes),
 	}
 	primitiveID := primitiveapi.PrimitiveId{Type: primitive.String(), Namespace: "test", Name: name}
-	_, err := agentClient.CreateProxy(ctx, &driverapi.CreateProxyRequest{ProxyID: driverapi.ProxyId{PrimitiveId: primitiveID}, Options: proxyOptions})
+	_, err = agentClient.CreateProxy(ctx, &driverapi.CreateProxyRequest{ProxyID: driverapi.ProxyId{PrimitiveId: primitiveID}, Options: proxyOptions})
 	if err != nil && !errors.IsAlreadyExists(errors.From(err)) {
 		return nil, err
 	}

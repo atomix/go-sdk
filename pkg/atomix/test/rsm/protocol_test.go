@@ -22,7 +22,7 @@ import (
 )
 
 func TestRSMTest(t *testing.T) {
-	test := test.NewTest(Protocol, test.WithPartitions(1), test.WithReplicas(1))
+	test := test.NewTest(NewProtocol(), test.WithPartitions(1), test.WithReplicas(1))
 	assert.NoError(t, test.Start())
 	defer test.Stop()
 

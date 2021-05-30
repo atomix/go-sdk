@@ -19,11 +19,28 @@ import (
 	test "github.com/atomix/atomix-go-client/pkg/atomix/test"
 )
 
-// Protocol is a state machine test protocol implementation
-var Protocol test.Protocol = &rsmProtocol{}
+type rsmOptions struct{}
+
+// Option is a state machine protocol option
+type Option interface {
+	apply(*rsmOptions)
+}
+
+// NewProtocol creates a new state machine test protocol
+func NewProtocol(opts ...Option) test.Protocol {
+	options := rsmOptions{}
+	for _, opt := range opts {
+		opt.apply(&options)
+	}
+	return &rsmProtocol{
+		options: options,
+	}
+}
 
 // rsmProtocol is a test protocol for state machine replication
-type rsmProtocol struct{}
+type rsmProtocol struct {
+	options rsmOptions
+}
 
 func (p *rsmProtocol) NewReplica(replica protocolapi.ProtocolReplica, protocol protocolapi.ProtocolConfig) test.Replica {
 	return newReplica(replica, protocol)
