@@ -24,6 +24,8 @@ github.com/atomix/atomix-api/go v0.4.5 h1:LRaDmYZ4j0aeTfKG+dRd+Uei0KmXQ8x+7a0Nv7
 github.com/atomix/atomix-api/go v0.4.5/go.mod h1:N6gtApjoC9bRS9m7dksdVQIWSKaNArAl5EiOoaTHnmw=
 github.com/atomix/atomix-go-framework v0.6.16 h1:mTzrsvgAX4+npJUSJLamDa01p/wsxTHFyu4qnC1HDgY=
 github.com/atomix/atomix-go-framework v0.6.16/go.mod h1:x0k+DV9H2y0l4t17jKTlejK6Ka8DYgbQd4wYYIP8dIE=
+github.com/atomix/atomix-go-framework v0.6.18 h1:r2p9a1IayR/TIVnJi9gOPU5xjn/MGuQ4JyuSukNFuwc=
+github.com/atomix/atomix-go-framework v0.6.18/go.mod h1:x0k+DV9H2y0l4t17jKTlejK6Ka8DYgbQd4wYYIP8dIE=
 github.com/atomix/atomix-go-local v0.6.13 h1:LFpyilwL5VmMZjKruhG3BubL6DLd9OrSJXKI7mZEisU=
 github.com/atomix/atomix-go-local v0.6.13/go.mod h1:3yz8j2K7YXn1y+VpAGl/+DjjVi2+Jnpl2ANRQiLPB28=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=

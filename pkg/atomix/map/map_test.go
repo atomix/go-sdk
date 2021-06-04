@@ -192,6 +192,7 @@ func TestMapStreams(t *testing.T) {
 	assert.Equal(t, byte(2), kv.Value[0])
 
 	event := <-keyCh
+	assert.Equal(t, EventUpdate, event.Type)
 	assert.NotNil(t, event)
 	assert.Equal(t, "foo", event.Entry.Key)
 	assert.Equal(t, kv.Revision, event.Entry.Revision)
@@ -215,6 +216,19 @@ func TestMapStreams(t *testing.T) {
 	assert.Equal(t, byte(5), kv.Value[0])
 
 	event = <-keyCh
+	assert.Equal(t, EventUpdate, event.Type)
+	assert.NotNil(t, event)
+	assert.Equal(t, "foo", event.Entry.Key)
+	assert.Equal(t, kv.Revision, event.Entry.Revision)
+
+	kv, err = _map.Remove(context.Background(), "foo")
+	assert.NoError(t, err)
+	assert.NotNil(t, kv)
+	assert.Equal(t, "foo", kv.Key)
+	assert.Equal(t, byte(5), kv.Value[0])
+
+	event = <-keyCh
+	assert.Equal(t, EventRemove, event.Type)
 	assert.NotNil(t, event)
 	assert.Equal(t, "foo", event.Entry.Key)
 	assert.Equal(t, kv.Revision, event.Entry.Revision)
@@ -237,7 +251,7 @@ func TestMapStreams(t *testing.T) {
 
 	size, err := map1.Len(context.TODO())
 	assert.NoError(t, err)
-	assert.Equal(t, 3, size)
+	assert.Equal(t, 2, size)
 
 	err = map1.Close(context.Background())
 	assert.NoError(t, err)

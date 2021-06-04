@@ -53,12 +53,12 @@ import (
 // NewRSMTest creates a new RSM-based test
 func NewRSMTest() *RSMTest {
 	return &RSMTest{
+		network: cluster.NewLocalNetwork(),
 		config: protocolapi.ProtocolConfig{
 			Replicas: []protocolapi.ProtocolReplica{
 				{
 					ID:      "rsm-1",
 					NodeID:  "node-1",
-					Host:    "localhost",
 					APIPort: 7001,
 				},
 			},
@@ -74,6 +74,7 @@ func NewRSMTest() *RSMTest {
 
 // RSMTest is an RSM-based primitive test
 type RSMTest struct {
+	network  cluster.Network
 	config   protocolapi.ProtocolConfig
 	protocol *rsmprotocol.Node
 	drivers  []*driver.Driver
@@ -81,7 +82,12 @@ type RSMTest struct {
 
 // Start starts the test cluster
 func (t *RSMTest) Start() error {
-	t.protocol = rsmprotocol.NewNode(cluster.NewCluster(t.config, cluster.WithMemberID("rsm-1")), local.NewProtocol())
+	t.protocol = rsmprotocol.NewNode(
+		cluster.NewCluster(
+			t.network,
+			t.config,
+			cluster.WithMemberID("rsm-1")),
+		local.NewProtocol())
 	rsmcounterprotocol.RegisterService(t.protocol)
 	rsmelectionprotocol.RegisterService(t.protocol)
 	rsmindexedmapprotocol.RegisterService(t.protocol)
@@ -117,14 +123,21 @@ func (t *RSMTest) CreateProxy(primitiveID primitiveapi.PrimitiveId) (*grpc.Clien
 	}
 
 	driverPort := 5252 + len(t.drivers)
-	driver := driver.NewDriver(protocolFunc, driver.WithNamespace("test"), driver.WithDriverID("rsm"), driver.WithPort(driverPort))
+	driver := driver.NewDriver(
+		cluster.NewCluster(
+			t.network,
+			protocolapi.ProtocolConfig{},
+			cluster.WithMemberID("rsm"),
+			cluster.WithPort(driverPort)),
+		protocolFunc,
+		driver.WithNamespace("test"))
 	err := driver.Start()
 	if err != nil {
 		return nil, err
 	}
 	t.drivers = append(t.drivers, driver)
 
-	driverConn, err := grpc.Dial(fmt.Sprintf("localhost:%d", driverPort), grpc.WithInsecure())
+	driverConn, err := grpc.Dial(fmt.Sprintf(":%d", driverPort), grpc.WithInsecure(), grpc.WithContextDialer(t.network.Connect))
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +162,7 @@ func (t *RSMTest) CreateProxy(primitiveID primitiveapi.PrimitiveId) (*grpc.Clien
 		return nil, err
 	}
 
-	agentConn, err := grpc.Dial(fmt.Sprintf("localhost:%d", agentPort), grpc.WithInsecure())
+	agentConn, err := grpc.Dial(fmt.Sprintf(":%d", agentPort), grpc.WithInsecure(), grpc.WithContextDialer(t.network.Connect))
 	if err != nil {
 		return nil, err
 	}

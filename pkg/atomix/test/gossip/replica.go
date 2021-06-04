@@ -24,21 +24,23 @@ import (
 	gossipvalueprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/gossip/value"
 )
 
-func newReplica(replica protocolapi.ProtocolReplica, protocol protocolapi.ProtocolConfig) *testReplica {
+func newReplica(network cluster.Network, replica protocolapi.ProtocolReplica, protocol protocolapi.ProtocolConfig) *testReplica {
 	return &testReplica{
+		network:  network,
 		replica:  replica,
 		protocol: protocol,
 	}
 }
 
 type testReplica struct {
+	network  cluster.Network
 	replica  protocolapi.ProtocolReplica
 	protocol protocolapi.ProtocolConfig
 	node     *gossipprotocol.Node
 }
 
 func (r *testReplica) Start() error {
-	r.node = gossipprotocol.NewNode(cluster.NewCluster(r.protocol, cluster.WithMemberID(r.replica.ID)))
+	r.node = gossipprotocol.NewNode(cluster.NewCluster(r.network, r.protocol, cluster.WithMemberID(r.replica.ID)))
 	gossipcounterprotocol.RegisterService(r.node)
 	gossipmapprotocol.RegisterService(r.node)
 	gossipsetprotocol.RegisterService(r.node)

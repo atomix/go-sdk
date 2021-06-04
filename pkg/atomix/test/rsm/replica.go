@@ -31,21 +31,23 @@ import (
 	"github.com/atomix/atomix-go-local/pkg/atomix/local"
 )
 
-func newReplica(replica protocolapi.ProtocolReplica, protocol protocolapi.ProtocolConfig) *testReplica {
+func newReplica(network cluster.Network, replica protocolapi.ProtocolReplica, protocol protocolapi.ProtocolConfig) *testReplica {
 	return &testReplica{
+		network:  network,
 		replica:  replica,
 		protocol: protocol,
 	}
 }
 
 type testReplica struct {
+	network  cluster.Network
 	replica  protocolapi.ProtocolReplica
 	protocol protocolapi.ProtocolConfig
 	node     *rsmprotocol.Node
 }
 
 func (r *testReplica) Start() error {
-	r.node = rsmprotocol.NewNode(cluster.NewCluster(r.protocol, cluster.WithMemberID(r.replica.ID)), local.NewProtocol())
+	r.node = rsmprotocol.NewNode(cluster.NewCluster(r.network, r.protocol, cluster.WithMemberID(r.replica.ID)), local.NewProtocol())
 	rsmcounterprotocol.RegisterService(r.node)
 	rsmelectionprotocol.RegisterService(r.node)
 	rsmindexedmapprotocol.RegisterService(r.node)

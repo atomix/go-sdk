@@ -17,6 +17,7 @@ package rsm
 import (
 	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
 	test "github.com/atomix/atomix-go-client/pkg/atomix/test"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 )
 
 type rsmOptions struct{}
@@ -42,10 +43,10 @@ type rsmProtocol struct {
 	options rsmOptions
 }
 
-func (p *rsmProtocol) NewReplica(replica protocolapi.ProtocolReplica, protocol protocolapi.ProtocolConfig) test.Replica {
-	return newReplica(replica, protocol)
+func (p *rsmProtocol) NewReplica(network cluster.Network, replica protocolapi.ProtocolReplica, protocol protocolapi.ProtocolConfig) test.Replica {
+	return newReplica(network, replica, protocol)
 }
 
-func (p *rsmProtocol) NewClient(clientID string, protocol protocolapi.ProtocolConfig) test.Client {
-	return newClient(clientID, protocol)
+func (p *rsmProtocol) NewClient(network cluster.Network, clientID string, protocol protocolapi.ProtocolConfig) test.Client {
+	return newClient(network, clientID, protocol)
 }

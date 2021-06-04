@@ -40,18 +40,20 @@ import (
 	"google.golang.org/grpc"
 )
 
-func newClient(clientID string, config protocolapi.ProtocolConfig) *testClient {
+func newClient(network cluster.Network, clientID string, config protocolapi.ProtocolConfig) *testClient {
 	return &testClient{
-		id:     clientID,
-		config: config,
+		network: network,
+		id:      clientID,
+		config:  config,
 	}
 }
 
 type testClient struct {
-	id     string
-	config protocolapi.ProtocolConfig
-	driver *driver.Driver
-	conn   *grpc.ClientConn
+	network cluster.Network
+	id      string
+	config  protocolapi.ProtocolConfig
+	driver  *driver.Driver
+	conn    *grpc.ClientConn
 }
 
 func (c *testClient) Start(driverPort, agentPort int) error {
@@ -70,13 +72,18 @@ func (c *testClient) Start(driverPort, agentPort int) error {
 		return protocol
 	}
 
-	c.driver = driver.NewDriver(protocolFunc, driver.WithNamespace("test"), driver.WithDriverID("driver"), driver.WithPort(driverPort))
+	cluster := cluster.NewCluster(
+		c.network,
+		protocolapi.ProtocolConfig{},
+		cluster.WithMemberID("rsm-driver"),
+		cluster.WithPort(driverPort))
+	c.driver = driver.NewDriver(cluster, protocolFunc, driver.WithNamespace("test"))
 	err := c.driver.Start()
 	if err != nil {
 		return err
 	}
 
-	driverConn, err := grpc.Dial(fmt.Sprintf("localhost:%d", driverPort), grpc.WithInsecure())
+	driverConn, err := grpc.Dial(fmt.Sprintf(":%d", driverPort), grpc.WithInsecure(), grpc.WithContextDialer(c.network.Connect))
 	if err != nil {
 		return err
 	}
@@ -100,7 +107,7 @@ func (c *testClient) Start(driverPort, agentPort int) error {
 		return err
 	}
 
-	c.conn, err = grpc.Dial(fmt.Sprintf("localhost:%d", agentPort), grpc.WithInsecure())
+	c.conn, err = grpc.Dial(fmt.Sprintf(":%d", agentPort), grpc.WithInsecure(), grpc.WithContextDialer(c.network.Connect))
 	if err != nil {
 		return err
 	}

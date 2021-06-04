@@ -18,6 +18,7 @@ import (
 	"fmt"
 	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
 	"github.com/atomix/atomix-go-client/pkg/atomix"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"sync"
 )
@@ -25,9 +26,9 @@ import (
 // Protocol is a test protocol implementation
 type Protocol interface {
 	// NewReplica creates a new test replica
-	NewReplica(replica protocolapi.ProtocolReplica, protocol protocolapi.ProtocolConfig) Replica
+	NewReplica(network cluster.Network, replica protocolapi.ProtocolReplica, protocol protocolapi.ProtocolConfig) Replica
 	// NewClient creates a new test client
-	NewClient(clientID string, protocol protocolapi.ProtocolConfig) Client
+	NewClient(network cluster.Network, clientID string, protocol protocolapi.ProtocolConfig) Client
 }
 
 // Option is a test option
@@ -89,6 +90,7 @@ func (o debugOption) apply(options *testOptions) {
 
 // NewTest creates a new Atomix test
 func NewTest(protocol Protocol, opts ...Option) *Test {
+	network := cluster.NewLocalNetwork()
 	options := testOptions{
 		replicas:   1,
 		partitions: 1,
@@ -99,9 +101,10 @@ func NewTest(protocol Protocol, opts ...Option) *Test {
 	config := newTestConfig(options)
 	replicas := make([]*testReplica, len(config.Replicas))
 	for i, r := range config.Replicas {
-		replicas[i] = newReplica(protocol.NewReplica(r, config))
+		replicas[i] = newReplica(protocol.NewReplica(network, r, config))
 	}
 	return &Test{
+		network:  network,
 		protocol: protocol,
 		config:   config,
 		replicas: replicas,
@@ -118,7 +121,6 @@ func newTestConfig(options testOptions) protocolapi.ProtocolConfig {
 		config.Replicas = append(config.Replicas, protocolapi.ProtocolReplica{
 			ID:      replicaID,
 			NodeID:  nodeID,
-			Host:    "localhost",
 			APIPort: int32(nextPort()),
 		})
 		replicas = append(replicas, replicaID)
@@ -135,6 +137,7 @@ func newTestConfig(options testOptions) protocolapi.ProtocolConfig {
 
 // Test is an Atomix test utility
 type Test struct {
+	network  cluster.Network
 	protocol Protocol
 	config   protocolapi.ProtocolConfig
 	replicas []*testReplica
@@ -162,7 +165,7 @@ func (t *Test) Start() error {
 func (t *Test) NewClient(clientID string) (atomix.Client, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	client := newClient(clientID, t.protocol.NewClient(clientID, t.config))
+	client := newClient(clientID, t.protocol.NewClient(t.network, clientID, t.config))
 	driverPort := nextPort()
 	agentPort := nextPort()
 	if err := client.Start(driverPort, agentPort); err != nil {

@@ -17,6 +17,7 @@ package gossip
 import (
 	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
 	test "github.com/atomix/atomix-go-client/pkg/atomix/test"
+	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/gossip"
 )
 
@@ -89,10 +90,10 @@ type gossipProtocol struct {
 	options gossipOptions
 }
 
-func (p *gossipProtocol) NewReplica(replica protocolapi.ProtocolReplica, protocol protocolapi.ProtocolConfig) test.Replica {
-	return newReplica(replica, protocol)
+func (p *gossipProtocol) NewReplica(network cluster.Network, replica protocolapi.ProtocolReplica, protocol protocolapi.ProtocolConfig) test.Replica {
+	return newReplica(network, replica, protocol)
 }
 
-func (p *gossipProtocol) NewClient(clientID string, protocol protocolapi.ProtocolConfig) test.Client {
-	return newClient(clientID, protocol, p.options)
+func (p *gossipProtocol) NewClient(network cluster.Network, clientID string, protocol protocolapi.ProtocolConfig) test.Client {
+	return newClient(network, clientID, protocol, p.options)
 }
