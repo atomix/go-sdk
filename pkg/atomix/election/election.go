@@ -220,6 +220,11 @@ func (e *election) Watch(ctx context.Context, ch chan<- Event) error {
 	go func() {
 		defer close(ch)
 		open := false
+		defer func() {
+			if !open {
+				close(openCh)
+			}
+		}()
 		for {
 			response, err := stream.Recv()
 			if err == io.EOF || err == context.Canceled || errors.IsCanceled(errors.From(err)) {

@@ -195,10 +195,8 @@ func (s *set) Elements(ctx context.Context, ch chan<- string) error {
 		return errors.From(err)
 	}
 
-	openCh := make(chan struct{})
 	go func() {
 		defer close(ch)
-		open := false
 		for {
 			response, err := stream.Recv()
 			if err == io.EOF {
@@ -206,21 +204,11 @@ func (s *set) Elements(ctx context.Context, ch chan<- string) error {
 			} else if err != nil {
 				log.Errorf("Elements failed: %v", err)
 			} else {
-				if !open {
-					close(openCh)
-					open = true
-				}
 				ch <- response.Element.Value
 			}
 		}
 	}()
-
-	select {
-	case <-openCh:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
+	return nil
 }
 
 func (s *set) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) error {
@@ -240,6 +228,11 @@ func (s *set) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) e
 	go func() {
 		defer close(ch)
 		open := false
+		defer func() {
+			if !open {
+				close(openCh)
+			}
+		}()
 		for {
 			response, err := stream.Recv()
 			if err == io.EOF || err == context.Canceled || errors.IsCanceled(errors.From(err)) {

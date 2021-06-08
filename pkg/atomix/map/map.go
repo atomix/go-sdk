@@ -241,10 +241,8 @@ func (m *_map) Entries(ctx context.Context, ch chan<- Entry) error {
 		return errors.From(err)
 	}
 
-	openCh := make(chan struct{})
 	go func() {
 		defer close(ch)
-		open := false
 		for {
 			response, err := stream.Recv()
 			if err == io.EOF {
@@ -252,10 +250,6 @@ func (m *_map) Entries(ctx context.Context, ch chan<- Entry) error {
 			} else if err != nil {
 				log.Errorf("Entries failed: %v", err)
 			} else {
-				if !open {
-					close(openCh)
-					open = true
-				}
 				ch <- Entry{
 					ObjectMeta: meta.FromProto(response.Entry.Key.ObjectMeta),
 					Key:        response.Entry.Key.Key,
@@ -264,13 +258,7 @@ func (m *_map) Entries(ctx context.Context, ch chan<- Entry) error {
 			}
 		}
 	}()
-
-	select {
-	case <-openCh:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
+	return nil
 }
 
 func (m *_map) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) error {
@@ -290,6 +278,11 @@ func (m *_map) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) 
 	go func() {
 		defer close(ch)
 		open := false
+		defer func() {
+			if !open {
+				close(openCh)
+			}
+		}()
 		for {
 			response, err := stream.Recv()
 			if err == io.EOF || err == context.Canceled || errors.IsCanceled(errors.From(err)) {

@@ -218,10 +218,8 @@ func (l *list) Items(ctx context.Context, ch chan<- []byte) error {
 		return errors.From(err)
 	}
 
-	openCh := make(chan struct{})
 	go func() {
 		defer close(ch)
-		open := false
 		for {
 			response, err := stream.Recv()
 			if err == io.EOF {
@@ -229,10 +227,6 @@ func (l *list) Items(ctx context.Context, ch chan<- []byte) error {
 			} else if err != nil {
 				log.Errorf("Entries failed: %v", err)
 			} else {
-				if !open {
-					close(openCh)
-					open = true
-				}
 				bytes, err := base64.StdEncoding.DecodeString(response.Item.Value.Value)
 				if err != nil {
 					log.Errorf("Failed to decode list item: %v", err)
@@ -242,13 +236,7 @@ func (l *list) Items(ctx context.Context, ch chan<- []byte) error {
 			}
 		}
 	}()
-
-	select {
-	case <-openCh:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
+	return nil
 }
 
 func (l *list) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) error {
@@ -268,6 +256,11 @@ func (l *list) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) 
 	go func() {
 		defer close(ch)
 		open := false
+		defer func() {
+			if !open {
+				close(openCh)
+			}
+		}()
 		for {
 			response, err := stream.Recv()
 			if err == io.EOF || err == context.Canceled || errors.IsCanceled(errors.From(err)) {

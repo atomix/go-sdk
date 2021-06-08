@@ -43,6 +43,12 @@ func TestMapOperations(t *testing.T) {
 	_map, err := New(context.TODO(), "TestMapOperations", conn1)
 	assert.NoError(t, err)
 
+	ch := make(chan Entry)
+	err = _map.Entries(context.Background(), ch)
+	assert.NoError(t, err)
+	_, ok := <-ch
+	assert.False(t, ok)
+
 	kv, err := _map.Get(context.Background(), "foo")
 	assert.Error(t, err)
 	assert.True(t, errors.IsNotFound(err))
