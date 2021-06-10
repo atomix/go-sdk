@@ -35,6 +35,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"io"
 	"sync"
+	"time"
 )
 
 // GetCounter gets the Counter instance of the given name
@@ -148,7 +149,7 @@ func (c *atomixClient) connect(ctx context.Context, primitive primitiveapi.Primi
 			PrimitiveId: primitive,
 		},
 	}
-	response, err := brokerClient.LookupPrimitive(ctx, request, retry.WithRetryOn(codes.Unavailable, codes.NotFound))
+	response, err := brokerClient.LookupPrimitive(ctx, request, retry.WithRetryOn(codes.Unavailable, codes.NotFound), retry.WithPerCallTimeout(time.Second))
 	if err != nil {
 		return nil, errors.From(err)
 	}
