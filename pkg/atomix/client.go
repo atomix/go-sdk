@@ -134,8 +134,7 @@ func (c *atomixClient) connect(ctx context.Context, primitive primitiveapi.Primi
 	if brokerConn == nil {
 		conn, err := grpc.DialContext(ctx, fmt.Sprintf("%s:%d", c.options.brokerHost, c.options.brokerPort),
 			grpc.WithInsecure(),
-			grpc.WithUnaryInterceptor(retry.RetryingUnaryClientInterceptor()),
-			grpc.WithStreamInterceptor(retry.RetryingStreamClientInterceptor()))
+			grpc.WithUnaryInterceptor(retry.RetryingUnaryClientInterceptor(retry.WithRetryOn(codes.Unavailable))))
 		if err != nil {
 			return nil, err
 		}
@@ -154,7 +153,10 @@ func (c *atomixClient) connect(ctx context.Context, primitive primitiveapi.Primi
 		return nil, errors.From(err)
 	}
 
-	driverConn, err = grpc.DialContext(ctx, fmt.Sprintf("%s:%d", response.Address.Host, response.Address.Port), grpc.WithInsecure())
+	driverConn, err = grpc.DialContext(ctx, fmt.Sprintf("%s:%d", response.Address.Host, response.Address.Port),
+		grpc.WithInsecure(),
+		grpc.WithUnaryInterceptor(retry.RetryingUnaryClientInterceptor(retry.WithRetryOn(codes.Unavailable))),
+		grpc.WithStreamInterceptor(retry.RetryingStreamClientInterceptor(retry.WithRetryOn(codes.Unavailable))))
 	if err != nil {
 		return nil, err
 	}
