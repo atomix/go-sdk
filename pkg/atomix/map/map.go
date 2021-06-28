@@ -248,7 +248,7 @@ func (m *_map) Entries(ctx context.Context, ch chan<- Entry) error {
 			if err == io.EOF {
 				return
 			} else if err != nil {
-				log.Errorf("Entries failed: %v", err)
+				log.Warnf("Entries failed: %v", err)
 			} else {
 				ch <- Entry{
 					ObjectMeta: meta.FromProto(response.Entry.Key.ObjectMeta),
@@ -288,7 +288,7 @@ func (m *_map) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) 
 			if err == io.EOF || err == context.Canceled || errors.IsCanceled(errors.From(err)) {
 				return
 			} else if err != nil {
-				log.Errorf("Watch failed: %v", err)
+				log.Warnf("Watch failed: %v", err)
 				return
 			} else {
 				if !open {
