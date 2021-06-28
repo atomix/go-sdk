@@ -227,7 +227,9 @@ func (e *election) Watch(ctx context.Context, ch chan<- Event) error {
 		}()
 		for {
 			response, err := stream.Recv()
-			if err == io.EOF || err == context.Canceled || errors.IsCanceled(errors.From(err)) {
+			if err == io.EOF ||
+				errors.IsCanceled(errors.From(err)) ||
+				errors.IsTimeout(errors.From(err)) {
 				return
 			} else if err != nil {
 				log.Errorf("Watch failed: %v", err)
