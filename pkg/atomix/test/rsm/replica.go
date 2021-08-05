@@ -21,10 +21,8 @@ import (
 	rsmcounterprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/counter"
 	rsmelectionprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/election"
 	rsmindexedmapprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/indexedmap"
-	rsmleaderprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/leader"
 	rsmlistprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/list"
 	rsmlockprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/lock"
-	rsmlogprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/log"
 	rsmmapprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/map"
 	rsmsetprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/set"
 	rsmvalueprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/value"
@@ -51,10 +49,8 @@ func (r *testReplica) Start() error {
 	rsmcounterprotocol.RegisterService(r.node)
 	rsmelectionprotocol.RegisterService(r.node)
 	rsmindexedmapprotocol.RegisterService(r.node)
-	rsmleaderprotocol.RegisterService(r.node)
 	rsmlistprotocol.RegisterService(r.node)
 	rsmlockprotocol.RegisterService(r.node)
-	rsmlogprotocol.RegisterService(r.node)
 	rsmmapprotocol.RegisterService(r.node)
 	rsmsetprotocol.RegisterService(r.node)
 	rsmvalueprotocol.RegisterService(r.node)

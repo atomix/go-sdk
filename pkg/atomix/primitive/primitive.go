@@ -38,9 +38,6 @@ type Primitive interface {
 
 	// Close closes the primitive
 	Close(ctx context.Context) error
-
-	// Delete deletes the primitive state from the cluster
-	Delete(ctx context.Context) error
 }
 
 // NewClient creates a new primitive client
@@ -110,14 +107,5 @@ func (c *Client) Close(ctx context.Context) error {
 		Headers: c.GetHeaders(),
 	}
 	_, err := c.client.Close(ctx, request)
-	return errors.From(err)
-}
-
-// Delete deletes the primitive state
-func (c *Client) Delete(ctx context.Context) error {
-	request := &primitiveapi.DeleteRequest{
-		Headers: c.GetHeaders(),
-	}
-	_, err := c.client.Delete(ctx, request)
 	return errors.From(err)
 }

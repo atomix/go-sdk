@@ -20,7 +20,6 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/atomix/util/test"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
@@ -42,9 +41,6 @@ func TestLock(t *testing.T) {
 	assert.NoError(t, err)
 
 	conn2, err := test.CreateProxy(primitiveID)
-	assert.NoError(t, err)
-
-	conn3, err := test.CreateProxy(primitiveID)
 	assert.NoError(t, err)
 
 	l1, err := New(context.TODO(), "TestLock", conn1)
@@ -92,25 +88,12 @@ func TestLock(t *testing.T) {
 	assert.Equal(t, StateLocked, locked.State)
 
 	v2, err = l2.Lock(context.Background(), WithTimeout(1*time.Second))
-	assert.NoError(t, err)
-	assert.Equal(t, meta.Revision(0), v2.Revision)
+	assert.Error(t, err)
+	assert.True(t, errors.IsTimeout(err))
+	assert.Equal(t, StateLocked, v2.State)
 
 	err = l1.Close(context.Background())
 	assert.NoError(t, err)
-
-	err = l1.Delete(context.Background())
-	assert.NoError(t, err)
-
-	err = l2.Delete(context.Background())
-	assert.Error(t, err)
-	assert.True(t, errors.IsNotFound(err))
-
-	l, err := New(context.TODO(), "TestLock", conn3)
-	assert.NoError(t, err)
-
-	locked, err = l.Get(context.TODO())
-	assert.NoError(t, err)
-	assert.Equal(t, StateUnlocked, locked.State)
 
 	assert.NoError(t, test.Stop())
 }

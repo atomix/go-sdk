@@ -19,7 +19,6 @@ import (
 	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-client/pkg/atomix/util/test"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
 	"github.com/stretchr/testify/assert"
@@ -247,9 +246,6 @@ func TestElectionOperations(t *testing.T) {
 	election1, err = New(context.TODO(), "TestElectionOperations", conn1, primitive.WithSessionID("client-1"))
 	assert.NoError(t, err)
 
-	election2, err = New(context.TODO(), "TestElectionOperations", conn2, primitive.WithSessionID("client-2"))
-	assert.NoError(t, err)
-
 	term, err = election1.GetTerm(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, meta.Revision(7), term.Revision)
@@ -258,22 +254,6 @@ func TestElectionOperations(t *testing.T) {
 
 	err = election1.Close(context.Background())
 	assert.NoError(t, err)
-
-	err = election1.Delete(context.Background())
-	assert.NoError(t, err)
-
-	err = election2.Delete(context.Background())
-	assert.Error(t, err)
-	assert.True(t, errors.IsNotFound(err))
-
-	election, err := New(context.TODO(), "TestElectionOperations", conn3, primitive.WithSessionID("client-3"))
-	assert.NoError(t, err)
-
-	term, err = election.GetTerm(context.TODO())
-	assert.NoError(t, err)
-	assert.Equal(t, meta.Revision(0), term.Revision)
-	assert.Equal(t, "", term.Leader)
-	assert.Len(t, term.Candidates, 0)
 
 	assert.NoError(t, test.Stop())
 }

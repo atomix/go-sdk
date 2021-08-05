@@ -42,9 +42,6 @@ func TestListOperations(t *testing.T) {
 	conn2, err := test.CreateProxy(primitiveID)
 	assert.NoError(t, err)
 
-	conn3, err := test.CreateProxy(primitiveID)
-	assert.NoError(t, err)
-
 	list, err := New(context.TODO(), "TestListOperations", conn1)
 	assert.NoError(t, err)
 	assert.NotNil(t, list)
@@ -154,36 +151,12 @@ func TestListOperations(t *testing.T) {
 	list1, err := New(context.TODO(), "TestListOperations", conn2)
 	assert.NoError(t, err)
 
-	list2, err := New(context.TODO(), "TestListOperations", conn3)
-	assert.NoError(t, err)
-
 	size, err = list1.Len(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, 4, size)
 
 	err = list1.Close(context.Background())
 	assert.NoError(t, err)
-
-	err = list1.Delete(context.Background())
-	assert.NoError(t, err)
-
-	err = list2.Delete(context.Background())
-	assert.Error(t, err)
-	assert.True(t, errors.IsNotFound(err))
-
-	list, err = New(context.TODO(), "TestListOperations", conn1)
-	assert.NoError(t, err)
-
-	size, err = list.Len(context.TODO())
-	assert.NoError(t, err)
-	assert.Equal(t, 0, size)
-
-	assert.NoError(t, list.Append(context.TODO(), []byte("1")))
-	assert.NoError(t, list.Append(context.TODO(), []byte("2")))
-	assert.NoError(t, list.Append(context.TODO(), []byte("3")))
-	assert.NoError(t, list.Append(context.TODO(), []byte("4")))
-	assert.NoError(t, list.Append(context.TODO(), []byte("5")))
-	assert.NoError(t, list.Append(context.TODO(), []byte("6")))
 
 	assert.NoError(t, test.Stop())
 }

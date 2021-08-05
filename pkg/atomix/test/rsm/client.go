@@ -29,10 +29,8 @@ import (
 	rsmcounterproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/counter"
 	rsmelectionproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/election"
 	rsmindexedmapproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/indexedmap"
-	rsmleaderproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/leader"
 	rsmlistproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/list"
 	rsmlockproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/lock"
-	rsmlogproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/log"
 	rsmmapproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/map"
 	rsmsetproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/set"
 	rsmvalueproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/value"
@@ -62,10 +60,8 @@ func (c *testClient) Start(driverPort, agentPort int) error {
 		rsmcounterproxy.Register(protocol)
 		rsmelectionproxy.Register(protocol)
 		rsmindexedmapproxy.Register(protocol)
-		rsmleaderproxy.Register(protocol)
 		rsmlistproxy.Register(protocol)
 		rsmlockproxy.Register(protocol)
-		rsmlogproxy.Register(protocol)
 		rsmmapproxy.Register(protocol)
 		rsmsetproxy.Register(protocol)
 		rsmvalueproxy.Register(protocol)

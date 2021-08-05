@@ -18,7 +18,6 @@ import (
 	"context"
 	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
 	"github.com/atomix/atomix-go-client/pkg/atomix/util/test"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -40,9 +39,6 @@ func TestCounterOperations(t *testing.T) {
 	assert.NoError(t, err)
 
 	conn2, err := test.CreateProxy(primitiveID)
-	assert.NoError(t, err)
-
-	conn3, err := test.CreateProxy(primitiveID)
 	assert.NoError(t, err)
 
 	counter, err := New(context.TODO(), "TestCounterOperations", conn1)
@@ -89,29 +85,12 @@ func TestCounterOperations(t *testing.T) {
 	counter1, err := New(context.TODO(), "TestCounterOperations", conn2)
 	assert.NoError(t, err)
 
-	counter2, err := New(context.TODO(), "TestCounterOperations", conn3)
-	assert.NoError(t, err)
-
 	value, err = counter1.Get(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, int64(10), value)
 
 	err = counter1.Close(context.Background())
 	assert.NoError(t, err)
-
-	err = counter1.Delete(context.Background())
-	assert.NoError(t, err)
-
-	err = counter2.Delete(context.Background())
-	assert.Error(t, err)
-	assert.True(t, errors.IsNotFound(err))
-
-	counter, err = New(context.TODO(), "TestCounterOperations", conn1)
-	assert.NoError(t, err)
-
-	value, err = counter.Get(context.TODO())
-	assert.NoError(t, err)
-	assert.Equal(t, int64(0), value)
 
 	assert.NoError(t, test.Stop())
 }

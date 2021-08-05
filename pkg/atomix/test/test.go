@@ -115,13 +115,15 @@ func NewTest(protocol Protocol, opts ...Option) *Test {
 func newTestConfig(options testOptions) protocolapi.ProtocolConfig {
 	var config protocolapi.ProtocolConfig
 	var replicas []string
+	var port int
 	for i := 1; i <= options.replicas; i++ {
 		replicaID := fmt.Sprintf("replica-%d", i)
 		nodeID := fmt.Sprintf("node-%d", i)
+		port = nextPort()
 		config.Replicas = append(config.Replicas, protocolapi.ProtocolReplica{
 			ID:      replicaID,
 			NodeID:  nodeID,
-			APIPort: int32(nextPort()),
+			APIPort: int32(port),
 		})
 		replicas = append(replicas, replicaID)
 	}
@@ -130,6 +132,7 @@ func newTestConfig(options testOptions) protocolapi.ProtocolConfig {
 		config.Partitions = append(config.Partitions, protocolapi.ProtocolPartition{
 			PartitionID: uint32(i),
 			Replicas:    replicas,
+			APIPort:     int32(port),
 		})
 	}
 	return config

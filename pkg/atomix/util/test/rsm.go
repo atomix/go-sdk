@@ -28,10 +28,8 @@ import (
 	rsmcounterproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/counter"
 	rsmelectionproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/election"
 	rsmindexedmapproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/indexedmap"
-	rsmleaderproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/leader"
 	rsmlistproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/list"
 	rsmlockproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/lock"
-	rsmlogproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/log"
 	rsmmapproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/map"
 	rsmsetproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/set"
 	rsmvalueproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/value"
@@ -39,10 +37,8 @@ import (
 	rsmcounterprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/counter"
 	rsmelectionprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/election"
 	rsmindexedmapprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/indexedmap"
-	rsmleaderprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/leader"
 	rsmlistprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/list"
 	rsmlockprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/lock"
-	rsmlogprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/log"
 	rsmmapprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/map"
 	rsmsetprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/set"
 	rsmvalueprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/value"
@@ -66,6 +62,7 @@ func NewRSMTest() *RSMTest {
 				{
 					PartitionID: 1,
 					Replicas:    []string{"rsm-1"},
+					APIPort:     7001,
 				},
 			},
 		},
@@ -91,10 +88,8 @@ func (t *RSMTest) Start() error {
 	rsmcounterprotocol.RegisterService(t.protocol)
 	rsmelectionprotocol.RegisterService(t.protocol)
 	rsmindexedmapprotocol.RegisterService(t.protocol)
-	rsmleaderprotocol.RegisterService(t.protocol)
 	rsmlistprotocol.RegisterService(t.protocol)
 	rsmlockprotocol.RegisterService(t.protocol)
-	rsmlogprotocol.RegisterService(t.protocol)
 	rsmmapprotocol.RegisterService(t.protocol)
 	rsmsetprotocol.RegisterService(t.protocol)
 	rsmvalueprotocol.RegisterService(t.protocol)
@@ -112,10 +107,8 @@ func (t *RSMTest) CreateProxy(primitiveID primitiveapi.PrimitiveId) (*grpc.Clien
 		rsmcounterproxy.Register(protocol)
 		rsmelectionproxy.Register(protocol)
 		rsmindexedmapproxy.Register(protocol)
-		rsmleaderproxy.Register(protocol)
 		rsmlistproxy.Register(protocol)
 		rsmlockproxy.Register(protocol)
-		rsmlogproxy.Register(protocol)
 		rsmmapproxy.Register(protocol)
 		rsmsetproxy.Register(protocol)
 		rsmvalueproxy.Register(protocol)

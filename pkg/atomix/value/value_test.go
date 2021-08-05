@@ -43,9 +43,6 @@ func TestValueOperations(t *testing.T) {
 	conn2, err := test.CreateProxy(primitiveID)
 	assert.NoError(t, err)
 
-	conn3, err := test.CreateProxy(primitiveID)
-	assert.NoError(t, err)
-
 	value, err := New(context.TODO(), "TestRSMValue", conn1)
 	assert.NoError(t, err)
 	assert.NotNil(t, value)
@@ -116,29 +113,12 @@ func TestValueOperations(t *testing.T) {
 	value1, err := New(context.TODO(), "TestRSMValue", conn2)
 	assert.NoError(t, err)
 
-	value2, err := New(context.TODO(), "TestRSMValue", conn3)
-	assert.NoError(t, err)
-
 	val, _, err = value1.Get(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, "baz", string(val))
 
 	err = value1.Close(context.Background())
 	assert.NoError(t, err)
-
-	err = value1.Delete(context.Background())
-	assert.NoError(t, err)
-
-	err = value2.Delete(context.Background())
-	assert.Error(t, err)
-	assert.True(t, errors.IsNotFound(err))
-
-	value, err = New(context.TODO(), "TestRSMValue", conn1)
-	assert.NoError(t, err)
-
-	val, _, err = value.Get(context.TODO())
-	assert.NoError(t, err)
-	assert.Nil(t, val)
 
 	assert.NoError(t, test.Stop())
 }
