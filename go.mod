@@ -4,7 +4,7 @@ go 1.13
 
 require (
 	github.com/atomix/atomix-api/go v0.4.9
-	github.com/atomix/atomix-go-framework v0.9.0
+	github.com/atomix/atomix-go-framework v0.9.3
 	github.com/atomix/atomix-go-local v0.8.0
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/gogo/protobuf v1.3.1
