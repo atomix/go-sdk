@@ -147,25 +147,28 @@ func (v *value) Watch(ctx context.Context, ch chan<- Event) error {
 		}()
 		for {
 			response, err := stream.Recv()
-			if err == io.EOF ||
-				errors.IsCanceled(errors.From(err)) ||
-				errors.IsTimeout(errors.From(err)) {
-				return
-			} else if err != nil {
+			if err != nil {
+				if err == io.EOF {
+					return
+				}
+				err = errors.From(err)
+				if errors.IsCanceled(err) || errors.IsTimeout(err) {
+					return
+				}
 				log.Errorf("Watch failed: %v", err)
 				return
-			} else {
-				if !open {
-					close(openCh)
-					open = true
-				}
-				switch response.Event.Type {
-				case api.Event_UPDATE:
-					ch <- Event{
-						ObjectMeta: meta.FromProto(response.Event.Value.ObjectMeta),
-						Type:       EventUpdate,
-						Value:      response.Event.Value.Value,
-					}
+			}
+
+			if !open {
+				close(openCh)
+				open = true
+			}
+			switch response.Event.Type {
+			case api.Event_UPDATE:
+				ch <- Event{
+					ObjectMeta: meta.FromProto(response.Event.Value.ObjectMeta),
+					Type:       EventUpdate,
+					Value:      response.Event.Value.Value,
 				}
 			}
 		}

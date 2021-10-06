@@ -245,16 +245,22 @@ func (m *_map) Entries(ctx context.Context, ch chan<- Entry) error {
 		defer close(ch)
 		for {
 			response, err := stream.Recv()
-			if err == io.EOF {
-				return
-			} else if err != nil {
-				log.Errorf("Entries failed: %v", err)
-			} else {
-				ch <- Entry{
-					ObjectMeta: meta.FromProto(response.Entry.Key.ObjectMeta),
-					Key:        response.Entry.Key.Key,
-					Value:      response.Entry.Value.Value,
+			if err != nil {
+				if err == io.EOF {
+					return
 				}
+				err = errors.From(err)
+				if errors.IsCanceled(err) || errors.IsTimeout(err) {
+					return
+				}
+				log.Errorf("Entries failed: %v", err)
+				return
+			}
+
+			ch <- Entry{
+				ObjectMeta: meta.FromProto(response.Entry.Key.ObjectMeta),
+				Key:        response.Entry.Key.Key,
+				Value:      response.Entry.Value.Value,
 			}
 		}
 	}()
@@ -285,44 +291,47 @@ func (m *_map) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) 
 		}()
 		for {
 			response, err := stream.Recv()
-			if err == io.EOF ||
-				errors.IsCanceled(errors.From(err)) ||
-				errors.IsTimeout(errors.From(err)) {
-				return
-			} else if err != nil {
+			if err != nil {
+				if err == io.EOF {
+					return
+				}
+				err = errors.From(err)
+				if errors.IsCanceled(err) || errors.IsTimeout(err) {
+					return
+				}
 				log.Errorf("Watch failed: %v", err)
 				return
-			} else {
-				if !open {
-					close(openCh)
-					open = true
-				}
+			}
 
-				for i := range opts {
-					opts[i].afterWatch(response)
-				}
+			if !open {
+				close(openCh)
+				open = true
+			}
 
-				switch response.Event.Type {
-				case api.Event_INSERT:
-					ch <- Event{
-						Type:  EventInsert,
-						Entry: *newEntry(&response.Event.Entry),
-					}
-				case api.Event_UPDATE:
-					ch <- Event{
-						Type:  EventUpdate,
-						Entry: *newEntry(&response.Event.Entry),
-					}
-				case api.Event_REMOVE:
-					ch <- Event{
-						Type:  EventRemove,
-						Entry: *newEntry(&response.Event.Entry),
-					}
-				case api.Event_REPLAY:
-					ch <- Event{
-						Type:  EventReplay,
-						Entry: *newEntry(&response.Event.Entry),
-					}
+			for i := range opts {
+				opts[i].afterWatch(response)
+			}
+
+			switch response.Event.Type {
+			case api.Event_INSERT:
+				ch <- Event{
+					Type:  EventInsert,
+					Entry: *newEntry(&response.Event.Entry),
+				}
+			case api.Event_UPDATE:
+				ch <- Event{
+					Type:  EventUpdate,
+					Entry: *newEntry(&response.Event.Entry),
+				}
+			case api.Event_REMOVE:
+				ch <- Event{
+					Type:  EventRemove,
+					Entry: *newEntry(&response.Event.Entry),
+				}
+			case api.Event_REPLAY:
+				ch <- Event{
+					Type:  EventReplay,
+					Entry: *newEntry(&response.Event.Entry),
 				}
 			}
 		}

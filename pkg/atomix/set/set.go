@@ -199,13 +199,19 @@ func (s *set) Elements(ctx context.Context, ch chan<- string) error {
 		defer close(ch)
 		for {
 			response, err := stream.Recv()
-			if err == io.EOF {
-				return
-			} else if err != nil {
+			if err != nil {
+				if err == io.EOF {
+					return
+				}
+				err = errors.From(err)
+				if errors.IsCanceled(err) || errors.IsTimeout(err) {
+					return
+				}
 				log.Errorf("Elements failed: %v", err)
-			} else {
-				ch <- response.Element.Value
+				return
 			}
+
+			ch <- response.Element.Value
 		}
 	}()
 	return nil
@@ -235,38 +241,41 @@ func (s *set) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) e
 		}()
 		for {
 			response, err := stream.Recv()
-			if err == io.EOF ||
-				errors.IsCanceled(errors.From(err)) ||
-				errors.IsTimeout(errors.From(err)) {
-				return
-			} else if err != nil {
+			if err != nil {
+				if err == io.EOF {
+					return
+				}
+				err = errors.From(err)
+				if errors.IsCanceled(err) || errors.IsTimeout(err) {
+					return
+				}
 				log.Errorf("Watch failed: %v", err)
 				return
-			} else {
-				if !open {
-					close(openCh)
-					open = true
-				}
-				for i := range opts {
-					opts[i].afterWatch(response)
-				}
+			}
 
-				switch response.Event.Type {
-				case api.Event_ADD:
-					ch <- Event{
-						Type:  EventAdd,
-						Value: response.Event.Element.Value,
-					}
-				case api.Event_REMOVE:
-					ch <- Event{
-						Type:  EventRemove,
-						Value: response.Event.Element.Value,
-					}
-				case api.Event_REPLAY:
-					ch <- Event{
-						Type:  EventReplay,
-						Value: response.Event.Element.Value,
-					}
+			if !open {
+				close(openCh)
+				open = true
+			}
+			for i := range opts {
+				opts[i].afterWatch(response)
+			}
+
+			switch response.Event.Type {
+			case api.Event_ADD:
+				ch <- Event{
+					Type:  EventAdd,
+					Value: response.Event.Element.Value,
+				}
+			case api.Event_REMOVE:
+				ch <- Event{
+					Type:  EventRemove,
+					Value: response.Event.Element.Value,
+				}
+			case api.Event_REPLAY:
+				ch <- Event{
+					Type:  EventReplay,
+					Value: response.Event.Element.Value,
 				}
 			}
 		}

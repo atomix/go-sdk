@@ -222,17 +222,23 @@ func (l *list) Items(ctx context.Context, ch chan<- []byte) error {
 		defer close(ch)
 		for {
 			response, err := stream.Recv()
-			if err == io.EOF {
-				return
-			} else if err != nil {
-				log.Errorf("Entries failed: %v", err)
-			} else {
-				bytes, err := base64.StdEncoding.DecodeString(response.Item.Value.Value)
-				if err != nil {
-					log.Errorf("Failed to decode list item: %v", err)
-				} else {
-					ch <- bytes
+			if err != nil {
+				if err == io.EOF {
+					return
 				}
+				err = errors.From(err)
+				if errors.IsCanceled(err) || errors.IsTimeout(err) {
+					return
+				}
+				log.Errorf("Entries failed: %v", err)
+				return
+			}
+
+			bytes, err := base64.StdEncoding.DecodeString(response.Item.Value.Value)
+			if err != nil {
+				log.Errorf("Failed to decode list item: %v", err)
+			} else {
+				ch <- bytes
 			}
 		}
 	}()
@@ -263,45 +269,48 @@ func (l *list) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) 
 		}()
 		for {
 			response, err := stream.Recv()
-			if err == io.EOF ||
-				errors.IsCanceled(errors.From(err)) ||
-				errors.IsTimeout(errors.From(err)) {
-				return
-			} else if err != nil {
+			if err != nil {
+				if err == io.EOF {
+					return
+				}
+				err = errors.From(err)
+				if errors.IsCanceled(err) || errors.IsTimeout(err) {
+					return
+				}
 				log.Errorf("Watch failed: %v", err)
 				return
-			} else {
-				if !open {
-					close(openCh)
-					open = true
-				}
-				for i := range opts {
-					opts[i].afterWatch(response)
-				}
+			}
 
-				bytes, err := base64.StdEncoding.DecodeString(response.Event.Item.Value.Value)
-				if err != nil {
-					log.Errorf("Failed to decode list item: %v", err)
-				} else {
-					switch response.Event.Type {
-					case api.Event_ADD:
-						ch <- Event{
-							Type:  EventAdd,
-							Index: int(response.Event.Item.Index),
-							Value: bytes,
-						}
-					case api.Event_REMOVE:
-						ch <- Event{
-							Type:  EventRemove,
-							Index: int(response.Event.Item.Index),
-							Value: bytes,
-						}
-					case api.Event_REPLAY:
-						ch <- Event{
-							Type:  EventReplay,
-							Index: int(response.Event.Item.Index),
-							Value: bytes,
-						}
+			if !open {
+				close(openCh)
+				open = true
+			}
+			for i := range opts {
+				opts[i].afterWatch(response)
+			}
+
+			bytes, err := base64.StdEncoding.DecodeString(response.Event.Item.Value.Value)
+			if err != nil {
+				log.Errorf("Failed to decode list item: %v", err)
+			} else {
+				switch response.Event.Type {
+				case api.Event_ADD:
+					ch <- Event{
+						Type:  EventAdd,
+						Index: int(response.Event.Item.Index),
+						Value: bytes,
+					}
+				case api.Event_REMOVE:
+					ch <- Event{
+						Type:  EventRemove,
+						Index: int(response.Event.Item.Index),
+						Value: bytes,
+					}
+				case api.Event_REPLAY:
+					ch <- Event{
+						Type:  EventReplay,
+						Index: int(response.Event.Item.Index),
+						Value: bytes,
 					}
 				}
 			}
