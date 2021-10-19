@@ -15,7 +15,7 @@
 package lock
 
 import (
-	api "github.com/atomix/atomix-api/go/atomix/primitive/lock"
+	api "github.com/atomix/atomix-api/go/atomix/primitive/lock/v1"
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
 	"time"
@@ -27,8 +27,10 @@ type Option interface {
 	applyNewLock(options *newLockOptions)
 }
 
-// newLockOptions is lock options
-type newLockOptions struct{}
+// newLockOptions is Lock options
+type newLockOptions struct {
+	sessionOptions api.LockSessionOptions
+}
 
 // LockOption is an option for Lock calls
 //nolint:golint

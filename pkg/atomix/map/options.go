@@ -15,7 +15,7 @@
 package _map //nolint:golint
 
 import (
-	api "github.com/atomix/atomix-api/go/atomix/primitive/map"
+	api "github.com/atomix/atomix-api/go/atomix/primitive/map/v1"
 	metaapi "github.com/atomix/atomix-api/go/atomix/primitive/meta"
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
@@ -28,7 +28,58 @@ type Option interface {
 }
 
 // newMapOptions is map options
-type newMapOptions struct{}
+type newMapOptions struct {
+	sessionOptions api.MapSessionOptions
+}
+
+type CacheOption struct {
+	primitive.EmptyOption
+	options api.MapCacheOptions
+}
+
+func (o *CacheOption) applyNewMap(options *newMapOptions) {
+	options.sessionOptions.Cache = o.options
+}
+
+// WithNearCache enabled a near cache for a map
+func WithNearCache() Option {
+	return &CacheOption{
+		options: api.MapCacheOptions{
+			Enabled:  true,
+			Strategy: api.MapCacheStrategy_NEAR,
+		},
+	}
+}
+
+// WithReadThroughCache enabled a read-through cache for a map
+func WithReadThroughCache() Option {
+	return &CacheOption{
+		options: api.MapCacheOptions{
+			Enabled:  true,
+			Strategy: api.MapCacheStrategy_READ_THROUGH,
+		},
+	}
+}
+
+// WithWriteThroughCache enabled a write-through cache for a map
+func WithWriteThroughCache() Option {
+	return &CacheOption{
+		options: api.MapCacheOptions{
+			Enabled:  true,
+			Strategy: api.MapCacheStrategy_WRITE_THROUGH,
+		},
+	}
+}
+
+// WithReadThroughWriteThroughCache enabled a read-through/write-through cache for a map
+func WithReadThroughWriteThroughCache() Option {
+	return &CacheOption{
+		options: api.MapCacheOptions{
+			Enabled:  true,
+			Strategy: api.MapCacheStrategy_READ_THROUGH_WRITE_THROUGH,
+		},
+	}
+}
 
 // PutOption is an option for the Put method
 type PutOption interface {

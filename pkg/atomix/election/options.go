@@ -15,6 +15,7 @@
 package election
 
 import (
+	api "github.com/atomix/atomix-api/go/atomix/primitive/election/v1"
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 )
 
@@ -25,4 +26,6 @@ type Option interface {
 }
 
 // newElectionOptions is election options
-type newElectionOptions struct{}
+type newElectionOptions struct {
+	sessionOptions api.LeaderElectionSessionOptions
+}

@@ -16,10 +16,10 @@ package primitive
 
 import (
 	"context"
-	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
+
+const sessionIDKey = "session-id"
 
 // Type is the type of a primitive
 type Type string
@@ -41,16 +41,11 @@ type Primitive interface {
 }
 
 // NewClient creates a new primitive client
-func NewClient(primitiveType Type, name string, conn *grpc.ClientConn, opts ...Option) *Client {
-	options := newOptions{}
-	for _, opt := range opts {
-		opt.applyNew(&options)
-	}
+func NewClient(primitiveType Type, name string, session string) *Client {
 	return &Client{
 		primitiveType: primitiveType,
 		name:          name,
-		client:        primitiveapi.NewPrimitiveClient(conn),
-		options:       options,
+		session:       session,
 	}
 }
 
@@ -58,8 +53,7 @@ func NewClient(primitiveType Type, name string, conn *grpc.ClientConn, opts ...O
 type Client struct {
 	primitiveType Type
 	name          string
-	client        primitiveapi.PrimitiveClient
-	options       newOptions
+	session       string
 }
 
 // Type returns the primitive type
@@ -69,7 +63,7 @@ func (c *Client) Type() Type {
 
 // SessionID returns the primitive session identifier
 func (c *Client) SessionID() string {
-	return c.options.sessionID
+	return c.session
 }
 
 // Name returns the primitive name
@@ -77,35 +71,7 @@ func (c *Client) Name() string {
 	return c.name
 }
 
-func (c *Client) getPrimitiveID() primitiveapi.PrimitiveId {
-	return primitiveapi.PrimitiveId{
-		Type: c.primitiveType.String(),
-		Name: c.name,
-	}
-}
-
-// GetHeaders gets the primitive headers
-func (c *Client) GetHeaders() primitiveapi.RequestHeaders {
-	return primitiveapi.RequestHeaders{
-		PrimitiveID: c.getPrimitiveID(),
-		ClusterKey:  c.options.clusterKey,
-	}
-}
-
-// Create creates an instance of the primitive
-func (c *Client) Create(ctx context.Context) error {
-	request := &primitiveapi.CreateRequest{
-		Headers: c.GetHeaders(),
-	}
-	_, err := c.client.Create(ctx, request)
-	return errors.From(err)
-}
-
-// Close closes the primitive session
-func (c *Client) Close(ctx context.Context) error {
-	request := &primitiveapi.CloseRequest{
-		Headers: c.GetHeaders(),
-	}
-	_, err := c.client.Close(ctx, request)
-	return errors.From(err)
+// GetContext returns the primitive context
+func (c *Client) GetContext(ctx context.Context) context.Context {
+	return metadata.AppendToOutgoingContext(ctx, sessionIDKey, c.session)
 }

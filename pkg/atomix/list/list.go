@@ -17,7 +17,7 @@ package list
 import (
 	"context"
 	"encoding/base64"
-	api "github.com/atomix/atomix-api/go/atomix/primitive/list"
+	api "github.com/atomix/atomix-api/go/atomix/primitive/list/v1"
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
@@ -33,7 +33,7 @@ const Type primitive.Type = "List"
 // Client provides an API for creating Lists
 type Client interface {
 	// GetList gets the List instance of the given name
-	GetList(ctx context.Context, name string, opts ...primitive.Option) (List, error)
+	GetList(ctx context.Context, name string, opts ...Option) (List, error)
 }
 
 // List provides a distributed list data structure
@@ -101,39 +101,42 @@ type Event struct {
 }
 
 // New creates a new list primitive
-func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...primitive.Option) (List, error) {
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (List, error) {
 	options := newListOptions{}
 	for _, opt := range opts {
 		if op, ok := opt.(Option); ok {
 			op.applyNewList(&options)
 		}
 	}
-	l := &list{
-		Client:  primitive.NewClient(Type, name, conn, opts...),
-		client:  api.NewListServiceClient(conn),
-		options: options,
+	sessions := api.NewListSessionClient(conn)
+	request := &api.OpenSessionRequest{
+		Options: options.sessionOptions,
 	}
-	if err := l.Create(ctx); err != nil {
-		return nil, err
+	response, err := sessions.OpenSession(ctx, request)
+	if err != nil {
+		return nil, errors.From(err)
 	}
-	return l, nil
+	return &list{
+		Client:  primitive.NewClient(Type, name, response.SessionID),
+		client:  api.NewListClient(conn),
+		session: sessions,
+	}, nil
 }
 
 // list is the single partition implementation of List
 type list struct {
 	*primitive.Client
-	client  api.ListServiceClient
-	options newListOptions
+	client  api.ListClient
+	session api.ListSessionClient
 }
 
 func (l *list) Append(ctx context.Context, value []byte) error {
 	request := &api.AppendRequest{
-		Headers: l.GetHeaders(),
 		Value: api.Value{
 			Value: base64.StdEncoding.EncodeToString(value),
 		},
 	}
-	_, err := l.client.Append(ctx, request)
+	_, err := l.client.Append(l.GetContext(ctx), request)
 	if err != nil {
 		return errors.From(err)
 	}
@@ -142,7 +145,6 @@ func (l *list) Append(ctx context.Context, value []byte) error {
 
 func (l *list) Insert(ctx context.Context, index int, value []byte) error {
 	request := &api.InsertRequest{
-		Headers: l.GetHeaders(),
 		Item: api.Item{
 			Index: uint32(index),
 			Value: api.Value{
@@ -150,7 +152,7 @@ func (l *list) Insert(ctx context.Context, index int, value []byte) error {
 			},
 		},
 	}
-	_, err := l.client.Insert(ctx, request)
+	_, err := l.client.Insert(l.GetContext(ctx), request)
 	if err != nil {
 		return errors.From(err)
 	}
@@ -159,7 +161,6 @@ func (l *list) Insert(ctx context.Context, index int, value []byte) error {
 
 func (l *list) Set(ctx context.Context, index int, value []byte) error {
 	request := &api.SetRequest{
-		Headers: l.GetHeaders(),
 		Item: api.Item{
 			Index: uint32(index),
 			Value: api.Value{
@@ -167,7 +168,7 @@ func (l *list) Set(ctx context.Context, index int, value []byte) error {
 			},
 		},
 	}
-	_, err := l.client.Set(ctx, request)
+	_, err := l.client.Set(l.GetContext(ctx), request)
 	if err != nil {
 		return errors.From(err)
 	}
@@ -176,10 +177,9 @@ func (l *list) Set(ctx context.Context, index int, value []byte) error {
 
 func (l *list) Get(ctx context.Context, index int) ([]byte, error) {
 	request := &api.GetRequest{
-		Headers: l.GetHeaders(),
-		Index:   uint32(index),
+		Index: uint32(index),
 	}
-	response, err := l.client.Get(ctx, request)
+	response, err := l.client.Get(l.GetContext(ctx), request)
 	if err != nil {
 		return nil, errors.From(err)
 	}
@@ -188,10 +188,9 @@ func (l *list) Get(ctx context.Context, index int) ([]byte, error) {
 
 func (l *list) Remove(ctx context.Context, index int) ([]byte, error) {
 	request := &api.RemoveRequest{
-		Headers: l.GetHeaders(),
-		Index:   uint32(index),
+		Index: uint32(index),
 	}
-	response, err := l.client.Remove(ctx, request)
+	response, err := l.client.Remove(l.GetContext(ctx), request)
 	if err != nil {
 		return nil, errors.From(err)
 	}
@@ -199,10 +198,8 @@ func (l *list) Remove(ctx context.Context, index int) ([]byte, error) {
 }
 
 func (l *list) Len(ctx context.Context) (int, error) {
-	request := &api.SizeRequest{
-		Headers: l.GetHeaders(),
-	}
-	response, err := l.client.Size(ctx, request)
+	request := &api.SizeRequest{}
+	response, err := l.client.Size(l.GetContext(ctx), request)
 	if err != nil {
 		return 0, errors.From(err)
 	}
@@ -210,10 +207,8 @@ func (l *list) Len(ctx context.Context) (int, error) {
 }
 
 func (l *list) Items(ctx context.Context, ch chan<- []byte) error {
-	request := &api.ElementsRequest{
-		Headers: l.GetHeaders(),
-	}
-	stream, err := l.client.Elements(ctx, request)
+	request := &api.ElementsRequest{}
+	stream, err := l.client.Elements(l.GetContext(ctx), request)
 	if err != nil {
 		return errors.From(err)
 	}
@@ -246,14 +241,12 @@ func (l *list) Items(ctx context.Context, ch chan<- []byte) error {
 }
 
 func (l *list) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) error {
-	request := &api.EventsRequest{
-		Headers: l.GetHeaders(),
-	}
+	request := &api.EventsRequest{}
 	for i := range opts {
 		opts[i].beforeWatch(request)
 	}
 
-	stream, err := l.client.Events(ctx, request)
+	stream, err := l.client.Events(l.GetContext(ctx), request)
 	if err != nil {
 		return errors.From(err)
 	}
@@ -326,10 +319,19 @@ func (l *list) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) 
 }
 
 func (l *list) Clear(ctx context.Context) error {
-	request := &api.ClearRequest{
-		Headers: l.GetHeaders(),
+	request := &api.ClearRequest{}
+	_, err := l.client.Clear(l.GetContext(ctx), request)
+	if err != nil {
+		return errors.From(err)
 	}
-	_, err := l.client.Clear(ctx, request)
+	return nil
+}
+
+func (l *list) Close(ctx context.Context) error {
+	request := &api.CloseSessionRequest{
+		SessionID: l.SessionID(),
+	}
+	_, err := l.session.CloseSession(ctx, request)
 	if err != nil {
 		return errors.From(err)
 	}

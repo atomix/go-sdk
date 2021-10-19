@@ -15,7 +15,7 @@
 package indexedmap
 
 import (
-	api "github.com/atomix/atomix-api/go/atomix/primitive/indexedmap"
+	api "github.com/atomix/atomix-api/go/atomix/primitive/indexedmap/v1"
 	metaapi "github.com/atomix/atomix-api/go/atomix/primitive/meta"
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
@@ -28,7 +28,58 @@ type Option interface {
 }
 
 // newIndexedMapOptions is indexed map options
-type newIndexedMapOptions struct{}
+type newIndexedMapOptions struct {
+	sessionOptions api.IndexedMapSessionOptions
+}
+
+type CacheOption struct {
+	primitive.EmptyOption
+	options api.IndexedMapCacheOptions
+}
+
+func (o *CacheOption) applyNewIndexedMap(options *newIndexedMapOptions) {
+	options.sessionOptions.Cache = o.options
+}
+
+// WithNearCache enabled a near cache for a map
+func WithNearCache() Option {
+	return &CacheOption{
+		options: api.IndexedMapCacheOptions{
+			Enabled:  true,
+			Strategy: api.IndexedMapCacheStrategy_NEAR,
+		},
+	}
+}
+
+// WithReadThroughCache enabled a read-through cache for a map
+func WithReadThroughCache() Option {
+	return &CacheOption{
+		options: api.IndexedMapCacheOptions{
+			Enabled:  true,
+			Strategy: api.IndexedMapCacheStrategy_READ_THROUGH,
+		},
+	}
+}
+
+// WithWriteThroughCache enabled a write-through cache for a map
+func WithWriteThroughCache() Option {
+	return &CacheOption{
+		options: api.IndexedMapCacheOptions{
+			Enabled:  true,
+			Strategy: api.IndexedMapCacheStrategy_WRITE_THROUGH,
+		},
+	}
+}
+
+// WithReadThroughWriteThroughCache enabled a read-through/write-through cache for a map
+func WithReadThroughWriteThroughCache() Option {
+	return &CacheOption{
+		options: api.IndexedMapCacheOptions{
+			Enabled:  true,
+			Strategy: api.IndexedMapCacheStrategy_READ_THROUGH_WRITE_THROUGH,
+		},
+	}
+}
 
 // SetOption is an option for the Put method
 type SetOption interface {

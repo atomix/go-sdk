@@ -17,7 +17,7 @@ package _map //nolint:golint
 import (
 	"context"
 	"fmt"
-	api "github.com/atomix/atomix-api/go/atomix/primitive/map"
+	api "github.com/atomix/atomix-api/go/atomix/primitive/map/v1"
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
@@ -34,7 +34,7 @@ var log = logging.GetLogger("atomix", "client", "map")
 // Client provides an API for creating Maps
 type Client interface {
 	// GetMap gets the Map instance of the given name
-	GetMap(ctx context.Context, name string, opts ...primitive.Option) (Map, error)
+	GetMap(ctx context.Context, name string, opts ...Option) (Map, error)
 }
 
 // Map is a distributed set of keys and values
@@ -123,33 +123,36 @@ type Event struct {
 }
 
 // New creates a new partitioned Map
-func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...primitive.Option) (Map, error) {
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Map, error) {
 	options := newMapOptions{}
 	for _, opt := range opts {
 		if op, ok := opt.(Option); ok {
 			op.applyNewMap(&options)
 		}
 	}
-	m := &_map{
-		Client:  primitive.NewClient(Type, name, conn, opts...),
-		client:  api.NewMapServiceClient(conn),
-		options: options,
+	sessions := api.NewMapSessionClient(conn)
+	request := &api.OpenSessionRequest{
+		Options: options.sessionOptions,
 	}
-	if err := m.Create(ctx); err != nil {
-		return nil, err
+	response, err := sessions.OpenSession(ctx, request)
+	if err != nil {
+		return nil, errors.From(err)
 	}
-	return m, nil
+	return &_map{
+		Client:  primitive.NewClient(Type, name, response.SessionID),
+		client:  api.NewMapClient(conn),
+		session: sessions,
+	}, nil
 }
 
 type _map struct {
 	*primitive.Client
-	client  api.MapServiceClient
-	options newMapOptions
+	client  api.MapClient
+	session api.MapSessionClient
 }
 
 func (m *_map) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*Entry, error) {
 	request := &api.PutRequest{
-		Headers: m.GetHeaders(),
 		Entry: api.Entry{
 			Key: api.Key{
 				Key: key,
@@ -162,7 +165,7 @@ func (m *_map) Put(ctx context.Context, key string, value []byte, opts ...PutOpt
 	for i := range opts {
 		opts[i].beforePut(request)
 	}
-	response, err := m.client.Put(ctx, request)
+	response, err := m.client.Put(m.GetContext(ctx), request)
 	if err != nil {
 		return nil, errors.From(err)
 	}
@@ -174,13 +177,12 @@ func (m *_map) Put(ctx context.Context, key string, value []byte, opts ...PutOpt
 
 func (m *_map) Get(ctx context.Context, key string, opts ...GetOption) (*Entry, error) {
 	request := &api.GetRequest{
-		Headers: m.GetHeaders(),
-		Key:     key,
+		Key: key,
 	}
 	for i := range opts {
 		opts[i].beforeGet(request)
 	}
-	response, err := m.client.Get(ctx, request)
+	response, err := m.client.Get(m.GetContext(ctx), request)
 	if err != nil {
 		return nil, errors.From(err)
 	}
@@ -192,7 +194,6 @@ func (m *_map) Get(ctx context.Context, key string, opts ...GetOption) (*Entry, 
 
 func (m *_map) Remove(ctx context.Context, key string, opts ...RemoveOption) (*Entry, error) {
 	request := &api.RemoveRequest{
-		Headers: m.GetHeaders(),
 		Key: api.Key{
 			Key: key,
 		},
@@ -200,7 +201,7 @@ func (m *_map) Remove(ctx context.Context, key string, opts ...RemoveOption) (*E
 	for i := range opts {
 		opts[i].beforeRemove(request)
 	}
-	response, err := m.client.Remove(ctx, request)
+	response, err := m.client.Remove(m.GetContext(ctx), request)
 	if err != nil {
 		return nil, errors.From(err)
 	}
@@ -211,10 +212,8 @@ func (m *_map) Remove(ctx context.Context, key string, opts ...RemoveOption) (*E
 }
 
 func (m *_map) Len(ctx context.Context) (int, error) {
-	request := &api.SizeRequest{
-		Headers: m.GetHeaders(),
-	}
-	response, err := m.client.Size(ctx, request)
+	request := &api.SizeRequest{}
+	response, err := m.client.Size(m.GetContext(ctx), request)
 	if err != nil {
 		return 0, errors.From(err)
 	}
@@ -222,10 +221,8 @@ func (m *_map) Len(ctx context.Context) (int, error) {
 }
 
 func (m *_map) Clear(ctx context.Context) error {
-	request := &api.ClearRequest{
-		Headers: m.GetHeaders(),
-	}
-	_, err := m.client.Clear(ctx, request)
+	request := &api.ClearRequest{}
+	_, err := m.client.Clear(m.GetContext(ctx), request)
 	if err != nil {
 		return errors.From(err)
 	}
@@ -233,10 +230,8 @@ func (m *_map) Clear(ctx context.Context) error {
 }
 
 func (m *_map) Entries(ctx context.Context, ch chan<- Entry) error {
-	request := &api.EntriesRequest{
-		Headers: m.GetHeaders(),
-	}
-	stream, err := m.client.Entries(ctx, request)
+	request := &api.EntriesRequest{}
+	stream, err := m.client.Entries(m.GetContext(ctx), request)
 	if err != nil {
 		return errors.From(err)
 	}
@@ -268,14 +263,12 @@ func (m *_map) Entries(ctx context.Context, ch chan<- Entry) error {
 }
 
 func (m *_map) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) error {
-	request := &api.EventsRequest{
-		Headers: m.GetHeaders(),
-	}
+	request := &api.EventsRequest{}
 	for i := range opts {
 		opts[i].beforeWatch(request)
 	}
 
-	stream, err := m.client.Events(ctx, request)
+	stream, err := m.client.Events(m.GetContext(ctx), request)
 	if err != nil {
 		return errors.From(err)
 	}
@@ -343,4 +336,15 @@ func (m *_map) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) 
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+func (m *_map) Close(ctx context.Context) error {
+	request := &api.CloseSessionRequest{
+		SessionID: m.SessionID(),
+	}
+	_, err := m.session.CloseSession(ctx, request)
+	if err != nil {
+		return errors.From(err)
+	}
+	return nil
 }

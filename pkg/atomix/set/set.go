@@ -16,7 +16,7 @@ package set
 
 import (
 	"context"
-	api "github.com/atomix/atomix-api/go/atomix/primitive/set"
+	api "github.com/atomix/atomix-api/go/atomix/primitive/set/v1"
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
@@ -32,7 +32,7 @@ const Type primitive.Type = "Set"
 // Client provides an API for creating Sets
 type Client interface {
 	// GetSet gets the Set instance of the given name
-	GetSet(ctx context.Context, name string, opts ...primitive.Option) (Set, error)
+	GetSet(ctx context.Context, name string, opts ...Option) (Set, error)
 }
 
 // Set provides a distributed set data structure
@@ -90,38 +90,41 @@ type Event struct {
 }
 
 // New creates a new partitioned set primitive
-func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...primitive.Option) (Set, error) {
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Set, error) {
 	options := newSetOptions{}
 	for _, opt := range opts {
 		if op, ok := opt.(Option); ok {
 			op.applyNewSet(&options)
 		}
 	}
-	s := &set{
-		Client:  primitive.NewClient(Type, name, conn, opts...),
-		client:  api.NewSetServiceClient(conn),
-		options: options,
+	sessions := api.NewSetSessionClient(conn)
+	request := &api.OpenSessionRequest{
+		Options: options.sessionOptions,
 	}
-	if err := s.Create(ctx); err != nil {
-		return nil, err
+	response, err := sessions.OpenSession(ctx, request)
+	if err != nil {
+		return nil, errors.From(err)
 	}
-	return s, nil
+	return &set{
+		Client:  primitive.NewClient(Type, name, response.SessionID),
+		client:  api.NewSetClient(conn),
+		session: sessions,
+	}, nil
 }
 
 type set struct {
 	*primitive.Client
-	client  api.SetServiceClient
-	options newSetOptions
+	client  api.SetClient
+	session api.SetSessionClient
 }
 
 func (s *set) Add(ctx context.Context, value string) (bool, error) {
 	request := &api.AddRequest{
-		Headers: s.GetHeaders(),
 		Element: api.Element{
 			Value: value,
 		},
 	}
-	_, err := s.client.Add(ctx, request)
+	_, err := s.client.Add(s.GetContext(ctx), request)
 	if err != nil {
 		err = errors.From(err)
 		if errors.IsAlreadyExists(err) {
@@ -134,12 +137,11 @@ func (s *set) Add(ctx context.Context, value string) (bool, error) {
 
 func (s *set) Remove(ctx context.Context, value string) (bool, error) {
 	request := &api.RemoveRequest{
-		Headers: s.GetHeaders(),
 		Element: api.Element{
 			Value: value,
 		},
 	}
-	_, err := s.client.Remove(ctx, request)
+	_, err := s.client.Remove(s.GetContext(ctx), request)
 	if err != nil {
 		err = errors.From(err)
 		if errors.IsNotFound(err) {
@@ -152,12 +154,11 @@ func (s *set) Remove(ctx context.Context, value string) (bool, error) {
 
 func (s *set) Contains(ctx context.Context, value string) (bool, error) {
 	request := &api.ContainsRequest{
-		Headers: s.GetHeaders(),
 		Element: api.Element{
 			Value: value,
 		},
 	}
-	response, err := s.client.Contains(ctx, request)
+	response, err := s.client.Contains(s.GetContext(ctx), request)
 	if err != nil {
 		return false, errors.From(err)
 	}
@@ -165,10 +166,8 @@ func (s *set) Contains(ctx context.Context, value string) (bool, error) {
 }
 
 func (s *set) Len(ctx context.Context) (int, error) {
-	request := &api.SizeRequest{
-		Headers: s.GetHeaders(),
-	}
-	response, err := s.client.Size(ctx, request)
+	request := &api.SizeRequest{}
+	response, err := s.client.Size(s.GetContext(ctx), request)
 	if err != nil {
 		return 0, errors.From(err)
 	}
@@ -176,10 +175,8 @@ func (s *set) Len(ctx context.Context) (int, error) {
 }
 
 func (s *set) Clear(ctx context.Context) error {
-	request := &api.ClearRequest{
-		Headers: s.GetHeaders(),
-	}
-	_, err := s.client.Clear(ctx, request)
+	request := &api.ClearRequest{}
+	_, err := s.client.Clear(s.GetContext(ctx), request)
 	if err != nil {
 		return errors.From(err)
 	}
@@ -187,10 +184,8 @@ func (s *set) Clear(ctx context.Context) error {
 }
 
 func (s *set) Elements(ctx context.Context, ch chan<- string) error {
-	request := &api.ElementsRequest{
-		Headers: s.GetHeaders(),
-	}
-	stream, err := s.client.Elements(ctx, request)
+	request := &api.ElementsRequest{}
+	stream, err := s.client.Elements(s.GetContext(ctx), request)
 	if err != nil {
 		return errors.From(err)
 	}
@@ -218,14 +213,12 @@ func (s *set) Elements(ctx context.Context, ch chan<- string) error {
 }
 
 func (s *set) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) error {
-	request := &api.EventsRequest{
-		Headers: s.GetHeaders(),
-	}
+	request := &api.EventsRequest{}
 	for i := range opts {
 		opts[i].beforeWatch(request)
 	}
 
-	stream, err := s.client.Events(ctx, request)
+	stream, err := s.client.Events(s.GetContext(ctx), request)
 	if err != nil {
 		return errors.From(err)
 	}
@@ -287,4 +280,15 @@ func (s *set) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) e
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+func (s *set) Close(ctx context.Context) error {
+	request := &api.CloseSessionRequest{
+		SessionID: s.SessionID(),
+	}
+	_, err := s.session.CloseSession(ctx, request)
+	if err != nil {
+		return errors.From(err)
+	}
+	return nil
 }

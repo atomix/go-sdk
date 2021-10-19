@@ -15,7 +15,7 @@
 package set
 
 import (
-	api "github.com/atomix/atomix-api/go/atomix/primitive/set"
+	api "github.com/atomix/atomix-api/go/atomix/primitive/set/v1"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

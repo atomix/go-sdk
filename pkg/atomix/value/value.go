@@ -16,7 +16,7 @@ package value
 
 import (
 	"context"
-	api "github.com/atomix/atomix-api/go/atomix/primitive/value"
+	api "github.com/atomix/atomix-api/go/atomix/primitive/value/v1"
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
@@ -33,7 +33,7 @@ const Type primitive.Type = "Value"
 // Client provides an API for creating Values
 type Client interface {
 	// GetValue gets the Value instance of the given name
-	GetValue(ctx context.Context, name string, opts ...primitive.Option) (Value, error)
+	GetValue(ctx context.Context, name string, opts ...Option) (Value, error)
 }
 
 // Value provides a simple atomic value
@@ -71,42 +71,45 @@ type Event struct {
 
 // New creates a new Lock primitive for the given partitions
 // The value will be created in one of the given partitions.
-func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...primitive.Option) (Value, error) {
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Value, error) {
 	options := newValueOptions{}
 	for _, opt := range opts {
 		if op, ok := opt.(Option); ok {
 			op.applyNewValue(&options)
 		}
 	}
-	v := &value{
-		Client:  primitive.NewClient(Type, name, conn, opts...),
-		client:  api.NewValueServiceClient(conn),
-		options: options,
+	sessions := api.NewValueSessionClient(conn)
+	request := &api.OpenSessionRequest{
+		Options: options.sessionOptions,
 	}
-	if err := v.Create(ctx); err != nil {
-		return nil, err
+	response, err := sessions.OpenSession(ctx, request)
+	if err != nil {
+		return nil, errors.From(err)
 	}
-	return v, nil
+	return &value{
+		Client:  primitive.NewClient(Type, name, response.SessionID),
+		client:  api.NewValueClient(conn),
+		session: sessions,
+	}, nil
 }
 
 // value is the single partition implementation of Lock
 type value struct {
 	*primitive.Client
-	client  api.ValueServiceClient
-	options newValueOptions
+	client  api.ValueClient
+	session api.ValueSessionClient
 }
 
 func (v *value) Set(ctx context.Context, value []byte, opts ...SetOption) (meta.ObjectMeta, error) {
 	request := &api.SetRequest{
-		Headers: v.GetHeaders(),
-		Value: api.Value{
+		Value: api.Object{
 			Value: value,
 		},
 	}
 	for i := range opts {
 		opts[i].beforeSet(request)
 	}
-	response, err := v.client.Set(ctx, request)
+	response, err := v.client.Set(v.GetContext(ctx), request)
 	if err != nil {
 		return meta.ObjectMeta{}, errors.From(err)
 	}
@@ -117,10 +120,8 @@ func (v *value) Set(ctx context.Context, value []byte, opts ...SetOption) (meta.
 }
 
 func (v *value) Get(ctx context.Context) ([]byte, meta.ObjectMeta, error) {
-	request := &api.GetRequest{
-		Headers: v.GetHeaders(),
-	}
-	response, err := v.client.Get(ctx, request)
+	request := &api.GetRequest{}
+	response, err := v.client.Get(v.GetContext(ctx), request)
 	if err != nil {
 		return nil, meta.ObjectMeta{}, errors.From(err)
 	}
@@ -128,10 +129,8 @@ func (v *value) Get(ctx context.Context) ([]byte, meta.ObjectMeta, error) {
 }
 
 func (v *value) Watch(ctx context.Context, ch chan<- Event) error {
-	request := &api.EventsRequest{
-		Headers: v.GetHeaders(),
-	}
-	stream, err := v.client.Events(ctx, request)
+	request := &api.EventsRequest{}
+	stream, err := v.client.Events(v.GetContext(ctx), request)
 	if err != nil {
 		return errors.From(err)
 	}
@@ -180,4 +179,15 @@ func (v *value) Watch(ctx context.Context, ch chan<- Event) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+func (v *value) Close(ctx context.Context) error {
+	request := &api.CloseSessionRequest{
+		SessionID: v.SessionID(),
+	}
+	_, err := v.session.CloseSession(ctx, request)
+	if err != nil {
+		return errors.From(err)
+	}
+	return nil
 }

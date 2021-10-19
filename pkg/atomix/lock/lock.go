@@ -16,7 +16,7 @@ package lock
 
 import (
 	"context"
-	api "github.com/atomix/atomix-api/go/atomix/primitive/lock"
+	api "github.com/atomix/atomix-api/go/atomix/primitive/lock/v1"
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
@@ -29,7 +29,7 @@ const Type primitive.Type = "Lock"
 // Client provides an API for creating Locks
 type Client interface {
 	// GetLock gets the Lock instance of the given name
-	GetLock(ctx context.Context, name string, opts ...primitive.Option) (Lock, error)
+	GetLock(ctx context.Context, name string, opts ...Option) (Lock, error)
 }
 
 // Lock provides distributed concurrency control
@@ -64,39 +64,41 @@ const (
 
 // New creates a new Lock primitive for the given partitions
 // The lock will be created in one of the given partitions.
-func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...primitive.Option) (Lock, error) {
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Lock, error) {
 	options := newLockOptions{}
 	for _, opt := range opts {
 		if op, ok := opt.(Option); ok {
 			op.applyNewLock(&options)
 		}
 	}
-	l := &lock{
-		Client:  primitive.NewClient(Type, name, conn, opts...),
-		client:  api.NewLockServiceClient(conn),
-		options: options,
+	sessions := api.NewLockSessionClient(conn)
+	request := &api.OpenSessionRequest{
+		Options: options.sessionOptions,
 	}
-	if err := l.Create(ctx); err != nil {
-		return nil, err
+	response, err := sessions.OpenSession(ctx, request)
+	if err != nil {
+		return nil, errors.From(err)
 	}
-	return l, nil
+	return &lock{
+		Client:  primitive.NewClient(Type, name, response.SessionID),
+		client:  api.NewLockClient(conn),
+		session: sessions,
+	}, nil
 }
 
 // lock is the single partition implementation of Lock
 type lock struct {
 	*primitive.Client
-	client  api.LockServiceClient
-	options newLockOptions
+	client  api.LockClient
+	session api.LockSessionClient
 }
 
 func (l *lock) Lock(ctx context.Context, opts ...LockOption) (Status, error) {
-	request := &api.LockRequest{
-		Headers: l.GetHeaders(),
-	}
+	request := &api.LockRequest{}
 	for i := range opts {
 		opts[i].beforeLock(request)
 	}
-	response, err := l.client.Lock(ctx, request)
+	response, err := l.client.Lock(l.GetContext(ctx), request)
 	if err != nil {
 		return Status{}, errors.From(err)
 	}
@@ -105,9 +107,9 @@ func (l *lock) Lock(ctx context.Context, opts ...LockOption) (Status, error) {
 	}
 	var state State
 	switch response.Lock.State {
-	case api.Lock_LOCKED:
+	case api.LockInstance_LOCKED:
 		state = StateLocked
-	case api.Lock_UNLOCKED:
+	case api.LockInstance_UNLOCKED:
 		state = StateUnlocked
 	}
 	return Status{
@@ -117,13 +119,11 @@ func (l *lock) Lock(ctx context.Context, opts ...LockOption) (Status, error) {
 }
 
 func (l *lock) Unlock(ctx context.Context, opts ...UnlockOption) error {
-	request := &api.UnlockRequest{
-		Headers: l.GetHeaders(),
-	}
+	request := &api.UnlockRequest{}
 	for i := range opts {
 		opts[i].beforeUnlock(request)
 	}
-	response, err := l.client.Unlock(ctx, request)
+	response, err := l.client.Unlock(l.GetContext(ctx), request)
 	if err != nil {
 		return errors.From(err)
 	}
@@ -134,13 +134,11 @@ func (l *lock) Unlock(ctx context.Context, opts ...UnlockOption) error {
 }
 
 func (l *lock) Get(ctx context.Context, opts ...GetOption) (Status, error) {
-	request := &api.GetLockRequest{
-		Headers: l.GetHeaders(),
-	}
+	request := &api.GetLockRequest{}
 	for i := range opts {
 		opts[i].beforeGet(request)
 	}
-	response, err := l.client.GetLock(ctx, request)
+	response, err := l.client.GetLock(l.GetContext(ctx), request)
 	if err != nil {
 		return Status{}, errors.From(err)
 	}
@@ -149,13 +147,24 @@ func (l *lock) Get(ctx context.Context, opts ...GetOption) (Status, error) {
 	}
 	var state State
 	switch response.Lock.State {
-	case api.Lock_LOCKED:
+	case api.LockInstance_LOCKED:
 		state = StateLocked
-	case api.Lock_UNLOCKED:
+	case api.LockInstance_UNLOCKED:
 		state = StateUnlocked
 	}
 	return Status{
 		ObjectMeta: meta.FromProto(response.Lock.ObjectMeta),
 		State:      state,
 	}, nil
+}
+
+func (l *lock) Close(ctx context.Context) error {
+	request := &api.CloseSessionRequest{
+		SessionID: l.SessionID(),
+	}
+	_, err := l.session.CloseSession(ctx, request)
+	if err != nil {
+		return errors.From(err)
+	}
+	return nil
 }

@@ -15,7 +15,7 @@
 package list
 
 import (
-	api "github.com/atomix/atomix-api/go/atomix/primitive/list"
+	api "github.com/atomix/atomix-api/go/atomix/primitive/list/v1"
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 )
 
@@ -26,7 +26,9 @@ type Option interface {
 }
 
 // newListOptions is list options
-type newListOptions struct{}
+type newListOptions struct {
+	sessionOptions api.ListSessionOptions
+}
 
 // WatchOption is an option for list Watch calls
 type WatchOption interface {

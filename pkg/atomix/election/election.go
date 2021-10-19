@@ -16,7 +16,7 @@ package election
 
 import (
 	"context"
-	api "github.com/atomix/atomix-api/go/atomix/primitive/election"
+	api "github.com/atomix/atomix-api/go/atomix/primitive/election/v1"
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
@@ -33,7 +33,7 @@ const Type primitive.Type = "Election"
 // Client provides an API for creating Elections
 type Client interface {
 	// GetElection gets the Election instance of the given name
-	GetElection(ctx context.Context, name string, opts ...primitive.Option) (Election, error)
+	GetElection(ctx context.Context, name string, opts ...Option) (Election, error)
 }
 
 // Election provides distributed leader election
@@ -107,29 +107,33 @@ type Event struct {
 }
 
 // New creates a new election primitive
-func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...primitive.Option) (Election, error) {
+func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option) (Election, error) {
 	options := newElectionOptions{}
 	for _, opt := range opts {
 		if op, ok := opt.(Option); ok {
 			op.applyNewElection(&options)
 		}
 	}
-	e := &election{
-		Client:  primitive.NewClient(Type, name, conn, opts...),
-		client:  api.NewLeaderElectionServiceClient(conn),
-		options: options,
+	sessions := api.NewLeaderElectionSessionClient(conn)
+	request := &api.OpenSessionRequest{
+		Options: options.sessionOptions,
 	}
-	if err := e.Create(ctx); err != nil {
-		return nil, err
+	response, err := sessions.OpenSession(ctx, request)
+	if err != nil {
+		return nil, errors.From(err)
 	}
-	return e, nil
+	return &election{
+		Client:  primitive.NewClient(Type, name, response.SessionID),
+		client:  api.NewLeaderElectionClient(conn),
+		session: sessions,
+	}, nil
 }
 
 // election is the single partition implementation of Election
 type election struct {
 	*primitive.Client
-	client  api.LeaderElectionServiceClient
-	options newElectionOptions
+	client  api.LeaderElectionClient
+	session api.LeaderElectionSessionClient
 }
 
 func (e *election) ID() string {
@@ -137,10 +141,8 @@ func (e *election) ID() string {
 }
 
 func (e *election) GetTerm(ctx context.Context) (*Term, error) {
-	request := &api.GetTermRequest{
-		Headers: e.GetHeaders(),
-	}
-	response, err := e.client.GetTerm(ctx, request)
+	request := &api.GetTermRequest{}
+	response, err := e.client.GetTerm(e.GetContext(ctx), request)
 	if err != nil {
 		return nil, errors.From(err)
 	}
@@ -149,10 +151,9 @@ func (e *election) GetTerm(ctx context.Context) (*Term, error) {
 
 func (e *election) Enter(ctx context.Context) (*Term, error) {
 	request := &api.EnterRequest{
-		Headers:     e.GetHeaders(),
 		CandidateID: e.SessionID(),
 	}
-	response, err := e.client.Enter(ctx, request)
+	response, err := e.client.Enter(e.GetContext(ctx), request)
 	if err != nil {
 		return nil, errors.From(err)
 	}
@@ -161,10 +162,9 @@ func (e *election) Enter(ctx context.Context) (*Term, error) {
 
 func (e *election) Leave(ctx context.Context) (*Term, error) {
 	request := &api.WithdrawRequest{
-		Headers:     e.GetHeaders(),
 		CandidateID: e.SessionID(),
 	}
-	response, err := e.client.Withdraw(ctx, request)
+	response, err := e.client.Withdraw(e.GetContext(ctx), request)
 	if err != nil {
 		return nil, errors.From(err)
 	}
@@ -173,10 +173,9 @@ func (e *election) Leave(ctx context.Context) (*Term, error) {
 
 func (e *election) Anoint(ctx context.Context, id string) (*Term, error) {
 	request := &api.AnointRequest{
-		Headers:     e.GetHeaders(),
 		CandidateID: id,
 	}
-	response, err := e.client.Anoint(ctx, request)
+	response, err := e.client.Anoint(e.GetContext(ctx), request)
 	if err != nil {
 		return nil, errors.From(err)
 	}
@@ -185,10 +184,9 @@ func (e *election) Anoint(ctx context.Context, id string) (*Term, error) {
 
 func (e *election) Promote(ctx context.Context, id string) (*Term, error) {
 	request := &api.PromoteRequest{
-		Headers:     e.GetHeaders(),
 		CandidateID: id,
 	}
-	response, err := e.client.Promote(ctx, request)
+	response, err := e.client.Promote(e.GetContext(ctx), request)
 	if err != nil {
 		return nil, errors.From(err)
 	}
@@ -197,10 +195,9 @@ func (e *election) Promote(ctx context.Context, id string) (*Term, error) {
 
 func (e *election) Evict(ctx context.Context, id string) (*Term, error) {
 	request := &api.EvictRequest{
-		Headers:     e.GetHeaders(),
 		CandidateID: id,
 	}
-	response, err := e.client.Evict(ctx, request)
+	response, err := e.client.Evict(e.GetContext(ctx), request)
 	if err != nil {
 		return nil, errors.From(err)
 	}
@@ -208,10 +205,8 @@ func (e *election) Evict(ctx context.Context, id string) (*Term, error) {
 }
 
 func (e *election) Watch(ctx context.Context, ch chan<- Event) error {
-	request := &api.EventsRequest{
-		Headers: e.GetHeaders(),
-	}
-	stream, err := e.client.Events(ctx, request)
+	request := &api.EventsRequest{}
+	stream, err := e.client.Events(e.GetContext(ctx), request)
 	if err != nil {
 		return errors.From(err)
 	}
@@ -260,4 +255,15 @@ func (e *election) Watch(ctx context.Context, ch chan<- Event) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+func (e *election) Close(ctx context.Context) error {
+	request := &api.CloseSessionRequest{
+		SessionID: e.SessionID(),
+	}
+	_, err := e.session.CloseSession(ctx, request)
+	if err != nil {
+		return errors.From(err)
+	}
+	return nil
 }

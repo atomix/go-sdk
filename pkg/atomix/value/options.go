@@ -15,7 +15,7 @@
 package value
 
 import (
-	api "github.com/atomix/atomix-api/go/atomix/primitive/value"
+	api "github.com/atomix/atomix-api/go/atomix/primitive/value/v1"
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
 )
@@ -27,7 +27,58 @@ type Option interface {
 }
 
 // newValueOptions is value options
-type newValueOptions struct{}
+type newValueOptions struct {
+	sessionOptions api.ValueSessionOptions
+}
+
+type CacheOption struct {
+	primitive.EmptyOption
+	options api.ValueCacheOptions
+}
+
+func (o *CacheOption) applyNewValue(options *newValueOptions) {
+	options.sessionOptions.Cache = o.options
+}
+
+// WithNearCache enabled a near cache for a value
+func WithNearCache() Option {
+	return &CacheOption{
+		options: api.ValueCacheOptions{
+			Enabled:  true,
+			Strategy: api.ValueCacheStrategy_NEAR,
+		},
+	}
+}
+
+// WithReadThroughCache enabled a read-through cache for a value
+func WithReadThroughCache() Option {
+	return &CacheOption{
+		options: api.ValueCacheOptions{
+			Enabled:  true,
+			Strategy: api.ValueCacheStrategy_READ_THROUGH,
+		},
+	}
+}
+
+// WithWriteThroughCache enabled a write-through cache for a value
+func WithWriteThroughCache() Option {
+	return &CacheOption{
+		options: api.ValueCacheOptions{
+			Enabled:  true,
+			Strategy: api.ValueCacheStrategy_WRITE_THROUGH,
+		},
+	}
+}
+
+// WithReadThroughWriteThroughCache enabled a read-through/write-through cache for a value
+func WithReadThroughWriteThroughCache() Option {
+	return &CacheOption{
+		options: api.ValueCacheOptions{
+			Enabled:  true,
+			Strategy: api.ValueCacheStrategy_READ_THROUGH_WRITE_THROUGH,
+		},
+	}
+}
 
 // SetOption is an option for Set calls
 type SetOption interface {
