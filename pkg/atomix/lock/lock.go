@@ -18,8 +18,8 @@ import (
 	"context"
 	api "github.com/atomix/atomix-api/go/atomix/primitive/lock/v1"
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
+	"github.com/atomix/atomix-sdk-go/pkg/errors"
+	"github.com/atomix/atomix-sdk-go/pkg/meta"
 	"google.golang.org/grpc"
 )
 

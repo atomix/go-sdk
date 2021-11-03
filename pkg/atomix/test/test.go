@@ -16,10 +16,10 @@ package test
 
 import (
 	"fmt"
-	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
+	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol/v1"
 	"github.com/atomix/atomix-go-client/pkg/atomix"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"github.com/atomix/atomix-sdk-go/pkg/cluster"
+	"github.com/atomix/atomix-sdk-go/pkg/logging"
 	"sync"
 )
 

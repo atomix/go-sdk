@@ -16,9 +16,9 @@ package set
 
 import (
 	"context"
-	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
+	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver/v1"
 	"github.com/atomix/atomix-go-client/pkg/atomix/util/test"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"github.com/atomix/atomix-sdk-go/pkg/logging"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -26,10 +26,9 @@ import (
 func TestSetOperations(t *testing.T) {
 	logging.SetLevel(logging.DebugLevel)
 
-	primitiveID := primitiveapi.PrimitiveId{
-		Type:      Type.String(),
-		Namespace: "test",
-		Name:      "TestSetOperations",
+	primitiveID := driverapi.ProxyId{
+		Type: Type.String(),
+		Name: "TestSetOperations",
 	}
 
 	test := test.NewRSMTest()

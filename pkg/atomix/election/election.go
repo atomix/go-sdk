@@ -16,11 +16,12 @@ package election
 
 import (
 	"context"
+	"fmt"
 	api "github.com/atomix/atomix-api/go/atomix/primitive/election/v1"
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
+	"github.com/atomix/atomix-sdk-go/pkg/errors"
+	"github.com/atomix/atomix-sdk-go/pkg/logging"
+	"github.com/atomix/atomix-sdk-go/pkg/meta"
 	"google.golang.org/grpc"
 	"io"
 )
@@ -137,7 +138,7 @@ type election struct {
 }
 
 func (e *election) ID() string {
-	return e.SessionID()
+	return fmt.Sprint(e.SessionID())
 }
 
 func (e *election) GetTerm(ctx context.Context) (*Term, error) {
@@ -151,7 +152,7 @@ func (e *election) GetTerm(ctx context.Context) (*Term, error) {
 
 func (e *election) Enter(ctx context.Context) (*Term, error) {
 	request := &api.EnterRequest{
-		CandidateID: e.SessionID(),
+		CandidateID: e.ID(),
 	}
 	response, err := e.client.Enter(e.GetContext(ctx), request)
 	if err != nil {
@@ -162,7 +163,7 @@ func (e *election) Enter(ctx context.Context) (*Term, error) {
 
 func (e *election) Leave(ctx context.Context) (*Term, error) {
 	request := &api.WithdrawRequest{
-		CandidateID: e.SessionID(),
+		CandidateID: e.ID(),
 	}
 	response, err := e.client.Withdraw(e.GetContext(ctx), request)
 	if err != nil {

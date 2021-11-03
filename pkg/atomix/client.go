@@ -17,8 +17,7 @@ package atomix
 import (
 	"context"
 	"fmt"
-	brokerapi "github.com/atomix/atomix-api/go/atomix/management/broker"
-	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
+	brokerapi "github.com/atomix/atomix-api/go/atomix/management/broker/v1"
 	"github.com/atomix/atomix-go-client/pkg/atomix/counter"
 	"github.com/atomix/atomix-go-client/pkg/atomix/election"
 	"github.com/atomix/atomix-go-client/pkg/atomix/indexedmap"
@@ -28,8 +27,8 @@ import (
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-client/pkg/atomix/set"
 	"github.com/atomix/atomix-go-client/pkg/atomix/value"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/util/retry"
+	"github.com/atomix/atomix-sdk-go/pkg/errors"
+	"github.com/atomix/atomix-sdk-go/pkg/grpc/retry"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -39,42 +38,42 @@ import (
 )
 
 // GetCounter gets the Counter instance of the given name
-func GetCounter(ctx context.Context, name string, opts ...primitive.Option) (counter.Counter, error) {
+func GetCounter(ctx context.Context, name string, opts ...counter.Option) (counter.Counter, error) {
 	return getClient().GetCounter(ctx, name, opts...)
 }
 
 // GetElection gets the Election instance of the given name
-func GetElection(ctx context.Context, name string, opts ...primitive.Option) (election.Election, error) {
+func GetElection(ctx context.Context, name string, opts ...election.Option) (election.Election, error) {
 	return getClient().GetElection(ctx, name, opts...)
 }
 
 // GetIndexedMap gets the IndexedMap instance of the given name
-func GetIndexedMap(ctx context.Context, name string, opts ...primitive.Option) (indexedmap.IndexedMap, error) {
+func GetIndexedMap(ctx context.Context, name string, opts ...indexedmap.Option) (indexedmap.IndexedMap, error) {
 	return getClient().GetIndexedMap(ctx, name, opts...)
 }
 
 // GetList gets the List instance of the given name
-func GetList(ctx context.Context, name string, opts ...primitive.Option) (list.List, error) {
+func GetList(ctx context.Context, name string, opts ...list.Option) (list.List, error) {
 	return getClient().GetList(ctx, name, opts...)
 }
 
 // GetLock gets the Lock instance of the given name
-func GetLock(ctx context.Context, name string, opts ...primitive.Option) (lock.Lock, error) {
+func GetLock(ctx context.Context, name string, opts ...lock.Option) (lock.Lock, error) {
 	return getClient().GetLock(ctx, name, opts...)
 }
 
 // GetMap gets the Map instance of the given name
-func GetMap(ctx context.Context, name string, opts ...primitive.Option) (_map.Map, error) {
+func GetMap(ctx context.Context, name string, opts ..._map.Option) (_map.Map, error) {
 	return getClient().GetMap(ctx, name, opts...)
 }
 
 // GetSet gets the Set instance of the given name
-func GetSet(ctx context.Context, name string, opts ...primitive.Option) (set.Set, error) {
+func GetSet(ctx context.Context, name string, opts ...set.Option) (set.Set, error) {
 	return getClient().GetSet(ctx, name, opts...)
 }
 
 // GetValue gets the Value instance of the given name
-func GetValue(ctx context.Context, name string, opts ...primitive.Option) (value.Value, error) {
+func GetValue(ctx context.Context, name string, opts ...value.Option) (value.Value, error) {
 	return getClient().GetValue(ctx, name, opts...)
 }
 
@@ -90,7 +89,7 @@ func NewClient(opts ...Option) Client {
 	}
 	return &atomixClient{
 		options:        options,
-		primitiveConns: make(map[primitiveapi.PrimitiveId]*grpc.ClientConn),
+		primitiveConns: make(map[brokerapi.PrimitiveId]*grpc.ClientConn),
 	}
 }
 
@@ -110,13 +109,13 @@ type Client interface {
 type atomixClient struct {
 	options        clientOptions
 	brokerConn     *grpc.ClientConn
-	primitiveConns map[primitiveapi.PrimitiveId]*grpc.ClientConn
+	primitiveConns map[brokerapi.PrimitiveId]*grpc.ClientConn
 	mu             sync.RWMutex
 }
 
-func (c *atomixClient) connect(ctx context.Context, primitive primitiveapi.PrimitiveId) (*grpc.ClientConn, error) {
+func (c *atomixClient) connect(ctx context.Context, primitiveID brokerapi.PrimitiveId) (*grpc.ClientConn, error) {
 	c.mu.RLock()
-	driverConn, ok := c.primitiveConns[primitive]
+	driverConn, ok := c.primitiveConns[primitiveID]
 	c.mu.RUnlock()
 	if ok {
 		return driverConn, nil
@@ -125,7 +124,7 @@ func (c *atomixClient) connect(ctx context.Context, primitive primitiveapi.Primi
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	driverConn, ok = c.primitiveConns[primitive]
+	driverConn, ok = c.primitiveConns[primitiveID]
 	if ok {
 		return driverConn, nil
 	}
@@ -144,9 +143,7 @@ func (c *atomixClient) connect(ctx context.Context, primitive primitiveapi.Primi
 
 	brokerClient := brokerapi.NewBrokerClient(brokerConn)
 	request := &brokerapi.LookupPrimitiveRequest{
-		PrimitiveID: brokerapi.PrimitiveId{
-			PrimitiveId: primitive,
-		},
+		PrimitiveID: primitiveID,
 	}
 	response, err := brokerClient.LookupPrimitive(ctx, request, retry.WithRetryOn(codes.Unavailable, codes.NotFound), retry.WithPerCallTimeout(time.Second))
 	if err != nil {
@@ -160,83 +157,79 @@ func (c *atomixClient) connect(ctx context.Context, primitive primitiveapi.Primi
 	if err != nil {
 		return nil, err
 	}
-	c.primitiveConns[primitive] = driverConn
+	c.primitiveConns[primitiveID] = driverConn
 	return driverConn, nil
 }
 
-func newPrimitiveID(t primitive.Type, name string) primitiveapi.PrimitiveId {
-	return primitiveapi.PrimitiveId{
+func newPrimitiveID(t primitive.Type, name string) brokerapi.PrimitiveId {
+	return brokerapi.PrimitiveId{
 		Type: t.String(),
 		Name: name,
 	}
 }
 
-func getPrimitiveOpts(clientOpts clientOptions, primitiveOpts ...primitive.Option) []primitive.Option {
-	return append([]primitive.Option{primitive.WithSessionID(clientOpts.clientID)}, primitiveOpts...)
-}
-
-func (c *atomixClient) GetCounter(ctx context.Context, name string, opts ...primitive.Option) (counter.Counter, error) {
+func (c *atomixClient) GetCounter(ctx context.Context, name string, opts ...counter.Option) (counter.Counter, error) {
 	conn, err := c.connect(ctx, newPrimitiveID(counter.Type, name))
 	if err != nil {
 		return nil, err
 	}
-	return counter.New(ctx, name, conn, getPrimitiveOpts(c.options, opts...)...)
+	return counter.New(ctx, name, conn, opts...)
 }
 
-func (c *atomixClient) GetElection(ctx context.Context, name string, opts ...primitive.Option) (election.Election, error) {
+func (c *atomixClient) GetElection(ctx context.Context, name string, opts ...election.Option) (election.Election, error) {
 	conn, err := c.connect(ctx, newPrimitiveID(election.Type, name))
 	if err != nil {
 		return nil, err
 	}
-	return election.New(ctx, name, conn, getPrimitiveOpts(c.options, opts...)...)
+	return election.New(ctx, name, conn, opts...)
 }
 
-func (c *atomixClient) GetIndexedMap(ctx context.Context, name string, opts ...primitive.Option) (indexedmap.IndexedMap, error) {
+func (c *atomixClient) GetIndexedMap(ctx context.Context, name string, opts ...indexedmap.Option) (indexedmap.IndexedMap, error) {
 	conn, err := c.connect(ctx, newPrimitiveID(indexedmap.Type, name))
 	if err != nil {
 		return nil, err
 	}
-	return indexedmap.New(ctx, name, conn, getPrimitiveOpts(c.options, opts...)...)
+	return indexedmap.New(ctx, name, conn, opts...)
 }
 
-func (c *atomixClient) GetList(ctx context.Context, name string, opts ...primitive.Option) (list.List, error) {
+func (c *atomixClient) GetList(ctx context.Context, name string, opts ...list.Option) (list.List, error) {
 	conn, err := c.connect(ctx, newPrimitiveID(list.Type, name))
 	if err != nil {
 		return nil, err
 	}
-	return list.New(ctx, name, conn, getPrimitiveOpts(c.options, opts...)...)
+	return list.New(ctx, name, conn, opts...)
 }
 
-func (c *atomixClient) GetLock(ctx context.Context, name string, opts ...primitive.Option) (lock.Lock, error) {
+func (c *atomixClient) GetLock(ctx context.Context, name string, opts ...lock.Option) (lock.Lock, error) {
 	conn, err := c.connect(ctx, newPrimitiveID(lock.Type, name))
 	if err != nil {
 		return nil, err
 	}
-	return lock.New(ctx, name, conn, getPrimitiveOpts(c.options, opts...)...)
+	return lock.New(ctx, name, conn, opts...)
 }
 
-func (c *atomixClient) GetMap(ctx context.Context, name string, opts ...primitive.Option) (_map.Map, error) {
+func (c *atomixClient) GetMap(ctx context.Context, name string, opts ..._map.Option) (_map.Map, error) {
 	conn, err := c.connect(ctx, newPrimitiveID(_map.Type, name))
 	if err != nil {
 		return nil, err
 	}
-	return _map.New(ctx, name, conn, getPrimitiveOpts(c.options, opts...)...)
+	return _map.New(ctx, name, conn, opts...)
 }
 
-func (c *atomixClient) GetSet(ctx context.Context, name string, opts ...primitive.Option) (set.Set, error) {
+func (c *atomixClient) GetSet(ctx context.Context, name string, opts ...set.Option) (set.Set, error) {
 	conn, err := c.connect(ctx, newPrimitiveID(set.Type, name))
 	if err != nil {
 		return nil, err
 	}
-	return set.New(ctx, name, conn, getPrimitiveOpts(c.options, opts...)...)
+	return set.New(ctx, name, conn, opts...)
 }
 
-func (c *atomixClient) GetValue(ctx context.Context, name string, opts ...primitive.Option) (value.Value, error) {
+func (c *atomixClient) GetValue(ctx context.Context, name string, opts ...value.Option) (value.Value, error) {
 	conn, err := c.connect(ctx, newPrimitiveID(value.Type, name))
 	if err != nil {
 		return nil, err
 	}
-	return value.New(ctx, name, conn, getPrimitiveOpts(c.options, opts...)...)
+	return value.New(ctx, name, conn, opts...)
 }
 
 func (c *atomixClient) Close() error {

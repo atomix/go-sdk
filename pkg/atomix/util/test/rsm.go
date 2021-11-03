@@ -17,31 +17,30 @@ package test
 import (
 	"context"
 	"fmt"
-	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
-	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
-	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/driver"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy"
-	rsmdriver "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm"
-	rsmcounterproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/counter"
-	rsmelectionproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/election"
-	rsmindexedmapproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/indexedmap"
-	rsmlistproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/list"
-	rsmlockproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/lock"
-	rsmmapproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/map"
-	rsmsetproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/set"
-	rsmvalueproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/value"
-	rsmprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
-	rsmcounterprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/counter"
-	rsmelectionprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/election"
-	rsmindexedmapprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/indexedmap"
-	rsmlistprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/list"
-	rsmlockprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/lock"
-	rsmmapprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/map"
-	rsmsetprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/set"
-	rsmvalueprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/value"
+	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver/v1"
+	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol/v1"
+	"github.com/atomix/atomix-sdk-go/pkg/cluster"
+	"github.com/atomix/atomix-sdk-go/pkg/driver"
+	"github.com/atomix/atomix-sdk-go/pkg/driver/env"
+	"github.com/atomix/atomix-sdk-go/pkg/driver/proxy"
+	rsmdriver "github.com/atomix/atomix-sdk-go/pkg/driver/proxy/rsm"
+	rsmcounterproxy "github.com/atomix/atomix-sdk-go/pkg/driver/proxy/rsm/counter"
+	rsmelectionproxy "github.com/atomix/atomix-sdk-go/pkg/driver/proxy/rsm/election"
+	rsmindexedmapproxy "github.com/atomix/atomix-sdk-go/pkg/driver/proxy/rsm/indexedmap"
+	rsmlistproxy "github.com/atomix/atomix-sdk-go/pkg/driver/proxy/rsm/list"
+	rsmlockproxy "github.com/atomix/atomix-sdk-go/pkg/driver/proxy/rsm/lock"
+	rsmmapproxy "github.com/atomix/atomix-sdk-go/pkg/driver/proxy/rsm/map"
+	rsmsetproxy "github.com/atomix/atomix-sdk-go/pkg/driver/proxy/rsm/set"
+	rsmvalueproxy "github.com/atomix/atomix-sdk-go/pkg/driver/proxy/rsm/value"
+	rsmprotocol "github.com/atomix/atomix-sdk-go/pkg/storage/protocol/rsm"
+	rsmcounterprotocol "github.com/atomix/atomix-sdk-go/pkg/storage/protocol/rsm/counter"
+	rsmelectionprotocol "github.com/atomix/atomix-sdk-go/pkg/storage/protocol/rsm/election"
+	rsmindexedmapprotocol "github.com/atomix/atomix-sdk-go/pkg/storage/protocol/rsm/indexedmap"
+	rsmlistprotocol "github.com/atomix/atomix-sdk-go/pkg/storage/protocol/rsm/list"
+	rsmlockprotocol "github.com/atomix/atomix-sdk-go/pkg/storage/protocol/rsm/lock"
+	rsmmapprotocol "github.com/atomix/atomix-sdk-go/pkg/storage/protocol/rsm/map"
+	rsmsetprotocol "github.com/atomix/atomix-sdk-go/pkg/storage/protocol/rsm/set"
+	rsmvalueprotocol "github.com/atomix/atomix-sdk-go/pkg/storage/protocol/rsm/value"
 	"github.com/atomix/atomix-go-local/pkg/atomix/local"
 	"google.golang.org/grpc"
 )
@@ -101,7 +100,7 @@ func (t *RSMTest) Start() error {
 }
 
 // CreateProxy creates an RSM proxy and returns the connection
-func (t *RSMTest) CreateProxy(primitiveID primitiveapi.PrimitiveId) (*grpc.ClientConn, error) {
+func (t *RSMTest) CreateProxy(proxyID driverapi.ProxyId) (*grpc.ClientConn, error) {
 	protocolFunc := func(rsmCluster cluster.Cluster, driverEnv env.DriverEnv) proxy.Protocol {
 		protocol := rsmdriver.NewProtocol(rsmCluster, driverEnv)
 		rsmcounterproxy.Register(protocol)
@@ -139,8 +138,10 @@ func (t *RSMTest) CreateProxy(primitiveID primitiveapi.PrimitiveId) (*grpc.Clien
 
 	agentPort := int32(55680 + len(t.drivers))
 	agentID := driverapi.AgentId{
-		Namespace: "test",
-		Name:      "rsm",
+		ProtocolId: protocolapi.ProtocolId{
+			Namespace: "test",
+			Name:      "rsm",
+		},
 	}
 	agentAddress := driverapi.AgentAddress{
 		Host: "localhost",
@@ -161,11 +162,14 @@ func (t *RSMTest) CreateProxy(primitiveID primitiveapi.PrimitiveId) (*grpc.Clien
 	}
 	agentClient := driverapi.NewAgentClient(agentConn)
 
-	proxyOptions := driverapi.ProxyOptions{
-		Read:  true,
-		Write: true,
+	request := &driverapi.CreateProxyRequest{
+		ProxyID: proxyID,
+		Options: driverapi.ProxyOptions{
+			Read:  true,
+			Write: true,
+		},
 	}
-	_, err = agentClient.CreateProxy(context.TODO(), &driverapi.CreateProxyRequest{ProxyID: driverapi.ProxyId{PrimitiveId: primitiveID}, Options: proxyOptions})
+	_, err = agentClient.CreateProxy(context.TODO(), request)
 	if err != nil {
 		return nil, err
 	}

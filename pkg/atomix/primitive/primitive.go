@@ -16,6 +16,8 @@ package primitive
 
 import (
 	"context"
+	"fmt"
+	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive/v1"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -41,7 +43,7 @@ type Primitive interface {
 }
 
 // NewClient creates a new primitive client
-func NewClient(primitiveType Type, name string, session string) *Client {
+func NewClient(primitiveType Type, name string, session primitiveapi.SessionID) *Client {
 	return &Client{
 		primitiveType: primitiveType,
 		name:          name,
@@ -53,7 +55,7 @@ func NewClient(primitiveType Type, name string, session string) *Client {
 type Client struct {
 	primitiveType Type
 	name          string
-	session       string
+	session       primitiveapi.SessionID
 }
 
 // Type returns the primitive type
@@ -62,7 +64,7 @@ func (c *Client) Type() Type {
 }
 
 // SessionID returns the primitive session identifier
-func (c *Client) SessionID() string {
+func (c *Client) SessionID() primitiveapi.SessionID {
 	return c.session
 }
 
@@ -73,5 +75,5 @@ func (c *Client) Name() string {
 
 // GetContext returns the primitive context
 func (c *Client) GetContext(ctx context.Context) context.Context {
-	return metadata.AppendToOutgoingContext(ctx, sessionIDKey, c.session)
+	return metadata.AppendToOutgoingContext(ctx, sessionIDKey, fmt.Sprint(c.session))
 }

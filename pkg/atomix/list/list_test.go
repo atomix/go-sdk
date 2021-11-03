@@ -18,8 +18,8 @@ import (
 	"context"
 	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
 	"github.com/atomix/atomix-go-client/pkg/atomix/util/test"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"github.com/atomix/atomix-sdk-go/pkg/errors"
+	"github.com/atomix/atomix-sdk-go/pkg/logging"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

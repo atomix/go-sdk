@@ -15,9 +15,9 @@
 package rsm
 
 import (
-	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
+	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol/v1"
 	test "github.com/atomix/atomix-go-client/pkg/atomix/test"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
+	"github.com/atomix/atomix-sdk-go/pkg/cluster"
 )
 
 type rsmOptions struct{}

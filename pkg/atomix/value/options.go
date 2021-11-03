@@ -17,7 +17,7 @@ package value
 import (
 	api "github.com/atomix/atomix-api/go/atomix/primitive/value/v1"
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
+	"github.com/atomix/atomix-sdk-go/pkg/meta"
 )
 
 // Option is a value option

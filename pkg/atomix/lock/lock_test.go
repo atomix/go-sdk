@@ -16,10 +16,10 @@ package lock
 
 import (
 	"context"
-	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
+	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver/v1"
 	"github.com/atomix/atomix-go-client/pkg/atomix/util/test"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"github.com/atomix/atomix-sdk-go/pkg/errors"
+	"github.com/atomix/atomix-sdk-go/pkg/logging"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
@@ -28,10 +28,9 @@ import (
 func TestLock(t *testing.T) {
 	logging.SetLevel(logging.DebugLevel)
 
-	primitiveID := primitiveapi.PrimitiveId{
-		Type:      Type.String(),
-		Namespace: "test",
-		Name:      "TestLock",
+	primitiveID := driverapi.ProxyId{
+		Type: Type.String(),
+		Name: "TestLock",
 	}
 
 	test := test.NewRSMTest()

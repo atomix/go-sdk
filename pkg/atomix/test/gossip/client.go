@@ -17,20 +17,19 @@ package gossip
 import (
 	"context"
 	"fmt"
-	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
-	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
-	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
+	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver/v1"
+	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol/v1"
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/driver"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/gossip"
-	gossipcounterproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/gossip/counter"
-	gossipmapproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/gossip/map"
-	gossipsetproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/gossip/set"
-	gossipvalueproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/gossip/value"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/atomix-sdk-go/pkg/cluster"
+	"github.com/atomix/atomix-sdk-go/pkg/driver"
+	"github.com/atomix/atomix-sdk-go/pkg/driver/env"
+	"github.com/atomix/atomix-sdk-go/pkg/driver/proxy"
+	"github.com/atomix/atomix-sdk-go/pkg/driver/proxy/gossip"
+	gossipcounterproxy "github.com/atomix/atomix-sdk-go/pkg/driver/proxy/gossip/counter"
+	gossipmapproxy "github.com/atomix/atomix-sdk-go/pkg/driver/proxy/gossip/map"
+	gossipsetproxy "github.com/atomix/atomix-sdk-go/pkg/driver/proxy/gossip/set"
+	gossipvalueproxy "github.com/atomix/atomix-sdk-go/pkg/driver/proxy/gossip/value"
+	"github.com/atomix/atomix-sdk-go/pkg/errors"
 	"github.com/gogo/protobuf/jsonpb"
 	"google.golang.org/grpc"
 )
@@ -82,8 +81,10 @@ func (c *gossipClient) Start(driverPort, agentPort int) error {
 	driverClient := driverapi.NewDriverClient(driverConn)
 
 	agentID := driverapi.AgentId{
-		Namespace: "test",
-		Name:      "rsm",
+		ProtocolId: protocolapi.ProtocolId{
+			Namespace: "test",
+			Name:      "rsm",
+		},
 	}
 	agentAddress := driverapi.AgentAddress{
 		Host: "localhost",
@@ -113,13 +114,15 @@ func (c *gossipClient) Connect(ctx context.Context, primitive primitive.Type, na
 	}
 
 	agentClient := driverapi.NewAgentClient(c.conn)
-	proxyOptions := driverapi.ProxyOptions{
-		Read:   true,
-		Write:  true,
-		Config: []byte(bytes),
+	request := &driverapi.CreateProxyRequest{
+		ProxyID: driverapi.ProxyId{Type: primitive.String(), Name: name},
+		Options: driverapi.ProxyOptions{
+			Read:   true,
+			Write:  true,
+			Config: []byte(bytes),
+		},
 	}
-	primitiveID := primitiveapi.PrimitiveId{Type: primitive.String(), Namespace: "test", Name: name}
-	_, err = agentClient.CreateProxy(ctx, &driverapi.CreateProxyRequest{ProxyID: driverapi.ProxyId{PrimitiveId: primitiveID}, Options: proxyOptions})
+	_, err = agentClient.CreateProxy(ctx, request)
 	if err != nil && !errors.IsAlreadyExists(errors.From(err)) {
 		return nil, err
 	}

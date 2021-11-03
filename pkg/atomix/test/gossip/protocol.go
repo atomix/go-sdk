@@ -15,10 +15,10 @@
 package gossip
 
 import (
-	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
+	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol/v1"
 	test "github.com/atomix/atomix-go-client/pkg/atomix/test"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/gossip"
+	"github.com/atomix/atomix-sdk-go/pkg/cluster"
+	"github.com/atomix/atomix-sdk-go/pkg/driver/proxy/gossip"
 )
 
 type gossipOptions struct {

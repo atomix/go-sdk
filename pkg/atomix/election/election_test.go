@@ -16,11 +16,10 @@ package election
 
 import (
 	"context"
-	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
-	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
+	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver/v1"
 	"github.com/atomix/atomix-go-client/pkg/atomix/util/test"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
+	"github.com/atomix/atomix-sdk-go/pkg/logging"
+	"github.com/atomix/atomix-sdk-go/pkg/meta"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -28,10 +27,9 @@ import (
 func TestElectionOperations(t *testing.T) {
 	logging.SetLevel(logging.DebugLevel)
 
-	primitiveID := primitiveapi.PrimitiveId{
-		Type:      Type.String(),
-		Namespace: "test",
-		Name:      "TestElectionOperations",
+	primitiveID := driverapi.ProxyId{
+		Type: Type.String(),
+		Name: "TestElectionOperations",
 	}
 
 	test := test.NewRSMTest()
@@ -46,15 +44,15 @@ func TestElectionOperations(t *testing.T) {
 	conn3, err := test.CreateProxy(primitiveID)
 	assert.NoError(t, err)
 
-	election1, err := New(context.TODO(), "TestElectionOperations", conn1, primitive.WithSessionID("client-1"))
+	election1, err := New(context.TODO(), "TestElectionOperations", conn1)
 	assert.NoError(t, err)
 	assert.NotNil(t, election1)
 
-	election2, err := New(context.TODO(), "TestElectionOperations", conn2, primitive.WithSessionID("client-2"))
+	election2, err := New(context.TODO(), "TestElectionOperations", conn2)
 	assert.NoError(t, err)
 	assert.NotNil(t, election2)
 
-	election3, err := New(context.TODO(), "TestElectionOperations", conn3, primitive.WithSessionID("client-3"))
+	election3, err := New(context.TODO(), "TestElectionOperations", conn3)
 	assert.NoError(t, err)
 	assert.NotNil(t, election3)
 
@@ -243,7 +241,7 @@ func TestElectionOperations(t *testing.T) {
 	err = election3.Close(context.Background())
 	assert.NoError(t, err)
 
-	election1, err = New(context.TODO(), "TestElectionOperations", conn1, primitive.WithSessionID("client-1"))
+	election1, err = New(context.TODO(), "TestElectionOperations", conn1)
 	assert.NoError(t, err)
 
 	term, err = election1.GetTerm(context.TODO())
