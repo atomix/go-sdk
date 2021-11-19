@@ -16,11 +16,10 @@ package value
 
 import (
 	"context"
-	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver/v1"
-	"github.com/atomix/atomix-go-client/pkg/atomix/util/test"
 	"github.com/atomix/atomix-sdk-go/pkg/errors"
 	"github.com/atomix/atomix-sdk-go/pkg/logging"
 	"github.com/atomix/atomix-sdk-go/pkg/meta"
+	"github.com/atomix/atomix-sdk-go/pkg/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -28,18 +27,13 @@ import (
 func TestValueOperations(t *testing.T) {
 	logging.SetLevel(logging.DebugLevel)
 
-	primitiveID := driverapi.ProxyId{
-		Type: Type.String(),
-		Name: "TestRSMValue",
-	}
-
-	test := test.NewRSMTest()
+	test := test.New()
 	assert.NoError(t, test.Start())
 
-	conn1, err := test.CreateProxy(primitiveID)
+	conn1, err := test.Connect()
 	assert.NoError(t, err)
 
-	conn2, err := test.CreateProxy(primitiveID)
+	conn2, err := test.Connect()
 	assert.NoError(t, err)
 
 	value, err := New(context.TODO(), "TestRSMValue", conn1)

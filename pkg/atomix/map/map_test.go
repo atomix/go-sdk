@@ -16,11 +16,10 @@ package _map //nolint:golint
 
 import (
 	"context"
-	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver/v1"
-	"github.com/atomix/atomix-go-client/pkg/atomix/util/test"
 	"github.com/atomix/atomix-sdk-go/pkg/errors"
 	"github.com/atomix/atomix-sdk-go/pkg/logging"
 	"github.com/atomix/atomix-sdk-go/pkg/meta"
+	"github.com/atomix/atomix-sdk-go/pkg/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -28,15 +27,10 @@ import (
 func TestMapOperations(t *testing.T) {
 	logging.SetLevel(logging.DebugLevel)
 
-	primitiveID := driverapi.ProxyId{
-		Type: Type.String(),
-		Name: "TestMapOperations",
-	}
-
-	test := test.NewRSMTest()
+	test := test.New()
 	assert.NoError(t, test.Start())
 
-	conn1, err := test.CreateProxy(primitiveID)
+	conn1, err := test.Connect()
 	assert.NoError(t, err)
 
 	_map, err := New(context.TODO(), "TestMapOperations", conn1)
@@ -137,18 +131,13 @@ func TestMapOperations(t *testing.T) {
 func TestMapStreams(t *testing.T) {
 	logging.SetLevel(logging.DebugLevel)
 
-	primitiveID := driverapi.ProxyId{
-		Type: Type.String(),
-		Name: "TestMapStreams",
-	}
-
-	test := test.NewRSMTest()
+	test := test.New()
 	assert.NoError(t, test.Start())
 
-	conn1, err := test.CreateProxy(primitiveID)
+	conn1, err := test.Connect()
 	assert.NoError(t, err)
 
-	conn2, err := test.CreateProxy(primitiveID)
+	conn2, err := test.Connect()
 	assert.NoError(t, err)
 
 	_map, err := New(context.TODO(), "TestMapStreams", conn1)

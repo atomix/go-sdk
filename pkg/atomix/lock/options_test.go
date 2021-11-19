@@ -16,7 +16,7 @@ package lock
 
 import (
 	api "github.com/atomix/atomix-api/go/atomix/primitive/lock/v1"
-	metaapi "github.com/atomix/atomix-api/go/atomix/primitive/meta"
+	metaapi "github.com/atomix/atomix-api/go/atomix/primitive/meta/v1"
 	"github.com/atomix/atomix-sdk-go/pkg/meta"
 	"github.com/stretchr/testify/assert"
 	"testing"

@@ -16,10 +16,9 @@ package election
 
 import (
 	"context"
-	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver/v1"
-	"github.com/atomix/atomix-go-client/pkg/atomix/util/test"
 	"github.com/atomix/atomix-sdk-go/pkg/logging"
 	"github.com/atomix/atomix-sdk-go/pkg/meta"
+	"github.com/atomix/atomix-sdk-go/pkg/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -27,21 +26,16 @@ import (
 func TestElectionOperations(t *testing.T) {
 	logging.SetLevel(logging.DebugLevel)
 
-	primitiveID := driverapi.ProxyId{
-		Type: Type.String(),
-		Name: "TestElectionOperations",
-	}
-
-	test := test.NewRSMTest()
+	test := test.New()
 	assert.NoError(t, test.Start())
 
-	conn1, err := test.CreateProxy(primitiveID)
+	conn1, err := test.Connect()
 	assert.NoError(t, err)
 
-	conn2, err := test.CreateProxy(primitiveID)
+	conn2, err := test.Connect()
 	assert.NoError(t, err)
 
-	conn3, err := test.CreateProxy(primitiveID)
+	conn3, err := test.Connect()
 	assert.NoError(t, err)
 
 	election1, err := New(context.TODO(), "TestElectionOperations", conn1)
