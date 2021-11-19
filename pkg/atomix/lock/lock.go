@@ -71,7 +71,7 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option
 			op.applyNewLock(&options)
 		}
 	}
-	sessions := api.NewLockSessionClient(conn)
+	sessions := api.NewLockManagerClient(conn)
 	request := &api.OpenSessionRequest{
 		Options: options.sessionOptions,
 	}
@@ -90,7 +90,7 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option
 type lock struct {
 	*primitive.Client
 	client  api.LockClient
-	session api.LockSessionClient
+	session api.LockManagerClient
 }
 
 func (l *lock) Lock(ctx context.Context, opts ...LockOption) (Status, error) {

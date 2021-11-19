@@ -97,7 +97,7 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option
 			op.applyNewSet(&options)
 		}
 	}
-	sessions := api.NewSetSessionClient(conn)
+	sessions := api.NewSetManagerClient(conn)
 	request := &api.OpenSessionRequest{
 		Options: options.sessionOptions,
 	}
@@ -115,7 +115,7 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option
 type set struct {
 	*primitive.Client
 	client  api.SetClient
-	session api.SetSessionClient
+	session api.SetManagerClient
 }
 
 func (s *set) Add(ctx context.Context, value string) (bool, error) {

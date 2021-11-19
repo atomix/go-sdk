@@ -163,7 +163,7 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option
 			op.applyNewIndexedMap(&options)
 		}
 	}
-	sessions := api.NewIndexedMapSessionClient(conn)
+	sessions := api.NewIndexedMapManagerClient(conn)
 	request := &api.OpenSessionRequest{
 		Options: options.sessionOptions,
 	}
@@ -182,7 +182,7 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option
 type indexedMap struct {
 	*primitive.Client
 	client  api.IndexedMapClient
-	session api.IndexedMapSessionClient
+	session api.IndexedMapManagerClient
 }
 
 func newEntry(entry *api.Entry) *Entry {

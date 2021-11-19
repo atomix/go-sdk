@@ -130,7 +130,7 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option
 			op.applyNewMap(&options)
 		}
 	}
-	sessions := api.NewMapSessionClient(conn)
+	sessions := api.NewMapManagerClient(conn)
 	request := &api.OpenSessionRequest{
 		Options: options.sessionOptions,
 	}
@@ -148,7 +148,7 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option
 type _map struct {
 	*primitive.Client
 	client  api.MapClient
-	session api.MapSessionClient
+	session api.MapManagerClient
 }
 
 func (m *_map) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*Entry, error) {

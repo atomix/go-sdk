@@ -115,7 +115,7 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option
 			op.applyNewElection(&options)
 		}
 	}
-	sessions := api.NewLeaderElectionSessionClient(conn)
+	sessions := api.NewLeaderElectionManagerClient(conn)
 	request := &api.OpenSessionRequest{
 		Options: options.sessionOptions,
 	}
@@ -134,7 +134,7 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option
 type election struct {
 	*primitive.Client
 	client  api.LeaderElectionClient
-	session api.LeaderElectionSessionClient
+	session api.LeaderElectionManagerClient
 }
 
 func (e *election) ID() string {

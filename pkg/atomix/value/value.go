@@ -78,7 +78,7 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option
 			op.applyNewValue(&options)
 		}
 	}
-	sessions := api.NewValueSessionClient(conn)
+	sessions := api.NewValueManagerClient(conn)
 	request := &api.OpenSessionRequest{
 		Options: options.sessionOptions,
 	}
@@ -97,7 +97,7 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option
 type value struct {
 	*primitive.Client
 	client  api.ValueClient
-	session api.ValueSessionClient
+	session api.ValueManagerClient
 }
 
 func (v *value) Set(ctx context.Context, value []byte, opts ...SetOption) (meta.ObjectMeta, error) {

@@ -56,7 +56,7 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option
 			op.applyNewCounter(&options)
 		}
 	}
-	sessions := api.NewCounterSessionClient(conn)
+	sessions := api.NewCounterManagerClient(conn)
 	request := &api.OpenSessionRequest{
 		Options: options.sessionOptions,
 	}
@@ -75,7 +75,7 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option
 type counter struct {
 	*primitive.Client
 	client  api.CounterClient
-	session api.CounterSessionClient
+	session api.CounterManagerClient
 }
 
 func (c *counter) Get(ctx context.Context) (int64, error) {

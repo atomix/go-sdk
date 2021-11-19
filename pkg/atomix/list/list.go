@@ -108,7 +108,7 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option
 			op.applyNewList(&options)
 		}
 	}
-	sessions := api.NewListSessionClient(conn)
+	sessions := api.NewListManagerClient(conn)
 	request := &api.OpenSessionRequest{
 		Options: options.sessionOptions,
 	}
@@ -127,7 +127,7 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...Option
 type list struct {
 	*primitive.Client
 	client  api.ListClient
-	session api.ListSessionClient
+	session api.ListManagerClient
 }
 
 func (l *list) Append(ctx context.Context, value []byte) error {
