@@ -54,7 +54,7 @@ func GetLock(ctx context.Context, name string, opts ...primitive.Option) (lock.L
 }
 
 // GetMap gets the Map instance of the given name
-func GetMap(ctx context.Context, name string, opts ...primitive.Option) (_map.Map, error) {
+func GetMap(ctx context.Context, name string, opts ...primitive.Option[_map.Map]) (_map.Map, error) {
 	return getClient().GetMap(ctx, name, opts...)
 }
 
@@ -154,15 +154,15 @@ func (c *atomixClient) connect(ctx context.Context, primitive primitiveapi.Primi
 	return driverConn, nil
 }
 
-func newPrimitiveID(t primitive.Type, name string) primitiveapi.PrimitiveId {
+func newPrimitiveID[T primitive.Primitive](t primitive.Type[T], name string) primitiveapi.PrimitiveId {
 	return primitiveapi.PrimitiveId{
 		Type: t.String(),
 		Name: name,
 	}
 }
 
-func getPrimitiveOpts(clientOpts clientOptions, primitiveOpts ...primitive.Option) []primitive.Option {
-	return append([]primitive.Option{primitive.WithSessionID(clientOpts.clientID)}, primitiveOpts...)
+func getPrimitiveOpts[T primitive.Primitive](clientOpts clientOptions, primitiveOpts ...primitive.Option[T]) []primitive.Option[T] {
+	return append([]primitive.Option[T]{primitive.WithSessionID[T](clientOpts.clientID)}, primitiveOpts...)
 }
 
 func (c *atomixClient) GetCounter(ctx context.Context, name string, opts ...primitive.Option) (counter.Counter, error) {
@@ -205,7 +205,7 @@ func (c *atomixClient) GetLock(ctx context.Context, name string, opts ...primiti
 	return lock.New(ctx, name, conn, getPrimitiveOpts(c.options, opts...)...)
 }
 
-func (c *atomixClient) GetMap(ctx context.Context, name string, opts ...primitive.Option) (_map.Map, error) {
+func (c *atomixClient) GetMap(ctx context.Context, name string, opts ...primitive.Option[_map.Map]) (_map.Map, error) {
 	conn, err := c.connect(ctx, newPrimitiveID(_map.Type, name))
 	if err != nil {
 		return nil, err

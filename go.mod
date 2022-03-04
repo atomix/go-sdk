@@ -1,6 +1,6 @@
 module github.com/atomix/atomix-go-client
 
-go 1.13
+go 1.18
 
 require (
 	github.com/atomix/atomix-api/go v0.4.9
