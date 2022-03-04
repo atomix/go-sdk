@@ -22,9 +22,9 @@ import (
 )
 
 // Type is the type of a primitive
-type Type string
+type Type[T Primitive] string
 
-func (t Type) String() string {
+func (t Type[T]) String() string {
 	return string(t)
 }
 
@@ -41,12 +41,12 @@ type Primitive interface {
 }
 
 // NewClient creates a new primitive client
-func NewClient(primitiveType Type, name string, conn *grpc.ClientConn, opts ...Option) *Client {
-	options := newOptions{}
+func NewClient[T Primitive](primitiveType Type[T], name string, conn *grpc.ClientConn, opts ...Option[T]) *Client[T] {
+	options := newOptions[T]{}
 	for _, opt := range opts {
 		opt.applyNew(&options)
 	}
-	return &Client{
+	return &Client[T]{
 		primitiveType: primitiveType,
 		name:          name,
 		client:        primitiveapi.NewPrimitiveClient(conn),
@@ -55,29 +55,29 @@ func NewClient(primitiveType Type, name string, conn *grpc.ClientConn, opts ...O
 }
 
 // Client is a base client for all primitives
-type Client struct {
-	primitiveType Type
+type Client[T Primitive] struct {
+	primitiveType Type[T]
 	name          string
 	client        primitiveapi.PrimitiveClient
-	options       newOptions
+	options       newOptions[T]
 }
 
 // Type returns the primitive type
-func (c *Client) Type() Type {
+func (c *Client[T]) Type() Type[T] {
 	return c.primitiveType
 }
 
 // SessionID returns the primitive session identifier
-func (c *Client) SessionID() string {
+func (c *Client[T]) SessionID() string {
 	return c.options.sessionID
 }
 
 // Name returns the primitive name
-func (c *Client) Name() string {
+func (c *Client[T]) Name() string {
 	return c.name
 }
 
-func (c *Client) getPrimitiveID() primitiveapi.PrimitiveId {
+func (c *Client[T]) getPrimitiveID() primitiveapi.PrimitiveId {
 	return primitiveapi.PrimitiveId{
 		Type: c.primitiveType.String(),
 		Name: c.name,
@@ -85,7 +85,7 @@ func (c *Client) getPrimitiveID() primitiveapi.PrimitiveId {
 }
 
 // GetHeaders gets the primitive headers
-func (c *Client) GetHeaders() primitiveapi.RequestHeaders {
+func (c *Client[T]) GetHeaders() primitiveapi.RequestHeaders {
 	return primitiveapi.RequestHeaders{
 		PrimitiveID: c.getPrimitiveID(),
 		ClusterKey:  c.options.clusterKey,
@@ -93,7 +93,7 @@ func (c *Client) GetHeaders() primitiveapi.RequestHeaders {
 }
 
 // Create creates an instance of the primitive
-func (c *Client) Create(ctx context.Context) error {
+func (c *Client[T]) Create(ctx context.Context) error {
 	request := &primitiveapi.CreateRequest{
 		Headers: c.GetHeaders(),
 	}
@@ -102,7 +102,7 @@ func (c *Client) Create(ctx context.Context) error {
 }
 
 // Close closes the primitive session
-func (c *Client) Close(ctx context.Context) error {
+func (c *Client[T]) Close(ctx context.Context) error {
 	request := &primitiveapi.CloseRequest{
 		Headers: c.GetHeaders(),
 	}

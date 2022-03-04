@@ -18,17 +18,51 @@ import (
 	api "github.com/atomix/atomix-api/go/atomix/primitive/map"
 	metaapi "github.com/atomix/atomix-api/go/atomix/primitive/meta"
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
+	"github.com/atomix/atomix-go-client/pkg/atomix/primitive/codec"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
 )
 
 // Option is a map option
-type Option interface {
-	primitive.Option
-	applyNewMap(options *newMapOptions)
+type Option[K, V any] interface {
+	primitive.Option[Map[K, V]]
+	applyNewMap(options *newMapOptions[K, V])
 }
 
 // newMapOptions is map options
-type newMapOptions struct{}
+type newMapOptions[K, V any] struct {
+	keyCodec   codec.Codec[K]
+	valueCodec codec.Codec[V]
+}
+
+func WithKeyCodec[K any](keyCodec codec.Codec[K]) Option[K, any] {
+	return keyCodecOption[K]{
+		keyCodec: keyCodec,
+	}
+}
+
+type keyCodecOption[K any] struct {
+	primitive.EmptyOption[Map[K, any]]
+	keyCodec codec.Codec[K]
+}
+
+func (o keyCodecOption[K]) applyNewMap(options *newMapOptions[K, any]) {
+	options.keyCodec = o.keyCodec
+}
+
+func WithValueCodec[V any](valueCodec codec.Codec[V]) Option[any, V] {
+	return valueCodecOption[V]{
+		valueCodec: valueCodec,
+	}
+}
+
+type valueCodecOption[V any] struct {
+	primitive.EmptyOption[Map[any, V]]
+	valueCodec codec.Codec[V]
+}
+
+func (o valueCodecOption[K, V]) applyNewMap(options *newMapOptions[K, V]) {
+	options.valueCodec = o.valueCodec
+}
 
 // PutOption is an option for the Put method
 type PutOption interface {
