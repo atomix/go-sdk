@@ -7,17 +7,35 @@ package value
 import (
 	api "github.com/atomix/atomix-api/go/atomix/primitive/value"
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
+	"github.com/atomix/atomix-go-client/pkg/atomix/primitive/codec"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
 )
 
 // Option is a value option
-type Option interface {
+type Option[V any] interface {
 	primitive.Option
-	applyNewValue(options *newValueOptions)
+	applyNewValue(options *newValueOptions[V])
 }
 
 // newValueOptions is value options
-type newValueOptions struct{}
+type newValueOptions[V any] struct {
+	valueCodec codec.Codec[V]
+}
+
+func WithCodec[E any](valueCodec codec.Codec[E]) Option[E] {
+	return codecOption[E]{
+		valueCodec: valueCodec,
+	}
+}
+
+type codecOption[V any] struct {
+	primitive.EmptyOption
+	valueCodec codec.Codec[V]
+}
+
+func (o codecOption[V]) applyNewValue(options *newValueOptions[V]) {
+	options.valueCodec = o.valueCodec
+}
 
 // SetOption is an option for Set calls
 type SetOption interface {

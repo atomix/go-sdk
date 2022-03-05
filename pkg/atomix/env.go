@@ -20,10 +20,10 @@ const (
 const defaultHost = "127.0.0.1"
 const defaultPort = 5678
 
-var envClient Client
+var envClient *Client
 var envClientMu sync.RWMutex
 
-func getClient() Client {
+func getClient() *Client {
 	envClientMu.RLock()
 	client := envClient
 	envClientMu.RUnlock()

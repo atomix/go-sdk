@@ -8,17 +8,39 @@ import (
 	api "github.com/atomix/atomix-api/go/atomix/primitive/indexedmap"
 	metaapi "github.com/atomix/atomix-api/go/atomix/primitive/meta"
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
+	"github.com/atomix/atomix-go-client/pkg/atomix/primitive/codec"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
 )
 
 // Option is a indexed map option
-type Option interface {
+type Option[K, V any] interface {
 	primitive.Option
-	applyNewIndexedMap(options *newIndexedMapOptions)
+	applyNewIndexedMap(options *newIndexedMapOptions[K, V])
 }
 
 // newIndexedMapOptions is indexed map options
-type newIndexedMapOptions struct{}
+type newIndexedMapOptions[K, V any] struct {
+	keyCodec   codec.Codec[K]
+	valueCodec codec.Codec[V]
+}
+
+func WithCodec[K, V any](keyCodec codec.Codec[K], valueCodec codec.Codec[V]) Option[K, V] {
+	return codecOption[K, V]{
+		keyCodec:   keyCodec,
+		valueCodec: valueCodec,
+	}
+}
+
+type codecOption[K, V any] struct {
+	primitive.EmptyOption
+	keyCodec   codec.Codec[K]
+	valueCodec codec.Codec[V]
+}
+
+func (o codecOption[K, V]) applyNewIndexedMap(options *newIndexedMapOptions[K, V]) {
+	options.keyCodec = o.keyCodec
+	options.valueCodec = o.valueCodec
+}
 
 // SetOption is an option for the Put method
 type SetOption interface {

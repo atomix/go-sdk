@@ -7,6 +7,7 @@ package list
 import (
 	"context"
 	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
+	"github.com/atomix/atomix-go-client/pkg/atomix/primitive/codec"
 	"github.com/atomix/atomix-go-client/pkg/atomix/util/test"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
@@ -32,7 +33,7 @@ func TestListOperations(t *testing.T) {
 	conn2, err := test.CreateProxy(primitiveID)
 	assert.NoError(t, err)
 
-	list, err := New(context.TODO(), "TestListOperations", conn1)
+	list, err := New[string](context.TODO(), "TestListOperations", conn1, WithCodec[string](codec.String()))
 	assert.NoError(t, err)
 	assert.NotNil(t, list)
 
@@ -44,7 +45,7 @@ func TestListOperations(t *testing.T) {
 	assert.Error(t, err)
 	assert.True(t, errors.IsInvalid(err))
 
-	err = list.Append(context.TODO(), []byte("foo"))
+	err = list.Append(context.TODO(), "foo")
 	assert.NoError(t, err)
 
 	size, err = list.Len(context.TODO())
@@ -53,40 +54,40 @@ func TestListOperations(t *testing.T) {
 
 	value, err := list.Get(context.TODO(), 0)
 	assert.NoError(t, err)
-	assert.Equal(t, "foo", string(value))
+	assert.Equal(t, "foo", value)
 
-	err = list.Append(context.TODO(), []byte("bar"))
+	err = list.Append(context.TODO(), "bar")
 	assert.NoError(t, err)
 
 	size, err = list.Len(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, 2, size)
 
-	err = list.Insert(context.TODO(), 1, []byte("baz"))
+	err = list.Insert(context.TODO(), 1, "baz")
 	assert.NoError(t, err)
 
 	size, err = list.Len(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, 3, size)
 
-	ch := make(chan []byte)
+	ch := make(chan string)
 	err = list.Items(context.TODO(), ch)
 	assert.NoError(t, err)
 
 	value, ok := <-ch
 	assert.True(t, ok)
-	assert.Equal(t, "foo", string(value))
+	assert.Equal(t, "foo", value)
 	value, ok = <-ch
 	assert.True(t, ok)
-	assert.Equal(t, "baz", string(value))
+	assert.Equal(t, "baz", value)
 	value, ok = <-ch
 	assert.True(t, ok)
-	assert.Equal(t, "bar", string(value))
+	assert.Equal(t, "bar", value)
 
 	_, ok = <-ch
 	assert.False(t, ok)
 
-	events := make(chan Event)
+	events := make(chan Event[string])
 	err = list.Watch(context.TODO(), events)
 	assert.NoError(t, err)
 
@@ -95,42 +96,42 @@ func TestListOperations(t *testing.T) {
 		event := <-events
 		assert.Equal(t, EventAdd, event.Type)
 		assert.Equal(t, 3, event.Index)
-		assert.Equal(t, "Hello world!", string(event.Value))
+		assert.Equal(t, "Hello world!", event.Value)
 
 		event = <-events
 		assert.Equal(t, EventAdd, event.Type)
 		assert.Equal(t, 2, event.Index)
-		assert.Equal(t, "Hello world again!", string(event.Value))
+		assert.Equal(t, "Hello world again!", event.Value)
 
 		event = <-events
 		assert.Equal(t, EventRemove, event.Type)
 		assert.Equal(t, 1, event.Index)
-		assert.Equal(t, "baz", string(event.Value))
+		assert.Equal(t, "baz", event.Value)
 
 		event = <-events
 		assert.Equal(t, EventRemove, event.Type)
 		assert.Equal(t, 1, event.Index)
-		assert.Equal(t, "Hello world again!", string(event.Value))
+		assert.Equal(t, "Hello world again!", event.Value)
 
 		event = <-events
 		assert.Equal(t, EventAdd, event.Type)
 		assert.Equal(t, 1, event.Index)
-		assert.Equal(t, "Not hello world!", string(event.Value))
+		assert.Equal(t, "Not hello world!", event.Value)
 
 		close(done)
 	}()
 
-	err = list.Append(context.TODO(), []byte("Hello world!"))
+	err = list.Append(context.TODO(), "Hello world!")
 	assert.NoError(t, err)
 
-	err = list.Insert(context.TODO(), 2, []byte("Hello world again!"))
+	err = list.Insert(context.TODO(), 2, "Hello world again!")
 	assert.NoError(t, err)
 
 	value, err = list.Remove(context.TODO(), 1)
 	assert.NoError(t, err)
-	assert.Equal(t, "baz", string(value))
+	assert.Equal(t, "baz", value)
 
-	err = list.Set(context.TODO(), 1, []byte("Not hello world!"))
+	err = list.Set(context.TODO(), 1, "Not hello world!")
 	assert.NoError(t, err)
 
 	<-done
@@ -138,7 +139,7 @@ func TestListOperations(t *testing.T) {
 	err = list.Close(context.Background())
 	assert.NoError(t, err)
 
-	list1, err := New(context.TODO(), "TestListOperations", conn2)
+	list1, err := New[string](context.TODO(), "TestListOperations", conn2, WithCodec[string](codec.String()))
 	assert.NoError(t, err)
 
 	size, err = list1.Len(context.TODO())

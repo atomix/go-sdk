@@ -8,6 +8,7 @@ import (
 	"context"
 	api "github.com/atomix/atomix-api/go/atomix/primitive/value"
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
+	"github.com/atomix/atomix-go-client/pkg/atomix/primitive/codec"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
@@ -20,24 +21,18 @@ var log = logging.GetLogger("atomix", "client", "value")
 // Type is the value type
 const Type primitive.Type = "Value"
 
-// Client provides an API for creating Values
-type Client interface {
-	// GetValue gets the Value instance of the given name
-	GetValue(ctx context.Context, name string, opts ...primitive.Option) (Value, error)
-}
-
 // Value provides a simple atomic value
-type Value interface {
+type Value[V any] interface {
 	primitive.Primitive
 
 	// Set sets the current value and returns the version
-	Set(ctx context.Context, value []byte, opts ...SetOption) (meta.ObjectMeta, error)
+	Set(ctx context.Context, value V, opts ...SetOption) (meta.ObjectMeta, error)
 
 	// Get gets the current value and version
-	Get(ctx context.Context) ([]byte, meta.ObjectMeta, error)
+	Get(ctx context.Context) (V, meta.ObjectMeta, error)
 
 	// Watch watches the value for changes
-	Watch(ctx context.Context, ch chan<- Event) error
+	Watch(ctx context.Context, ch chan<- Event[V]) error
 }
 
 // EventType is the type of a set event
@@ -49,29 +44,32 @@ const (
 )
 
 // Event is a value change event
-type Event struct {
+type Event[V any] struct {
 	meta.ObjectMeta
 
 	// Type is the change event type
 	Type EventType
 
 	// Value is the updated value
-	Value []byte
+	Value V
 }
 
 // New creates a new Lock primitive for the given partitions
 // The value will be created in one of the given partitions.
-func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...primitive.Option) (Value, error) {
-	options := newValueOptions{}
+func New[V any](ctx context.Context, name string, conn *grpc.ClientConn, opts ...primitive.Option) (Value[V], error) {
+	options := newValueOptions[V]{}
 	for _, opt := range opts {
-		if op, ok := opt.(Option); ok {
+		if op, ok := opt.(Option[V]); ok {
 			op.applyNewValue(&options)
 		}
 	}
-	v := &value{
-		Client:  primitive.NewClient(Type, name, conn, opts...),
-		client:  api.NewValueServiceClient(conn),
-		options: options,
+	if options.valueCodec == nil {
+		options.valueCodec = codec.String().(codec.Codec[V])
+	}
+	v := &typedValue[V]{
+		Client: primitive.NewClient(Type, name, conn, opts...),
+		client: api.NewValueServiceClient(conn),
+		codec:  options.valueCodec,
 	}
 	if err := v.Create(ctx); err != nil {
 		return nil, err
@@ -80,17 +78,21 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...primit
 }
 
 // value is the single partition implementation of Lock
-type value struct {
+type typedValue[V any] struct {
 	*primitive.Client
-	client  api.ValueServiceClient
-	options newValueOptions
+	client api.ValueServiceClient
+	codec  codec.Codec[V]
 }
 
-func (v *value) Set(ctx context.Context, value []byte, opts ...SetOption) (meta.ObjectMeta, error) {
+func (v *typedValue[V]) Set(ctx context.Context, value V, opts ...SetOption) (meta.ObjectMeta, error) {
+	bytes, err := v.codec.Encode(value)
+	if err != nil {
+		return meta.ObjectMeta{}, errors.NewInvalid("value encoding failed", err)
+	}
 	request := &api.SetRequest{
 		Headers: v.GetHeaders(),
 		Value: api.Value{
-			Value: value,
+			Value: bytes,
 		},
 	}
 	for i := range opts {
@@ -106,18 +108,23 @@ func (v *value) Set(ctx context.Context, value []byte, opts ...SetOption) (meta.
 	return meta.FromProto(response.Value.ObjectMeta), nil
 }
 
-func (v *value) Get(ctx context.Context) ([]byte, meta.ObjectMeta, error) {
+func (v *typedValue[V]) Get(ctx context.Context) (V, meta.ObjectMeta, error) {
 	request := &api.GetRequest{
 		Headers: v.GetHeaders(),
 	}
+	var r V
 	response, err := v.client.Get(ctx, request)
 	if err != nil {
-		return nil, meta.ObjectMeta{}, errors.From(err)
+		return r, meta.ObjectMeta{}, errors.From(err)
 	}
-	return response.Value.Value, meta.FromProto(response.Value.ObjectMeta), nil
+	value, err := v.codec.Decode(response.Value.Value)
+	if err != nil {
+		return r, meta.ObjectMeta{}, errors.NewInvalid("value decoding failed", err)
+	}
+	return value, meta.FromProto(response.Value.ObjectMeta), nil
 }
 
-func (v *value) Watch(ctx context.Context, ch chan<- Event) error {
+func (v *typedValue[V]) Watch(ctx context.Context, ch chan<- Event[V]) error {
 	request := &api.EventsRequest{
 		Headers: v.GetHeaders(),
 	}
@@ -153,12 +160,19 @@ func (v *value) Watch(ctx context.Context, ch chan<- Event) error {
 				close(openCh)
 				open = true
 			}
+
+			value, err := v.codec.Decode(response.Event.Value.Value)
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+
 			switch response.Event.Type {
 			case api.Event_UPDATE:
-				ch <- Event{
+				ch <- Event[V]{
 					ObjectMeta: meta.FromProto(response.Event.Value.ObjectMeta),
 					Type:       EventUpdate,
-					Value:      response.Event.Value.Value,
+					Value:      value,
 				}
 			}
 		}

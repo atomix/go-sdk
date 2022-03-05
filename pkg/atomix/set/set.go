@@ -6,8 +6,10 @@ package set
 
 import (
 	"context"
+	"encoding/base64"
 	api "github.com/atomix/atomix-api/go/atomix/primitive/set"
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
+	"github.com/atomix/atomix-go-client/pkg/atomix/primitive/codec"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"google.golang.org/grpc"
@@ -19,27 +21,21 @@ var log = logging.GetLogger("atomix", "client", "set")
 // Type is the set type
 const Type primitive.Type = "Set"
 
-// Client provides an API for creating Sets
-type Client interface {
-	// GetSet gets the Set instance of the given name
-	GetSet(ctx context.Context, name string, opts ...primitive.Option) (Set, error)
-}
-
 // Set provides a distributed set data structure
 // The set values are defines as strings. To store more complex types in the set, encode values to strings e.g.
 // using base 64 encoding.
-type Set interface {
+type Set[E any] interface {
 	primitive.Primitive
 
 	// Add adds a value to the set
-	Add(ctx context.Context, value string) (bool, error)
+	Add(ctx context.Context, value E) (bool, error)
 
 	// Remove removes a value from the set
 	// A bool indicating whether the set contained the given value will be returned
-	Remove(ctx context.Context, value string) (bool, error)
+	Remove(ctx context.Context, value E) (bool, error)
 
 	// Contains returns a bool indicating whether the set contains the given value
-	Contains(ctx context.Context, value string) (bool, error)
+	Contains(ctx context.Context, value E) (bool, error)
 
 	// Len gets the set size in number of elements
 	Len(ctx context.Context) (int, error)
@@ -48,12 +44,12 @@ type Set interface {
 	Clear(ctx context.Context) error
 
 	// Elements lists the elements in the set
-	Elements(ctx context.Context, ch chan<- string) error
+	Elements(ctx context.Context, ch chan<- E) error
 
 	// Watch watches the set for changes
 	// This is a non-blocking method. If the method returns without error, set events will be pushed onto
 	// the given channel.
-	Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) error
+	Watch(ctx context.Context, ch chan<- Event[E], opts ...WatchOption) error
 }
 
 // EventType is the type of a set event
@@ -71,26 +67,29 @@ const (
 )
 
 // Event is a set change event
-type Event struct {
+type Event[E any] struct {
 	// Type is the change event type
 	Type EventType
 
 	// Value is the value that changed
-	Value string
+	Value E
 }
 
 // New creates a new partitioned set primitive
-func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...primitive.Option) (Set, error) {
-	options := newSetOptions{}
+func New[E any](ctx context.Context, name string, conn *grpc.ClientConn, opts ...primitive.Option) (Set[E], error) {
+	options := newSetOptions[E]{}
 	for _, opt := range opts {
-		if op, ok := opt.(Option); ok {
+		if op, ok := opt.(Option[E]); ok {
 			op.applyNewSet(&options)
 		}
 	}
-	s := &set{
-		Client:  primitive.NewClient(Type, name, conn, opts...),
-		client:  api.NewSetServiceClient(conn),
-		options: options,
+	if options.elementCodec == nil {
+		options.elementCodec = codec.String().(codec.Codec[E])
+	}
+	s := &typedSet[E]{
+		Client: primitive.NewClient(Type, name, conn, opts...),
+		client: api.NewSetServiceClient(conn),
+		codec:  options.elementCodec,
 	}
 	if err := s.Create(ctx); err != nil {
 		return nil, err
@@ -98,20 +97,24 @@ func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...primit
 	return s, nil
 }
 
-type set struct {
+type typedSet[E any] struct {
 	*primitive.Client
-	client  api.SetServiceClient
-	options newSetOptions
+	client api.SetServiceClient
+	codec  codec.Codec[E]
 }
 
-func (s *set) Add(ctx context.Context, value string) (bool, error) {
+func (s *typedSet[E]) Add(ctx context.Context, value E) (bool, error) {
+	bytes, err := s.codec.Encode(value)
+	if err != nil {
+		return false, errors.NewInvalid("element encoding failed", err)
+	}
 	request := &api.AddRequest{
 		Headers: s.GetHeaders(),
 		Element: api.Element{
-			Value: value,
+			Value: base64.StdEncoding.EncodeToString(bytes),
 		},
 	}
-	_, err := s.client.Add(ctx, request)
+	_, err = s.client.Add(ctx, request)
 	if err != nil {
 		err = errors.From(err)
 		if errors.IsAlreadyExists(err) {
@@ -122,14 +125,18 @@ func (s *set) Add(ctx context.Context, value string) (bool, error) {
 	return true, nil
 }
 
-func (s *set) Remove(ctx context.Context, value string) (bool, error) {
+func (s *typedSet[E]) Remove(ctx context.Context, value E) (bool, error) {
+	bytes, err := s.codec.Encode(value)
+	if err != nil {
+		return false, errors.NewInvalid("element encoding failed", err)
+	}
 	request := &api.RemoveRequest{
 		Headers: s.GetHeaders(),
 		Element: api.Element{
-			Value: value,
+			Value: base64.StdEncoding.EncodeToString(bytes),
 		},
 	}
-	_, err := s.client.Remove(ctx, request)
+	_, err = s.client.Remove(ctx, request)
 	if err != nil {
 		err = errors.From(err)
 		if errors.IsNotFound(err) {
@@ -140,11 +147,15 @@ func (s *set) Remove(ctx context.Context, value string) (bool, error) {
 	return true, nil
 }
 
-func (s *set) Contains(ctx context.Context, value string) (bool, error) {
+func (s *typedSet[E]) Contains(ctx context.Context, value E) (bool, error) {
+	bytes, err := s.codec.Encode(value)
+	if err != nil {
+		return false, errors.NewInvalid("element encoding failed", err)
+	}
 	request := &api.ContainsRequest{
 		Headers: s.GetHeaders(),
 		Element: api.Element{
-			Value: value,
+			Value: base64.StdEncoding.EncodeToString(bytes),
 		},
 	}
 	response, err := s.client.Contains(ctx, request)
@@ -154,7 +165,7 @@ func (s *set) Contains(ctx context.Context, value string) (bool, error) {
 	return response.Contains, nil
 }
 
-func (s *set) Len(ctx context.Context) (int, error) {
+func (s *typedSet[E]) Len(ctx context.Context) (int, error) {
 	request := &api.SizeRequest{
 		Headers: s.GetHeaders(),
 	}
@@ -165,7 +176,7 @@ func (s *set) Len(ctx context.Context) (int, error) {
 	return int(response.Size_), nil
 }
 
-func (s *set) Clear(ctx context.Context) error {
+func (s *typedSet[E]) Clear(ctx context.Context) error {
 	request := &api.ClearRequest{
 		Headers: s.GetHeaders(),
 	}
@@ -176,7 +187,7 @@ func (s *set) Clear(ctx context.Context) error {
 	return nil
 }
 
-func (s *set) Elements(ctx context.Context, ch chan<- string) error {
+func (s *typedSet[E]) Elements(ctx context.Context, ch chan<- E) error {
 	request := &api.ElementsRequest{
 		Headers: s.GetHeaders(),
 	}
@@ -201,13 +212,23 @@ func (s *set) Elements(ctx context.Context, ch chan<- string) error {
 				return
 			}
 
-			ch <- response.Element.Value
+			bytes, err := base64.StdEncoding.DecodeString(response.Element.Value)
+			if err != nil {
+				log.Errorf("Failed to decode list item: %v", err)
+			} else {
+				elem, err := s.codec.Decode(bytes)
+				if err != nil {
+					log.Error(err)
+				} else {
+					ch <- elem
+				}
+			}
 		}
 	}()
 	return nil
 }
 
-func (s *set) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) error {
+func (s *typedSet[E]) Watch(ctx context.Context, ch chan<- Event[E], opts ...WatchOption) error {
 	request := &api.EventsRequest{
 		Headers: s.GetHeaders(),
 	}
@@ -251,21 +272,32 @@ func (s *set) Watch(ctx context.Context, ch chan<- Event, opts ...WatchOption) e
 				opts[i].afterWatch(response)
 			}
 
-			switch response.Event.Type {
-			case api.Event_ADD:
-				ch <- Event{
-					Type:  EventAdd,
-					Value: response.Event.Element.Value,
+			bytes, err := base64.StdEncoding.DecodeString(response.Event.Element.Value)
+			if err != nil {
+				log.Errorf("Failed to decode list item: %v", err)
+			} else {
+				elem, err := s.codec.Decode(bytes)
+				if err != nil {
+					log.Error(err)
+					continue
 				}
-			case api.Event_REMOVE:
-				ch <- Event{
-					Type:  EventRemove,
-					Value: response.Event.Element.Value,
-				}
-			case api.Event_REPLAY:
-				ch <- Event{
-					Type:  EventReplay,
-					Value: response.Event.Element.Value,
+
+				switch response.Event.Type {
+				case api.Event_ADD:
+					ch <- Event[E]{
+						Type:  EventAdd,
+						Value: elem,
+					}
+				case api.Event_REMOVE:
+					ch <- Event[E]{
+						Type:  EventRemove,
+						Value: elem,
+					}
+				case api.Event_REPLAY:
+					ch <- Event[E]{
+						Type:  EventReplay,
+						Value: elem,
+					}
 				}
 			}
 		}
