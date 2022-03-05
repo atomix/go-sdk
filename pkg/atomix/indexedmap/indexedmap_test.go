@@ -17,6 +17,7 @@ package indexedmap
 import (
 	"context"
 	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
+	"github.com/atomix/atomix-go-client/pkg/atomix/primitive/codec"
 	"github.com/atomix/atomix-go-client/pkg/atomix/util/test"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
@@ -41,7 +42,7 @@ func TestIndexedMapOperations(t *testing.T) {
 	conn1, err := test.CreateProxy(primitiveID)
 	assert.NoError(t, err)
 
-	_map, err := New(context.TODO(), "TestIndexedMapOperations", conn1)
+	_map, err := New[string, string](context.TODO(), "TestIndexedMapOperations", conn1, WithCodec[string, string](codec.String(), codec.String()))
 	assert.NoError(t, err)
 
 	kv, err := _map.Get(context.Background(), "foo")
@@ -53,26 +54,26 @@ func TestIndexedMapOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 0, size)
 
-	kv, err = _map.Put(context.Background(), "foo", []byte("bar"))
+	kv, err = _map.Put(context.Background(), "foo", "bar")
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "foo", kv.Key)
 	assert.Equal(t, Index(1), kv.Index)
-	assert.Equal(t, "bar", string(kv.Value))
+	assert.Equal(t, "bar", kv.Value)
 
 	kv, err = _map.Get(context.Background(), "foo")
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "foo", kv.Key)
 	assert.Equal(t, Index(1), kv.Index)
-	assert.Equal(t, "bar", string(kv.Value))
+	assert.Equal(t, "bar", kv.Value)
 
 	kv, err = _map.GetIndex(context.Background(), 1)
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "foo", kv.Key)
 	assert.Equal(t, Index(1), kv.Index)
-	assert.Equal(t, "bar", string(kv.Value))
+	assert.Equal(t, "bar", kv.Value)
 	assert.NotEqual(t, meta.Revision(0), kv.Revision)
 	version := kv.Revision
 
@@ -93,23 +94,23 @@ func TestIndexedMapOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 0, size)
 
-	kv, err = _map.Put(context.Background(), "foo", []byte("bar"))
+	kv, err = _map.Put(context.Background(), "foo", "bar")
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "foo", kv.Key)
 	assert.Equal(t, Index(2), kv.Index)
-	assert.Equal(t, "bar", string(kv.Value))
+	assert.Equal(t, "bar", kv.Value)
 
 	kv1, err := _map.Get(context.Background(), "foo")
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 
-	kv2, err := _map.Set(context.Background(), 2, "foo", []byte("baz"), IfMatch(kv1))
+	kv2, err := _map.Set(context.Background(), 2, "foo", "baz", IfMatch(kv1))
 	assert.NoError(t, err)
 	assert.NotEqual(t, kv1.Revision, kv2.Revision)
 	assert.Equal(t, "baz", string(kv2.Value))
 
-	_, err = _map.Set(context.Background(), 2, "foo", []byte("bar"), IfMatch(kv1))
+	_, err = _map.Set(context.Background(), 2, "foo", "bar", IfMatch(kv1))
 	assert.Error(t, err)
 	assert.True(t, errors.IsConflict(err))
 
@@ -122,21 +123,21 @@ func TestIndexedMapOperations(t *testing.T) {
 	assert.NotNil(t, removed)
 	assert.Equal(t, kv2.Revision, removed.Revision)
 
-	kv, err = _map.Put(context.Background(), "foo", []byte("bar"))
+	kv, err = _map.Put(context.Background(), "foo", "bar")
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "foo", kv.Key)
 	assert.Equal(t, Index(3), kv.Index)
 	assert.Equal(t, "bar", string(kv.Value))
 
-	kv, err = _map.Put(context.Background(), "bar", []byte("baz"))
+	kv, err = _map.Put(context.Background(), "bar", "baz")
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "bar", kv.Key)
 	assert.Equal(t, Index(4), kv.Index)
 	assert.Equal(t, "baz", string(kv.Value))
 
-	kv, err = _map.Put(context.Background(), "foo", []byte("baz"))
+	kv, err = _map.Put(context.Background(), "foo", "baz")
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "foo", kv.Key)
@@ -199,7 +200,7 @@ func TestIndexedMapOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 0, size)
 
-	kv, err = _map.Put(context.Background(), "foo", []byte("bar"))
+	kv, err = _map.Put(context.Background(), "foo", "bar")
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 
@@ -224,45 +225,45 @@ func TestIndexedMapStreams(t *testing.T) {
 	conn2, err := test.CreateProxy(primitiveID)
 	assert.NoError(t, err)
 
-	_map, err := New(context.TODO(), "TestIndexedMapStreams", conn1)
+	_map, err := New[string, int](context.TODO(), "TestIndexedMapStreams", conn1, WithCodec[string, int](codec.String(), codec.Int()))
 	assert.NoError(t, err)
 
-	kv, err := _map.Put(context.Background(), "foo", []byte{1})
+	kv, err := _map.Put(context.Background(), "foo", 1)
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 
-	c := make(chan Event)
+	c := make(chan Event[string, int])
 	latch := make(chan struct{})
 	go func() {
 		e := <-c
 		assert.Equal(t, "foo", e.Entry.Key)
-		assert.Equal(t, byte(2), e.Entry.Value[0])
+		assert.Equal(t, 2, e.Entry.Value)
 		e = <-c
 		assert.Equal(t, "bar", e.Entry.Key)
-		assert.Equal(t, byte(3), e.Entry.Value[0])
+		assert.Equal(t, 3, e.Entry.Value)
 		e = <-c
 		assert.Equal(t, "baz", e.Entry.Key)
-		assert.Equal(t, byte(4), e.Entry.Value[0])
+		assert.Equal(t, 4, e.Entry.Value)
 		e = <-c
 		assert.Equal(t, "foo", e.Entry.Key)
-		assert.Equal(t, byte(5), e.Entry.Value[0])
+		assert.Equal(t, 5, e.Entry.Value)
 		latch <- struct{}{}
 	}()
 
 	err = _map.Watch(context.Background(), c)
 	assert.NoError(t, err)
 
-	keyCh := make(chan Event)
+	keyCh := make(chan Event[string, int])
 	err = _map.Watch(context.Background(), keyCh, WithFilter(Filter{
 		Key: "foo",
 	}))
 	assert.NoError(t, err)
 
-	kv, err = _map.Put(context.Background(), "foo", []byte{2})
+	kv, err = _map.Put(context.Background(), "foo", 2)
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "foo", kv.Key)
-	assert.Equal(t, byte(2), kv.Value[0])
+	assert.Equal(t, 2, kv.Value)
 	assert.NotEqual(t, meta.Revision(0), kv.Revision)
 
 	event := <-keyCh
@@ -271,29 +272,29 @@ func TestIndexedMapStreams(t *testing.T) {
 	assert.NotEqual(t, meta.Revision(0), event.Entry.Revision)
 	assert.Equal(t, kv.Revision, event.Entry.Revision)
 
-	indexCh := make(chan Event)
+	indexCh := make(chan Event[string, int])
 	err = _map.Watch(context.Background(), indexCh, WithFilter(Filter{
 		Index: kv.Index,
 	}))
 	assert.NoError(t, err)
 
-	kv, err = _map.Put(context.Background(), "bar", []byte{3})
+	kv, err = _map.Put(context.Background(), "bar", 3)
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "bar", kv.Key)
-	assert.Equal(t, byte(3), kv.Value[0])
+	assert.Equal(t, 3, kv.Value)
 
-	kv, err = _map.Put(context.Background(), "baz", []byte{4})
+	kv, err = _map.Put(context.Background(), "baz", 4)
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "baz", kv.Key)
-	assert.Equal(t, byte(4), kv.Value[0])
+	assert.Equal(t, 4, kv.Value)
 
-	kv, err = _map.Put(context.Background(), "foo", []byte{5})
+	kv, err = _map.Put(context.Background(), "foo", 5)
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "foo", kv.Key)
-	assert.Equal(t, byte(5), kv.Value[0])
+	assert.Equal(t, 5, kv.Value)
 
 	event = <-keyCh
 	assert.NotNil(t, event)
@@ -307,7 +308,7 @@ func TestIndexedMapStreams(t *testing.T) {
 	assert.NotEqual(t, meta.Revision(0), event.Entry.Revision)
 	assert.Equal(t, kv.Revision, event.Entry.Revision)
 
-	chanEntry := make(chan Entry)
+	chanEntry := make(chan Entry[string, int])
 	go func() {
 		e, ok := <-chanEntry
 		assert.True(t, ok)
@@ -331,7 +332,7 @@ func TestIndexedMapStreams(t *testing.T) {
 	err = _map.Close(context.Background())
 	assert.NoError(t, err)
 
-	map1, err := New(context.TODO(), "TestIndexedMapStreams", conn2)
+	map1, err := New[string, int](context.TODO(), "TestIndexedMapStreams", conn2, WithCodec[string, int](codec.String(), codec.Int()))
 	assert.NoError(t, err)
 
 	size, err := map1.Len(context.TODO())

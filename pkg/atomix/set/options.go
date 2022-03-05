@@ -17,16 +17,34 @@ package set
 import (
 	api "github.com/atomix/atomix-api/go/atomix/primitive/set"
 	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
+	"github.com/atomix/atomix-go-client/pkg/atomix/primitive/codec"
 )
 
 // Option is a set option
-type Option interface {
+type Option[E any] interface {
 	primitive.Option
-	applyNewSet(options *newSetOptions)
+	applyNewSet(options *newSetOptions[E])
 }
 
 // newSetOptions is set options
-type newSetOptions struct{}
+type newSetOptions[E any] struct {
+	elementCodec codec.Codec[E]
+}
+
+func WithCodec[E any](elementCodec codec.Codec[E]) Option[E] {
+	return codecOption[E]{
+		elementCodec: elementCodec,
+	}
+}
+
+type codecOption[E any] struct {
+	primitive.EmptyOption
+	elementCodec codec.Codec[E]
+}
+
+func (o codecOption[E]) applyNewSet(options *newSetOptions[E]) {
+	options.elementCodec = o.elementCodec
+}
 
 // WatchOption is an option for set Watch calls
 type WatchOption interface {

@@ -15,49 +15,49 @@
 package primitive
 
 // Option is a primitive option
-type Option[T Primitive] interface {
-	applyNew(*newOptions[T])
+type Option interface {
+	applyNew(*newOptions)
 }
 
 // EmptyOption is an empty primitive option
-type EmptyOption[T Primitive] struct{}
+type EmptyOption struct{}
 
-func (EmptyOption[T]) applyNew(*newOptions[T]) {}
+func (EmptyOption) applyNew(*newOptions) {}
 
 // newOptions is a set of primitive options
-type newOptions[T Primitive] struct {
+type newOptions struct {
 	clusterKey string
 	sessionID  string
 }
 
 // WithClusterKey sets the primitive cluster key
-func WithClusterKey[T Primitive](clusterKey string) Option[T] {
-	return &clusterKeyOption[T]{
+func WithClusterKey(clusterKey string) Option {
+	return &clusterKeyOption{
 		clusterKey: clusterKey,
 	}
 }
 
 // clusterKeyOption is a cluster key option
-type clusterKeyOption[T Primitive] struct {
+type clusterKeyOption struct {
 	clusterKey string
 }
 
-func (o *clusterKeyOption[T]) applyNew(options *newOptions[T]) {
+func (o *clusterKeyOption) applyNew(options *newOptions) {
 	options.clusterKey = o.clusterKey
 }
 
 // WithSessionID sets the primitive session identifier
-func WithSessionID[T Primitive](sessionID string) Option[T] {
-	return &sessionIDOption[T]{
+func WithSessionID(sessionID string) Option {
+	return &sessionIDOption{
 		sessionID: sessionID,
 	}
 }
 
 // sessionIDOption is a session identifier option
-type sessionIDOption[T Primitive] struct {
+type sessionIDOption struct {
 	sessionID string
 }
 
-func (o *sessionIDOption[T]) applyNew(options *newOptions[T]) {
+func (o *sessionIDOption) applyNew(options *newOptions) {
 	options.sessionID = o.sessionID
 }

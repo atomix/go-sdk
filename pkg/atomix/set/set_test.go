@@ -17,6 +17,7 @@ package set
 import (
 	"context"
 	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
+	"github.com/atomix/atomix-go-client/pkg/atomix/primitive/codec"
 	"github.com/atomix/atomix-go-client/pkg/atomix/util/test"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/stretchr/testify/assert"
@@ -41,7 +42,7 @@ func TestSetOperations(t *testing.T) {
 	conn2, err := test.CreateProxy(primitiveID)
 	assert.NoError(t, err)
 
-	set, err := New(context.TODO(), "TestSetOperations", conn1)
+	set, err := New[string](context.TODO(), "TestSetOperations", conn1, WithCodec[string](codec.String()))
 	assert.NoError(t, err)
 	assert.NotNil(t, set)
 
@@ -102,7 +103,7 @@ func TestSetOperations(t *testing.T) {
 	_, ok = <-ch
 	assert.False(t, ok)
 
-	events := make(chan Event)
+	events := make(chan Event[string])
 	err = set.Watch(context.TODO(), events, WithReplay())
 	assert.NoError(t, err)
 

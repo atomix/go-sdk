@@ -24,7 +24,7 @@ import (
 
 // Option is a map option
 type Option[K, V any] interface {
-	primitive.Option[Map[K, V]]
+	primitive.Option
 	applyNewMap(options *newMapOptions[K, V])
 }
 
@@ -34,33 +34,21 @@ type newMapOptions[K, V any] struct {
 	valueCodec codec.Codec[V]
 }
 
-func WithKeyCodec[K any](keyCodec codec.Codec[K]) Option[K, any] {
-	return keyCodecOption[K]{
-		keyCodec: keyCodec,
-	}
-}
-
-type keyCodecOption[K any] struct {
-	primitive.EmptyOption[Map[K, any]]
-	keyCodec codec.Codec[K]
-}
-
-func (o keyCodecOption[K]) applyNewMap(options *newMapOptions[K, any]) {
-	options.keyCodec = o.keyCodec
-}
-
-func WithValueCodec[V any](valueCodec codec.Codec[V]) Option[any, V] {
-	return valueCodecOption[V]{
+func WithCodec[K, V any](keyCodec codec.Codec[K], valueCodec codec.Codec[V]) Option[K, V] {
+	return codecOption[K, V]{
+		keyCodec:   keyCodec,
 		valueCodec: valueCodec,
 	}
 }
 
-type valueCodecOption[V any] struct {
-	primitive.EmptyOption[Map[any, V]]
+type codecOption[K, V any] struct {
+	primitive.EmptyOption
+	keyCodec   codec.Codec[K]
 	valueCodec codec.Codec[V]
 }
 
-func (o valueCodecOption[K, V]) applyNewMap(options *newMapOptions[K, V]) {
+func (o codecOption[K, V]) applyNewMap(options *newMapOptions[K, V]) {
+	options.keyCodec = o.keyCodec
 	options.valueCodec = o.valueCodec
 }
 
