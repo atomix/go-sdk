@@ -7,7 +7,6 @@ package test
 import (
 	"fmt"
 	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
-	"github.com/atomix/atomix-go-client/pkg/atomix"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"sync"
@@ -155,7 +154,7 @@ func (t *Test) Start() error {
 }
 
 // NewClient creates a new test client
-func (t *Test) NewClient(clientID string) (atomix.Client, error) {
+func (t *Test) NewClient(clientID string) (Client, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	client := newClient(clientID, t.protocol.NewClient(t.network, clientID, t.config))
