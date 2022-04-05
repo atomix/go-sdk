@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019-present Open Networking Foundation <info@opennetworking.org>
+#
+# SPDX-License-Identifier: Apache-2.0
+
 export CGO_ENABLED=0
 export GO111MODULE=on
 
@@ -12,11 +16,11 @@ build:
 	go build -v ./...
 
 test: # @HELP run the unit tests and source code validation
-test: build license_check linters
+test: build license linters
 	go test github.com/atomix/atomix-go-client/pkg/...
 
 coverage: # @HELP generate unit test coverage data
-coverage: build linters license_check
+coverage: build license linters
 	./build/bin/coveralls-coverage
 
 primitives: # @HELP compile the protobuf files (using protoc-go Docker)
@@ -30,6 +34,8 @@ primitives: # @HELP compile the protobuf files (using protoc-go Docker)
 linters: # @HELP examines Go source code and reports coding problems
 	golangci-lint run
 
-license_check: # @HELP examine and ensure license headers exist
-	@if [ ! -d "../build-tools" ]; then cd .. && git clone https://github.com/onosproject/build-tools.git; fi
-	./../build-tools/licensing/boilerplate.py -v --rootdir=${CURDIR}
+reuse-tool: # @HELP install reuse if not present
+	command -v reuse || python3 -m pip install reuse
+
+license: reuse-tool # @HELP run license checks
+	reuse lint

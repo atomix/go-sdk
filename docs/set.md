@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2019-present Open Networking Foundation <info@opennetworking.org>
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Set
 
 The `Set` primitive is a partitioned distributed set. Set values are stored as `strings`. To create a set, call `GetSet`
