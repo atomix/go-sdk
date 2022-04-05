@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2019-present Open Networking Foundation <info@opennetworking.org>
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Counter
 
 The `Counter` primitive is a distributed counter that supports atomic increment, decrement,
