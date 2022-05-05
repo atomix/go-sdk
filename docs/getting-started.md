@@ -10,7 +10,7 @@ SPDX-License-Identifier: Apache-2.0
 To install the Go client, use `go get`:
 
 ```bash
-$ GO111MODULE=on go get github.com/atomix/atomix-go-client
+$ GO111MODULE=on go get github.com/atomix/go-client
 ```
 
 ## Usage
@@ -18,7 +18,7 @@ $ GO111MODULE=on go get github.com/atomix/atomix-go-client
 To use the client, import the client API:
 
 ```go
-import "github.com/atomix/atomix-go-client/pkg/atomix"
+import "github.com/atomix/go-client/pkg/atomix"
 ```
 
 The `atomix` package provides functions for working with primitives using the default cluster configuration:

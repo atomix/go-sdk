@@ -1,31 +1,21 @@
-// Copyright 2020-present Open Networking Foundation.
+// SPDX-FileCopyrightText: 2022-present Open Networking Foundation <info@opennetworking.org>
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 package atomix
 
 import (
 	"context"
 	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
-	"github.com/atomix/atomix-go-client/pkg/atomix/counter"
-	"github.com/atomix/atomix-go-client/pkg/atomix/election"
-	"github.com/atomix/atomix-go-client/pkg/atomix/indexedmap"
-	"github.com/atomix/atomix-go-client/pkg/atomix/list"
-	"github.com/atomix/atomix-go-client/pkg/atomix/lock"
-	_map "github.com/atomix/atomix-go-client/pkg/atomix/map"
-	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
-	"github.com/atomix/atomix-go-client/pkg/atomix/set"
-	"github.com/atomix/atomix-go-client/pkg/atomix/value"
+	"github.com/atomix/go-client/pkg/atomix/counter"
+	"github.com/atomix/go-client/pkg/atomix/election"
+	"github.com/atomix/go-client/pkg/atomix/indexedmap"
+	"github.com/atomix/go-client/pkg/atomix/list"
+	"github.com/atomix/go-client/pkg/atomix/lock"
+	_map "github.com/atomix/go-client/pkg/atomix/map"
+	"github.com/atomix/go-client/pkg/atomix/primitive"
+	"github.com/atomix/go-client/pkg/atomix/set"
+	"github.com/atomix/go-client/pkg/atomix/value"
 )
 
 // GetCounter gets the Counter instance of the given name

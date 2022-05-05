@@ -6,7 +6,7 @@ package test
 
 import (
 	"context"
-	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
+	"github.com/atomix/go-client/pkg/atomix/primitive"
 	"google.golang.org/grpc"
 )
 

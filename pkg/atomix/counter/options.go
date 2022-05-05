@@ -5,7 +5,7 @@
 package counter
 
 import (
-	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
+	"github.com/atomix/go-client/pkg/atomix/primitive"
 )
 
 // Option is a counter option

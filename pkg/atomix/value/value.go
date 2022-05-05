@@ -7,11 +7,11 @@ package value
 import (
 	"context"
 	api "github.com/atomix/atomix-api/go/atomix/primitive/value"
-	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
-	"github.com/atomix/atomix-go-client/pkg/atomix/primitive/codec"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
+	"github.com/atomix/go-client/pkg/atomix/primitive"
+	"github.com/atomix/go-client/pkg/atomix/primitive/codec"
 	"google.golang.org/grpc"
 	"io"
 )

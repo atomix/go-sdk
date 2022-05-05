@@ -7,11 +7,11 @@ package indexedmap
 import (
 	"context"
 	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
-	"github.com/atomix/atomix-go-client/pkg/atomix/primitive/codec"
-	"github.com/atomix/atomix-go-client/pkg/atomix/util/test"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
+	"github.com/atomix/go-client/pkg/atomix/primitive/codec"
+	"github.com/atomix/go-client/pkg/atomix/util/test"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

@@ -10,7 +10,6 @@ import (
 	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
 	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
 	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
-	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
@@ -25,6 +24,7 @@ import (
 	rsmsetproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/set"
 	rsmvalueproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/rsm/value"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/go-client/pkg/atomix/primitive"
 	"google.golang.org/grpc"
 )
 

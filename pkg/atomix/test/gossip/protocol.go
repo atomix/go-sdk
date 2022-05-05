@@ -6,9 +6,9 @@ package gossip
 
 import (
 	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
-	test "github.com/atomix/atomix-go-client/pkg/atomix/test"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/gossip"
+	test "github.com/atomix/go-client/pkg/atomix/test"
 )
 
 type gossipOptions struct {

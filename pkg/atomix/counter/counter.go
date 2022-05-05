@@ -7,8 +7,8 @@ package counter
 import (
 	"context"
 	api "github.com/atomix/atomix-api/go/atomix/primitive/counter"
-	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/go-client/pkg/atomix/primitive"
 	"google.golang.org/grpc"
 )
 

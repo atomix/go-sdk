@@ -6,8 +6,8 @@ package list
 
 import (
 	api "github.com/atomix/atomix-api/go/atomix/primitive/list"
-	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
-	"github.com/atomix/atomix-go-client/pkg/atomix/primitive/codec"
+	"github.com/atomix/go-client/pkg/atomix/primitive"
+	"github.com/atomix/go-client/pkg/atomix/primitive/codec"
 )
 
 // Option is a list option

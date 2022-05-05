@@ -6,8 +6,8 @@ package lock
 
 import (
 	api "github.com/atomix/atomix-api/go/atomix/primitive/lock"
-	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
+	"github.com/atomix/go-client/pkg/atomix/primitive"
 	"time"
 )
 

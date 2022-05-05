@@ -7,9 +7,9 @@ package _map //nolint:golint
 import (
 	api "github.com/atomix/atomix-api/go/atomix/primitive/map"
 	metaapi "github.com/atomix/atomix-api/go/atomix/primitive/meta"
-	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
-	"github.com/atomix/atomix-go-client/pkg/atomix/primitive/codec"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
+	"github.com/atomix/go-client/pkg/atomix/primitive"
+	"github.com/atomix/go-client/pkg/atomix/primitive/codec"
 )
 
 // Option is a map option

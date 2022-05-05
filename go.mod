@@ -1,4 +1,4 @@
-module github.com/atomix/atomix-go-client
+module github.com/atomix/go-client
 
 go 1.18
 

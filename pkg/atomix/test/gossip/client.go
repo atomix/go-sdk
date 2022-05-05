@@ -10,7 +10,6 @@ import (
 	driverapi "github.com/atomix/atomix-api/go/atomix/management/driver"
 	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
 	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
-	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/driver/env"
@@ -21,6 +20,7 @@ import (
 	gossipsetproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/gossip/set"
 	gossipvalueproxy "github.com/atomix/atomix-go-framework/pkg/atomix/driver/proxy/gossip/value"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
+	"github.com/atomix/go-client/pkg/atomix/primitive"
 	"github.com/gogo/protobuf/jsonpb"
 	"google.golang.org/grpc"
 )

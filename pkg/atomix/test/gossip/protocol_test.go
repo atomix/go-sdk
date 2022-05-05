@@ -6,8 +6,8 @@ package gossip
 
 import (
 	"context"
-	"github.com/atomix/atomix-go-client/pkg/atomix/test"
 	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"github.com/atomix/go-client/pkg/atomix/test"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"

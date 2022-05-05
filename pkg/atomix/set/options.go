@@ -6,8 +6,8 @@ package set
 
 import (
 	api "github.com/atomix/atomix-api/go/atomix/primitive/set"
-	"github.com/atomix/atomix-go-client/pkg/atomix/primitive"
-	"github.com/atomix/atomix-go-client/pkg/atomix/primitive/codec"
+	"github.com/atomix/go-client/pkg/atomix/primitive"
+	"github.com/atomix/go-client/pkg/atomix/primitive/codec"
 )
 
 // Option is a set option
