@@ -4,15 +4,28 @@
 
 package counter
 
-import (
-	"github.com/atomix/go-client/pkg/atomix/primitive"
-)
-
 // Option is a counter option
 type Option interface {
-	primitive.Option
-	applyNewCounter(options *newCounterOptions)
+	apply(options *Options)
 }
 
-// newCounterOptions is counter options
-type newCounterOptions struct{}
+// Options is counter options
+type Options struct{}
+
+func (o Options) apply(opts ...Option) {
+	for _, opt := range opts {
+		opt.apply(&o)
+	}
+}
+
+func newFuncOption(f func(*Options)) Option {
+	return funcOption{f}
+}
+
+type funcOption[K, V any] struct {
+	f func(*Options)
+}
+
+func (o funcOption) apply(options *Options) {
+	o.f(options)
+}

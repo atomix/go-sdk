@@ -6,9 +6,9 @@ package test
 
 import (
 	"fmt"
-	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	protocolapi "github.com/atomix/api/pkg/atomix/protocol"
+	"github.com/atomix/runtime/pkg/cluster"
+	"github.com/atomix/runtime/pkg/logging"
 	"sync"
 )
 

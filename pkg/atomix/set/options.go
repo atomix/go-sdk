@@ -5,41 +5,48 @@
 package set
 
 import (
-	api "github.com/atomix/atomix-api/go/atomix/primitive/set"
-	"github.com/atomix/go-client/pkg/atomix/primitive"
-	"github.com/atomix/go-client/pkg/atomix/primitive/codec"
+	"github.com/atomix/go-client/pkg/atomix/generic"
+	setv1 "github.com/atomix/runtime/api/atomix/set/v1"
 )
 
 // Option is a set option
 type Option[E any] interface {
-	primitive.Option
-	applyNewSet(options *newSetOptions[E])
+	apply(options *Options[E])
 }
 
-// newSetOptions is set options
-type newSetOptions[E any] struct {
-	elementCodec codec.Codec[E]
+// Options is set options
+type Options[E any] struct {
+	ElementType generic.Type[E]
 }
 
-func WithCodec[E any](elementCodec codec.Codec[E]) Option[E] {
-	return codecOption[E]{
-		elementCodec: elementCodec,
+func (o Options[E]) apply(opts ...Option[E]) {
+	for _, opt := range opts {
+		opt.apply(&o)
 	}
 }
 
-type codecOption[E any] struct {
-	primitive.EmptyOption
-	elementCodec codec.Codec[E]
+func newFuncOption[E any](f func(*Options[E])) Option[E] {
+	return funcOption[E]{f}
 }
 
-func (o codecOption[E]) applyNewSet(options *newSetOptions[E]) {
-	options.elementCodec = o.elementCodec
+type funcOption[E any] struct {
+	f func(*Options[E])
+}
+
+func (o funcOption[E]) apply(options *Options[E]) {
+	o.f(options)
+}
+
+func WithElementType[E any](elementType generic.Type[E]) Option[E] {
+	return newFuncOption[E](func(options *Options[E]) {
+		options.ElementType = elementType
+	})
 }
 
 // WatchOption is an option for set Watch calls
 type WatchOption interface {
-	beforeWatch(request *api.EventsRequest)
-	afterWatch(response *api.EventsResponse)
+	beforeWatch(request *setv1.EventsRequest)
+	afterWatch(response *setv1.EventsResponse)
 }
 
 // WithReplay returns a Watch option to replay entries
@@ -49,10 +56,10 @@ func WithReplay() WatchOption {
 
 type replayOption struct{}
 
-func (o replayOption) beforeWatch(request *api.EventsRequest) {
+func (o replayOption) beforeWatch(request *setv1.EventsRequest) {
 	request.Replay = true
 }
 
-func (o replayOption) afterWatch(response *api.EventsResponse) {
+func (o replayOption) afterWatch(response *setv1.EventsResponse) {
 
 }

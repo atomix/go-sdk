@@ -5,18 +5,18 @@
 package rsm
 
 import (
-	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
-	rsmprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm"
-	rsmcounterprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/counter"
-	rsmelectionprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/election"
-	rsmindexedmapprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/indexedmap"
-	rsmlistprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/list"
-	rsmlockprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/lock"
-	rsmmapprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/map"
-	rsmsetprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/set"
-	rsmvalueprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/rsm/value"
+	protocolapi "github.com/atomix/api/pkg/atomix/protocol"
 	"github.com/atomix/atomix-go-local/pkg/atomix/local"
+	"github.com/atomix/runtime/pkg/cluster"
+	rsmprotocol "github.com/atomix/runtime/pkg/storage/protocol/rsm"
+	rsmcounterprotocol "github.com/atomix/runtime/pkg/storage/protocol/rsm/counter"
+	rsmelectionprotocol "github.com/atomix/runtime/pkg/storage/protocol/rsm/election"
+	rsmindexedmapprotocol "github.com/atomix/runtime/pkg/storage/protocol/rsm/indexedmap"
+	rsmlistprotocol "github.com/atomix/runtime/pkg/storage/protocol/rsm/list"
+	rsmlockprotocol "github.com/atomix/runtime/pkg/storage/protocol/rsm/lock"
+	rsmmapprotocol "github.com/atomix/runtime/pkg/storage/protocol/rsm/map"
+	rsmsetprotocol "github.com/atomix/runtime/pkg/storage/protocol/rsm/set"
+	rsmvalueprotocol "github.com/atomix/runtime/pkg/storage/protocol/rsm/value"
 )
 
 func newReplica(network cluster.Network, replica protocolapi.ProtocolReplica, protocol protocolapi.ProtocolConfig) *testReplica {

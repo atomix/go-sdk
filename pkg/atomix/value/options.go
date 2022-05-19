@@ -5,42 +5,49 @@
 package value
 
 import (
-	api "github.com/atomix/atomix-api/go/atomix/primitive/value"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
-	"github.com/atomix/go-client/pkg/atomix/primitive"
-	"github.com/atomix/go-client/pkg/atomix/primitive/codec"
+	"github.com/atomix/go-client/pkg/atomix/generic"
+	valuev1 "github.com/atomix/runtime/api/atomix/value/v1"
+	"github.com/atomix/runtime/pkg/meta"
 )
 
 // Option is a value option
 type Option[V any] interface {
-	primitive.Option
-	applyNewValue(options *newValueOptions[V])
+	apply(options *Options[V])
 }
 
-// newValueOptions is value options
-type newValueOptions[V any] struct {
-	valueCodec codec.Codec[V]
+// Options is value options
+type Options[V any] struct {
+	ValueType generic.Type[V]
 }
 
-func WithCodec[E any](valueCodec codec.Codec[E]) Option[E] {
-	return codecOption[E]{
-		valueCodec: valueCodec,
+func (o Options[V]) apply(opts ...Option[V]) {
+	for _, opt := range opts {
+		opt.apply(&o)
 	}
 }
 
-type codecOption[V any] struct {
-	primitive.EmptyOption
-	valueCodec codec.Codec[V]
+func newFuncOption[V any](f func(*Options[V])) Option[V] {
+	return funcOption[V]{f}
 }
 
-func (o codecOption[V]) applyNewValue(options *newValueOptions[V]) {
-	options.valueCodec = o.valueCodec
+type funcOption[V any] struct {
+	f func(*Options[V])
+}
+
+func (o funcOption[V]) apply(options *Options[V]) {
+	o.f(options)
+}
+
+func WithValueType[V any](valueType generic.Type[V]) Option[V] {
+	return newFuncOption[V](func(options *Options[V]) {
+		options.ValueType = valueType
+	})
 }
 
 // SetOption is an option for Set calls
 type SetOption interface {
-	beforeSet(request *api.SetRequest)
-	afterSet(response *api.SetResponse)
+	beforeSet(request *valuev1.SetRequest)
+	afterSet(response *valuev1.SetResponse)
 }
 
 // IfMatch updates the value if the version matches the given version
@@ -52,15 +59,15 @@ type matchOption struct {
 	object meta.Object
 }
 
-func (o matchOption) beforeSet(request *api.SetRequest) {
+func (o matchOption) beforeSet(request *valuev1.SetRequest) {
 	proto := o.object.Meta().Proto()
-	request.Preconditions = append(request.Preconditions, api.Precondition{
-		Precondition: &api.Precondition_Metadata{
+	request.Preconditions = append(request.Preconditions, valuev1.Precondition{
+		Precondition: &valuev1.Precondition_Metadata{
 			Metadata: &proto,
 		},
 	})
 }
 
-func (o matchOption) afterSet(response *api.SetResponse) {
+func (o matchOption) afterSet(response *valuev1.SetResponse) {
 
 }

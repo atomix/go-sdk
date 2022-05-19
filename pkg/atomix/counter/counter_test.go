@@ -6,21 +6,14 @@ package counter
 
 import (
 	"context"
-	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-client/pkg/atomix/util/test"
+	"github.com/atomix/runtime/pkg/logging"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestCounterOperations(t *testing.T) {
 	logging.SetLevel(logging.DebugLevel)
-
-	primitiveID := primitiveapi.PrimitiveId{
-		Type:      Type.String(),
-		Namespace: "test",
-		Name:      "TestCounterOperations",
-	}
 
 	test := test.NewRSMTest()
 	assert.NoError(t, test.Start())

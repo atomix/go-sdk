@@ -7,21 +7,18 @@ package indexedmap
 import (
 	"context"
 	"fmt"
-	api "github.com/atomix/atomix-api/go/atomix/primitive/indexedmap"
-	metaapi "github.com/atomix/atomix-api/go/atomix/primitive/meta"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
+	"github.com/atomix/go-client/pkg/atomix/generic"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
-	"github.com/atomix/go-client/pkg/atomix/primitive/codec"
+	indexedmapv1 "github.com/atomix/runtime/api/atomix/indexed_map/v1"
+	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
+	"github.com/atomix/runtime/pkg/errors"
+	"github.com/atomix/runtime/pkg/logging"
+	"github.com/atomix/runtime/pkg/meta"
 	"google.golang.org/grpc"
 	"io"
 )
 
-// Type is the indexed map type
-const Type primitive.Type = "IndexedMap"
-
-var log = logging.GetLogger("atomix", "client", "indexedmap")
+var log = logging.GetLogger()
 
 // Index is the index of an entry
 type Index uint64
@@ -140,65 +137,72 @@ type Event[K, V any] struct {
 	Entry Entry[K, V]
 }
 
-// New creates a new IndexedMap primitive
-func New[K, V any](ctx context.Context, name string, conn *grpc.ClientConn, opts ...primitive.Option) (IndexedMap[K, V], error) {
-	options := newIndexedMapOptions[K, V]{}
-	for _, opt := range opts {
-		if op, ok := opt.(Option[K, V]); ok {
-			op.applyNewIndexedMap(&options)
+func Client[K, V any](conn *grpc.ClientConn) primitive.Client[IndexedMap[K, V], Option[K, V]] {
+	return primitive.NewClient[IndexedMap[K, V], Option[K, V]](newManager(conn), func(primitive *primitive.ManagedPrimitive, opts ...Option[K, V]) (IndexedMap[K, V], error) {
+		var options Options[K, V]
+		for _, opt := range opts {
+			opt.apply(&options)
 		}
-	}
-	if options.keyCodec == nil {
-		options.keyCodec = codec.String().(codec.Codec[K])
-	}
-	if options.valueCodec == nil {
-		options.valueCodec = codec.Bytes().(codec.Codec[V])
-	}
-	m := &typedIndexedMap[K, V]{
-		Client:     primitive.NewClient(Type, name, conn, opts...),
-		client:     api.NewIndexedMapServiceClient(conn),
-		keyCodec:   options.keyCodec,
-		valueCodec: options.valueCodec,
-	}
-	if err := m.Create(ctx); err != nil {
-		return nil, err
-	}
-	return m, nil
+		if options.KeyType == nil {
+			stringType := generic.String()
+			if keyType, ok := stringType.(generic.Type[K]); ok {
+				options.KeyType = keyType
+			} else {
+				return nil, errors.NewInvalid("must configure a generic type for key parameter")
+			}
+		}
+		if options.ValueType == nil {
+			jsonType := generic.JSON[V]()
+			if valueType, ok := jsonType.(generic.Type[V]); ok {
+				options.ValueType = valueType
+			} else {
+				return nil, errors.NewInvalid("must configure a generic type for key parameter")
+			}
+		}
+		return &typedIndexedMap[K, V]{
+			ManagedPrimitive: primitive,
+			client:           indexedmapv1.NewIndexedMapClient(conn),
+			keyType:          options.KeyType,
+			valueType:        options.ValueType,
+		}, nil
+	})
 }
 
 // typedIndexedMap is the default single-partition implementation of Map
 type typedIndexedMap[K, V any] struct {
-	*primitive.Client
-	client     api.IndexedMapServiceClient
-	keyCodec   codec.Codec[K]
-	valueCodec codec.Codec[V]
+	*primitive.ManagedPrimitive
+	client    indexedmapv1.IndexedMapClient
+	keyType   generic.Type[K]
+	valueType generic.Type[V]
 }
 
 func (m *typedIndexedMap[K, V]) Append(ctx context.Context, key K, value V) (*Entry[K, V], error) {
-	keyBytes, err := m.keyCodec.Encode(key)
+	keyBytes, err := m.keyType.Marshal(&key)
 	if err != nil {
 		return nil, errors.NewInvalid("key encoding failed", err)
 	}
-	valueBytes, err := m.valueCodec.Encode(value)
+	valueBytes, err := m.valueType.Marshal(&value)
 	if err != nil {
 		return nil, errors.NewInvalid("value encoding failed", err)
 	}
 
-	request := &api.PutRequest{
+	request := &indexedmapv1.PutRequest{
 		Headers: m.GetHeaders(),
-		Entry: api.Entry{
-			Position: api.Position{
-				Key: string(keyBytes),
+		PutInput: indexedmapv1.PutInput{
+			Entry: indexedmapv1.Entry{
+				Position: indexedmapv1.Position{
+					Key: string(keyBytes),
+				},
+				Value: indexedmapv1.Value{
+					Value: valueBytes,
+				},
 			},
-			Value: api.Value{
-				Value: valueBytes,
-			},
-		},
-		Preconditions: []api.Precondition{
-			{
-				Precondition: &api.Precondition_Metadata{
-					Metadata: &metaapi.ObjectMeta{
-						Type: metaapi.ObjectMeta_TOMBSTONE,
+			Preconditions: []indexedmapv1.Precondition{
+				{
+					Precondition: &indexedmapv1.Precondition_Metadata{
+						Metadata: &runtimev1.ObjectMeta{
+							Type: runtimev1.ObjectMeta_TOMBSTONE,
+						},
 					},
 				},
 			},
@@ -206,58 +210,62 @@ func (m *typedIndexedMap[K, V]) Append(ctx context.Context, key K, value V) (*En
 	}
 	response, err := m.client.Put(ctx, request)
 	if err != nil {
-		return nil, errors.From(err)
+		return nil, errors.FromProto(err)
 	}
 	return m.newEntry(response.Entry)
 }
 
 func (m *typedIndexedMap[K, V]) Put(ctx context.Context, key K, value V) (*Entry[K, V], error) {
-	keyBytes, err := m.keyCodec.Encode(key)
+	keyBytes, err := m.keyType.Marshal(&key)
 	if err != nil {
 		return nil, errors.NewInvalid("key encoding failed", err)
 	}
-	valueBytes, err := m.valueCodec.Encode(value)
+	valueBytes, err := m.valueType.Marshal(&value)
 	if err != nil {
 		return nil, errors.NewInvalid("value encoding failed", err)
 	}
 
-	request := &api.PutRequest{
+	request := &indexedmapv1.PutRequest{
 		Headers: m.GetHeaders(),
-		Entry: api.Entry{
-			Position: api.Position{
-				Key: string(keyBytes),
-			},
-			Value: api.Value{
-				Value: valueBytes,
+		PutInput: indexedmapv1.PutInput{
+			Entry: indexedmapv1.Entry{
+				Position: indexedmapv1.Position{
+					Key: string(keyBytes),
+				},
+				Value: indexedmapv1.Value{
+					Value: valueBytes,
+				},
 			},
 		},
 	}
 	response, err := m.client.Put(ctx, request)
 	if err != nil {
-		return nil, errors.From(err)
+		return nil, errors.FromProto(err)
 	}
 	return m.newEntry(response.Entry)
 }
 
 func (m *typedIndexedMap[K, V]) Set(ctx context.Context, index Index, key K, value V, opts ...SetOption) (*Entry[K, V], error) {
-	keyBytes, err := m.keyCodec.Encode(key)
+	keyBytes, err := m.keyType.Marshal(&key)
 	if err != nil {
 		return nil, errors.NewInvalid("key encoding failed", err)
 	}
-	valueBytes, err := m.valueCodec.Encode(value)
+	valueBytes, err := m.valueType.Marshal(&value)
 	if err != nil {
 		return nil, errors.NewInvalid("value encoding failed", err)
 	}
 
-	request := &api.PutRequest{
+	request := &indexedmapv1.PutRequest{
 		Headers: m.GetHeaders(),
-		Entry: api.Entry{
-			Position: api.Position{
-				Index: uint64(index),
-				Key:   string(keyBytes),
-			},
-			Value: api.Value{
-				Value: valueBytes,
+		PutInput: indexedmapv1.PutInput{
+			Entry: indexedmapv1.Entry{
+				Position: indexedmapv1.Position{
+					Index: uint64(index),
+					Key:   string(keyBytes),
+				},
+				Value: indexedmapv1.Value{
+					Value: valueBytes,
+				},
 			},
 		},
 	}
@@ -266,7 +274,7 @@ func (m *typedIndexedMap[K, V]) Set(ctx context.Context, index Index, key K, val
 	}
 	response, err := m.client.Put(ctx, request)
 	if err != nil {
-		return nil, errors.From(err)
+		return nil, errors.FromProto(err)
 	}
 	for i := range opts {
 		opts[i].afterPut(response)
@@ -275,14 +283,16 @@ func (m *typedIndexedMap[K, V]) Set(ctx context.Context, index Index, key K, val
 }
 
 func (m *typedIndexedMap[K, V]) Get(ctx context.Context, key K, opts ...GetOption) (*Entry[K, V], error) {
-	keyBytes, err := m.keyCodec.Encode(key)
+	keyBytes, err := m.keyType.Marshal(&key)
 	if err != nil {
 		return nil, errors.NewInvalid("key encoding failed", err)
 	}
-	request := &api.GetRequest{
+	request := &indexedmapv1.GetRequest{
 		Headers: m.GetHeaders(),
-		Position: api.Position{
-			Key: string(keyBytes),
+		GetInput: indexedmapv1.GetInput{
+			Position: indexedmapv1.Position{
+				Key: string(keyBytes),
+			},
 		},
 	}
 	for i := range opts {
@@ -290,7 +300,7 @@ func (m *typedIndexedMap[K, V]) Get(ctx context.Context, key K, opts ...GetOptio
 	}
 	response, err := m.client.Get(ctx, request)
 	if err != nil {
-		return nil, errors.From(err)
+		return nil, errors.FromProto(err)
 	}
 	for i := range opts {
 		opts[i].afterGet(response)
@@ -299,10 +309,12 @@ func (m *typedIndexedMap[K, V]) Get(ctx context.Context, key K, opts ...GetOptio
 }
 
 func (m *typedIndexedMap[K, V]) GetIndex(ctx context.Context, index Index, opts ...GetOption) (*Entry[K, V], error) {
-	request := &api.GetRequest{
+	request := &indexedmapv1.GetRequest{
 		Headers: m.GetHeaders(),
-		Position: api.Position{
-			Index: uint64(index),
+		GetInput: indexedmapv1.GetInput{
+			Position: indexedmapv1.Position{
+				Index: uint64(index),
+			},
 		},
 	}
 	for i := range opts {
@@ -310,7 +322,7 @@ func (m *typedIndexedMap[K, V]) GetIndex(ctx context.Context, index Index, opts 
 	}
 	response, err := m.client.Get(ctx, request)
 	if err != nil {
-		return nil, errors.From(err)
+		return nil, errors.FromProto(err)
 	}
 	for i := range opts {
 		opts[i].afterGet(response)
@@ -319,108 +331,118 @@ func (m *typedIndexedMap[K, V]) GetIndex(ctx context.Context, index Index, opts 
 }
 
 func (m *typedIndexedMap[K, V]) FirstIndex(ctx context.Context) (Index, error) {
-	request := &api.FirstEntryRequest{
+	request := &indexedmapv1.FirstEntryRequest{
 		Headers: m.GetHeaders(),
 	}
 	response, err := m.client.FirstEntry(ctx, request)
 	if err != nil {
-		return 0, errors.From(err)
+		return 0, errors.FromProto(err)
 	}
 	return Index(response.Entry.Index), nil
 }
 
 func (m *typedIndexedMap[K, V]) LastIndex(ctx context.Context) (Index, error) {
-	request := &api.LastEntryRequest{
+	request := &indexedmapv1.LastEntryRequest{
 		Headers: m.GetHeaders(),
 	}
 	response, err := m.client.LastEntry(ctx, request)
 	if err != nil {
-		return 0, errors.From(err)
+		return 0, errors.FromProto(err)
 	}
 	return Index(response.Entry.Index), nil
 }
 
 func (m *typedIndexedMap[K, V]) PrevIndex(ctx context.Context, index Index) (Index, error) {
-	request := &api.PrevEntryRequest{
+	request := &indexedmapv1.PrevEntryRequest{
 		Headers: m.GetHeaders(),
-		Index:   uint64(index),
+		PrevEntryInput: indexedmapv1.PrevEntryInput{
+			Index: uint64(index),
+		},
 	}
 	response, err := m.client.PrevEntry(ctx, request)
 	if err != nil {
-		return 0, errors.From(err)
+		return 0, errors.FromProto(err)
 	}
 	return Index(response.Entry.Index), nil
 }
 
 func (m *typedIndexedMap[K, V]) NextIndex(ctx context.Context, index Index) (Index, error) {
-	request := &api.NextEntryRequest{
+	request := &indexedmapv1.NextEntryRequest{
 		Headers: m.GetHeaders(),
-		Index:   uint64(index),
+		NextEntryInput: indexedmapv1.NextEntryInput{
+			Index: uint64(index),
+		},
 	}
 	response, err := m.client.NextEntry(ctx, request)
 	if err != nil {
-		return 0, errors.From(err)
+		return 0, errors.FromProto(err)
 	}
 	return Index(response.Entry.Index), nil
 }
 
 func (m *typedIndexedMap[K, V]) FirstEntry(ctx context.Context) (*Entry[K, V], error) {
-	request := &api.FirstEntryRequest{
+	request := &indexedmapv1.FirstEntryRequest{
 		Headers: m.GetHeaders(),
 	}
 	response, err := m.client.FirstEntry(ctx, request)
 	if err != nil {
-		return nil, errors.From(err)
+		return nil, errors.FromProto(err)
 	}
 	return m.newEntry(response.Entry)
 }
 
 func (m *typedIndexedMap[K, V]) LastEntry(ctx context.Context) (*Entry[K, V], error) {
-	request := &api.LastEntryRequest{
+	request := &indexedmapv1.LastEntryRequest{
 		Headers: m.GetHeaders(),
 	}
 	response, err := m.client.LastEntry(ctx, request)
 	if err != nil {
-		return nil, errors.From(err)
+		return nil, errors.FromProto(err)
 	}
 	return m.newEntry(response.Entry)
 }
 
 func (m *typedIndexedMap[K, V]) PrevEntry(ctx context.Context, index Index) (*Entry[K, V], error) {
-	request := &api.PrevEntryRequest{
+	request := &indexedmapv1.PrevEntryRequest{
 		Headers: m.GetHeaders(),
-		Index:   uint64(index),
+		PrevEntryInput: indexedmapv1.PrevEntryInput{
+			Index: uint64(index),
+		},
 	}
 	response, err := m.client.PrevEntry(ctx, request)
 	if err != nil {
-		return nil, errors.From(err)
+		return nil, errors.FromProto(err)
 	}
 	return m.newEntry(response.Entry)
 }
 
 func (m *typedIndexedMap[K, V]) NextEntry(ctx context.Context, index Index) (*Entry[K, V], error) {
-	request := &api.NextEntryRequest{
+	request := &indexedmapv1.NextEntryRequest{
 		Headers: m.GetHeaders(),
-		Index:   uint64(index),
+		NextEntryInput: indexedmapv1.NextEntryInput{
+			Index: uint64(index),
+		},
 	}
 	response, err := m.client.NextEntry(ctx, request)
 	if err != nil {
-		return nil, errors.From(err)
+		return nil, errors.FromProto(err)
 	}
 	return m.newEntry(response.Entry)
 }
 
 func (m *typedIndexedMap[K, V]) Remove(ctx context.Context, key K, opts ...RemoveOption) (*Entry[K, V], error) {
-	keyBytes, err := m.keyCodec.Encode(key)
+	keyBytes, err := m.keyType.Marshal(&key)
 	if err != nil {
 		return nil, errors.NewInvalid("key encoding failed", err)
 	}
 
-	request := &api.RemoveRequest{
+	request := &indexedmapv1.RemoveRequest{
 		Headers: m.GetHeaders(),
-		Entry: &api.Entry{
-			Position: api.Position{
-				Key: string(keyBytes),
+		RemoveInput: indexedmapv1.RemoveInput{
+			Entry: &indexedmapv1.Entry{
+				Position: indexedmapv1.Position{
+					Key: string(keyBytes),
+				},
 			},
 		},
 	}
@@ -429,7 +451,7 @@ func (m *typedIndexedMap[K, V]) Remove(ctx context.Context, key K, opts ...Remov
 	}
 	response, err := m.client.Remove(ctx, request)
 	if err != nil {
-		return nil, errors.From(err)
+		return nil, errors.FromProto(err)
 	}
 	for i := range opts {
 		opts[i].afterRemove(response)
@@ -438,11 +460,13 @@ func (m *typedIndexedMap[K, V]) Remove(ctx context.Context, key K, opts ...Remov
 }
 
 func (m *typedIndexedMap[K, V]) RemoveIndex(ctx context.Context, index Index, opts ...RemoveOption) (*Entry[K, V], error) {
-	request := &api.RemoveRequest{
+	request := &indexedmapv1.RemoveRequest{
 		Headers: m.GetHeaders(),
-		Entry: &api.Entry{
-			Position: api.Position{
-				Index: uint64(index),
+		RemoveInput: indexedmapv1.RemoveInput{
+			Entry: &indexedmapv1.Entry{
+				Position: indexedmapv1.Position{
+					Index: uint64(index),
+				},
 			},
 		},
 	}
@@ -451,7 +475,7 @@ func (m *typedIndexedMap[K, V]) RemoveIndex(ctx context.Context, index Index, op
 	}
 	response, err := m.client.Remove(ctx, request)
 	if err != nil {
-		return nil, errors.From(err)
+		return nil, errors.FromProto(err)
 	}
 	for i := range opts {
 		opts[i].afterRemove(response)
@@ -460,34 +484,34 @@ func (m *typedIndexedMap[K, V]) RemoveIndex(ctx context.Context, index Index, op
 }
 
 func (m *typedIndexedMap[K, V]) Len(ctx context.Context) (int, error) {
-	request := &api.SizeRequest{
+	request := &indexedmapv1.SizeRequest{
 		Headers: m.GetHeaders(),
 	}
 	response, err := m.client.Size(ctx, request)
 	if err != nil {
-		return 0, errors.From(err)
+		return 0, errors.FromProto(err)
 	}
 	return int(response.Size_), nil
 }
 
 func (m *typedIndexedMap[K, V]) Clear(ctx context.Context) error {
-	request := &api.ClearRequest{
+	request := &indexedmapv1.ClearRequest{
 		Headers: m.GetHeaders(),
 	}
 	_, err := m.client.Clear(ctx, request)
 	if err != nil {
-		return errors.From(err)
+		return errors.FromProto(err)
 	}
 	return nil
 }
 
 func (m *typedIndexedMap[K, V]) Entries(ctx context.Context, ch chan<- Entry[K, V]) error {
-	request := &api.EntriesRequest{
+	request := &indexedmapv1.EntriesRequest{
 		Headers: m.GetHeaders(),
 	}
 	stream, err := m.client.Entries(ctx, request)
 	if err != nil {
-		return errors.From(err)
+		return errors.FromProto(err)
 	}
 
 	go func() {
@@ -498,7 +522,7 @@ func (m *typedIndexedMap[K, V]) Entries(ctx context.Context, ch chan<- Entry[K, 
 				if err == io.EOF {
 					return
 				}
-				err = errors.From(err)
+				err = errors.FromProto(err)
 				if errors.IsCanceled(err) || errors.IsTimeout(err) {
 					return
 				}
@@ -518,7 +542,7 @@ func (m *typedIndexedMap[K, V]) Entries(ctx context.Context, ch chan<- Entry[K, 
 }
 
 func (m *typedIndexedMap[K, V]) Watch(ctx context.Context, ch chan<- Event[K, V], opts ...WatchOption) error {
-	request := &api.EventsRequest{
+	request := &indexedmapv1.EventsRequest{
 		Headers: m.GetHeaders(),
 	}
 	for i := range opts {
@@ -527,7 +551,7 @@ func (m *typedIndexedMap[K, V]) Watch(ctx context.Context, ch chan<- Event[K, V]
 
 	stream, err := m.client.Events(ctx, request)
 	if err != nil {
-		return errors.From(err)
+		return errors.FromProto(err)
 	}
 
 	openCh := make(chan struct{})
@@ -545,7 +569,7 @@ func (m *typedIndexedMap[K, V]) Watch(ctx context.Context, ch chan<- Event[K, V]
 				if err == io.EOF {
 					return
 				}
-				err = errors.From(err)
+				err = errors.FromProto(err)
 				if errors.IsCanceled(err) || errors.IsTimeout(err) {
 					return
 				}
@@ -569,22 +593,22 @@ func (m *typedIndexedMap[K, V]) Watch(ctx context.Context, ch chan<- Event[K, V]
 			}
 
 			switch response.Event.Type {
-			case api.Event_INSERT:
+			case indexedmapv1.Event_INSERT:
 				ch <- Event[K, V]{
 					Type:  EventInsert,
 					Entry: *entry,
 				}
-			case api.Event_UPDATE:
+			case indexedmapv1.Event_UPDATE:
 				ch <- Event[K, V]{
 					Type:  EventUpdate,
 					Entry: *entry,
 				}
-			case api.Event_REMOVE:
+			case indexedmapv1.Event_REMOVE:
 				ch <- Event[K, V]{
 					Type:  EventRemove,
 					Entry: *entry,
 				}
-			case api.Event_REPLAY:
+			case indexedmapv1.Event_REPLAY:
 				ch <- Event[K, V]{
 					Type:  EventReplay,
 					Entry: *entry,
@@ -601,16 +625,16 @@ func (m *typedIndexedMap[K, V]) Watch(ctx context.Context, ch chan<- Event[K, V]
 	}
 }
 
-func (m *typedIndexedMap[K, V]) newEntry(entry *api.Entry) (*Entry[K, V], error) {
+func (m *typedIndexedMap[K, V]) newEntry(entry *indexedmapv1.Entry) (*Entry[K, V], error) {
 	if entry == nil {
 		return nil, nil
 	}
-	key, err := m.keyCodec.Decode([]byte(entry.Key))
-	if err != nil {
+	var key K
+	if err := m.keyType.Unmarshal([]byte(entry.Key), &key); err != nil {
 		return nil, errors.NewInvalid("key decoding failed", err)
 	}
-	value, err := m.valueCodec.Decode(entry.Value.Value)
-	if err != nil {
+	var value V
+	if err := m.valueType.Unmarshal(entry.Value.Value, &value); err != nil {
 		return nil, errors.NewInvalid("value decoding failed", err)
 	}
 	return &Entry[K, V]{

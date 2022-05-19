@@ -7,19 +7,16 @@ package list
 import (
 	"context"
 	"encoding/base64"
-	api "github.com/atomix/atomix-api/go/atomix/primitive/list"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"github.com/atomix/go-client/pkg/atomix/generic"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
-	"github.com/atomix/go-client/pkg/atomix/primitive/codec"
+	listv1 "github.com/atomix/runtime/api/atomix/list/v1"
+	"github.com/atomix/runtime/pkg/errors"
+	"github.com/atomix/runtime/pkg/logging"
 	"google.golang.org/grpc"
 	"io"
 )
 
-var log = logging.GetLogger("atomix", "client", "list")
-
-// Type is the list type
-const Type primitive.Type = "List"
+var log = logging.GetLogger()
 
 // List provides a distributed list data structure
 // The list values are defines as strings. To store more complex types in the list, encode values to strings e.g.
@@ -85,147 +82,165 @@ type Event[E any] struct {
 	Value E
 }
 
-// New creates a new list primitive
-func New[E any](ctx context.Context, name string, conn *grpc.ClientConn, opts ...primitive.Option) (List[E], error) {
-	options := newListOptions[E]{}
-	for _, opt := range opts {
-		if op, ok := opt.(Option[E]); ok {
-			op.applyNewList(&options)
+func Client[E any](conn *grpc.ClientConn) primitive.Client[List[E], Option[E]] {
+	return primitive.NewClient[List[E], Option[E]](newManager(conn), func(primitive *primitive.ManagedPrimitive, opts ...Option[E]) (List[E], error) {
+		var options Options[E]
+		for _, opt := range opts {
+			opt.apply(&options)
 		}
-	}
-	if options.elementCodec == nil {
-		options.elementCodec = codec.String().(codec.Codec[E])
-	}
-	l := &typedList[E]{
-		Client: primitive.NewClient(Type, name, conn, opts...),
-		client: api.NewListServiceClient(conn),
-		codec:  options.elementCodec,
-	}
-	if err := l.Create(ctx); err != nil {
-		return nil, err
-	}
-	return l, nil
+		if options.ElementType == nil {
+			stringType := generic.Bytes()
+			if elementType, ok := stringType.(generic.Type[E]); ok {
+				options.ElementType = elementType
+			} else {
+				return nil, errors.NewInvalid("must configure a generic type for key parameter")
+			}
+		}
+		return &typedList[E]{
+			ManagedPrimitive: primitive,
+			client:           listv1.NewListClient(conn),
+			elementType:      options.ElementType,
+		}, nil
+	})
 }
 
 // list is the single partition implementation of List
 type typedList[E any] struct {
-	*primitive.Client
-	client api.ListServiceClient
-	codec  codec.Codec[E]
+	*primitive.ManagedPrimitive
+	client      listv1.ListClient
+	elementType generic.Type[E]
 }
 
 func (l *typedList[E]) Append(ctx context.Context, value E) error {
-	bytes, err := l.codec.Encode(value)
+	bytes, err := l.elementType.Marshal(&value)
 	if err != nil {
 		return errors.NewInvalid("element encoding failed", err)
 	}
-	request := &api.AppendRequest{
+	request := &listv1.AppendRequest{
 		Headers: l.GetHeaders(),
-		Value: api.Value{
-			Value: base64.StdEncoding.EncodeToString(bytes),
+		AppendInput: listv1.AppendInput{
+			Value: listv1.Value{
+				Value: base64.StdEncoding.EncodeToString(bytes),
+			},
 		},
 	}
 	_, err = l.client.Append(ctx, request)
 	if err != nil {
-		return errors.From(err)
+		return errors.FromProto(err)
 	}
 	return nil
 }
 
 func (l *typedList[E]) Insert(ctx context.Context, index int, value E) error {
-	bytes, err := l.codec.Encode(value)
+	bytes, err := l.elementType.Marshal(&value)
 	if err != nil {
 		return errors.NewInvalid("element encoding failed", err)
 	}
-	request := &api.InsertRequest{
+	request := &listv1.InsertRequest{
 		Headers: l.GetHeaders(),
-		Item: api.Item{
-			Index: uint32(index),
-			Value: api.Value{
-				Value: base64.StdEncoding.EncodeToString(bytes),
+		InsertInput: listv1.InsertInput{
+			Item: listv1.Item{
+				Index: uint32(index),
+				Value: listv1.Value{
+					Value: base64.StdEncoding.EncodeToString(bytes),
+				},
 			},
 		},
 	}
 	_, err = l.client.Insert(ctx, request)
 	if err != nil {
-		return errors.From(err)
+		return errors.FromProto(err)
 	}
 	return nil
 }
 
 func (l *typedList[E]) Set(ctx context.Context, index int, value E) error {
-	bytes, err := l.codec.Encode(value)
+	bytes, err := l.elementType.Marshal(&value)
 	if err != nil {
 		return errors.NewInvalid("element encoding failed", err)
 	}
-	request := &api.SetRequest{
+	request := &listv1.SetRequest{
 		Headers: l.GetHeaders(),
-		Item: api.Item{
-			Index: uint32(index),
-			Value: api.Value{
-				Value: base64.StdEncoding.EncodeToString(bytes),
+		SetInput: listv1.SetInput{
+			Item: listv1.Item{
+				Index: uint32(index),
+				Value: listv1.Value{
+					Value: base64.StdEncoding.EncodeToString(bytes),
+				},
 			},
 		},
 	}
 	_, err = l.client.Set(ctx, request)
 	if err != nil {
-		return errors.From(err)
+		return errors.FromProto(err)
 	}
 	return nil
 }
 
 func (l *typedList[E]) Get(ctx context.Context, index int) (E, error) {
-	request := &api.GetRequest{
+	request := &listv1.GetRequest{
 		Headers: l.GetHeaders(),
-		Index:   uint32(index),
+		GetInput: listv1.GetInput{
+			Index: uint32(index),
+		},
 	}
 	var e E
 	response, err := l.client.Get(ctx, request)
 	if err != nil {
-		return e, errors.From(err)
+		return e, errors.FromProto(err)
 	}
 	bytes, err := base64.StdEncoding.DecodeString(response.Item.Value.Value)
 	if err != nil {
 		return e, errors.NewInvalid("element decoding failed", err)
 	}
-	return l.codec.Decode(bytes)
+	var elem E
+	if err := l.elementType.Unmarshal(bytes, &elem); err != nil {
+		return elem, err
+	}
+	return elem, nil
 }
 
 func (l *typedList[E]) Remove(ctx context.Context, index int) (E, error) {
-	request := &api.RemoveRequest{
+	request := &listv1.RemoveRequest{
 		Headers: l.GetHeaders(),
-		Index:   uint32(index),
+		RemoveInput: listv1.RemoveInput{
+			Index: uint32(index),
+		},
 	}
 	var e E
 	response, err := l.client.Remove(ctx, request)
 	if err != nil {
-		return e, errors.From(err)
+		return e, errors.FromProto(err)
 	}
 	bytes, err := base64.StdEncoding.DecodeString(response.Item.Value.Value)
 	if err != nil {
 		return e, errors.NewInvalid("element decoding failed", err)
 	}
-	return l.codec.Decode(bytes)
+	var elem E
+	if err := l.elementType.Unmarshal(bytes, &elem); err != nil {
+		return elem, err
+	}
+	return elem, nil
 }
 
 func (l *typedList[E]) Len(ctx context.Context) (int, error) {
-	request := &api.SizeRequest{
+	request := &listv1.SizeRequest{
 		Headers: l.GetHeaders(),
 	}
 	response, err := l.client.Size(ctx, request)
 	if err != nil {
-		return 0, errors.From(err)
+		return 0, errors.FromProto(err)
 	}
 	return int(response.Size_), nil
 }
 
 func (l *typedList[E]) Items(ctx context.Context, ch chan<- E) error {
-	request := &api.ElementsRequest{
+	request := &listv1.ElementsRequest{
 		Headers: l.GetHeaders(),
 	}
 	stream, err := l.client.Elements(ctx, request)
 	if err != nil {
-		return errors.From(err)
+		return errors.FromProto(err)
 	}
 
 	go func() {
@@ -236,7 +251,7 @@ func (l *typedList[E]) Items(ctx context.Context, ch chan<- E) error {
 				if err == io.EOF {
 					return
 				}
-				err = errors.From(err)
+				err = errors.FromProto(err)
 				if errors.IsCanceled(err) || errors.IsTimeout(err) {
 					return
 				}
@@ -248,8 +263,8 @@ func (l *typedList[E]) Items(ctx context.Context, ch chan<- E) error {
 			if err != nil {
 				log.Errorf("Failed to decode list item: %v", err)
 			} else {
-				elem, err := l.codec.Decode(bytes)
-				if err != nil {
+				var elem E
+				if err := l.elementType.Unmarshal(bytes, &elem); err != nil {
 					log.Error(err)
 				} else {
 					ch <- elem
@@ -261,7 +276,7 @@ func (l *typedList[E]) Items(ctx context.Context, ch chan<- E) error {
 }
 
 func (l *typedList[E]) Watch(ctx context.Context, ch chan<- Event[E], opts ...WatchOption) error {
-	request := &api.EventsRequest{
+	request := &listv1.EventsRequest{
 		Headers: l.GetHeaders(),
 	}
 	for i := range opts {
@@ -270,7 +285,7 @@ func (l *typedList[E]) Watch(ctx context.Context, ch chan<- Event[E], opts ...Wa
 
 	stream, err := l.client.Events(ctx, request)
 	if err != nil {
-		return errors.From(err)
+		return errors.FromProto(err)
 	}
 
 	openCh := make(chan struct{})
@@ -288,7 +303,7 @@ func (l *typedList[E]) Watch(ctx context.Context, ch chan<- Event[E], opts ...Wa
 				if err == io.EOF {
 					return
 				}
-				err = errors.From(err)
+				err = errors.FromProto(err)
 				if errors.IsCanceled(err) || errors.IsTimeout(err) {
 					return
 				}
@@ -308,26 +323,26 @@ func (l *typedList[E]) Watch(ctx context.Context, ch chan<- Event[E], opts ...Wa
 			if err != nil {
 				log.Errorf("Failed to decode list item: %v", err)
 			} else {
-				elem, err := l.codec.Decode(bytes)
-				if err != nil {
+				var elem E
+				if err := l.elementType.Unmarshal(bytes, &elem); err != nil {
 					log.Error(err)
 					continue
 				}
 
 				switch response.Event.Type {
-				case api.Event_ADD:
+				case listv1.Event_ADD:
 					ch <- Event[E]{
 						Type:  EventAdd,
 						Index: int(response.Event.Item.Index),
 						Value: elem,
 					}
-				case api.Event_REMOVE:
+				case listv1.Event_REMOVE:
 					ch <- Event[E]{
 						Type:  EventRemove,
 						Index: int(response.Event.Item.Index),
 						Value: elem,
 					}
-				case api.Event_REPLAY:
+				case listv1.Event_REPLAY:
 					ch <- Event[E]{
 						Type:  EventReplay,
 						Index: int(response.Event.Item.Index),
@@ -347,12 +362,12 @@ func (l *typedList[E]) Watch(ctx context.Context, ch chan<- Event[E], opts ...Wa
 }
 
 func (l *typedList[E]) Clear(ctx context.Context) error {
-	request := &api.ClearRequest{
+	request := &listv1.ClearRequest{
 		Headers: l.GetHeaders(),
 	}
 	_, err := l.client.Clear(ctx, request)
 	if err != nil {
-		return errors.From(err)
+		return errors.FromProto(err)
 	}
 	return nil
 }

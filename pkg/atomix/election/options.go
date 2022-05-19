@@ -4,15 +4,41 @@
 
 package election
 
-import (
-	"github.com/atomix/go-client/pkg/atomix/primitive"
-)
+import "github.com/google/uuid"
 
-// Option is a election option
+// Option is a counter option
 type Option interface {
-	primitive.Option
-	applyNewElection(options *newElectionOptions)
+	apply(options *Options)
 }
 
-// newElectionOptions is election options
-type newElectionOptions struct{}
+// Options is counter options
+type Options struct {
+	CandidateID string
+}
+
+func (o Options) apply(opts ...Option) {
+	for _, opt := range opts {
+		opt.apply(&o)
+	}
+	if o.CandidateID == "" {
+		o.CandidateID = uuid.New().String()
+	}
+}
+
+func newFuncOption(f func(*Options)) Option {
+	return funcOption{f}
+}
+
+type funcOption[K, V any] struct {
+	f func(*Options)
+}
+
+func (o funcOption) apply(options *Options) {
+	o.f(options)
+}
+
+func WithCandidateID(candidateID string) Option {
+	return newFuncOption(func(options *Options) {
+		options.CandidateID = candidateID
+	})
+}

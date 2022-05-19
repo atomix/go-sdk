@@ -1,53 +1,55 @@
-// SPDX-FileCopyrightText: 2020-present Open Networking Foundation <info@opennetworking.org>
+// SPDX-FileCopyrightText: 2022-present Intel Corporation
 //
 // SPDX-License-Identifier: Apache-2.0
 
 package primitive
 
-// Option is a primitive option
 type Option interface {
-	applyNew(*newOptions)
+	apply(*Options)
 }
 
-// EmptyOption is an empty primitive option
-type EmptyOption struct{}
-
-func (EmptyOption) applyNew(*newOptions) {}
-
-// newOptions is a set of primitive options
-type newOptions struct {
-	clusterKey string
-	sessionID  string
+type Options struct {
+	Labels map[string]string
 }
 
-// WithClusterKey sets the primitive cluster key
-func WithClusterKey(clusterKey string) Option {
-	return &clusterKeyOption{
-		clusterKey: clusterKey,
+func (o Options) apply(opts ...Option) {
+	for _, opt := range opts {
+		opt.apply(&o)
 	}
 }
 
-// clusterKeyOption is a cluster key option
-type clusterKeyOption struct {
-	clusterKey string
+func newFuncOption(f func(*Options)) Option {
+	return funcOption{f}
 }
 
-func (o *clusterKeyOption) applyNew(options *newOptions) {
-	options.clusterKey = o.clusterKey
+type funcOption struct {
+	f func(*Options)
 }
 
-// WithSessionID sets the primitive session identifier
-func WithSessionID(sessionID string) Option {
-	return &sessionIDOption{
-		sessionID: sessionID,
-	}
+func (o funcOption) apply(options *Options) {
+	o.f(options)
 }
 
-// sessionIDOption is a session identifier option
-type sessionIDOption struct {
-	sessionID string
+func WithLabel(key, value string) Option {
+	return newFuncOption(func(options *Options) {
+		if options.Labels == nil {
+			options.Labels = make(map[string]string)
+		}
+		options.Labels[key] = value
+	})
 }
 
-func (o *sessionIDOption) applyNew(options *newOptions) {
-	options.sessionID = o.sessionID
+func WithLabels(labels ...string) Option {
+	return newFuncOption(func(options *Options) {
+		if options.Labels == nil {
+			options.Labels = make(map[string]string)
+		}
+		if len(labels)%2 != 0 {
+			panic("expected an even number of key=value pairs")
+		}
+		for i := 0; i < len(labels)-1; i += 2 {
+			key, value := labels[i], labels[i+1]
+			options.Labels[key] = value
+		}
+	})
 }

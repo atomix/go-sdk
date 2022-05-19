@@ -5,13 +5,13 @@
 package gossip
 
 import (
-	protocolapi "github.com/atomix/atomix-api/go/atomix/protocol"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/cluster"
-	gossipprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/gossip"
-	gossipcounterprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/gossip/counter"
-	gossipmapprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/gossip/map"
-	gossipsetprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/gossip/set"
-	gossipvalueprotocol "github.com/atomix/atomix-go-framework/pkg/atomix/storage/protocol/gossip/value"
+	protocolapi "github.com/atomix/api/pkg/atomix/protocol"
+	"github.com/atomix/runtime/pkg/cluster"
+	gossipprotocol "github.com/atomix/runtime/pkg/storage/protocol/gossip"
+	gossipcounterprotocol "github.com/atomix/runtime/pkg/storage/protocol/gossip/counter"
+	gossipmapprotocol "github.com/atomix/runtime/pkg/storage/protocol/gossip/map"
+	gossipsetprotocol "github.com/atomix/runtime/pkg/storage/protocol/gossip/set"
+	gossipvalueprotocol "github.com/atomix/runtime/pkg/storage/protocol/gossip/value"
 )
 
 func newReplica(network cluster.Network, replica protocolapi.ProtocolReplica, protocol protocolapi.ProtocolConfig) *testReplica {

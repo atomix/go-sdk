@@ -6,32 +6,23 @@ package election
 
 import (
 	"context"
-	api "github.com/atomix/atomix-api/go/atomix/primitive/election"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
+	electionv1 "github.com/atomix/runtime/api/atomix/election/v1"
+	"github.com/atomix/runtime/pkg/errors"
+	"github.com/atomix/runtime/pkg/logging"
+	"github.com/atomix/runtime/pkg/meta"
 	"google.golang.org/grpc"
 	"io"
 )
 
-var log = logging.GetLogger("atomix", "client", "election")
-
-// Type is the election type
-const Type primitive.Type = "Election"
-
-// Client provides an API for creating Elections
-type Client interface {
-	// GetElection gets the Election instance of the given name
-	GetElection(ctx context.Context, name string, opts ...primitive.Option) (Election, error)
-}
+var log = logging.GetLogger()
 
 // Election provides distributed leader election
 type Election interface {
 	primitive.Primitive
 
-	// ID returns the election identifier
-	ID() string
+	// CandidateID returns the candidate identifier
+	CandidateID() string
 
 	// GetTerm gets the current election term
 	GetTerm(ctx context.Context) (*Term, error)
@@ -56,7 +47,7 @@ type Election interface {
 }
 
 // newTerm returns a new term from the response term
-func newTerm(term *api.Term) *Term {
+func newTerm(term *electionv1.Term) *Term {
 	if term == nil {
 		return nil
 	}
@@ -73,10 +64,10 @@ type Term struct {
 	meta.ObjectMeta
 
 	// Leader is the ID of the leader that was elected
-	Leader string
+	Leader uint64
 
 	// Candidates is a list of candidates currently participating in the election
-	Candidates []string
+	Candidates []uint64
 }
 
 // EventType is the type of an Election event
@@ -96,114 +87,114 @@ type Event struct {
 	Term Term
 }
 
-// New creates a new election primitive
-func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...primitive.Option) (Election, error) {
-	options := newElectionOptions{}
-	for _, opt := range opts {
-		if op, ok := opt.(Option); ok {
-			op.applyNewElection(&options)
-		}
-	}
-	e := &election{
-		Client:  primitive.NewClient(Type, name, conn, opts...),
-		client:  api.NewLeaderElectionServiceClient(conn),
-		options: options,
-	}
-	if err := e.Create(ctx); err != nil {
-		return nil, err
-	}
-	return e, nil
+func Client(conn *grpc.ClientConn) primitive.Client[Election, Option] {
+	return primitive.NewClient[Election, Option](newManager(conn), func(primitive *primitive.ManagedPrimitive, opts ...Option) (Election, error) {
+		return &election{
+			ManagedPrimitive: primitive,
+			client:           electionv1.NewLeaderElectionClient(conn),
+		}, nil
+	})
 }
 
 // election is the single partition implementation of Election
 type election struct {
-	*primitive.Client
-	client  api.LeaderElectionServiceClient
-	options newElectionOptions
+	*primitive.ManagedPrimitive
+	client      electionv1.LeaderElectionClient
+	candidateID string
 }
 
-func (e *election) ID() string {
-	return e.SessionID()
+func (e *election) CandidateID() string {
+	return e.candidateID
 }
 
 func (e *election) GetTerm(ctx context.Context) (*Term, error) {
-	request := &api.GetTermRequest{
+	request := &electionv1.GetTermRequest{
 		Headers: e.GetHeaders(),
 	}
 	response, err := e.client.GetTerm(ctx, request)
 	if err != nil {
-		return nil, errors.From(err)
+		return nil, errors.FromProto(err)
 	}
 	return newTerm(&response.Term), nil
 }
 
 func (e *election) Enter(ctx context.Context) (*Term, error) {
-	request := &api.EnterRequest{
-		Headers:     e.GetHeaders(),
-		CandidateID: e.SessionID(),
+	request := &electionv1.EnterRequest{
+		Headers: e.GetHeaders(),
+		EnterInput: electionv1.EnterInput{
+			CandidateID: e.candidateID,
+		},
 	}
 	response, err := e.client.Enter(ctx, request)
 	if err != nil {
-		return nil, errors.From(err)
+		return nil, errors.FromProto(err)
 	}
 	return newTerm(&response.Term), nil
 }
 
 func (e *election) Leave(ctx context.Context) (*Term, error) {
-	request := &api.WithdrawRequest{
-		Headers:     e.GetHeaders(),
-		CandidateID: e.SessionID(),
+	request := &electionv1.WithdrawRequest{
+		Headers: e.GetHeaders(),
+		WithdrawInput: electionv1.WithdrawInput{
+			CandidateID: e.candidateID,
+		},
 	}
 	response, err := e.client.Withdraw(ctx, request)
 	if err != nil {
-		return nil, errors.From(err)
+		return nil, errors.FromProto(err)
 	}
 	return newTerm(&response.Term), nil
 }
 
 func (e *election) Anoint(ctx context.Context, id string) (*Term, error) {
-	request := &api.AnointRequest{
-		Headers:     e.GetHeaders(),
-		CandidateID: id,
+	request := &electionv1.AnointRequest{
+		Headers: e.GetHeaders(),
+		AnointInput: electionv1.AnointInput{
+			CandidateID: id,
+		},
 	}
 	response, err := e.client.Anoint(ctx, request)
 	if err != nil {
-		return nil, errors.From(err)
+		return nil, errors.FromProto(err)
 	}
 	return newTerm(&response.Term), nil
 }
 
 func (e *election) Promote(ctx context.Context, id string) (*Term, error) {
-	request := &api.PromoteRequest{
-		Headers:     e.GetHeaders(),
-		CandidateID: id,
+	request := &electionv1.PromoteRequest{
+		Headers: e.GetHeaders(),
+		PromoteInput: electionv1.PromoteInput{
+			CandidateID: id,
+		},
 	}
 	response, err := e.client.Promote(ctx, request)
 	if err != nil {
-		return nil, errors.From(err)
+		return nil, errors.FromProto(err)
 	}
 	return newTerm(&response.Term), nil
 }
 
 func (e *election) Evict(ctx context.Context, id string) (*Term, error) {
-	request := &api.EvictRequest{
-		Headers:     e.GetHeaders(),
-		CandidateID: id,
+	request := &electionv1.EvictRequest{
+		Headers: e.GetHeaders(),
+		EvictInput: electionv1.EvictInput{
+			CandidateID: id,
+		},
 	}
 	response, err := e.client.Evict(ctx, request)
 	if err != nil {
-		return nil, errors.From(err)
+		return nil, errors.FromProto(err)
 	}
 	return newTerm(&response.Term), nil
 }
 
 func (e *election) Watch(ctx context.Context, ch chan<- Event) error {
-	request := &api.EventsRequest{
+	request := &electionv1.EventsRequest{
 		Headers: e.GetHeaders(),
 	}
 	stream, err := e.client.Events(ctx, request)
 	if err != nil {
-		return errors.From(err)
+		return errors.FromProto(err)
 	}
 
 	openCh := make(chan struct{})
@@ -221,7 +212,7 @@ func (e *election) Watch(ctx context.Context, ch chan<- Event) error {
 				if err == io.EOF {
 					return
 				}
-				err = errors.From(err)
+				err = errors.FromProto(err)
 				if errors.IsCanceled(err) || errors.IsTimeout(err) {
 					return
 				}
@@ -235,7 +226,7 @@ func (e *election) Watch(ctx context.Context, ch chan<- Event) error {
 			}
 
 			switch response.Event.Type {
-			case api.Event_CHANGED:
+			case electionv1.Event_CHANGED:
 				ch <- Event{
 					Type: EventChange,
 					Term: *newTerm(&response.Event.Term),

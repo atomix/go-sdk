@@ -6,8 +6,8 @@ package rsm
 
 import (
 	"context"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
 	"github.com/atomix/go-client/pkg/atomix/test"
+	"github.com/atomix/runtime/pkg/logging"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

@@ -6,21 +6,12 @@ package lock
 
 import (
 	"context"
-	api "github.com/atomix/atomix-api/go/atomix/primitive/lock"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
+	lockv1 "github.com/atomix/runtime/api/atomix/lock/v1"
+	"github.com/atomix/runtime/pkg/errors"
+	"github.com/atomix/runtime/pkg/meta"
 	"google.golang.org/grpc"
 )
-
-// Type is the lock type
-const Type primitive.Type = "Lock"
-
-// Client provides an API for creating Locks
-type Client interface {
-	// GetLock gets the Lock instance of the given name
-	GetLock(ctx context.Context, name string, opts ...primitive.Option) (Lock, error)
-}
 
 // Lock provides distributed concurrency control
 type Lock interface {
@@ -52,35 +43,24 @@ const (
 	StateUnlocked
 )
 
-// New creates a new Lock primitive for the given partitions
-// The lock will be created in one of the given partitions.
-func New(ctx context.Context, name string, conn *grpc.ClientConn, opts ...primitive.Option) (Lock, error) {
-	options := newLockOptions{}
-	for _, opt := range opts {
-		if op, ok := opt.(Option); ok {
-			op.applyNewLock(&options)
-		}
-	}
-	l := &lock{
-		Client:  primitive.NewClient(Type, name, conn, opts...),
-		client:  api.NewLockServiceClient(conn),
-		options: options,
-	}
-	if err := l.Create(ctx); err != nil {
-		return nil, err
-	}
-	return l, nil
+func Client(conn *grpc.ClientConn) primitive.Client[Lock, Option] {
+	return primitive.NewClient[Lock, Option](newManager(conn), func(primitive *primitive.ManagedPrimitive, opts ...Option) (Lock, error) {
+		return &lock{
+			ManagedPrimitive: primitive,
+			client:           lockv1.NewLockClient(conn),
+		}, nil
+	})
 }
 
 // lock is the single partition implementation of Lock
 type lock struct {
-	*primitive.Client
-	client  api.LockServiceClient
+	*primitive.ManagedPrimitive
+	client  lockv1.LockClient
 	options newLockOptions
 }
 
 func (l *lock) Lock(ctx context.Context, opts ...LockOption) (Status, error) {
-	request := &api.LockRequest{
+	request := &lockv1.LockRequest{
 		Headers: l.GetHeaders(),
 	}
 	for i := range opts {
@@ -88,16 +68,16 @@ func (l *lock) Lock(ctx context.Context, opts ...LockOption) (Status, error) {
 	}
 	response, err := l.client.Lock(ctx, request)
 	if err != nil {
-		return Status{}, errors.From(err)
+		return Status{}, errors.FromProto(err)
 	}
 	for i := range opts {
 		opts[i].afterLock(response)
 	}
 	var state State
 	switch response.Lock.State {
-	case api.Lock_LOCKED:
+	case lockv1.LockInstance_LOCKED:
 		state = StateLocked
-	case api.Lock_UNLOCKED:
+	case lockv1.LockInstance_UNLOCKED:
 		state = StateUnlocked
 	}
 	return Status{
@@ -107,7 +87,7 @@ func (l *lock) Lock(ctx context.Context, opts ...LockOption) (Status, error) {
 }
 
 func (l *lock) Unlock(ctx context.Context, opts ...UnlockOption) error {
-	request := &api.UnlockRequest{
+	request := &lockv1.UnlockRequest{
 		Headers: l.GetHeaders(),
 	}
 	for i := range opts {
@@ -115,7 +95,7 @@ func (l *lock) Unlock(ctx context.Context, opts ...UnlockOption) error {
 	}
 	response, err := l.client.Unlock(ctx, request)
 	if err != nil {
-		return errors.From(err)
+		return errors.FromProto(err)
 	}
 	for i := range opts {
 		opts[i].afterUnlock(response)
@@ -124,7 +104,7 @@ func (l *lock) Unlock(ctx context.Context, opts ...UnlockOption) error {
 }
 
 func (l *lock) Get(ctx context.Context, opts ...GetOption) (Status, error) {
-	request := &api.GetLockRequest{
+	request := &lockv1.GetLockRequest{
 		Headers: l.GetHeaders(),
 	}
 	for i := range opts {
@@ -132,16 +112,16 @@ func (l *lock) Get(ctx context.Context, opts ...GetOption) (Status, error) {
 	}
 	response, err := l.client.GetLock(ctx, request)
 	if err != nil {
-		return Status{}, errors.From(err)
+		return Status{}, errors.FromProto(err)
 	}
 	for i := range opts {
 		opts[i].afterGet(response)
 	}
 	var state State
 	switch response.Lock.State {
-	case api.Lock_LOCKED:
+	case lockv1.LockInstance_LOCKED:
 		state = StateLocked
-	case api.Lock_UNLOCKED:
+	case lockv1.LockInstance_UNLOCKED:
 		state = StateUnlocked
 	}
 	return Status{

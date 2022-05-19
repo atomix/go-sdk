@@ -5,8 +5,8 @@
 package value
 
 import (
-	api "github.com/atomix/atomix-api/go/atomix/primitive/value"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
+	api "github.com/atomix/api/pkg/atomix/value/v1"
+	"github.com/atomix/runtime/pkg/meta"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

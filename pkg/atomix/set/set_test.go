@@ -6,10 +6,10 @@ package set
 
 import (
 	"context"
-	primitiveapi "github.com/atomix/atomix-api/go/atomix/primitive"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	primitiveapi "github.com/atomix/api/pkg/atomix"
 	"github.com/atomix/go-client/pkg/atomix/primitive/codec"
 	"github.com/atomix/go-client/pkg/atomix/util/test"
+	"github.com/atomix/runtime/pkg/logging"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

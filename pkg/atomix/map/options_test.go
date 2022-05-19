@@ -5,22 +5,22 @@
 package _map //nolint:golint
 
 import (
-	api "github.com/atomix/atomix-api/go/atomix/primitive/map"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
+	mapv1 "github.com/atomix/runtime/api/atomix/map/v1"
+	"github.com/atomix/runtime/pkg/meta"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestOptions(t *testing.T) {
-	putRequest := &api.PutRequest{}
+	putRequest := &mapv1.PutRequest{}
 	IfMatch(meta.ObjectMeta{Revision: 1}).beforePut(putRequest)
-	assert.Equal(t, meta.Revision(1), meta.Revision(putRequest.Preconditions[0].GetMetadata().Revision.Num))
+	assert.Equal(t, meta.Revision(1), meta.Revision(putRequest.Preconditions[0].GetMetadata().Revision))
 
-	removeRequest := &api.RemoveRequest{}
+	removeRequest := &mapv1.RemoveRequest{}
 	IfMatch(meta.ObjectMeta{Revision: 2}).beforeRemove(removeRequest)
-	assert.Equal(t, meta.Revision(2), meta.Revision(removeRequest.Preconditions[0].GetMetadata().Revision.Num))
+	assert.Equal(t, meta.Revision(2), meta.Revision(removeRequest.Preconditions[0].GetMetadata().Revision))
 
-	eventRequest := &api.EventsRequest{}
+	eventRequest := &mapv1.EventsRequest{}
 	assert.False(t, eventRequest.Replay)
 	WithReplay().beforeWatch(eventRequest)
 	assert.True(t, eventRequest.Replay)

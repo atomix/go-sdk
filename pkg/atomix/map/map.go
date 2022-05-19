@@ -7,19 +7,17 @@ package _map //nolint:golint
 import (
 	"context"
 	"fmt"
-	api "github.com/atomix/atomix-api/go/atomix/primitive/map"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/meta"
+	"github.com/atomix/go-client/pkg/atomix/generic"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
-	"github.com/atomix/go-client/pkg/atomix/primitive/codec"
+	mapv1 "github.com/atomix/runtime/api/atomix/map/v1"
+	"github.com/atomix/runtime/pkg/errors"
+	"github.com/atomix/runtime/pkg/logging"
+	"github.com/atomix/runtime/pkg/meta"
 	"google.golang.org/grpc"
 	"io"
 )
 
-const Type primitive.Type = "Map"
-
-var log = logging.GetLogger("atomix", "client", "map")
+var log = logging.GetLogger()
 
 // Map is a distributed set of keys and values
 type Map[K, V any] interface {
@@ -95,57 +93,64 @@ type Event[K, V any] struct {
 	Entry Entry[K, V]
 }
 
-// New creates a new partitioned Map
-func New[K, V any](ctx context.Context, name string, conn *grpc.ClientConn, opts ...primitive.Option) (Map[K, V], error) {
-	mapOptions := newMapOptions[K, V]{}
-	for _, opt := range opts {
-		if op, ok := opt.(Option[K, V]); ok {
-			op.applyNewMap(&mapOptions)
+func Client[K, V any](conn *grpc.ClientConn) primitive.Client[Map[K, V], Option[K, V]] {
+	return primitive.NewClient[Map[K, V], Option[K, V]](newManager(conn), func(primitive *primitive.ManagedPrimitive, opts ...Option[K, V]) (Map[K, V], error) {
+		var options Options[K, V]
+		for _, opt := range opts {
+			opt.apply(&options)
 		}
-	}
-	if mapOptions.keyCodec == nil {
-		mapOptions.keyCodec = codec.String().(codec.Codec[K])
-	}
-	if mapOptions.valueCodec == nil {
-		mapOptions.valueCodec = codec.Bytes().(codec.Codec[V])
-	}
-	m := &typedMap[K, V]{
-		Client:     primitive.NewClient(Type, name, conn, opts...),
-		client:     api.NewMapServiceClient(conn),
-		keyCodec:   mapOptions.keyCodec,
-		valueCodec: mapOptions.valueCodec,
-	}
-	if err := m.Create(ctx); err != nil {
-		return nil, err
-	}
-	return m, nil
+		if options.KeyType == nil {
+			stringType := generic.String()
+			if keyType, ok := stringType.(generic.Type[K]); ok {
+				options.KeyType = keyType
+			} else {
+				return nil, errors.NewInvalid("must configure a generic type for key parameter")
+			}
+		}
+		if options.ValueType == nil {
+			jsonType := generic.JSON[V]()
+			if valueType, ok := jsonType.(generic.Type[V]); ok {
+				options.ValueType = valueType
+			} else {
+				return nil, errors.NewInvalid("must configure a generic type for key parameter")
+			}
+		}
+		return &typedMap[K, V]{
+			ManagedPrimitive: primitive,
+			client:           mapv1.NewMapClient(conn),
+			keyType:          options.KeyType,
+			valueType:        options.ValueType,
+		}, nil
+	})
 }
 
 type typedMap[K, V any] struct {
-	*primitive.Client
-	client     api.MapServiceClient
-	keyCodec   codec.Codec[K]
-	valueCodec codec.Codec[V]
+	*primitive.ManagedPrimitive
+	client    mapv1.MapClient
+	keyType   generic.Type[K]
+	valueType generic.Type[V]
 }
 
 func (m *typedMap[K, V]) Put(ctx context.Context, key K, value V, opts ...PutOption) (*Entry[K, V], error) {
-	keyBytes, err := m.keyCodec.Encode(key)
+	keyBytes, err := m.keyType.Marshal(&key)
 	if err != nil {
 		return nil, errors.NewInvalid("key encoding failed", err)
 	}
-	valueBytes, err := m.valueCodec.Encode(value)
+	valueBytes, err := m.valueType.Marshal(&value)
 	if err != nil {
 		return nil, errors.NewInvalid("value encoding failed", err)
 	}
 
-	request := &api.PutRequest{
+	request := &mapv1.PutRequest{
 		Headers: m.GetHeaders(),
-		Entry: api.Entry{
-			Key: api.Key{
-				Key: string(keyBytes),
-			},
-			Value: &api.Value{
-				Value: valueBytes,
+		PutInput: mapv1.PutInput{
+			Entry: mapv1.Entry{
+				Key: mapv1.Key{
+					Key: string(keyBytes),
+				},
+				Value: &mapv1.Value{
+					Value: valueBytes,
+				},
 			},
 		},
 	}
@@ -154,7 +159,7 @@ func (m *typedMap[K, V]) Put(ctx context.Context, key K, value V, opts ...PutOpt
 	}
 	response, err := m.client.Put(ctx, request)
 	if err != nil {
-		return nil, errors.From(err)
+		return nil, errors.FromProto(err)
 	}
 	for i := range opts {
 		opts[i].afterPut(response)
@@ -163,20 +168,22 @@ func (m *typedMap[K, V]) Put(ctx context.Context, key K, value V, opts ...PutOpt
 }
 
 func (m *typedMap[K, V]) Get(ctx context.Context, key K, opts ...GetOption) (*Entry[K, V], error) {
-	keyBytes, err := m.keyCodec.Encode(key)
+	keyBytes, err := m.keyType.Marshal(&key)
 	if err != nil {
 		return nil, errors.NewInvalid("key encoding failed", err)
 	}
-	request := &api.GetRequest{
+	request := &mapv1.GetRequest{
 		Headers: m.GetHeaders(),
-		Key:     string(keyBytes),
+		GetInput: mapv1.GetInput{
+			Key: string(keyBytes),
+		},
 	}
 	for i := range opts {
 		opts[i].beforeGet(request)
 	}
 	response, err := m.client.Get(ctx, request)
 	if err != nil {
-		return nil, errors.From(err)
+		return nil, errors.FromProto(err)
 	}
 	for i := range opts {
 		opts[i].afterGet(response)
@@ -185,14 +192,16 @@ func (m *typedMap[K, V]) Get(ctx context.Context, key K, opts ...GetOption) (*En
 }
 
 func (m *typedMap[K, V]) Remove(ctx context.Context, key K, opts ...RemoveOption) (*Entry[K, V], error) {
-	keyBytes, err := m.keyCodec.Encode(key)
+	keyBytes, err := m.keyType.Marshal(&key)
 	if err != nil {
 		return nil, errors.NewInvalid("key encoding failed", err)
 	}
-	request := &api.RemoveRequest{
+	request := &mapv1.RemoveRequest{
 		Headers: m.GetHeaders(),
-		Key: api.Key{
-			Key: string(keyBytes),
+		RemoveInput: mapv1.RemoveInput{
+			Key: mapv1.Key{
+				Key: string(keyBytes),
+			},
 		},
 	}
 	for i := range opts {
@@ -200,7 +209,7 @@ func (m *typedMap[K, V]) Remove(ctx context.Context, key K, opts ...RemoveOption
 	}
 	response, err := m.client.Remove(ctx, request)
 	if err != nil {
-		return nil, errors.From(err)
+		return nil, errors.FromProto(err)
 	}
 	for i := range opts {
 		opts[i].afterRemove(response)
@@ -209,34 +218,34 @@ func (m *typedMap[K, V]) Remove(ctx context.Context, key K, opts ...RemoveOption
 }
 
 func (m *typedMap[K, V]) Len(ctx context.Context) (int, error) {
-	request := &api.SizeRequest{
+	request := &mapv1.SizeRequest{
 		Headers: m.GetHeaders(),
 	}
 	response, err := m.client.Size(ctx, request)
 	if err != nil {
-		return 0, errors.From(err)
+		return 0, errors.FromProto(err)
 	}
 	return int(response.Size_), nil
 }
 
 func (m *typedMap[K, V]) Clear(ctx context.Context) error {
-	request := &api.ClearRequest{
+	request := &mapv1.ClearRequest{
 		Headers: m.GetHeaders(),
 	}
 	_, err := m.client.Clear(ctx, request)
 	if err != nil {
-		return errors.From(err)
+		return errors.FromProto(err)
 	}
 	return nil
 }
 
 func (m *typedMap[K, V]) Entries(ctx context.Context, ch chan<- Entry[K, V]) error {
-	request := &api.EntriesRequest{
+	request := &mapv1.EntriesRequest{
 		Headers: m.GetHeaders(),
 	}
 	stream, err := m.client.Entries(ctx, request)
 	if err != nil {
-		return errors.From(err)
+		return errors.FromProto(err)
 	}
 
 	go func() {
@@ -247,7 +256,7 @@ func (m *typedMap[K, V]) Entries(ctx context.Context, ch chan<- Entry[K, V]) err
 				if err == io.EOF {
 					return
 				}
-				err = errors.From(err)
+				err = errors.FromProto(err)
 				if errors.IsCanceled(err) || errors.IsTimeout(err) {
 					return
 				}
@@ -266,7 +275,7 @@ func (m *typedMap[K, V]) Entries(ctx context.Context, ch chan<- Entry[K, V]) err
 }
 
 func (m *typedMap[K, V]) Watch(ctx context.Context, ch chan<- Event[K, V], opts ...WatchOption) error {
-	request := &api.EventsRequest{
+	request := &mapv1.EventsRequest{
 		Headers: m.GetHeaders(),
 	}
 	for i := range opts {
@@ -275,7 +284,7 @@ func (m *typedMap[K, V]) Watch(ctx context.Context, ch chan<- Event[K, V], opts 
 
 	stream, err := m.client.Events(ctx, request)
 	if err != nil {
-		return errors.From(err)
+		return errors.FromProto(err)
 	}
 
 	openCh := make(chan struct{})
@@ -293,7 +302,7 @@ func (m *typedMap[K, V]) Watch(ctx context.Context, ch chan<- Event[K, V], opts 
 				if err == io.EOF {
 					return
 				}
-				err = errors.From(err)
+				err = errors.FromProto(err)
 				if errors.IsCanceled(err) || errors.IsTimeout(err) {
 					return
 				}
@@ -317,22 +326,22 @@ func (m *typedMap[K, V]) Watch(ctx context.Context, ch chan<- Event[K, V], opts 
 			}
 
 			switch response.Event.Type {
-			case api.Event_INSERT:
+			case mapv1.Event_INSERT:
 				ch <- Event[K, V]{
 					Type:  EventInsert,
 					Entry: *entry,
 				}
-			case api.Event_UPDATE:
+			case mapv1.Event_UPDATE:
 				ch <- Event[K, V]{
 					Type:  EventUpdate,
 					Entry: *entry,
 				}
-			case api.Event_REMOVE:
+			case mapv1.Event_REMOVE:
 				ch <- Event[K, V]{
 					Type:  EventRemove,
 					Entry: *entry,
 				}
-			case api.Event_REPLAY:
+			case mapv1.Event_REPLAY:
 				ch <- Event[K, V]{
 					Type:  EventReplay,
 					Entry: *entry,
@@ -349,16 +358,16 @@ func (m *typedMap[K, V]) Watch(ctx context.Context, ch chan<- Event[K, V], opts 
 	}
 }
 
-func (m *typedMap[K, V]) newEntry(entry *api.Entry) (*Entry[K, V], error) {
+func (m *typedMap[K, V]) newEntry(entry *mapv1.Entry) (*Entry[K, V], error) {
 	if entry == nil {
 		return nil, nil
 	}
-	key, err := m.keyCodec.Decode([]byte(entry.Key.Key))
-	if err != nil {
+	var key K
+	if err := m.keyType.Unmarshal([]byte(entry.Key.Key), &key); err != nil {
 		return nil, errors.NewInvalid("key decoding failed", err)
 	}
-	value, err := m.valueCodec.Decode(entry.Value.Value)
-	if err != nil {
+	var value V
+	if err := m.valueType.Unmarshal(entry.Value.Value, &value); err != nil {
 		return nil, errors.NewInvalid("value decoding failed", err)
 	}
 	return &Entry[K, V]{

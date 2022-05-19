@@ -7,19 +7,16 @@ package set
 import (
 	"context"
 	"encoding/base64"
-	api "github.com/atomix/atomix-api/go/atomix/primitive/set"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/errors"
-	"github.com/atomix/atomix-go-framework/pkg/atomix/logging"
+	"github.com/atomix/go-client/pkg/atomix/generic"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
-	"github.com/atomix/go-client/pkg/atomix/primitive/codec"
+	setv1 "github.com/atomix/runtime/api/atomix/set/v1"
+	"github.com/atomix/runtime/pkg/errors"
+	"github.com/atomix/runtime/pkg/logging"
 	"google.golang.org/grpc"
 	"io"
 )
 
 var log = logging.GetLogger("atomix", "client", "set")
-
-// Type is the set type
-const Type primitive.Type = "Set"
 
 // Set provides a distributed set data structure
 // The set values are defines as strings. To store more complex types in the set, encode values to strings e.g.
@@ -75,48 +72,50 @@ type Event[E any] struct {
 	Value E
 }
 
-// New creates a new partitioned set primitive
-func New[E any](ctx context.Context, name string, conn *grpc.ClientConn, opts ...primitive.Option) (Set[E], error) {
-	options := newSetOptions[E]{}
-	for _, opt := range opts {
-		if op, ok := opt.(Option[E]); ok {
-			op.applyNewSet(&options)
+func Client[E any](conn *grpc.ClientConn) primitive.Client[Set[E], Option[E]] {
+	return primitive.NewClient[Set[E], Option[E]](newManager(conn), func(primitive *primitive.ManagedPrimitive, opts ...Option[E]) (Set[E], error) {
+		var options Options[E]
+		for _, opt := range opts {
+			opt.apply(&options)
 		}
-	}
-	if options.elementCodec == nil {
-		options.elementCodec = codec.String().(codec.Codec[E])
-	}
-	s := &typedSet[E]{
-		Client: primitive.NewClient(Type, name, conn, opts...),
-		client: api.NewSetServiceClient(conn),
-		codec:  options.elementCodec,
-	}
-	if err := s.Create(ctx); err != nil {
-		return nil, err
-	}
-	return s, nil
+		if options.ElementType == nil {
+			stringType := generic.Bytes()
+			if elementType, ok := stringType.(generic.Type[E]); ok {
+				options.ElementType = elementType
+			} else {
+				return nil, errors.NewInvalid("must configure a generic type for key parameter")
+			}
+		}
+		return &typedSet[E]{
+			ManagedPrimitive: primitive,
+			client:           setv1.NewSetClient(conn),
+			elementType:      options.ElementType,
+		}, nil
+	})
 }
 
 type typedSet[E any] struct {
-	*primitive.Client
-	client api.SetServiceClient
-	codec  codec.Codec[E]
+	*primitive.ManagedPrimitive
+	client      setv1.SetClient
+	elementType generic.Type[E]
 }
 
 func (s *typedSet[E]) Add(ctx context.Context, value E) (bool, error) {
-	bytes, err := s.codec.Encode(value)
+	bytes, err := s.elementType.Marshal(&value)
 	if err != nil {
 		return false, errors.NewInvalid("element encoding failed", err)
 	}
-	request := &api.AddRequest{
+	request := &setv1.AddRequest{
 		Headers: s.GetHeaders(),
-		Element: api.Element{
-			Value: base64.StdEncoding.EncodeToString(bytes),
+		AddInput: setv1.AddInput{
+			Element: setv1.Element{
+				Value: base64.StdEncoding.EncodeToString(bytes),
+			},
 		},
 	}
 	_, err = s.client.Add(ctx, request)
 	if err != nil {
-		err = errors.From(err)
+		err = errors.FromProto(err)
 		if errors.IsAlreadyExists(err) {
 			return false, nil
 		}
@@ -126,19 +125,21 @@ func (s *typedSet[E]) Add(ctx context.Context, value E) (bool, error) {
 }
 
 func (s *typedSet[E]) Remove(ctx context.Context, value E) (bool, error) {
-	bytes, err := s.codec.Encode(value)
+	bytes, err := s.elementType.Marshal(&value)
 	if err != nil {
 		return false, errors.NewInvalid("element encoding failed", err)
 	}
-	request := &api.RemoveRequest{
+	request := &setv1.RemoveRequest{
 		Headers: s.GetHeaders(),
-		Element: api.Element{
-			Value: base64.StdEncoding.EncodeToString(bytes),
+		RemoveInput: setv1.RemoveInput{
+			Element: setv1.Element{
+				Value: base64.StdEncoding.EncodeToString(bytes),
+			},
 		},
 	}
 	_, err = s.client.Remove(ctx, request)
 	if err != nil {
-		err = errors.From(err)
+		err = errors.FromProto(err)
 		if errors.IsNotFound(err) {
 			return false, nil
 		}
@@ -148,52 +149,54 @@ func (s *typedSet[E]) Remove(ctx context.Context, value E) (bool, error) {
 }
 
 func (s *typedSet[E]) Contains(ctx context.Context, value E) (bool, error) {
-	bytes, err := s.codec.Encode(value)
+	bytes, err := s.elementType.Marshal(&value)
 	if err != nil {
 		return false, errors.NewInvalid("element encoding failed", err)
 	}
-	request := &api.ContainsRequest{
+	request := &setv1.ContainsRequest{
 		Headers: s.GetHeaders(),
-		Element: api.Element{
-			Value: base64.StdEncoding.EncodeToString(bytes),
+		ContainsInput: setv1.ContainsInput{
+			Element: setv1.Element{
+				Value: base64.StdEncoding.EncodeToString(bytes),
+			},
 		},
 	}
 	response, err := s.client.Contains(ctx, request)
 	if err != nil {
-		return false, errors.From(err)
+		return false, errors.FromProto(err)
 	}
 	return response.Contains, nil
 }
 
 func (s *typedSet[E]) Len(ctx context.Context) (int, error) {
-	request := &api.SizeRequest{
+	request := &setv1.SizeRequest{
 		Headers: s.GetHeaders(),
 	}
 	response, err := s.client.Size(ctx, request)
 	if err != nil {
-		return 0, errors.From(err)
+		return 0, errors.FromProto(err)
 	}
 	return int(response.Size_), nil
 }
 
 func (s *typedSet[E]) Clear(ctx context.Context) error {
-	request := &api.ClearRequest{
+	request := &setv1.ClearRequest{
 		Headers: s.GetHeaders(),
 	}
 	_, err := s.client.Clear(ctx, request)
 	if err != nil {
-		return errors.From(err)
+		return errors.FromProto(err)
 	}
 	return nil
 }
 
 func (s *typedSet[E]) Elements(ctx context.Context, ch chan<- E) error {
-	request := &api.ElementsRequest{
+	request := &setv1.ElementsRequest{
 		Headers: s.GetHeaders(),
 	}
 	stream, err := s.client.Elements(ctx, request)
 	if err != nil {
-		return errors.From(err)
+		return errors.FromProto(err)
 	}
 
 	go func() {
@@ -204,7 +207,7 @@ func (s *typedSet[E]) Elements(ctx context.Context, ch chan<- E) error {
 				if err == io.EOF {
 					return
 				}
-				err = errors.From(err)
+				err = errors.FromProto(err)
 				if errors.IsCanceled(err) || errors.IsTimeout(err) {
 					return
 				}
@@ -216,8 +219,8 @@ func (s *typedSet[E]) Elements(ctx context.Context, ch chan<- E) error {
 			if err != nil {
 				log.Errorf("Failed to decode list item: %v", err)
 			} else {
-				elem, err := s.codec.Decode(bytes)
-				if err != nil {
+				var elem E
+				if err := s.elementType.Unmarshal(bytes, &elem); err != nil {
 					log.Error(err)
 				} else {
 					ch <- elem
@@ -229,7 +232,7 @@ func (s *typedSet[E]) Elements(ctx context.Context, ch chan<- E) error {
 }
 
 func (s *typedSet[E]) Watch(ctx context.Context, ch chan<- Event[E], opts ...WatchOption) error {
-	request := &api.EventsRequest{
+	request := &setv1.EventsRequest{
 		Headers: s.GetHeaders(),
 	}
 	for i := range opts {
@@ -238,7 +241,7 @@ func (s *typedSet[E]) Watch(ctx context.Context, ch chan<- Event[E], opts ...Wat
 
 	stream, err := s.client.Events(ctx, request)
 	if err != nil {
-		return errors.From(err)
+		return errors.FromProto(err)
 	}
 
 	openCh := make(chan struct{})
@@ -256,7 +259,7 @@ func (s *typedSet[E]) Watch(ctx context.Context, ch chan<- Event[E], opts ...Wat
 				if err == io.EOF {
 					return
 				}
-				err = errors.From(err)
+				err = errors.FromProto(err)
 				if errors.IsCanceled(err) || errors.IsTimeout(err) {
 					return
 				}
@@ -276,24 +279,24 @@ func (s *typedSet[E]) Watch(ctx context.Context, ch chan<- Event[E], opts ...Wat
 			if err != nil {
 				log.Errorf("Failed to decode list item: %v", err)
 			} else {
-				elem, err := s.codec.Decode(bytes)
-				if err != nil {
+				var elem E
+				if err := s.elementType.Unmarshal(bytes, &elem); err != nil {
 					log.Error(err)
 					continue
 				}
 
 				switch response.Event.Type {
-				case api.Event_ADD:
+				case setv1.Event_ADD:
 					ch <- Event[E]{
 						Type:  EventAdd,
 						Value: elem,
 					}
-				case api.Event_REMOVE:
+				case setv1.Event_REMOVE:
 					ch <- Event[E]{
 						Type:  EventRemove,
 						Value: elem,
 					}
-				case api.Event_REPLAY:
+				case setv1.Event_REPLAY:
 					ch <- Event[E]{
 						Type:  EventReplay,
 						Value: elem,
