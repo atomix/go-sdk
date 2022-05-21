@@ -11,9 +11,10 @@ import (
 	"github.com/atomix/runtime/pkg/errors"
 	"github.com/atomix/runtime/pkg/logging"
 	"github.com/atomix/runtime/pkg/meta"
-	"google.golang.org/grpc"
 	"io"
 )
+
+const serviceName = "atomix.election.v1.LeaderElection"
 
 var log = logging.GetLogger()
 
@@ -87,27 +88,43 @@ type Event struct {
 	Term Term
 }
 
-func Client(conn *grpc.ClientConn) primitive.Client[Election, Option] {
-	return primitive.NewClient[Election, Option](newManager(conn), func(primitive *primitive.ManagedPrimitive, opts ...Option) (Election, error) {
-		return &election{
-			ManagedPrimitive: primitive,
-			client:           electionv1.NewLeaderElectionClient(conn),
-		}, nil
+func Provider(client primitive.Client) primitive.Provider[Election, Option] {
+	return primitive.NewProvider[Election, Option](func(ctx context.Context, name string, opts ...primitive.Option) func(...Option) (Election, error) {
+		return func(electionOpts ...Option) (Election, error) {
+			// Process the primitive options
+			var options Options
+			options.apply(electionOpts...)
+
+			// Construct the primitive configuration
+			var config electionv1.LeaderElectionConfig
+
+			// Open the primitive connection
+			base, conn, err := primitive.Open[*electionv1.LeaderElectionConfig](client)(ctx, serviceName, name, &config, opts...)
+			if err != nil {
+				return nil, err
+			}
+
+			// Create the primitive instance
+			return &electionPrimitive{
+				ManagedPrimitive: base,
+				client:           electionv1.NewLeaderElectionClient(conn),
+			}, nil
+		}
 	})
 }
 
-// election is the single partition implementation of Election
-type election struct {
+// electionPrimitive is the single partition implementation of Election
+type electionPrimitive struct {
 	*primitive.ManagedPrimitive
 	client      electionv1.LeaderElectionClient
 	candidateID string
 }
 
-func (e *election) CandidateID() string {
+func (e *electionPrimitive) CandidateID() string {
 	return e.candidateID
 }
 
-func (e *election) GetTerm(ctx context.Context) (*Term, error) {
+func (e *electionPrimitive) GetTerm(ctx context.Context) (*Term, error) {
 	request := &electionv1.GetTermRequest{
 		Headers: e.GetHeaders(),
 	}
@@ -118,7 +135,7 @@ func (e *election) GetTerm(ctx context.Context) (*Term, error) {
 	return newTerm(&response.Term), nil
 }
 
-func (e *election) Enter(ctx context.Context) (*Term, error) {
+func (e *electionPrimitive) Enter(ctx context.Context) (*Term, error) {
 	request := &electionv1.EnterRequest{
 		Headers: e.GetHeaders(),
 		EnterInput: electionv1.EnterInput{
@@ -132,7 +149,7 @@ func (e *election) Enter(ctx context.Context) (*Term, error) {
 	return newTerm(&response.Term), nil
 }
 
-func (e *election) Leave(ctx context.Context) (*Term, error) {
+func (e *electionPrimitive) Leave(ctx context.Context) (*Term, error) {
 	request := &electionv1.WithdrawRequest{
 		Headers: e.GetHeaders(),
 		WithdrawInput: electionv1.WithdrawInput{
@@ -146,7 +163,7 @@ func (e *election) Leave(ctx context.Context) (*Term, error) {
 	return newTerm(&response.Term), nil
 }
 
-func (e *election) Anoint(ctx context.Context, id string) (*Term, error) {
+func (e *electionPrimitive) Anoint(ctx context.Context, id string) (*Term, error) {
 	request := &electionv1.AnointRequest{
 		Headers: e.GetHeaders(),
 		AnointInput: electionv1.AnointInput{
@@ -160,7 +177,7 @@ func (e *election) Anoint(ctx context.Context, id string) (*Term, error) {
 	return newTerm(&response.Term), nil
 }
 
-func (e *election) Promote(ctx context.Context, id string) (*Term, error) {
+func (e *electionPrimitive) Promote(ctx context.Context, id string) (*Term, error) {
 	request := &electionv1.PromoteRequest{
 		Headers: e.GetHeaders(),
 		PromoteInput: electionv1.PromoteInput{
@@ -174,7 +191,7 @@ func (e *election) Promote(ctx context.Context, id string) (*Term, error) {
 	return newTerm(&response.Term), nil
 }
 
-func (e *election) Evict(ctx context.Context, id string) (*Term, error) {
+func (e *electionPrimitive) Evict(ctx context.Context, id string) (*Term, error) {
 	request := &electionv1.EvictRequest{
 		Headers: e.GetHeaders(),
 		EvictInput: electionv1.EvictInput{
@@ -188,7 +205,7 @@ func (e *election) Evict(ctx context.Context, id string) (*Term, error) {
 	return newTerm(&response.Term), nil
 }
 
-func (e *election) Watch(ctx context.Context, ch chan<- Event) error {
+func (e *electionPrimitive) Watch(ctx context.Context, ch chan<- Event) error {
 	request := &electionv1.EventsRequest{
 		Headers: e.GetHeaders(),
 	}

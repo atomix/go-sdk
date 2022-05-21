@@ -10,8 +10,9 @@ import (
 	lockv1 "github.com/atomix/runtime/api/atomix/lock/v1"
 	"github.com/atomix/runtime/pkg/errors"
 	"github.com/atomix/runtime/pkg/meta"
-	"google.golang.org/grpc"
 )
+
+const serviceName = "atomix.lock.v1.Lock"
 
 // Lock provides distributed concurrency control
 type Lock interface {
@@ -43,23 +44,39 @@ const (
 	StateUnlocked
 )
 
-func Client(conn *grpc.ClientConn) primitive.Client[Lock, Option] {
-	return primitive.NewClient[Lock, Option](newManager(conn), func(primitive *primitive.ManagedPrimitive, opts ...Option) (Lock, error) {
-		return &lock{
-			ManagedPrimitive: primitive,
-			client:           lockv1.NewLockClient(conn),
-		}, nil
+func Provider(client primitive.Client) primitive.Provider[Lock, Option] {
+	return primitive.NewProvider[Lock, Option](func(ctx context.Context, name string, opts ...primitive.Option) func(...Option) (Lock, error) {
+		return func(lockOpts ...Option) (Lock, error) {
+			// Process the primitive options
+			var options Options
+			options.apply(lockOpts...)
+
+			// Construct the primitive configuration
+			var config lockv1.LockConfig
+
+			// Open the primitive connection
+			base, conn, err := primitive.Open[*lockv1.LockConfig](client)(ctx, serviceName, name, &config, opts...)
+			if err != nil {
+				return nil, err
+			}
+
+			// Create the primitive instance
+			return &lockPrimitive{
+				ManagedPrimitive: base,
+				client:           lockv1.NewLockClient(conn),
+			}, nil
+		}
 	})
 }
 
-// lock is the single partition implementation of Lock
-type lock struct {
+// lockPrimitive is the single partition implementation of Lock
+type lockPrimitive struct {
 	*primitive.ManagedPrimitive
 	client  lockv1.LockClient
 	options newLockOptions
 }
 
-func (l *lock) Lock(ctx context.Context, opts ...LockOption) (Status, error) {
+func (l *lockPrimitive) Lock(ctx context.Context, opts ...LockOption) (Status, error) {
 	request := &lockv1.LockRequest{
 		Headers: l.GetHeaders(),
 	}
@@ -86,7 +103,7 @@ func (l *lock) Lock(ctx context.Context, opts ...LockOption) (Status, error) {
 	}, nil
 }
 
-func (l *lock) Unlock(ctx context.Context, opts ...UnlockOption) error {
+func (l *lockPrimitive) Unlock(ctx context.Context, opts ...UnlockOption) error {
 	request := &lockv1.UnlockRequest{
 		Headers: l.GetHeaders(),
 	}
@@ -103,7 +120,7 @@ func (l *lock) Unlock(ctx context.Context, opts ...UnlockOption) error {
 	return nil
 }
 
-func (l *lock) Get(ctx context.Context, opts ...GetOption) (Status, error) {
+func (l *lockPrimitive) Get(ctx context.Context, opts ...GetOption) (Status, error) {
 	request := &lockv1.GetLockRequest{
 		Headers: l.GetHeaders(),
 	}

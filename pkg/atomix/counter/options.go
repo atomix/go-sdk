@@ -22,7 +22,7 @@ func newFuncOption(f func(*Options)) Option {
 	return funcOption{f}
 }
 
-type funcOption[K, V any] struct {
+type funcOption struct {
 	f func(*Options)
 }
 

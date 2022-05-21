@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2019-present Open Networking Foundation <info@opennetworking.org>
+// SPDX-FileCopyrightText: 2022-present Intel Corporation
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -13,9 +13,10 @@ import (
 	"github.com/atomix/runtime/pkg/errors"
 	"github.com/atomix/runtime/pkg/logging"
 	"github.com/atomix/runtime/pkg/meta"
-	"google.golang.org/grpc"
 	"io"
 )
+
+const serviceName = "atomix.map.v1.Map"
 
 var log = logging.GetLogger()
 
@@ -93,45 +94,57 @@ type Event[K, V any] struct {
 	Entry Entry[K, V]
 }
 
-func Client[K, V any](conn *grpc.ClientConn) primitive.Client[Map[K, V], Option[K, V]] {
-	return primitive.NewClient[Map[K, V], Option[K, V]](newManager(conn), func(primitive *primitive.ManagedPrimitive, opts ...Option[K, V]) (Map[K, V], error) {
-		var options Options[K, V]
-		for _, opt := range opts {
-			opt.apply(&options)
-		}
-		if options.KeyType == nil {
-			stringType := generic.String()
-			if keyType, ok := stringType.(generic.Type[K]); ok {
-				options.KeyType = keyType
-			} else {
-				return nil, errors.NewInvalid("must configure a generic type for key parameter")
+func Provider[K, V any](client primitive.Client) primitive.Provider[Map[K, V], Option[K, V]] {
+	return primitive.NewProvider[Map[K, V], Option[K, V]](func(ctx context.Context, name string, opts ...primitive.Option) func(...Option[K, V]) (Map[K, V], error) {
+		return func(indexedMapOpts ...Option[K, V]) (Map[K, V], error) {
+			// Process the primitive options
+			var options Options[K, V]
+			for _, opt := range indexedMapOpts {
+				opt.apply(&options)
 			}
-		}
-		if options.ValueType == nil {
-			jsonType := generic.JSON[V]()
-			if valueType, ok := jsonType.(generic.Type[V]); ok {
-				options.ValueType = valueType
-			} else {
-				return nil, errors.NewInvalid("must configure a generic type for key parameter")
+			if options.KeyType == nil {
+				stringType := generic.String()
+				if keyType, ok := stringType.(generic.Type[K]); ok {
+					options.KeyType = keyType
+				} else {
+					return nil, errors.NewInvalid("must configure a generic type for key parameter")
+				}
 			}
+			if options.ValueType == nil {
+				jsonType := generic.JSON[V]()
+				if valueType, ok := jsonType.(generic.Type[V]); ok {
+					options.ValueType = valueType
+				} else {
+					return nil, errors.NewInvalid("must configure a generic type for value parameter")
+				}
+			}
+
+			// Construct the primitive configuration
+			var config mapv1.MapConfig
+
+			// Open the primitive connection
+			base, conn, err := primitive.Open[*mapv1.MapConfig](client)(ctx, serviceName, name, &config, opts...)
+			if err != nil {
+				return nil, err
+			}
+
+			// Create the primitive instance
+			return &mapPrimitive[K, V]{
+				ManagedPrimitive: base,
+				client:           mapv1.NewMapClient(conn),
+			}, nil
 		}
-		return &typedMap[K, V]{
-			ManagedPrimitive: primitive,
-			client:           mapv1.NewMapClient(conn),
-			keyType:          options.KeyType,
-			valueType:        options.ValueType,
-		}, nil
 	})
 }
 
-type typedMap[K, V any] struct {
+type mapPrimitive[K, V any] struct {
 	*primitive.ManagedPrimitive
 	client    mapv1.MapClient
 	keyType   generic.Type[K]
 	valueType generic.Type[V]
 }
 
-func (m *typedMap[K, V]) Put(ctx context.Context, key K, value V, opts ...PutOption) (*Entry[K, V], error) {
+func (m *mapPrimitive[K, V]) Put(ctx context.Context, key K, value V, opts ...PutOption) (*Entry[K, V], error) {
 	keyBytes, err := m.keyType.Marshal(&key)
 	if err != nil {
 		return nil, errors.NewInvalid("key encoding failed", err)
@@ -167,7 +180,7 @@ func (m *typedMap[K, V]) Put(ctx context.Context, key K, value V, opts ...PutOpt
 	return m.newEntry(&response.Entry)
 }
 
-func (m *typedMap[K, V]) Get(ctx context.Context, key K, opts ...GetOption) (*Entry[K, V], error) {
+func (m *mapPrimitive[K, V]) Get(ctx context.Context, key K, opts ...GetOption) (*Entry[K, V], error) {
 	keyBytes, err := m.keyType.Marshal(&key)
 	if err != nil {
 		return nil, errors.NewInvalid("key encoding failed", err)
@@ -191,7 +204,7 @@ func (m *typedMap[K, V]) Get(ctx context.Context, key K, opts ...GetOption) (*En
 	return m.newEntry(&response.Entry)
 }
 
-func (m *typedMap[K, V]) Remove(ctx context.Context, key K, opts ...RemoveOption) (*Entry[K, V], error) {
+func (m *mapPrimitive[K, V]) Remove(ctx context.Context, key K, opts ...RemoveOption) (*Entry[K, V], error) {
 	keyBytes, err := m.keyType.Marshal(&key)
 	if err != nil {
 		return nil, errors.NewInvalid("key encoding failed", err)
@@ -217,7 +230,7 @@ func (m *typedMap[K, V]) Remove(ctx context.Context, key K, opts ...RemoveOption
 	return m.newEntry(&response.Entry)
 }
 
-func (m *typedMap[K, V]) Len(ctx context.Context) (int, error) {
+func (m *mapPrimitive[K, V]) Len(ctx context.Context) (int, error) {
 	request := &mapv1.SizeRequest{
 		Headers: m.GetHeaders(),
 	}
@@ -228,7 +241,7 @@ func (m *typedMap[K, V]) Len(ctx context.Context) (int, error) {
 	return int(response.Size_), nil
 }
 
-func (m *typedMap[K, V]) Clear(ctx context.Context) error {
+func (m *mapPrimitive[K, V]) Clear(ctx context.Context) error {
 	request := &mapv1.ClearRequest{
 		Headers: m.GetHeaders(),
 	}
@@ -239,7 +252,7 @@ func (m *typedMap[K, V]) Clear(ctx context.Context) error {
 	return nil
 }
 
-func (m *typedMap[K, V]) Entries(ctx context.Context, ch chan<- Entry[K, V]) error {
+func (m *mapPrimitive[K, V]) Entries(ctx context.Context, ch chan<- Entry[K, V]) error {
 	request := &mapv1.EntriesRequest{
 		Headers: m.GetHeaders(),
 	}
@@ -274,7 +287,7 @@ func (m *typedMap[K, V]) Entries(ctx context.Context, ch chan<- Entry[K, V]) err
 	return nil
 }
 
-func (m *typedMap[K, V]) Watch(ctx context.Context, ch chan<- Event[K, V], opts ...WatchOption) error {
+func (m *mapPrimitive[K, V]) Watch(ctx context.Context, ch chan<- Event[K, V], opts ...WatchOption) error {
 	request := &mapv1.EventsRequest{
 		Headers: m.GetHeaders(),
 	}
@@ -358,7 +371,7 @@ func (m *typedMap[K, V]) Watch(ctx context.Context, ch chan<- Event[K, V], opts 
 	}
 }
 
-func (m *typedMap[K, V]) newEntry(entry *mapv1.Entry) (*Entry[K, V], error) {
+func (m *mapPrimitive[K, V]) newEntry(entry *mapv1.Entry) (*Entry[K, V], error) {
 	if entry == nil {
 		return nil, nil
 	}

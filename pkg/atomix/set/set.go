@@ -12,11 +12,12 @@ import (
 	setv1 "github.com/atomix/runtime/api/atomix/set/v1"
 	"github.com/atomix/runtime/pkg/errors"
 	"github.com/atomix/runtime/pkg/logging"
-	"google.golang.org/grpc"
 	"io"
 )
 
-var log = logging.GetLogger("atomix", "client", "set")
+const serviceName = "atomix.set.v1.Set"
+
+var log = logging.GetLogger()
 
 // Set provides a distributed set data structure
 // The set values are defines as strings. To store more complex types in the set, encode values to strings e.g.
@@ -72,35 +73,48 @@ type Event[E any] struct {
 	Value E
 }
 
-func Client[E any](conn *grpc.ClientConn) primitive.Client[Set[E], Option[E]] {
-	return primitive.NewClient[Set[E], Option[E]](newManager(conn), func(primitive *primitive.ManagedPrimitive, opts ...Option[E]) (Set[E], error) {
-		var options Options[E]
-		for _, opt := range opts {
-			opt.apply(&options)
-		}
-		if options.ElementType == nil {
-			stringType := generic.Bytes()
-			if elementType, ok := stringType.(generic.Type[E]); ok {
-				options.ElementType = elementType
-			} else {
-				return nil, errors.NewInvalid("must configure a generic type for key parameter")
+func Provider[E any](client primitive.Client) primitive.Provider[Set[E], Option[E]] {
+	return primitive.NewProvider[Set[E], Option[E]](func(ctx context.Context, name string, opts ...primitive.Option) func(...Option[E]) (Set[E], error) {
+		return func(setOpts ...Option[E]) (Set[E], error) {
+			// Process the primitive options
+			var options Options[E]
+			for _, opt := range setOpts {
+				opt.apply(&options)
 			}
+			if options.ElementType == nil {
+				stringType := generic.Bytes()
+				if elementType, ok := stringType.(generic.Type[E]); ok {
+					options.ElementType = elementType
+				} else {
+					return nil, errors.NewInvalid("must configure a generic type for element parameter")
+				}
+			}
+
+			// Construct the primitive configuration
+			var config setv1.SetConfig
+
+			// Open the primitive connection
+			base, conn, err := primitive.Open[*setv1.SetConfig](client)(ctx, serviceName, name, &config, opts...)
+			if err != nil {
+				return nil, err
+			}
+
+			// Create the primitive instance
+			return &setPrimitive[E]{
+				ManagedPrimitive: base,
+				client:           setv1.NewSetClient(conn),
+			}, nil
 		}
-		return &typedSet[E]{
-			ManagedPrimitive: primitive,
-			client:           setv1.NewSetClient(conn),
-			elementType:      options.ElementType,
-		}, nil
 	})
 }
 
-type typedSet[E any] struct {
+type setPrimitive[E any] struct {
 	*primitive.ManagedPrimitive
 	client      setv1.SetClient
 	elementType generic.Type[E]
 }
 
-func (s *typedSet[E]) Add(ctx context.Context, value E) (bool, error) {
+func (s *setPrimitive[E]) Add(ctx context.Context, value E) (bool, error) {
 	bytes, err := s.elementType.Marshal(&value)
 	if err != nil {
 		return false, errors.NewInvalid("element encoding failed", err)
@@ -124,7 +138,7 @@ func (s *typedSet[E]) Add(ctx context.Context, value E) (bool, error) {
 	return true, nil
 }
 
-func (s *typedSet[E]) Remove(ctx context.Context, value E) (bool, error) {
+func (s *setPrimitive[E]) Remove(ctx context.Context, value E) (bool, error) {
 	bytes, err := s.elementType.Marshal(&value)
 	if err != nil {
 		return false, errors.NewInvalid("element encoding failed", err)
@@ -148,7 +162,7 @@ func (s *typedSet[E]) Remove(ctx context.Context, value E) (bool, error) {
 	return true, nil
 }
 
-func (s *typedSet[E]) Contains(ctx context.Context, value E) (bool, error) {
+func (s *setPrimitive[E]) Contains(ctx context.Context, value E) (bool, error) {
 	bytes, err := s.elementType.Marshal(&value)
 	if err != nil {
 		return false, errors.NewInvalid("element encoding failed", err)
@@ -168,7 +182,7 @@ func (s *typedSet[E]) Contains(ctx context.Context, value E) (bool, error) {
 	return response.Contains, nil
 }
 
-func (s *typedSet[E]) Len(ctx context.Context) (int, error) {
+func (s *setPrimitive[E]) Len(ctx context.Context) (int, error) {
 	request := &setv1.SizeRequest{
 		Headers: s.GetHeaders(),
 	}
@@ -179,7 +193,7 @@ func (s *typedSet[E]) Len(ctx context.Context) (int, error) {
 	return int(response.Size_), nil
 }
 
-func (s *typedSet[E]) Clear(ctx context.Context) error {
+func (s *setPrimitive[E]) Clear(ctx context.Context) error {
 	request := &setv1.ClearRequest{
 		Headers: s.GetHeaders(),
 	}
@@ -190,7 +204,7 @@ func (s *typedSet[E]) Clear(ctx context.Context) error {
 	return nil
 }
 
-func (s *typedSet[E]) Elements(ctx context.Context, ch chan<- E) error {
+func (s *setPrimitive[E]) Elements(ctx context.Context, ch chan<- E) error {
 	request := &setv1.ElementsRequest{
 		Headers: s.GetHeaders(),
 	}
@@ -231,7 +245,7 @@ func (s *typedSet[E]) Elements(ctx context.Context, ch chan<- E) error {
 	return nil
 }
 
-func (s *typedSet[E]) Watch(ctx context.Context, ch chan<- Event[E], opts ...WatchOption) error {
+func (s *setPrimitive[E]) Watch(ctx context.Context, ch chan<- Event[E], opts ...WatchOption) error {
 	request := &setv1.EventsRequest{
 		Headers: s.GetHeaders(),
 	}

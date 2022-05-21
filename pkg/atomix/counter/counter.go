@@ -9,8 +9,9 @@ import (
 	"github.com/atomix/go-client/pkg/atomix/primitive"
 	counterv1 "github.com/atomix/runtime/api/atomix/counter/v1"
 	"github.com/atomix/runtime/pkg/errors"
-	"google.golang.org/grpc"
 )
+
+const serviceName = "atomix.counter.v1.Counter"
 
 // Counter provides a distributed atomic counter
 type Counter interface {
@@ -29,22 +30,38 @@ type Counter interface {
 	Decrement(ctx context.Context, delta int64) (int64, error)
 }
 
-func Client(conn *grpc.ClientConn) primitive.Client[Counter, Option] {
-	return primitive.NewClient[Counter, Option](newManager(conn), func(primitive *primitive.ManagedPrimitive, opts ...Option) (Counter, error) {
-		return &counter{
-			ManagedPrimitive: primitive,
-			client:           counterv1.NewCounterClient(conn),
-		}, nil
+func Provider(client primitive.Client) primitive.Provider[Counter, Option] {
+	return primitive.NewProvider[Counter, Option](func(ctx context.Context, name string, opts ...primitive.Option) func(...Option) (Counter, error) {
+		return func(counterOpts ...Option) (Counter, error) {
+			// Process the primitive options
+			var options Options
+			options.apply(counterOpts...)
+
+			// Construct the primitive configuration
+			var config counterv1.CounterConfig
+
+			// Open the primitive connection
+			base, conn, err := primitive.Open[*counterv1.CounterConfig](client)(ctx, serviceName, name, &config, opts...)
+			if err != nil {
+				return nil, err
+			}
+
+			// Create the primitive instance
+			return &counterPrimitive{
+				ManagedPrimitive: base,
+				client:           counterv1.NewCounterClient(conn),
+			}, nil
+		}
 	})
 }
 
 // counter is the single partition implementation of Counter
-type counter struct {
+type counterPrimitive struct {
 	*primitive.ManagedPrimitive
 	client counterv1.CounterClient
 }
 
-func (c *counter) Get(ctx context.Context) (int64, error) {
+func (c *counterPrimitive) Get(ctx context.Context) (int64, error) {
 	request := &counterv1.GetRequest{
 		Headers: c.GetHeaders(),
 	}
@@ -55,7 +72,7 @@ func (c *counter) Get(ctx context.Context) (int64, error) {
 	return response.Value, nil
 }
 
-func (c *counter) Set(ctx context.Context, value int64) error {
+func (c *counterPrimitive) Set(ctx context.Context, value int64) error {
 	request := &counterv1.SetRequest{
 		Headers: c.GetHeaders(),
 		SetInput: counterv1.SetInput{
@@ -69,7 +86,7 @@ func (c *counter) Set(ctx context.Context, value int64) error {
 	return nil
 }
 
-func (c *counter) Increment(ctx context.Context, delta int64) (int64, error) {
+func (c *counterPrimitive) Increment(ctx context.Context, delta int64) (int64, error) {
 	request := &counterv1.IncrementRequest{
 		Headers: c.GetHeaders(),
 		IncrementInput: counterv1.IncrementInput{
@@ -83,7 +100,7 @@ func (c *counter) Increment(ctx context.Context, delta int64) (int64, error) {
 	return response.Value, nil
 }
 
-func (c *counter) Decrement(ctx context.Context, delta int64) (int64, error) {
+func (c *counterPrimitive) Decrement(ctx context.Context, delta int64) (int64, error) {
 	request := &counterv1.DecrementRequest{
 		Headers: c.GetHeaders(),
 		DecrementInput: counterv1.DecrementInput{
