@@ -3,11 +3,11 @@ site_url: https://atomix.io/client/go
 repo_url: https://github.com/atomix/go-client
 nav:
   - Home: getting-started.md
-  - counter.md
-  - election.md
-  - indexed-map.md
-  - list.md
-  - lock.md
-  - map.md
-  - set.md
-  - value.md
+  - Counter: counter.md
+  - Election: election.md
+  - IndexedMap: indexed-map.md
+  - List: list.md
+  - Lock: lock.md
+  - Map: map.md
+  - Set: set.md
+  - Value: value.md
