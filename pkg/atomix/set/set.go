@@ -10,12 +10,10 @@ import (
 	"github.com/atomix/go-client/pkg/atomix/generic"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
 	setv1 "github.com/atomix/runtime/api/atomix/set/v1"
-	"github.com/atomix/runtime/pkg/errors"
-	"github.com/atomix/runtime/pkg/logging"
+	"github.com/atomix/runtime/pkg/atomix/errors"
+	"github.com/atomix/runtime/pkg/atomix/logging"
 	"io"
 )
-
-const serviceName = "atomix.set.v1.Set"
 
 var log = logging.GetLogger()
 
@@ -73,43 +71,32 @@ type Event[E any] struct {
 	Value E
 }
 
-func Provider[E any](client primitive.Client) primitive.Provider[Set[E], Option[E]] {
-	return primitive.NewProvider[Set[E], Option[E]](func(ctx context.Context, name string, opts ...primitive.Option) func(...Option[E]) (Set[E], error) {
-		return func(setOpts ...Option[E]) (Set[E], error) {
-			// Process the primitive options
-			var options Options[E]
-			for _, opt := range setOpts {
-				opt.apply(&options)
+func New[E any](client setv1.SetClient) func(context.Context, primitive.ID, ...Option[E]) (Set[E], error) {
+	return func(ctx context.Context, id primitive.ID, opts ...Option[E]) (Set[E], error) {
+		var options Options[E]
+		options.apply(opts...)
+		if options.ElementType == nil {
+			stringType := generic.Bytes()
+			if elementType, ok := stringType.(generic.Type[E]); ok {
+				options.ElementType = elementType
+			} else {
+				return nil, errors.NewInvalid("must configure a generic type for element parameter")
 			}
-			if options.ElementType == nil {
-				stringType := generic.Bytes()
-				if elementType, ok := stringType.(generic.Type[E]); ok {
-					options.ElementType = elementType
-				} else {
-					return nil, errors.NewInvalid("must configure a generic type for element parameter")
-				}
-			}
-
-			// Construct the primitive configuration
-			var config setv1.SetConfig
-
-			// Open the primitive connection
-			base, conn, err := primitive.Open[*setv1.SetConfig](client)(ctx, serviceName, name, &config, opts...)
-			if err != nil {
-				return nil, err
-			}
-
-			// Create the primitive instance
-			return &setPrimitive[E]{
-				ManagedPrimitive: base,
-				client:           setv1.NewSetClient(conn),
-			}, nil
 		}
-	})
+		indexedMap := &setPrimitive[E]{
+			Primitive:   primitive.New(id),
+			client:      client,
+			elementType: options.ElementType,
+		}
+		if err := indexedMap.create(ctx); err != nil {
+			return nil, err
+		}
+		return indexedMap, nil
+	}
 }
 
 type setPrimitive[E any] struct {
-	*primitive.ManagedPrimitive
+	primitive.Primitive
 	client      setv1.SetClient
 	elementType generic.Type[E]
 }
@@ -120,11 +107,8 @@ func (s *setPrimitive[E]) Add(ctx context.Context, value E) (bool, error) {
 		return false, errors.NewInvalid("element encoding failed", err)
 	}
 	request := &setv1.AddRequest{
-		Headers: s.GetHeaders(),
-		AddInput: setv1.AddInput{
-			Element: setv1.Element{
-				Value: base64.StdEncoding.EncodeToString(bytes),
-			},
+		Element: setv1.Element{
+			Value: base64.StdEncoding.EncodeToString(bytes),
 		},
 	}
 	_, err = s.client.Add(ctx, request)
@@ -144,11 +128,8 @@ func (s *setPrimitive[E]) Remove(ctx context.Context, value E) (bool, error) {
 		return false, errors.NewInvalid("element encoding failed", err)
 	}
 	request := &setv1.RemoveRequest{
-		Headers: s.GetHeaders(),
-		RemoveInput: setv1.RemoveInput{
-			Element: setv1.Element{
-				Value: base64.StdEncoding.EncodeToString(bytes),
-			},
+		Element: setv1.Element{
+			Value: base64.StdEncoding.EncodeToString(bytes),
 		},
 	}
 	_, err = s.client.Remove(ctx, request)
@@ -168,11 +149,8 @@ func (s *setPrimitive[E]) Contains(ctx context.Context, value E) (bool, error) {
 		return false, errors.NewInvalid("element encoding failed", err)
 	}
 	request := &setv1.ContainsRequest{
-		Headers: s.GetHeaders(),
-		ContainsInput: setv1.ContainsInput{
-			Element: setv1.Element{
-				Value: base64.StdEncoding.EncodeToString(bytes),
-			},
+		Element: setv1.Element{
+			Value: base64.StdEncoding.EncodeToString(bytes),
 		},
 	}
 	response, err := s.client.Contains(ctx, request)
@@ -183,9 +161,7 @@ func (s *setPrimitive[E]) Contains(ctx context.Context, value E) (bool, error) {
 }
 
 func (s *setPrimitive[E]) Len(ctx context.Context) (int, error) {
-	request := &setv1.SizeRequest{
-		Headers: s.GetHeaders(),
-	}
+	request := &setv1.SizeRequest{}
 	response, err := s.client.Size(ctx, request)
 	if err != nil {
 		return 0, errors.FromProto(err)
@@ -194,9 +170,7 @@ func (s *setPrimitive[E]) Len(ctx context.Context) (int, error) {
 }
 
 func (s *setPrimitive[E]) Clear(ctx context.Context) error {
-	request := &setv1.ClearRequest{
-		Headers: s.GetHeaders(),
-	}
+	request := &setv1.ClearRequest{}
 	_, err := s.client.Clear(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -205,9 +179,7 @@ func (s *setPrimitive[E]) Clear(ctx context.Context) error {
 }
 
 func (s *setPrimitive[E]) Elements(ctx context.Context, ch chan<- E) error {
-	request := &setv1.ElementsRequest{
-		Headers: s.GetHeaders(),
-	}
+	request := &setv1.ElementsRequest{}
 	stream, err := s.client.Elements(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -246,9 +218,7 @@ func (s *setPrimitive[E]) Elements(ctx context.Context, ch chan<- E) error {
 }
 
 func (s *setPrimitive[E]) Watch(ctx context.Context, ch chan<- Event[E], opts ...WatchOption) error {
-	request := &setv1.EventsRequest{
-		Headers: s.GetHeaders(),
-	}
+	request := &setv1.EventsRequest{}
 	for i := range opts {
 		opts[i].beforeWatch(request)
 	}
@@ -326,4 +296,32 @@ func (s *setPrimitive[E]) Watch(ctx context.Context, ch chan<- Event[E], opts ..
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+func (s *setPrimitive[E]) create(ctx context.Context) error {
+	request := &setv1.CreateRequest{
+		Config: setv1.SetConfig{},
+	}
+	ctx = primitive.AppendToOutgoingContext(ctx, s.ID())
+	_, err := s.client.Create(ctx, request)
+	if err != nil {
+		err = errors.FromProto(err)
+		if !errors.IsAlreadyExists(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *setPrimitive[E]) Close(ctx context.Context) error {
+	request := &setv1.CloseRequest{}
+	ctx = primitive.AppendToOutgoingContext(ctx, s.ID())
+	_, err := s.client.Close(ctx, request)
+	if err != nil {
+		err = errors.FromProto(err)
+		if !errors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
 }

@@ -7,7 +7,7 @@ package value
 import (
 	"github.com/atomix/go-client/pkg/atomix/generic"
 	valuev1 "github.com/atomix/runtime/api/atomix/value/v1"
-	"github.com/atomix/runtime/pkg/meta"
+	"github.com/atomix/runtime/pkg/atomix/time"
 )
 
 // Option is a value option
@@ -50,24 +50,20 @@ type SetOption interface {
 	afterSet(response *valuev1.SetResponse)
 }
 
-// IfMatch updates the value if the version matches the given version
-func IfMatch(object meta.Object) SetOption {
-	return matchOption{object}
+// IfTimestamp updates the value if the version matches the given version
+func IfTimestamp(timestamp time.Timestamp) SetOption {
+	return timestampOption{timestamp}
 }
 
-type matchOption struct {
-	object meta.Object
+type timestampOption struct {
+	timestamp time.Timestamp
 }
 
-func (o matchOption) beforeSet(request *valuev1.SetRequest) {
-	proto := o.object.Meta().Proto()
-	request.Preconditions = append(request.Preconditions, valuev1.Precondition{
-		Precondition: &valuev1.Precondition_Metadata{
-			Metadata: &proto,
-		},
-	})
+func (o timestampOption) beforeSet(request *valuev1.SetRequest) {
+	timestamp := o.timestamp.Scheme().Codec().EncodeTimestamp(o.timestamp)
+	request.Timestamp = &timestamp
 }
 
-func (o matchOption) afterSet(response *valuev1.SetResponse) {
+func (o timestampOption) afterSet(response *valuev1.SetResponse) {
 
 }

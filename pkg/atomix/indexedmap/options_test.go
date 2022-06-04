@@ -6,18 +6,18 @@ package indexedmap
 
 import (
 	api "github.com/atomix/api/pkg/atomix/indexed_map/v1"
-	"github.com/atomix/runtime/pkg/meta"
+	"github.com/atomix/runtime/pkg/atomix/meta"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestOptions(t *testing.T) {
 	putRequest := &api.PutRequest{}
-	IfMatch(meta.ObjectMeta{Revision: 1}).beforePut(putRequest)
+	IfTimestamp(meta.ObjectMeta{Revision: 1}).beforePut(putRequest)
 	assert.Equal(t, meta.Revision(1), meta.Revision(putRequest.Preconditions[0].GetMetadata().Revision.Num))
 
 	removeRequest := &api.RemoveRequest{}
-	IfMatch(meta.ObjectMeta{Revision: 2}).beforeRemove(removeRequest)
+	IfTimestamp(meta.ObjectMeta{Revision: 2}).beforeRemove(removeRequest)
 	assert.Equal(t, meta.Revision(2), meta.Revision(removeRequest.Preconditions[0].GetMetadata().Revision.Num))
 
 	eventRequest := &api.EventsRequest{}

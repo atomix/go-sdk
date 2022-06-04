@@ -8,10 +8,8 @@ import (
 	"context"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
 	counterv1 "github.com/atomix/runtime/api/atomix/counter/v1"
-	"github.com/atomix/runtime/pkg/errors"
+	"github.com/atomix/runtime/pkg/atomix/errors"
 )
-
-const serviceName = "atomix.counter.v1.Counter"
 
 // Counter provides a distributed atomic counter
 type Counter interface {
@@ -30,41 +28,30 @@ type Counter interface {
 	Decrement(ctx context.Context, delta int64) (int64, error)
 }
 
-func Provider(client primitive.Client) primitive.Provider[Counter, Option] {
-	return primitive.NewProvider[Counter, Option](func(ctx context.Context, name string, opts ...primitive.Option) func(...Option) (Counter, error) {
-		return func(counterOpts ...Option) (Counter, error) {
-			// Process the primitive options
-			var options Options
-			options.apply(counterOpts...)
-
-			// Construct the primitive configuration
-			var config counterv1.CounterConfig
-
-			// Open the primitive connection
-			base, conn, err := primitive.Open[*counterv1.CounterConfig](client)(ctx, serviceName, name, &config, opts...)
-			if err != nil {
-				return nil, err
-			}
-
-			// Create the primitive instance
-			return &counterPrimitive{
-				ManagedPrimitive: base,
-				client:           counterv1.NewCounterClient(conn),
-			}, nil
+func New(client counterv1.CounterClient) func(context.Context, primitive.ID, ...Option) (Counter, error) {
+	return func(ctx context.Context, id primitive.ID, opts ...Option) (Counter, error) {
+		var options Options
+		options.apply(opts...)
+		counter := &counterPrimitive{
+			Primitive: primitive.New(id),
+			client:    client,
 		}
-	})
+		if err := counter.create(ctx); err != nil {
+			return nil, err
+		}
+		return counter, nil
+	}
 }
 
 // counter is the single partition implementation of Counter
 type counterPrimitive struct {
-	*primitive.ManagedPrimitive
+	primitive.Primitive
 	client counterv1.CounterClient
 }
 
 func (c *counterPrimitive) Get(ctx context.Context) (int64, error) {
-	request := &counterv1.GetRequest{
-		Headers: c.GetHeaders(),
-	}
+	request := &counterv1.GetRequest{}
+	ctx = primitive.AppendToOutgoingContext(ctx, c.ID())
 	response, err := c.client.Get(ctx, request)
 	if err != nil {
 		return 0, errors.FromProto(err)
@@ -74,11 +61,9 @@ func (c *counterPrimitive) Get(ctx context.Context) (int64, error) {
 
 func (c *counterPrimitive) Set(ctx context.Context, value int64) error {
 	request := &counterv1.SetRequest{
-		Headers: c.GetHeaders(),
-		SetInput: counterv1.SetInput{
-			Value: value,
-		},
+		Value: value,
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, c.ID())
 	_, err := c.client.Set(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -88,11 +73,9 @@ func (c *counterPrimitive) Set(ctx context.Context, value int64) error {
 
 func (c *counterPrimitive) Increment(ctx context.Context, delta int64) (int64, error) {
 	request := &counterv1.IncrementRequest{
-		Headers: c.GetHeaders(),
-		IncrementInput: counterv1.IncrementInput{
-			Delta: delta,
-		},
+		Delta: delta,
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, c.ID())
 	response, err := c.client.Increment(ctx, request)
 	if err != nil {
 		return 0, errors.FromProto(err)
@@ -102,14 +85,40 @@ func (c *counterPrimitive) Increment(ctx context.Context, delta int64) (int64, e
 
 func (c *counterPrimitive) Decrement(ctx context.Context, delta int64) (int64, error) {
 	request := &counterv1.DecrementRequest{
-		Headers: c.GetHeaders(),
-		DecrementInput: counterv1.DecrementInput{
-			Delta: delta,
-		},
+		Delta: delta,
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, c.ID())
 	response, err := c.client.Decrement(ctx, request)
 	if err != nil {
 		return 0, errors.FromProto(err)
 	}
 	return response.Value, nil
+}
+
+func (c *counterPrimitive) create(ctx context.Context) error {
+	request := &counterv1.CreateRequest{
+		Config: counterv1.CounterConfig{},
+	}
+	ctx = primitive.AppendToOutgoingContext(ctx, c.ID())
+	_, err := c.client.Create(ctx, request)
+	if err != nil {
+		err = errors.FromProto(err)
+		if !errors.IsAlreadyExists(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *counterPrimitive) Close(ctx context.Context) error {
+	request := &counterv1.CloseRequest{}
+	ctx = primitive.AppendToOutgoingContext(ctx, c.ID())
+	_, err := c.client.Close(ctx, request)
+	if err != nil {
+		err = errors.FromProto(err)
+		if !errors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
 }

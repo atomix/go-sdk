@@ -48,7 +48,7 @@ func TestValueOperations(t *testing.T) {
 	err = value.Watch(context.TODO(), ch)
 	assert.NoError(t, err)
 
-	_, err = value.Set(context.TODO(), "foo", IfMatch(meta.ObjectMeta{Revision: 1}))
+	_, err = value.Set(context.TODO(), "foo", IfTimestamp(meta.ObjectMeta{Revision: 1}))
 	assert.Error(t, err)
 	assert.True(t, errors.IsConflict(err))
 
@@ -61,11 +61,11 @@ func TestValueOperations(t *testing.T) {
 	assert.Equal(t, meta.Revision(1), md.Revision)
 	assert.Equal(t, "foo", val)
 
-	_, err = value.Set(context.TODO(), "foo", IfMatch(meta.ObjectMeta{Revision: 2}))
+	_, err = value.Set(context.TODO(), "foo", IfTimestamp(meta.ObjectMeta{Revision: 2}))
 	assert.Error(t, err)
 	assert.True(t, errors.IsConflict(err))
 
-	md, err = value.Set(context.TODO(), "bar", IfMatch(meta.ObjectMeta{Revision: 1}))
+	md, err = value.Set(context.TODO(), "bar", IfTimestamp(meta.ObjectMeta{Revision: 1}))
 	assert.NoError(t, err)
 	assert.Equal(t, meta.Revision(2), md.Revision)
 

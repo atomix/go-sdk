@@ -10,13 +10,11 @@ import (
 	"github.com/atomix/go-client/pkg/atomix/generic"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
 	mapv1 "github.com/atomix/runtime/api/atomix/map/v1"
-	"github.com/atomix/runtime/pkg/errors"
-	"github.com/atomix/runtime/pkg/logging"
-	"github.com/atomix/runtime/pkg/meta"
+	"github.com/atomix/runtime/pkg/atomix/errors"
+	"github.com/atomix/runtime/pkg/atomix/logging"
+	"github.com/atomix/runtime/pkg/atomix/time"
 	"io"
 )
-
-const serviceName = "atomix.map.v1.Map"
 
 var log = logging.GetLogger()
 
@@ -55,13 +53,14 @@ type Version uint64
 
 // Entry is a versioned key/value pair
 type Entry[K, V any] struct {
-	meta.ObjectMeta
-
 	// Key is the key of the pair
 	Key K
 
 	// Value is the value of the pair
 	Value V
+
+	// Timestamp is the entry creation timestamp
+	Timestamp time.Timestamp
 }
 
 func (kv Entry[K, V]) String() string {
@@ -94,51 +93,41 @@ type Event[K, V any] struct {
 	Entry Entry[K, V]
 }
 
-func Provider[K, V any](client primitive.Client) primitive.Provider[Map[K, V], Option[K, V]] {
-	return primitive.NewProvider[Map[K, V], Option[K, V]](func(ctx context.Context, name string, opts ...primitive.Option) func(...Option[K, V]) (Map[K, V], error) {
-		return func(indexedMapOpts ...Option[K, V]) (Map[K, V], error) {
-			// Process the primitive options
-			var options Options[K, V]
-			for _, opt := range indexedMapOpts {
-				opt.apply(&options)
+func New[K, V any](client mapv1.MapClient) func(context.Context, primitive.ID, ...Option[K, V]) (Map[K, V], error) {
+	return func(ctx context.Context, id primitive.ID, opts ...Option[K, V]) (Map[K, V], error) {
+		var options Options[K, V]
+		options.apply(opts...)
+		if options.KeyType == nil {
+			stringType := generic.String()
+			if keyType, ok := stringType.(generic.Type[K]); ok {
+				options.KeyType = keyType
+			} else {
+				return nil, errors.NewInvalid("must configure a generic type for key parameter")
 			}
-			if options.KeyType == nil {
-				stringType := generic.String()
-				if keyType, ok := stringType.(generic.Type[K]); ok {
-					options.KeyType = keyType
-				} else {
-					return nil, errors.NewInvalid("must configure a generic type for key parameter")
-				}
-			}
-			if options.ValueType == nil {
-				jsonType := generic.JSON[V]()
-				if valueType, ok := jsonType.(generic.Type[V]); ok {
-					options.ValueType = valueType
-				} else {
-					return nil, errors.NewInvalid("must configure a generic type for value parameter")
-				}
-			}
-
-			// Construct the primitive configuration
-			var config mapv1.MapConfig
-
-			// Open the primitive connection
-			base, conn, err := primitive.Open[*mapv1.MapConfig](client)(ctx, serviceName, name, &config, opts...)
-			if err != nil {
-				return nil, err
-			}
-
-			// Create the primitive instance
-			return &mapPrimitive[K, V]{
-				ManagedPrimitive: base,
-				client:           mapv1.NewMapClient(conn),
-			}, nil
 		}
-	})
+		if options.ValueType == nil {
+			jsonType := generic.JSON[V]()
+			if valueType, ok := jsonType.(generic.Type[V]); ok {
+				options.ValueType = valueType
+			} else {
+				return nil, errors.NewInvalid("must configure a generic type for value parameter")
+			}
+		}
+		indexedMap := &mapPrimitive[K, V]{
+			Primitive: primitive.New(id),
+			client:    client,
+			keyType:   options.KeyType,
+			valueType: options.ValueType,
+		}
+		if err := indexedMap.create(ctx); err != nil {
+			return nil, err
+		}
+		return indexedMap, nil
+	}
 }
 
 type mapPrimitive[K, V any] struct {
-	*primitive.ManagedPrimitive
+	primitive.Primitive
 	client    mapv1.MapClient
 	keyType   generic.Type[K]
 	valueType generic.Type[V]
@@ -155,16 +144,9 @@ func (m *mapPrimitive[K, V]) Put(ctx context.Context, key K, value V, opts ...Pu
 	}
 
 	request := &mapv1.PutRequest{
-		Headers: m.GetHeaders(),
-		PutInput: mapv1.PutInput{
-			Entry: mapv1.Entry{
-				Key: mapv1.Key{
-					Key: string(keyBytes),
-				},
-				Value: &mapv1.Value{
-					Value: valueBytes,
-				},
-			},
+		Key: string(keyBytes),
+		Value: &mapv1.Value{
+			Value: valueBytes,
 		},
 	}
 	for i := range opts {
@@ -186,10 +168,7 @@ func (m *mapPrimitive[K, V]) Get(ctx context.Context, key K, opts ...GetOption) 
 		return nil, errors.NewInvalid("key encoding failed", err)
 	}
 	request := &mapv1.GetRequest{
-		Headers: m.GetHeaders(),
-		GetInput: mapv1.GetInput{
-			Key: string(keyBytes),
-		},
+		Key: string(keyBytes),
 	}
 	for i := range opts {
 		opts[i].beforeGet(request)
@@ -210,12 +189,7 @@ func (m *mapPrimitive[K, V]) Remove(ctx context.Context, key K, opts ...RemoveOp
 		return nil, errors.NewInvalid("key encoding failed", err)
 	}
 	request := &mapv1.RemoveRequest{
-		Headers: m.GetHeaders(),
-		RemoveInput: mapv1.RemoveInput{
-			Key: mapv1.Key{
-				Key: string(keyBytes),
-			},
-		},
+		Key: string(keyBytes),
 	}
 	for i := range opts {
 		opts[i].beforeRemove(request)
@@ -231,9 +205,7 @@ func (m *mapPrimitive[K, V]) Remove(ctx context.Context, key K, opts ...RemoveOp
 }
 
 func (m *mapPrimitive[K, V]) Len(ctx context.Context) (int, error) {
-	request := &mapv1.SizeRequest{
-		Headers: m.GetHeaders(),
-	}
+	request := &mapv1.SizeRequest{}
 	response, err := m.client.Size(ctx, request)
 	if err != nil {
 		return 0, errors.FromProto(err)
@@ -242,9 +214,7 @@ func (m *mapPrimitive[K, V]) Len(ctx context.Context) (int, error) {
 }
 
 func (m *mapPrimitive[K, V]) Clear(ctx context.Context) error {
-	request := &mapv1.ClearRequest{
-		Headers: m.GetHeaders(),
-	}
+	request := &mapv1.ClearRequest{}
 	_, err := m.client.Clear(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -253,9 +223,7 @@ func (m *mapPrimitive[K, V]) Clear(ctx context.Context) error {
 }
 
 func (m *mapPrimitive[K, V]) Entries(ctx context.Context, ch chan<- Entry[K, V]) error {
-	request := &mapv1.EntriesRequest{
-		Headers: m.GetHeaders(),
-	}
+	request := &mapv1.EntriesRequest{}
 	stream, err := m.client.Entries(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -288,9 +256,7 @@ func (m *mapPrimitive[K, V]) Entries(ctx context.Context, ch chan<- Entry[K, V])
 }
 
 func (m *mapPrimitive[K, V]) Watch(ctx context.Context, ch chan<- Event[K, V], opts ...WatchOption) error {
-	request := &mapv1.EventsRequest{
-		Headers: m.GetHeaders(),
-	}
+	request := &mapv1.EventsRequest{}
 	for i := range opts {
 		opts[i].beforeWatch(request)
 	}
@@ -376,7 +342,7 @@ func (m *mapPrimitive[K, V]) newEntry(entry *mapv1.Entry) (*Entry[K, V], error) 
 		return nil, nil
 	}
 	var key K
-	if err := m.keyType.Unmarshal([]byte(entry.Key.Key), &key); err != nil {
+	if err := m.keyType.Unmarshal([]byte(entry.Key), &key); err != nil {
 		return nil, errors.NewInvalid("key decoding failed", err)
 	}
 	var value V
@@ -384,8 +350,36 @@ func (m *mapPrimitive[K, V]) newEntry(entry *mapv1.Entry) (*Entry[K, V], error) 
 		return nil, errors.NewInvalid("value decoding failed", err)
 	}
 	return &Entry[K, V]{
-		ObjectMeta: meta.FromProto(entry.Key.ObjectMeta),
-		Key:        key,
-		Value:      value,
+		Key:       key,
+		Value:     value,
+		Timestamp: time.NewTimestamp(*entry.Timestamp),
 	}, nil
+}
+
+func (m *mapPrimitive[K, V]) create(ctx context.Context) error {
+	request := &mapv1.CreateRequest{
+		Config: mapv1.MapConfig{},
+	}
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
+	_, err := m.client.Create(ctx, request)
+	if err != nil {
+		err = errors.FromProto(err)
+		if !errors.IsAlreadyExists(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *mapPrimitive[K, V]) Close(ctx context.Context) error {
+	request := &mapv1.CloseRequest{}
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
+	_, err := m.client.Close(ctx, request)
+	if err != nil {
+		err = errors.FromProto(err)
+		if !errors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
 }

@@ -6,7 +6,7 @@ package lock
 
 import (
 	lockv1 "github.com/atomix/runtime/api/atomix/lock/v1"
-	"github.com/atomix/runtime/pkg/meta"
+	rttime "github.com/atomix/runtime/pkg/atomix/time"
 	"time"
 )
 
@@ -35,9 +35,6 @@ type funcOption struct {
 func (o funcOption) apply(options *Options) {
 	o.f(options)
 }
-
-// newLockOptions is lock options
-type newLockOptions struct{}
 
 // LockOption is an option for Lock calls
 //nolint:golint
@@ -75,28 +72,30 @@ type GetOption interface {
 	afterGet(response *lockv1.GetLockResponse)
 }
 
-// IfMatch sets the lock version to check
-func IfMatch(object meta.Object) MatchOption {
-	return MatchOption{object: object}
+// IfTimestamp sets the lock timestamp to check
+func IfTimestamp(timestamp rttime.Timestamp) TimestampOption {
+	return TimestampOption{timestamp: timestamp}
 }
 
-// MatchOption is a lock option for checking the version
-type MatchOption struct {
-	object meta.Object
+// TimestampOption is a lock option for checking the version
+type TimestampOption struct {
+	timestamp rttime.Timestamp
 }
 
-func (o MatchOption) beforeUnlock(request *lockv1.UnlockRequest) {
-	request.Lock.ObjectMeta = o.object.Meta().Proto()
+func (o TimestampOption) beforeUnlock(request *lockv1.UnlockRequest) {
+	timestamp := o.timestamp.Scheme().Codec().EncodeTimestamp(o.timestamp)
+	request.Lock.Timestamp = &timestamp
 }
 
-func (o MatchOption) afterUnlock(response *lockv1.UnlockResponse) {
+func (o TimestampOption) afterUnlock(response *lockv1.UnlockResponse) {
 
 }
 
-func (o MatchOption) beforeGet(request *lockv1.GetLockRequest) {
-	request.Lock.ObjectMeta = o.object.Meta().Proto()
+func (o TimestampOption) beforeGet(request *lockv1.GetLockRequest) {
+	timestamp := o.timestamp.Scheme().Codec().EncodeTimestamp(o.timestamp)
+	request.Lock.Timestamp = &timestamp
 }
 
-func (o MatchOption) afterGet(response *lockv1.GetLockResponse) {
+func (o TimestampOption) afterGet(response *lockv1.GetLockResponse) {
 
 }

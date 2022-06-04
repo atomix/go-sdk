@@ -8,7 +8,7 @@ import (
 	"github.com/atomix/go-client/pkg/atomix/generic"
 	mapv1 "github.com/atomix/runtime/api/atomix/map/v1"
 	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
-	"github.com/atomix/runtime/pkg/meta"
+	"github.com/atomix/runtime/pkg/atomix/time"
 )
 
 // Option is a map option
@@ -64,41 +64,33 @@ type RemoveOption interface {
 	afterRemove(response *mapv1.RemoveResponse)
 }
 
-// IfMatch sets the required version for optimistic concurrency control
-func IfMatch(object meta.Object) MatchOption {
-	return MatchOption{object: object}
+// IfTimestamp sets the required version for optimistic concurrency control
+func IfTimestamp(timestamp time.Timestamp) TimestampOption {
+	return TimestampOption{timestamp: timestamp}
 }
 
-// MatchOption is an implementation of PutOption and RemoveOption to specify the version for concurrency control
-type MatchOption struct {
+// TimestampOption is an implementation of PutOption and RemoveOption to specify the version for concurrency control
+type TimestampOption struct {
 	PutOption
 	RemoveOption
-	object meta.Object
+	timestamp time.Timestamp
 }
 
-func (o MatchOption) beforePut(request *mapv1.PutRequest) {
-	proto := o.object.Meta().Proto()
-	request.Preconditions = append(request.Preconditions, mapv1.Precondition{
-		Precondition: &mapv1.Precondition_Metadata{
-			Metadata: &proto,
-		},
-	})
+func (o TimestampOption) beforePut(request *mapv1.PutRequest) {
+	timestamp := o.timestamp.Scheme().Codec().EncodeTimestamp(o.timestamp)
+	request.Timestamp = &timestamp
 }
 
-func (o MatchOption) afterPut(response *mapv1.PutResponse) {
+func (o TimestampOption) afterPut(response *mapv1.PutResponse) {
 
 }
 
-func (o MatchOption) beforeRemove(request *mapv1.RemoveRequest) {
-	proto := o.object.Meta().Proto()
-	request.Preconditions = append(request.Preconditions, mapv1.Precondition{
-		Precondition: &mapv1.Precondition_Metadata{
-			Metadata: &proto,
-		},
-	})
+func (o TimestampOption) beforeRemove(request *mapv1.RemoveRequest) {
+	timestamp := o.timestamp.Scheme().Codec().EncodeTimestamp(o.timestamp)
+	request.Timestamp = &timestamp
 }
 
-func (o MatchOption) afterRemove(response *mapv1.RemoveResponse) {
+func (o TimestampOption) afterRemove(response *mapv1.RemoveResponse) {
 
 }
 

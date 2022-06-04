@@ -95,20 +95,20 @@ func TestIndexedMapOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 
-	kv2, err := _map.Set(context.Background(), 2, "foo", "baz", IfMatch(kv1))
+	kv2, err := _map.Set(context.Background(), 2, "foo", "baz", IfTimestamp(kv1))
 	assert.NoError(t, err)
 	assert.NotEqual(t, kv1.Revision, kv2.Revision)
 	assert.Equal(t, "baz", string(kv2.Value))
 
-	_, err = _map.Set(context.Background(), 2, "foo", "bar", IfMatch(kv1))
+	_, err = _map.Set(context.Background(), 2, "foo", "bar", IfTimestamp(kv1))
 	assert.Error(t, err)
 	assert.True(t, errors.IsConflict(err))
 
-	_, err = _map.Remove(context.Background(), "foo", IfMatch(meta.ObjectMeta{}))
+	_, err = _map.Remove(context.Background(), "foo", IfTimestamp(meta.ObjectMeta{}))
 	assert.Error(t, err)
 	assert.True(t, errors.IsConflict(err))
 
-	removed, err := _map.Remove(context.Background(), "foo", IfMatch(kv2))
+	removed, err := _map.Remove(context.Background(), "foo", IfTimestamp(kv2))
 	assert.NoError(t, err)
 	assert.NotNil(t, removed)
 	assert.Equal(t, kv2.Revision, removed.Revision)

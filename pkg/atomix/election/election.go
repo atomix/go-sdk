@@ -8,13 +8,11 @@ import (
 	"context"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
 	electionv1 "github.com/atomix/runtime/api/atomix/election/v1"
-	"github.com/atomix/runtime/pkg/errors"
-	"github.com/atomix/runtime/pkg/logging"
-	"github.com/atomix/runtime/pkg/meta"
+	"github.com/atomix/runtime/pkg/atomix/errors"
+	"github.com/atomix/runtime/pkg/atomix/logging"
+	"github.com/atomix/runtime/pkg/atomix/time"
 	"io"
 )
-
-const serviceName = "atomix.election.v1.LeaderElection"
 
 var log = logging.GetLogger()
 
@@ -53,22 +51,23 @@ func newTerm(term *electionv1.Term) *Term {
 		return nil
 	}
 	return &Term{
-		ObjectMeta: meta.FromProto(term.ObjectMeta),
-		Leader:     term.Leader,
+		Leader:     term.CandidateID,
 		Candidates: term.Candidates,
+		Timestamp:  time.NewTimestamp(*term.Timestamp),
 	}
 }
 
 // Term is a leadership term
 // A term is guaranteed to have a monotonically increasing, globally unique ID.
 type Term struct {
-	meta.ObjectMeta
-
 	// Leader is the ID of the leader that was elected
-	Leader uint64
+	Leader string
 
 	// Candidates is a list of candidates currently participating in the election
-	Candidates []uint64
+	Candidates []string
+
+	// Timestamp is the timestamp at which the leader was elected
+	Timestamp time.Timestamp
 }
 
 // EventType is the type of an Election event
@@ -88,34 +87,25 @@ type Event struct {
 	Term Term
 }
 
-func Provider(client primitive.Client) primitive.Provider[Election, Option] {
-	return primitive.NewProvider[Election, Option](func(ctx context.Context, name string, opts ...primitive.Option) func(...Option) (Election, error) {
-		return func(electionOpts ...Option) (Election, error) {
-			// Process the primitive options
-			var options Options
-			options.apply(electionOpts...)
-
-			// Construct the primitive configuration
-			var config electionv1.LeaderElectionConfig
-
-			// Open the primitive connection
-			base, conn, err := primitive.Open[*electionv1.LeaderElectionConfig](client)(ctx, serviceName, name, &config, opts...)
-			if err != nil {
-				return nil, err
-			}
-
-			// Create the primitive instance
-			return &electionPrimitive{
-				ManagedPrimitive: base,
-				client:           electionv1.NewLeaderElectionClient(conn),
-			}, nil
+func New(client electionv1.LeaderElectionClient) func(context.Context, primitive.ID, ...Option) (Election, error) {
+	return func(ctx context.Context, id primitive.ID, opts ...Option) (Election, error) {
+		var options Options
+		options.apply(opts...)
+		election := &electionPrimitive{
+			Primitive:   primitive.New(id),
+			client:      client,
+			candidateID: options.CandidateID,
 		}
-	})
+		if err := election.create(ctx); err != nil {
+			return nil, err
+		}
+		return election, nil
+	}
 }
 
 // electionPrimitive is the single partition implementation of Election
 type electionPrimitive struct {
-	*primitive.ManagedPrimitive
+	primitive.Primitive
 	client      electionv1.LeaderElectionClient
 	candidateID string
 }
@@ -125,9 +115,7 @@ func (e *electionPrimitive) CandidateID() string {
 }
 
 func (e *electionPrimitive) GetTerm(ctx context.Context) (*Term, error) {
-	request := &electionv1.GetTermRequest{
-		Headers: e.GetHeaders(),
-	}
+	request := &electionv1.GetTermRequest{}
 	response, err := e.client.GetTerm(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -137,10 +125,7 @@ func (e *electionPrimitive) GetTerm(ctx context.Context) (*Term, error) {
 
 func (e *electionPrimitive) Enter(ctx context.Context) (*Term, error) {
 	request := &electionv1.EnterRequest{
-		Headers: e.GetHeaders(),
-		EnterInput: electionv1.EnterInput{
-			CandidateID: e.candidateID,
-		},
+		CandidateID: e.candidateID,
 	}
 	response, err := e.client.Enter(ctx, request)
 	if err != nil {
@@ -151,10 +136,7 @@ func (e *electionPrimitive) Enter(ctx context.Context) (*Term, error) {
 
 func (e *electionPrimitive) Leave(ctx context.Context) (*Term, error) {
 	request := &electionv1.WithdrawRequest{
-		Headers: e.GetHeaders(),
-		WithdrawInput: electionv1.WithdrawInput{
-			CandidateID: e.candidateID,
-		},
+		CandidateID: e.candidateID,
 	}
 	response, err := e.client.Withdraw(ctx, request)
 	if err != nil {
@@ -165,10 +147,7 @@ func (e *electionPrimitive) Leave(ctx context.Context) (*Term, error) {
 
 func (e *electionPrimitive) Anoint(ctx context.Context, id string) (*Term, error) {
 	request := &electionv1.AnointRequest{
-		Headers: e.GetHeaders(),
-		AnointInput: electionv1.AnointInput{
-			CandidateID: id,
-		},
+		CandidateID: id,
 	}
 	response, err := e.client.Anoint(ctx, request)
 	if err != nil {
@@ -179,10 +158,7 @@ func (e *electionPrimitive) Anoint(ctx context.Context, id string) (*Term, error
 
 func (e *electionPrimitive) Promote(ctx context.Context, id string) (*Term, error) {
 	request := &electionv1.PromoteRequest{
-		Headers: e.GetHeaders(),
-		PromoteInput: electionv1.PromoteInput{
-			CandidateID: id,
-		},
+		CandidateID: id,
 	}
 	response, err := e.client.Promote(ctx, request)
 	if err != nil {
@@ -193,10 +169,7 @@ func (e *electionPrimitive) Promote(ctx context.Context, id string) (*Term, erro
 
 func (e *electionPrimitive) Evict(ctx context.Context, id string) (*Term, error) {
 	request := &electionv1.EvictRequest{
-		Headers: e.GetHeaders(),
-		EvictInput: electionv1.EvictInput{
-			CandidateID: id,
-		},
+		CandidateID: id,
 	}
 	response, err := e.client.Evict(ctx, request)
 	if err != nil {
@@ -206,9 +179,7 @@ func (e *electionPrimitive) Evict(ctx context.Context, id string) (*Term, error)
 }
 
 func (e *electionPrimitive) Watch(ctx context.Context, ch chan<- Event) error {
-	request := &electionv1.EventsRequest{
-		Headers: e.GetHeaders(),
-	}
+	request := &electionv1.EventsRequest{}
 	stream, err := e.client.Events(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -258,4 +229,32 @@ func (e *electionPrimitive) Watch(ctx context.Context, ch chan<- Event) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+func (e *electionPrimitive) create(ctx context.Context) error {
+	request := &electionv1.CreateRequest{
+		Config: electionv1.LeaderElectionConfig{},
+	}
+	ctx = primitive.AppendToOutgoingContext(ctx, e.ID())
+	_, err := e.client.Create(ctx, request)
+	if err != nil {
+		err = errors.FromProto(err)
+		if !errors.IsAlreadyExists(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (e *electionPrimitive) Close(ctx context.Context) error {
+	request := &electionv1.CloseRequest{}
+	ctx = primitive.AppendToOutgoingContext(ctx, e.ID())
+	_, err := e.client.Close(ctx, request)
+	if err != nil {
+		err = errors.FromProto(err)
+		if !errors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
 }

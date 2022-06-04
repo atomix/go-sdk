@@ -8,11 +8,9 @@ import (
 	"context"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
 	lockv1 "github.com/atomix/runtime/api/atomix/lock/v1"
-	"github.com/atomix/runtime/pkg/errors"
-	"github.com/atomix/runtime/pkg/meta"
+	"github.com/atomix/runtime/pkg/atomix/errors"
+	"github.com/atomix/runtime/pkg/atomix/time"
 )
-
-const serviceName = "atomix.lock.v1.Lock"
 
 // Lock provides distributed concurrency control
 type Lock interface {
@@ -30,8 +28,8 @@ type Lock interface {
 
 // Status is the lock status
 type Status struct {
-	meta.ObjectMeta
-	State State
+	State     State
+	Timestamp time.Timestamp
 }
 
 // State is a lock state
@@ -44,42 +42,29 @@ const (
 	StateUnlocked
 )
 
-func Provider(client primitive.Client) primitive.Provider[Lock, Option] {
-	return primitive.NewProvider[Lock, Option](func(ctx context.Context, name string, opts ...primitive.Option) func(...Option) (Lock, error) {
-		return func(lockOpts ...Option) (Lock, error) {
-			// Process the primitive options
-			var options Options
-			options.apply(lockOpts...)
-
-			// Construct the primitive configuration
-			var config lockv1.LockConfig
-
-			// Open the primitive connection
-			base, conn, err := primitive.Open[*lockv1.LockConfig](client)(ctx, serviceName, name, &config, opts...)
-			if err != nil {
-				return nil, err
-			}
-
-			// Create the primitive instance
-			return &lockPrimitive{
-				ManagedPrimitive: base,
-				client:           lockv1.NewLockClient(conn),
-			}, nil
+func New(client lockv1.LockClient) func(context.Context, primitive.ID, ...Option) (Lock, error) {
+	return func(ctx context.Context, id primitive.ID, opts ...Option) (Lock, error) {
+		var options Options
+		options.apply(opts...)
+		lock := &lockPrimitive{
+			Primitive: primitive.New(id),
+			client:    client,
 		}
-	})
+		if err := lock.create(ctx); err != nil {
+			return nil, err
+		}
+		return lock, nil
+	}
 }
 
 // lockPrimitive is the single partition implementation of Lock
 type lockPrimitive struct {
-	*primitive.ManagedPrimitive
-	client  lockv1.LockClient
-	options newLockOptions
+	primitive.Primitive
+	client lockv1.LockClient
 }
 
 func (l *lockPrimitive) Lock(ctx context.Context, opts ...LockOption) (Status, error) {
-	request := &lockv1.LockRequest{
-		Headers: l.GetHeaders(),
-	}
+	request := &lockv1.LockRequest{}
 	for i := range opts {
 		opts[i].beforeLock(request)
 	}
@@ -98,15 +83,13 @@ func (l *lockPrimitive) Lock(ctx context.Context, opts ...LockOption) (Status, e
 		state = StateUnlocked
 	}
 	return Status{
-		ObjectMeta: meta.FromProto(response.Lock.ObjectMeta),
-		State:      state,
+		State:     state,
+		Timestamp: time.NewTimestamp(*response.Lock.Timestamp),
 	}, nil
 }
 
 func (l *lockPrimitive) Unlock(ctx context.Context, opts ...UnlockOption) error {
-	request := &lockv1.UnlockRequest{
-		Headers: l.GetHeaders(),
-	}
+	request := &lockv1.UnlockRequest{}
 	for i := range opts {
 		opts[i].beforeUnlock(request)
 	}
@@ -121,9 +104,7 @@ func (l *lockPrimitive) Unlock(ctx context.Context, opts ...UnlockOption) error 
 }
 
 func (l *lockPrimitive) Get(ctx context.Context, opts ...GetOption) (Status, error) {
-	request := &lockv1.GetLockRequest{
-		Headers: l.GetHeaders(),
-	}
+	request := &lockv1.GetLockRequest{}
 	for i := range opts {
 		opts[i].beforeGet(request)
 	}
@@ -142,7 +123,35 @@ func (l *lockPrimitive) Get(ctx context.Context, opts ...GetOption) (Status, err
 		state = StateUnlocked
 	}
 	return Status{
-		ObjectMeta: meta.FromProto(response.Lock.ObjectMeta),
-		State:      state,
+		State:     state,
+		Timestamp: time.NewTimestamp(*response.Lock.Timestamp),
 	}, nil
+}
+
+func (l *lockPrimitive) create(ctx context.Context) error {
+	request := &lockv1.CreateRequest{
+		Config: lockv1.LockConfig{},
+	}
+	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
+	_, err := l.client.Create(ctx, request)
+	if err != nil {
+		err = errors.FromProto(err)
+		if !errors.IsAlreadyExists(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (l *lockPrimitive) Close(ctx context.Context) error {
+	request := &lockv1.CloseRequest{}
+	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
+	_, err := l.client.Close(ctx, request)
+	if err != nil {
+		err = errors.FromProto(err)
+		if !errors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
 }

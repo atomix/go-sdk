@@ -9,13 +9,11 @@ import (
 	"github.com/atomix/go-client/pkg/atomix/generic"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
 	valuev1 "github.com/atomix/runtime/api/atomix/value/v1"
-	"github.com/atomix/runtime/pkg/errors"
-	"github.com/atomix/runtime/pkg/logging"
-	"github.com/atomix/runtime/pkg/meta"
+	"github.com/atomix/runtime/pkg/atomix/errors"
+	"github.com/atomix/runtime/pkg/atomix/logging"
+	"github.com/atomix/runtime/pkg/atomix/time"
 	"io"
 )
-
-const serviceName = "atomix.value.v1.Value"
 
 var log = logging.GetLogger()
 
@@ -24,16 +22,16 @@ type Value[T any] interface {
 	primitive.Primitive
 
 	// Set sets the current value and returns the version
-	Set(ctx context.Context, value T, opts ...SetOption) (meta.ObjectMeta, error)
+	Set(ctx context.Context, value T, opts ...SetOption) (time.Timestamp, error)
 
 	// Get gets the current value and version
-	Get(ctx context.Context) (T, meta.ObjectMeta, error)
+	Get(ctx context.Context) (T, time.Timestamp, error)
 
 	// Watch watches the value for changes
 	Watch(ctx context.Context, ch chan<- Event[T]) error
 }
 
-// EventType is the type of a set event
+// EventType is the type of a value event
 type EventType string
 
 const (
@@ -43,103 +41,84 @@ const (
 
 // Event is a value change event
 type Event[T any] struct {
-	meta.ObjectMeta
-
 	// Type is the change event type
 	Type EventType
 
 	// Value is the updated value
 	Value T
+
+	// Timestamp is the timestamp at which the event occurred
+	Timestamp time.Timestamp
 }
 
-func Provider[T any](client primitive.Client) primitive.Provider[Value[T], Option[T]] {
-	return primitive.NewProvider[Value[T], Option[T]](func(ctx context.Context, name string, opts ...primitive.Option) func(...Option[T]) (Value[T], error) {
-		return func(listOpts ...Option[T]) (Value[T], error) {
-			// Process the primitive options
-			var options Options[T]
-			for _, opt := range listOpts {
-				opt.apply(&options)
+func New[T any](client valuev1.ValueClient) func(context.Context, primitive.ID, ...Option[T]) (Value[T], error) {
+	return func(ctx context.Context, id primitive.ID, opts ...Option[T]) (Value[T], error) {
+		var options Options[T]
+		options.apply(opts...)
+		if options.ValueType == nil {
+			stringType := generic.Bytes()
+			if valueType, ok := stringType.(generic.Type[T]); ok {
+				options.ValueType = valueType
+			} else {
+				return nil, errors.NewInvalid("must configure a generic type for value parameter")
 			}
-			if options.ValueType == nil {
-				stringType := generic.Bytes()
-				if valueType, ok := stringType.(generic.Type[T]); ok {
-					options.ValueType = valueType
-				} else {
-					return nil, errors.NewInvalid("must configure a generic type for value parameter")
-				}
-			}
-
-			// Construct the primitive configuration
-			var config valuev1.ValueConfig
-
-			// Open the primitive connection
-			base, conn, err := primitive.Open[*valuev1.ValueConfig](client)(ctx, serviceName, name, &config, opts...)
-			if err != nil {
-				return nil, err
-			}
-
-			// Create the primitive instance
-			return &valuePrimitive[T]{
-				ManagedPrimitive: base,
-				client:           valuev1.NewValueClient(conn),
-			}, nil
 		}
-	})
+		indexedMap := &valuePrimitive[T]{
+			Primitive: primitive.New(id),
+			client:    client,
+			valueType: options.ValueType,
+		}
+		if err := indexedMap.create(ctx); err != nil {
+			return nil, err
+		}
+		return indexedMap, nil
+	}
 }
 
 // value is the single partition implementation of Lock
 type valuePrimitive[T any] struct {
-	*primitive.ManagedPrimitive
+	primitive.Primitive
 	client    valuev1.ValueClient
 	valueType generic.Type[T]
 }
 
-func (v *valuePrimitive[T]) Set(ctx context.Context, value T, opts ...SetOption) (meta.ObjectMeta, error) {
+func (v *valuePrimitive[T]) Set(ctx context.Context, value T, opts ...SetOption) (time.Timestamp, error) {
 	bytes, err := v.valueType.Marshal(&value)
 	if err != nil {
-		return meta.ObjectMeta{}, errors.NewInvalid("element encoding failed", err)
+		return nil, errors.NewInvalid("element encoding failed", err)
 	}
 	request := &valuev1.SetRequest{
-		Headers: v.GetHeaders(),
-		SetInput: valuev1.SetInput{
-			Value: valuev1.Object{
-				Value: bytes,
-			},
-		},
+		Value: bytes,
 	}
 	for i := range opts {
 		opts[i].beforeSet(request)
 	}
 	response, err := v.client.Set(ctx, request)
 	if err != nil {
-		return meta.ObjectMeta{}, errors.FromProto(err)
+		return nil, errors.FromProto(err)
 	}
 	for i := range opts {
 		opts[i].afterSet(response)
 	}
-	return meta.FromProto(response.Value.ObjectMeta), nil
+	return time.NewTimestamp(*response.Timestamp), nil
 }
 
-func (v *valuePrimitive[T]) Get(ctx context.Context) (T, meta.ObjectMeta, error) {
-	request := &valuev1.GetRequest{
-		Headers: v.GetHeaders(),
-	}
+func (v *valuePrimitive[T]) Get(ctx context.Context) (T, time.Timestamp, error) {
+	request := &valuev1.GetRequest{}
 	var r T
 	response, err := v.client.Get(ctx, request)
 	if err != nil {
-		return r, meta.ObjectMeta{}, errors.FromProto(err)
+		return r, nil, errors.FromProto(err)
 	}
 	var value T
-	if err := v.valueType.Unmarshal(response.Value.Value, &value); err != nil {
-		return value, meta.ObjectMeta{}, err
+	if err := v.valueType.Unmarshal(response.Value, &value); err != nil {
+		return value, nil, err
 	}
-	return value, meta.FromProto(response.Value.ObjectMeta), nil
+	return value, time.NewTimestamp(*response.Timestamp), nil
 }
 
 func (v *valuePrimitive[T]) Watch(ctx context.Context, ch chan<- Event[T]) error {
-	request := &valuev1.EventsRequest{
-		Headers: v.GetHeaders(),
-	}
+	request := &valuev1.EventsRequest{}
 	stream, err := v.client.Events(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -174,7 +153,7 @@ func (v *valuePrimitive[T]) Watch(ctx context.Context, ch chan<- Event[T]) error
 			}
 
 			var value T
-			if err := v.valueType.Unmarshal(response.Event.Value.Value, &value); err != nil {
+			if err := v.valueType.Unmarshal(response.Event.Value, &value); err != nil {
 				log.Error(err)
 				continue
 			}
@@ -182,9 +161,9 @@ func (v *valuePrimitive[T]) Watch(ctx context.Context, ch chan<- Event[T]) error
 			switch response.Event.Type {
 			case valuev1.Event_UPDATE:
 				ch <- Event[T]{
-					ObjectMeta: meta.FromProto(response.Event.Value.ObjectMeta),
-					Type:       EventUpdate,
-					Value:      value,
+					Type:      EventUpdate,
+					Value:     value,
+					Timestamp: time.NewTimestamp(*response.Event.Timestamp),
 				}
 			}
 		}
@@ -196,4 +175,32 @@ func (v *valuePrimitive[T]) Watch(ctx context.Context, ch chan<- Event[T]) error
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+func (v *valuePrimitive[T]) create(ctx context.Context) error {
+	request := &valuev1.CreateRequest{
+		Config: valuev1.ValueConfig{},
+	}
+	ctx = primitive.AppendToOutgoingContext(ctx, v.ID())
+	_, err := v.client.Create(ctx, request)
+	if err != nil {
+		err = errors.FromProto(err)
+		if !errors.IsAlreadyExists(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (v *valuePrimitive[T]) Close(ctx context.Context) error {
+	request := &valuev1.CloseRequest{}
+	ctx = primitive.AppendToOutgoingContext(ctx, v.ID())
+	_, err := v.client.Close(ctx, request)
+	if err != nil {
+		err = errors.FromProto(err)
+		if !errors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
 }

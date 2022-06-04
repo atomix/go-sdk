@@ -7,8 +7,8 @@ package client
 import (
 	"context"
 	"fmt"
-	"github.com/atomix/runtime/pkg/errors"
-	"github.com/atomix/runtime/pkg/grpc/retry"
+	"github.com/atomix/runtime/pkg/atomix/errors"
+	"github.com/atomix/runtime/pkg/atomix/grpc/retry"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"sync"
@@ -29,7 +29,7 @@ type Client struct {
 	mu   sync.RWMutex
 }
 
-func (c *Client) Connect(ctx context.Context) (*grpc.ClientConn, error) {
+func (c *Client) connect(ctx context.Context) (*grpc.ClientConn, error) {
 	c.mu.RLock()
 	conn := c.conn
 	c.mu.RUnlock()

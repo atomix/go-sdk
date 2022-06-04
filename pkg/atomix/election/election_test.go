@@ -9,8 +9,8 @@ import (
 	primitiveapi "github.com/atomix/api/pkg/atomix"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
 	"github.com/atomix/go-client/pkg/atomix/util/test"
-	"github.com/atomix/runtime/pkg/logging"
-	"github.com/atomix/runtime/pkg/meta"
+	"github.com/atomix/runtime/pkg/atomix/logging"
+	"github.com/atomix/runtime/pkg/atomix/meta"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
