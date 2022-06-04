@@ -7,7 +7,6 @@ package indexedmap
 import (
 	"github.com/atomix/go-client/pkg/atomix/generic"
 	indexedmapv1 "github.com/atomix/runtime/api/atomix/indexed_map/v1"
-	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
 	"github.com/atomix/runtime/pkg/atomix/time"
 )
 
@@ -52,10 +51,10 @@ func WithValueType[K, V any](valueType generic.Type[V]) Option[K, V] {
 	})
 }
 
-// SetOption is an option for the Put method
-type SetOption interface {
-	beforePut(request *indexedmapv1.PutRequest)
-	afterPut(response *indexedmapv1.PutResponse)
+// UpdateOption is an option for the Update method
+type UpdateOption interface {
+	beforeUpdate(request *indexedmapv1.UpdateRequest)
+	afterUpdate(response *indexedmapv1.UpdateResponse)
 }
 
 // RemoveOption is an option for the Remove method
@@ -71,49 +70,26 @@ func IfTimestamp(timestamp time.Timestamp) TimestampOption {
 
 // TimestampOption is an implementation of SetOption and RemoveOption to specify the version for concurrency control
 type TimestampOption struct {
-	SetOption
+	UpdateOption
 	RemoveOption
 	timestamp time.Timestamp
 }
 
-func (o TimestampOption) beforePut(request *indexedmapv1.PutRequest) {
+func (o TimestampOption) beforeUpdate(request *indexedmapv1.UpdateRequest) {
 	timestamp := o.timestamp.Scheme().Codec().EncodeTimestamp(o.timestamp)
-	request.Timestamp = &timestamp
+	request.IfTimestamp = &timestamp
 }
 
-func (o TimestampOption) afterPut(response *indexedmapv1.PutResponse) {
+func (o TimestampOption) afterUpdate(response *indexedmapv1.UpdateResponse) {
 
 }
 
 func (o TimestampOption) beforeRemove(request *indexedmapv1.RemoveRequest) {
 	timestamp := o.timestamp.Scheme().Codec().EncodeTimestamp(o.timestamp)
-	request.Timestamp = &timestamp
+	request.IfTimestamp = &timestamp
 }
 
 func (o TimestampOption) afterRemove(response *indexedmapv1.RemoveResponse) {
-
-}
-
-// IfNotSet sets the value if the entry is not yet set
-func IfNotSet() SetOption {
-	return &NotSetOption{}
-}
-
-// NotSetOption is a SetOption that sets the value only if it's not already set
-type NotSetOption struct {
-}
-
-func (o NotSetOption) beforePut(request *indexedmapv1.PutRequest) {
-	request.Preconditions = append(request.Preconditions, indexedmapv1.Precondition{
-		Precondition: &indexedmapv1.Precondition_Metadata{
-			Metadata: &runtimev1.ObjectMeta{
-				Type: runtimev1.ObjectMeta_TOMBSTONE,
-			},
-		},
-	})
-}
-
-func (o NotSetOption) afterPut(response *indexedmapv1.PutResponse) {
 
 }
 
@@ -145,28 +121,19 @@ func (o replayOption) afterWatch(response *indexedmapv1.EventsResponse) {
 }
 
 type filterOption struct {
-	filter Filter
+	key string
 }
 
 func (o filterOption) beforeWatch(request *indexedmapv1.EventsRequest) {
-	if o.filter.Key != "" {
-		request.Key.Key = o.filter.Key
-	}
-	if o.filter.Index > 0 {
-		request.Key.Index = uint64(o.filter.Index)
+	if o.key != "" {
+		request.Key = o.key
 	}
 }
 
 func (o filterOption) afterWatch(response *indexedmapv1.EventsResponse) {
 }
 
-// WithFilter returns a watch option that filters the watch events
-func WithFilter(filter Filter) WatchOption {
-	return filterOption{filter: filter}
-}
-
-// Filter is a watch filter configuration
-type Filter struct {
-	Key   string
-	Index Index
+// WithFilterKey returns a watch option that filters the watch events
+func WithFilterKey(key string) WatchOption {
+	return filterOption{key: key}
 }

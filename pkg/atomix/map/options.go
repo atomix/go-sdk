@@ -7,7 +7,6 @@ package _map //nolint:golint
 import (
 	"github.com/atomix/go-client/pkg/atomix/generic"
 	mapv1 "github.com/atomix/runtime/api/atomix/map/v1"
-	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
 	"github.com/atomix/runtime/pkg/atomix/time"
 )
 
@@ -58,6 +57,12 @@ type PutOption interface {
 	afterPut(response *mapv1.PutResponse)
 }
 
+// UpdateOption is an option for the Update method
+type UpdateOption interface {
+	beforeUpdate(request *mapv1.UpdateRequest)
+	afterUpdate(response *mapv1.UpdateResponse)
+}
+
 // RemoveOption is an option for the Remove method
 type RemoveOption interface {
 	beforeRemove(request *mapv1.RemoveRequest)
@@ -72,48 +77,35 @@ func IfTimestamp(timestamp time.Timestamp) TimestampOption {
 // TimestampOption is an implementation of PutOption and RemoveOption to specify the version for concurrency control
 type TimestampOption struct {
 	PutOption
+	UpdateOption
 	RemoveOption
 	timestamp time.Timestamp
 }
 
 func (o TimestampOption) beforePut(request *mapv1.PutRequest) {
 	timestamp := o.timestamp.Scheme().Codec().EncodeTimestamp(o.timestamp)
-	request.Timestamp = &timestamp
+	request.IfTimestamp = &timestamp
 }
 
 func (o TimestampOption) afterPut(response *mapv1.PutResponse) {
 
 }
 
+func (o TimestampOption) beforeUpdate(request *mapv1.UpdateRequest) {
+	timestamp := o.timestamp.Scheme().Codec().EncodeTimestamp(o.timestamp)
+	request.IfTimestamp = &timestamp
+}
+
+func (o TimestampOption) afterUpdate(response *mapv1.UpdateResponse) {
+
+}
+
 func (o TimestampOption) beforeRemove(request *mapv1.RemoveRequest) {
 	timestamp := o.timestamp.Scheme().Codec().EncodeTimestamp(o.timestamp)
-	request.Timestamp = &timestamp
+	request.IfTimestamp = &timestamp
 }
 
 func (o TimestampOption) afterRemove(response *mapv1.RemoveResponse) {
-
-}
-
-// IfNotSet sets the value if the entry is not yet set
-func IfNotSet() PutOption {
-	return &NotSetOption{}
-}
-
-// NotSetOption is a PutOption that sets the value only if it's not already set
-type NotSetOption struct {
-}
-
-func (o NotSetOption) beforePut(request *mapv1.PutRequest) {
-	request.Preconditions = append(request.Preconditions, mapv1.Precondition{
-		Precondition: &mapv1.Precondition_Metadata{
-			Metadata: &runtimev1.ObjectMeta{
-				Type: runtimev1.ObjectMeta_TOMBSTONE,
-			},
-		},
-	})
-}
-
-func (o NotSetOption) afterPut(response *mapv1.PutResponse) {
 
 }
 

@@ -25,6 +25,12 @@ type Map[K, V any] interface {
 	// Put sets a key/value pair in the map
 	Put(ctx context.Context, key K, value V, opts ...PutOption) (*Entry[K, V], error)
 
+	// Insert inserts a key/value pair into the map
+	Insert(ctx context.Context, key K, value V) (*Entry[K, V], error)
+
+	// Update updates a key/value pair in the map
+	Update(ctx context.Context, key K, value V, opts ...UpdateOption) (*Entry[K, V], error)
+
 	// Get gets the value of the given key
 	Get(ctx context.Context, key K, opts ...GetOption) (*Entry[K, V], error)
 
@@ -158,6 +164,58 @@ func (m *mapPrimitive[K, V]) Put(ctx context.Context, key K, value V, opts ...Pu
 	}
 	for i := range opts {
 		opts[i].afterPut(response)
+	}
+	return m.newEntry(&response.Entry)
+}
+
+func (m *mapPrimitive[K, V]) Insert(ctx context.Context, key K, value V) (*Entry[K, V], error) {
+	keyBytes, err := m.keyType.Marshal(&key)
+	if err != nil {
+		return nil, errors.NewInvalid("key encoding failed", err)
+	}
+	valueBytes, err := m.valueType.Marshal(&value)
+	if err != nil {
+		return nil, errors.NewInvalid("value encoding failed", err)
+	}
+
+	request := &mapv1.InsertRequest{
+		Key: string(keyBytes),
+		Value: &mapv1.Value{
+			Value: valueBytes,
+		},
+	}
+	response, err := m.client.Insert(ctx, request)
+	if err != nil {
+		return nil, errors.FromProto(err)
+	}
+	return m.newEntry(&response.Entry)
+}
+
+func (m *mapPrimitive[K, V]) Update(ctx context.Context, key K, value V, opts ...UpdateOption) (*Entry[K, V], error) {
+	keyBytes, err := m.keyType.Marshal(&key)
+	if err != nil {
+		return nil, errors.NewInvalid("key encoding failed", err)
+	}
+	valueBytes, err := m.valueType.Marshal(&value)
+	if err != nil {
+		return nil, errors.NewInvalid("value encoding failed", err)
+	}
+
+	request := &mapv1.UpdateRequest{
+		Key: string(keyBytes),
+		Value: &mapv1.Value{
+			Value: valueBytes,
+		},
+	}
+	for i := range opts {
+		opts[i].beforeUpdate(request)
+	}
+	response, err := m.client.Update(ctx, request)
+	if err != nil {
+		return nil, errors.FromProto(err)
+	}
+	for i := range opts {
+		opts[i].afterUpdate(response)
 	}
 	return m.newEntry(&response.Entry)
 }

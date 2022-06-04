@@ -10,7 +10,6 @@ import (
 	"github.com/atomix/go-client/pkg/atomix/generic"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
 	indexedmapv1 "github.com/atomix/runtime/api/atomix/indexed_map/v1"
-	primitivev1 "github.com/atomix/runtime/api/atomix/primitive/v1"
 	"github.com/atomix/runtime/pkg/atomix/errors"
 	"github.com/atomix/runtime/pkg/atomix/logging"
 	"github.com/atomix/runtime/pkg/atomix/time"
@@ -32,11 +31,8 @@ type IndexedMap[K, V any] interface {
 	// Append appends the given key/value to the map
 	Append(ctx context.Context, key K, value V) (*Entry[K, V], error)
 
-	// Put appends the given key/value to the map
-	Put(ctx context.Context, key K, value V) (*Entry[K, V], error)
-
-	// Set sets the given index in the map
-	Set(ctx context.Context, index Index, key K, value V, opts ...SetOption) (*Entry[K, V], error)
+	// Update appends the given key/value in the map
+	Update(ctx context.Context, key K, value V, opts ...UpdateOption) (*Entry[K, V], error)
 
 	// Get gets the value of the given key
 	Get(ctx context.Context, key K, opts ...GetOption) (*Entry[K, V], error)
@@ -188,31 +184,20 @@ func (m *indexedMapPrimitive[K, V]) Append(ctx context.Context, key K, value V) 
 		return nil, errors.NewInvalid("value encoding failed", err)
 	}
 
-	request := &indexedmapv1.PutRequest{
-		Key: indexedmapv1.Key{
-			Key: string(keyBytes),
-		},
+	request := &indexedmapv1.AppendRequest{
+		Key: string(keyBytes),
 		Value: &indexedmapv1.Value{
 			Value: valueBytes,
 		},
-		Preconditions: []indexedmapv1.Precondition{
-			{
-				Precondition: &indexedmapv1.Precondition_Metadata{
-					Metadata: &primitivev1.ObjectMeta{
-						Type: primitivev1.ObjectMeta_TOMBSTONE,
-					},
-				},
-			},
-		},
 	}
-	response, err := m.client.Put(ctx, request)
+	response, err := m.client.Append(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
 	}
 	return m.newEntry(response.Entry)
 }
 
-func (m *indexedMapPrimitive[K, V]) Put(ctx context.Context, key K, value V) (*Entry[K, V], error) {
+func (m *indexedMapPrimitive[K, V]) Update(ctx context.Context, key K, value V, opts ...UpdateOption) (*Entry[K, V], error) {
 	keyBytes, err := m.keyType.Marshal(&key)
 	if err != nil {
 		return nil, errors.NewInvalid("key encoding failed", err)
@@ -222,49 +207,21 @@ func (m *indexedMapPrimitive[K, V]) Put(ctx context.Context, key K, value V) (*E
 		return nil, errors.NewInvalid("value encoding failed", err)
 	}
 
-	request := &indexedmapv1.PutRequest{
-		Key: indexedmapv1.Key{
-			Key: string(keyBytes),
-		},
-		Value: &indexedmapv1.Value{
-			Value: valueBytes,
-		},
-	}
-	response, err := m.client.Put(ctx, request)
-	if err != nil {
-		return nil, errors.FromProto(err)
-	}
-	return m.newEntry(response.Entry)
-}
-
-func (m *indexedMapPrimitive[K, V]) Set(ctx context.Context, index Index, key K, value V, opts ...SetOption) (*Entry[K, V], error) {
-	keyBytes, err := m.keyType.Marshal(&key)
-	if err != nil {
-		return nil, errors.NewInvalid("key encoding failed", err)
-	}
-	valueBytes, err := m.valueType.Marshal(&value)
-	if err != nil {
-		return nil, errors.NewInvalid("value encoding failed", err)
-	}
-
-	request := &indexedmapv1.PutRequest{
-		Key: indexedmapv1.Key{
-			Index: uint64(index),
-			Key:   string(keyBytes),
-		},
+	request := &indexedmapv1.UpdateRequest{
+		Key: string(keyBytes),
 		Value: &indexedmapv1.Value{
 			Value: valueBytes,
 		},
 	}
 	for i := range opts {
-		opts[i].beforePut(request)
+		opts[i].beforeUpdate(request)
 	}
-	response, err := m.client.Put(ctx, request)
+	response, err := m.client.Update(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
 	}
 	for i := range opts {
-		opts[i].afterPut(response)
+		opts[i].afterUpdate(response)
 	}
 	return m.newEntry(response.Entry)
 }
@@ -275,9 +232,7 @@ func (m *indexedMapPrimitive[K, V]) Get(ctx context.Context, key K, opts ...GetO
 		return nil, errors.NewInvalid("key encoding failed", err)
 	}
 	request := &indexedmapv1.GetRequest{
-		Key: indexedmapv1.Key{
-			Key: string(keyBytes),
-		},
+		Key: string(keyBytes),
 	}
 	for i := range opts {
 		opts[i].beforeGet(request)
@@ -294,9 +249,7 @@ func (m *indexedMapPrimitive[K, V]) Get(ctx context.Context, key K, opts ...GetO
 
 func (m *indexedMapPrimitive[K, V]) GetIndex(ctx context.Context, index Index, opts ...GetOption) (*Entry[K, V], error) {
 	request := &indexedmapv1.GetRequest{
-		Key: indexedmapv1.Key{
-			Index: uint64(index),
-		},
+		Index: uint64(index),
 	}
 	for i := range opts {
 		opts[i].beforeGet(request)
@@ -398,9 +351,7 @@ func (m *indexedMapPrimitive[K, V]) Remove(ctx context.Context, key K, opts ...R
 	}
 
 	request := &indexedmapv1.RemoveRequest{
-		Key: indexedmapv1.Key{
-			Key: string(keyBytes),
-		},
+		Key: string(keyBytes),
 	}
 	for i := range opts {
 		opts[i].beforeRemove(request)
@@ -417,9 +368,7 @@ func (m *indexedMapPrimitive[K, V]) Remove(ctx context.Context, key K, opts ...R
 
 func (m *indexedMapPrimitive[K, V]) RemoveIndex(ctx context.Context, index Index, opts ...RemoveOption) (*Entry[K, V], error) {
 	request := &indexedmapv1.RemoveRequest{
-		Key: indexedmapv1.Key{
-			Index: uint64(index),
-		},
+		Index: uint64(index),
 	}
 	for i := range opts {
 		opts[i].beforeRemove(request)
@@ -573,7 +522,7 @@ func (m *indexedMapPrimitive[K, V]) newEntry(entry *indexedmapv1.Entry) (*Entry[
 		return nil, nil
 	}
 	var key K
-	if err := m.keyType.Unmarshal([]byte(entry.Key.Key), &key); err != nil {
+	if err := m.keyType.Unmarshal([]byte(entry.Key), &key); err != nil {
 		return nil, errors.NewInvalid("key decoding failed", err)
 	}
 	var value V

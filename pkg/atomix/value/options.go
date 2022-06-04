@@ -61,7 +61,7 @@ type timestampOption struct {
 
 func (o timestampOption) beforeSet(request *valuev1.SetRequest) {
 	timestamp := o.timestamp.Scheme().Codec().EncodeTimestamp(o.timestamp)
-	request.Timestamp = &timestamp
+	request.IfTimestamp = &timestamp
 }
 
 func (o timestampOption) afterSet(response *valuev1.SetResponse) {
