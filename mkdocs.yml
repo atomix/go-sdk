@@ -2,12 +2,4 @@ site_name: Atomix Go Client
 site_url: https://atomix.io/client/go
 repo_url: https://github.com/atomix/go-client
 nav:
-  - Getting Started: getting-started.md
-  - Counter: counter.md
-  - Election: election.md
-  - IndexedMap: indexed-map.md
-  - List: list.md
-  - Lock: lock.md
-  - Map: map.md
-  - Set: set.md
-  - Value: value.md
+  - Go: getting-started.md
