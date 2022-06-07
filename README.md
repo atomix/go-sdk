@@ -13,9 +13,9 @@ SPDX-License-Identifier: Apache-2.0
 
 This project provides a [Go] client for [Atomix Cloud].
 
-# Getting Started
+## Getting Started
 
-## Installation
+### Installation
 
 To install the Go client, use `go get`:
 
@@ -23,7 +23,7 @@ To install the Go client, use `go get`:
 $ GO111MODULE=on go get github.com/atomix/go-client
 ```
 
-## Usage
+### Usage
 
 To use the client, import the client API:
 
@@ -72,7 +72,7 @@ When a primitive is no longer in used by the client it can be closed with `Close
 lock.Close(context.Background())
 ```
 
-# Counter
+## Counter
 
 The `Counter` primitive is a distributed counter that supports atomic increment, decrement,
 and check-and-set operations. To create a counter, call `GetCounter` on the database in which
@@ -115,7 +115,7 @@ if err !=  nil {
 }
 ```
 
-# Leader Election
+## Leader Election
 
 The `Election` primitive supports distributed leader election. Leader elections are implemented
 using first-in-first-out, but clients can sort election priority through various operations on
@@ -200,11 +200,11 @@ for event := range ch {
 }
 ```
 
-# IndexedMap
+## IndexedMap
 
-# List
+## List
 
-# Lock
+## Lock
 
 The `Lock` primitive is a distributed lock that provides lock version numbers for fencing.
 To create a lock, call `GetLock` on the database in which to create the lock.
@@ -284,7 +284,7 @@ if err != nil {
 }
 ```
 
-# Map
+## Map
 
 The `Map` primitive provides a distributed map that supports concurrency control through optimistic
 locking. Maps store `string` keys and `[]byte` values, and map entries are represented in return
@@ -370,7 +370,7 @@ for event := range ch {
 }
 ```
 
-# Set
+## Set
 
 The `Set` primitive is a partitioned distributed set. Set values are stored as `strings`. To create a set, call `GetSet`
 on the database in which to create the set:
@@ -434,14 +434,14 @@ for event := range ch {
 }
 ```
 
-# Value
+## Value
 
 The `Value` primitive is a distributed `[]byte` value that supoorts atomic set-and-get and compare-and-set operations.
 
 ```go
 myValue, err := atomix.GetValue(context.Background(), "my-value")
 if err != nil {
-    ...
+...
 }
 
 defer myValue.Close(context.Background())
@@ -452,7 +452,7 @@ To set the value call `Set`:
 ```go
 meta, err := myValue.Set(context.Background(), []byte("Hello world!"))
 if err != nil {
-    ...
+...
 }
 ```
 
@@ -461,7 +461,7 @@ To get the current value use `Get`:
 ```go
 bytes, meta, err := myValue.Get(context.Background())
 if err != nil {
-    ...
+...
 }
 ```
 
@@ -470,7 +470,7 @@ check-and-set operations using optimistic locking:
 
 ```go
 if string(bytes) == "Hello world!" {
-    _, err := myValue.Set(context.Background(), []byte("Goodbye world."), value.IfMatch(meta))
+_, err := myValue.Set(context.Background(), []byte("Goodbye world."), value.IfMatch(meta))
 }
 ```
 
@@ -481,7 +481,7 @@ published to all watchers.
 ch := make(chan value.Event)
 err := myValue.Watch(context.Background(), ch)
 for event := range ch {
-    ...
+...
 }
 ```
 
