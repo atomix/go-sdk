@@ -116,6 +116,7 @@ func (e *electionPrimitive) CandidateID() string {
 
 func (e *electionPrimitive) GetTerm(ctx context.Context) (*Term, error) {
 	request := &electionv1.GetTermRequest{}
+	ctx = primitive.AppendToOutgoingContext(ctx, e.ID())
 	response, err := e.client.GetTerm(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -127,6 +128,7 @@ func (e *electionPrimitive) Enter(ctx context.Context) (*Term, error) {
 	request := &electionv1.EnterRequest{
 		CandidateID: e.candidateID,
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, e.ID())
 	response, err := e.client.Enter(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -138,6 +140,7 @@ func (e *electionPrimitive) Leave(ctx context.Context) (*Term, error) {
 	request := &electionv1.WithdrawRequest{
 		CandidateID: e.candidateID,
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, e.ID())
 	response, err := e.client.Withdraw(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -149,6 +152,7 @@ func (e *electionPrimitive) Anoint(ctx context.Context, id string) (*Term, error
 	request := &electionv1.AnointRequest{
 		CandidateID: id,
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, e.ID())
 	response, err := e.client.Anoint(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -160,6 +164,7 @@ func (e *electionPrimitive) Promote(ctx context.Context, id string) (*Term, erro
 	request := &electionv1.PromoteRequest{
 		CandidateID: id,
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, e.ID())
 	response, err := e.client.Promote(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -171,6 +176,7 @@ func (e *electionPrimitive) Evict(ctx context.Context, id string) (*Term, error)
 	request := &electionv1.EvictRequest{
 		CandidateID: id,
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, e.ID())
 	response, err := e.client.Evict(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -180,6 +186,7 @@ func (e *electionPrimitive) Evict(ctx context.Context, id string) (*Term, error)
 
 func (e *electionPrimitive) Watch(ctx context.Context, ch chan<- Event) error {
 	request := &electionv1.EventsRequest{}
+	ctx = primitive.AppendToOutgoingContext(ctx, e.ID())
 	stream, err := e.client.Events(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)

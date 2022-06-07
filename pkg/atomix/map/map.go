@@ -158,6 +158,7 @@ func (m *mapPrimitive[K, V]) Put(ctx context.Context, key K, value V, opts ...Pu
 	for i := range opts {
 		opts[i].beforePut(request)
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	response, err := m.client.Put(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -184,6 +185,7 @@ func (m *mapPrimitive[K, V]) Insert(ctx context.Context, key K, value V) (*Entry
 			Value: valueBytes,
 		},
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	response, err := m.client.Insert(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -210,6 +212,7 @@ func (m *mapPrimitive[K, V]) Update(ctx context.Context, key K, value V, opts ..
 	for i := range opts {
 		opts[i].beforeUpdate(request)
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	response, err := m.client.Update(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -231,6 +234,7 @@ func (m *mapPrimitive[K, V]) Get(ctx context.Context, key K, opts ...GetOption) 
 	for i := range opts {
 		opts[i].beforeGet(request)
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	response, err := m.client.Get(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -252,6 +256,7 @@ func (m *mapPrimitive[K, V]) Remove(ctx context.Context, key K, opts ...RemoveOp
 	for i := range opts {
 		opts[i].beforeRemove(request)
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	response, err := m.client.Remove(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -264,6 +269,7 @@ func (m *mapPrimitive[K, V]) Remove(ctx context.Context, key K, opts ...RemoveOp
 
 func (m *mapPrimitive[K, V]) Len(ctx context.Context) (int, error) {
 	request := &mapv1.SizeRequest{}
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	response, err := m.client.Size(ctx, request)
 	if err != nil {
 		return 0, errors.FromProto(err)
@@ -273,6 +279,7 @@ func (m *mapPrimitive[K, V]) Len(ctx context.Context) (int, error) {
 
 func (m *mapPrimitive[K, V]) Clear(ctx context.Context) error {
 	request := &mapv1.ClearRequest{}
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	_, err := m.client.Clear(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -282,6 +289,7 @@ func (m *mapPrimitive[K, V]) Clear(ctx context.Context) error {
 
 func (m *mapPrimitive[K, V]) Entries(ctx context.Context, ch chan<- Entry[K, V]) error {
 	request := &mapv1.EntriesRequest{}
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	stream, err := m.client.Entries(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -319,6 +327,7 @@ func (m *mapPrimitive[K, V]) Watch(ctx context.Context, ch chan<- Event[K, V], o
 		opts[i].beforeWatch(request)
 	}
 
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	stream, err := m.client.Events(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)

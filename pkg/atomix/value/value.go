@@ -93,6 +93,7 @@ func (v *valuePrimitive[T]) Set(ctx context.Context, value T, opts ...SetOption)
 	for i := range opts {
 		opts[i].beforeSet(request)
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, v.ID())
 	response, err := v.client.Set(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -105,6 +106,7 @@ func (v *valuePrimitive[T]) Set(ctx context.Context, value T, opts ...SetOption)
 
 func (v *valuePrimitive[T]) Get(ctx context.Context) (T, time.Timestamp, error) {
 	request := &valuev1.GetRequest{}
+	ctx = primitive.AppendToOutgoingContext(ctx, v.ID())
 	var r T
 	response, err := v.client.Get(ctx, request)
 	if err != nil {
@@ -119,6 +121,7 @@ func (v *valuePrimitive[T]) Get(ctx context.Context) (T, time.Timestamp, error) 
 
 func (v *valuePrimitive[T]) Watch(ctx context.Context, ch chan<- Event[T]) error {
 	request := &valuev1.EventsRequest{}
+	ctx = primitive.AppendToOutgoingContext(ctx, v.ID())
 	stream, err := v.client.Events(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)

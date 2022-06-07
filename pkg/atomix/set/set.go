@@ -111,6 +111,7 @@ func (s *setPrimitive[E]) Add(ctx context.Context, value E) (bool, error) {
 			Value: base64.StdEncoding.EncodeToString(bytes),
 		},
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, s.ID())
 	_, err = s.client.Add(ctx, request)
 	if err != nil {
 		err = errors.FromProto(err)
@@ -132,6 +133,7 @@ func (s *setPrimitive[E]) Remove(ctx context.Context, value E) (bool, error) {
 			Value: base64.StdEncoding.EncodeToString(bytes),
 		},
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, s.ID())
 	_, err = s.client.Remove(ctx, request)
 	if err != nil {
 		err = errors.FromProto(err)
@@ -153,6 +155,7 @@ func (s *setPrimitive[E]) Contains(ctx context.Context, value E) (bool, error) {
 			Value: base64.StdEncoding.EncodeToString(bytes),
 		},
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, s.ID())
 	response, err := s.client.Contains(ctx, request)
 	if err != nil {
 		return false, errors.FromProto(err)
@@ -162,6 +165,7 @@ func (s *setPrimitive[E]) Contains(ctx context.Context, value E) (bool, error) {
 
 func (s *setPrimitive[E]) Len(ctx context.Context) (int, error) {
 	request := &setv1.SizeRequest{}
+	ctx = primitive.AppendToOutgoingContext(ctx, s.ID())
 	response, err := s.client.Size(ctx, request)
 	if err != nil {
 		return 0, errors.FromProto(err)
@@ -171,6 +175,7 @@ func (s *setPrimitive[E]) Len(ctx context.Context) (int, error) {
 
 func (s *setPrimitive[E]) Clear(ctx context.Context) error {
 	request := &setv1.ClearRequest{}
+	ctx = primitive.AppendToOutgoingContext(ctx, s.ID())
 	_, err := s.client.Clear(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -180,6 +185,7 @@ func (s *setPrimitive[E]) Clear(ctx context.Context) error {
 
 func (s *setPrimitive[E]) Elements(ctx context.Context, ch chan<- E) error {
 	request := &setv1.ElementsRequest{}
+	ctx = primitive.AppendToOutgoingContext(ctx, s.ID())
 	stream, err := s.client.Elements(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -223,6 +229,7 @@ func (s *setPrimitive[E]) Watch(ctx context.Context, ch chan<- Event[E], opts ..
 		opts[i].beforeWatch(request)
 	}
 
+	ctx = primitive.AppendToOutgoingContext(ctx, s.ID())
 	stream, err := s.client.Events(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)

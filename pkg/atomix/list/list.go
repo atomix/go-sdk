@@ -122,6 +122,7 @@ func (l *listPrimitive[E]) Append(ctx context.Context, value E) error {
 			Value: base64.StdEncoding.EncodeToString(bytes),
 		},
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
 	_, err = l.client.Append(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -140,6 +141,7 @@ func (l *listPrimitive[E]) Insert(ctx context.Context, index int, value E) error
 			Value: base64.StdEncoding.EncodeToString(bytes),
 		},
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
 	_, err = l.client.Insert(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -158,6 +160,7 @@ func (l *listPrimitive[E]) Set(ctx context.Context, index int, value E) error {
 			Value: base64.StdEncoding.EncodeToString(bytes),
 		},
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
 	_, err = l.client.Set(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -169,6 +172,7 @@ func (l *listPrimitive[E]) Get(ctx context.Context, index int) (E, error) {
 	request := &listv1.GetRequest{
 		Index: uint32(index),
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
 	var e E
 	response, err := l.client.Get(ctx, request)
 	if err != nil {
@@ -189,6 +193,7 @@ func (l *listPrimitive[E]) Remove(ctx context.Context, index int) (E, error) {
 	request := &listv1.RemoveRequest{
 		Index: uint32(index),
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
 	var e E
 	response, err := l.client.Remove(ctx, request)
 	if err != nil {
@@ -207,6 +212,7 @@ func (l *listPrimitive[E]) Remove(ctx context.Context, index int) (E, error) {
 
 func (l *listPrimitive[E]) Len(ctx context.Context) (int, error) {
 	request := &listv1.SizeRequest{}
+	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
 	response, err := l.client.Size(ctx, request)
 	if err != nil {
 		return 0, errors.FromProto(err)
@@ -216,6 +222,7 @@ func (l *listPrimitive[E]) Len(ctx context.Context) (int, error) {
 
 func (l *listPrimitive[E]) Items(ctx context.Context, ch chan<- E) error {
 	request := &listv1.ElementsRequest{}
+	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
 	stream, err := l.client.Elements(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -259,6 +266,7 @@ func (l *listPrimitive[E]) Watch(ctx context.Context, ch chan<- Event[E], opts .
 		opts[i].beforeWatch(request)
 	}
 
+	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
 	stream, err := l.client.Events(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -339,6 +347,7 @@ func (l *listPrimitive[E]) Watch(ctx context.Context, ch chan<- Event[E], opts .
 
 func (l *listPrimitive[E]) Clear(ctx context.Context) error {
 	request := &listv1.ClearRequest{}
+	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
 	_, err := l.client.Clear(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)

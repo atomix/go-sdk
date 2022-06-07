@@ -68,6 +68,7 @@ func (l *lockPrimitive) Lock(ctx context.Context, opts ...LockOption) (Status, e
 	for i := range opts {
 		opts[i].beforeLock(request)
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
 	response, err := l.client.Lock(ctx, request)
 	if err != nil {
 		return Status{}, errors.FromProto(err)
@@ -93,6 +94,7 @@ func (l *lockPrimitive) Unlock(ctx context.Context, opts ...UnlockOption) error 
 	for i := range opts {
 		opts[i].beforeUnlock(request)
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
 	response, err := l.client.Unlock(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -108,6 +110,7 @@ func (l *lockPrimitive) Get(ctx context.Context, opts ...GetOption) (Status, err
 	for i := range opts {
 		opts[i].beforeGet(request)
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
 	response, err := l.client.GetLock(ctx, request)
 	if err != nil {
 		return Status{}, errors.FromProto(err)

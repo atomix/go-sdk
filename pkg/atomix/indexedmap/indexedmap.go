@@ -190,6 +190,7 @@ func (m *indexedMapPrimitive[K, V]) Append(ctx context.Context, key K, value V) 
 			Value: valueBytes,
 		},
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	response, err := m.client.Append(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -216,6 +217,7 @@ func (m *indexedMapPrimitive[K, V]) Update(ctx context.Context, key K, value V, 
 	for i := range opts {
 		opts[i].beforeUpdate(request)
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	response, err := m.client.Update(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -237,6 +239,7 @@ func (m *indexedMapPrimitive[K, V]) Get(ctx context.Context, key K, opts ...GetO
 	for i := range opts {
 		opts[i].beforeGet(request)
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	response, err := m.client.Get(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -254,6 +257,7 @@ func (m *indexedMapPrimitive[K, V]) GetIndex(ctx context.Context, index Index, o
 	for i := range opts {
 		opts[i].beforeGet(request)
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	response, err := m.client.Get(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -266,6 +270,7 @@ func (m *indexedMapPrimitive[K, V]) GetIndex(ctx context.Context, index Index, o
 
 func (m *indexedMapPrimitive[K, V]) FirstIndex(ctx context.Context) (Index, error) {
 	request := &indexedmapv1.FirstEntryRequest{}
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	response, err := m.client.FirstEntry(ctx, request)
 	if err != nil {
 		return 0, errors.FromProto(err)
@@ -275,6 +280,7 @@ func (m *indexedMapPrimitive[K, V]) FirstIndex(ctx context.Context) (Index, erro
 
 func (m *indexedMapPrimitive[K, V]) LastIndex(ctx context.Context) (Index, error) {
 	request := &indexedmapv1.LastEntryRequest{}
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	response, err := m.client.LastEntry(ctx, request)
 	if err != nil {
 		return 0, errors.FromProto(err)
@@ -286,6 +292,7 @@ func (m *indexedMapPrimitive[K, V]) PrevIndex(ctx context.Context, index Index) 
 	request := &indexedmapv1.PrevEntryRequest{
 		Index: uint64(index),
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	response, err := m.client.PrevEntry(ctx, request)
 	if err != nil {
 		return 0, errors.FromProto(err)
@@ -297,6 +304,7 @@ func (m *indexedMapPrimitive[K, V]) NextIndex(ctx context.Context, index Index) 
 	request := &indexedmapv1.NextEntryRequest{
 		Index: uint64(index),
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	response, err := m.client.NextEntry(ctx, request)
 	if err != nil {
 		return 0, errors.FromProto(err)
@@ -306,6 +314,7 @@ func (m *indexedMapPrimitive[K, V]) NextIndex(ctx context.Context, index Index) 
 
 func (m *indexedMapPrimitive[K, V]) FirstEntry(ctx context.Context) (*Entry[K, V], error) {
 	request := &indexedmapv1.FirstEntryRequest{}
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	response, err := m.client.FirstEntry(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -315,6 +324,7 @@ func (m *indexedMapPrimitive[K, V]) FirstEntry(ctx context.Context) (*Entry[K, V
 
 func (m *indexedMapPrimitive[K, V]) LastEntry(ctx context.Context) (*Entry[K, V], error) {
 	request := &indexedmapv1.LastEntryRequest{}
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	response, err := m.client.LastEntry(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -326,6 +336,7 @@ func (m *indexedMapPrimitive[K, V]) PrevEntry(ctx context.Context, index Index) 
 	request := &indexedmapv1.PrevEntryRequest{
 		Index: uint64(index),
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	response, err := m.client.PrevEntry(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -337,6 +348,7 @@ func (m *indexedMapPrimitive[K, V]) NextEntry(ctx context.Context, index Index) 
 	request := &indexedmapv1.NextEntryRequest{
 		Index: uint64(index),
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	response, err := m.client.NextEntry(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -356,6 +368,7 @@ func (m *indexedMapPrimitive[K, V]) Remove(ctx context.Context, key K, opts ...R
 	for i := range opts {
 		opts[i].beforeRemove(request)
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	response, err := m.client.Remove(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -373,6 +386,7 @@ func (m *indexedMapPrimitive[K, V]) RemoveIndex(ctx context.Context, index Index
 	for i := range opts {
 		opts[i].beforeRemove(request)
 	}
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	response, err := m.client.Remove(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -385,6 +399,7 @@ func (m *indexedMapPrimitive[K, V]) RemoveIndex(ctx context.Context, index Index
 
 func (m *indexedMapPrimitive[K, V]) Len(ctx context.Context) (int, error) {
 	request := &indexedmapv1.SizeRequest{}
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	response, err := m.client.Size(ctx, request)
 	if err != nil {
 		return 0, errors.FromProto(err)
@@ -394,6 +409,7 @@ func (m *indexedMapPrimitive[K, V]) Len(ctx context.Context) (int, error) {
 
 func (m *indexedMapPrimitive[K, V]) Clear(ctx context.Context) error {
 	request := &indexedmapv1.ClearRequest{}
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	_, err := m.client.Clear(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -403,6 +419,7 @@ func (m *indexedMapPrimitive[K, V]) Clear(ctx context.Context) error {
 
 func (m *indexedMapPrimitive[K, V]) Entries(ctx context.Context, ch chan<- Entry[K, V]) error {
 	request := &indexedmapv1.EntriesRequest{}
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	stream, err := m.client.Entries(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -441,6 +458,7 @@ func (m *indexedMapPrimitive[K, V]) Watch(ctx context.Context, ch chan<- Event[K
 		opts[i].beforeWatch(request)
 	}
 
+	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	stream, err := m.client.Events(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
