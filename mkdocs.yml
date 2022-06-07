@@ -1,5 +1,0 @@
-site_name: Atomix Go Client
-site_url: https://atomix.io/client/go
-repo_url: https://github.com/atomix/go-client
-nav:
-  - Go: getting-started.md
