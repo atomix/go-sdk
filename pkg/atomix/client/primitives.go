@@ -102,9 +102,10 @@ func GetValue[V any](client *Client) func(ctx context.Context, name string, opts
 
 func getPrimitive[P primitive.Primitive, O any](client *Client, f func(conn *grpc.ClientConn) func(context.Context, primitive.ID, ...O) (P, error)) func(context.Context, string, ...O) (P, error) {
 	return func(ctx context.Context, name string, opts ...O) (P, error) {
+		var p P
 		conn, err := client.connect(ctx)
 		if err != nil {
-			return nil, errors.FromProto(err)
+			return p, errors.FromProto(err)
 		}
 		id := primitive.ID{
 			Application: client.ApplicationID,
