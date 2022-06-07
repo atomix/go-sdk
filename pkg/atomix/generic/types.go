@@ -24,6 +24,7 @@ type Type[T any] interface {
 }
 
 type goType[T any] struct {
+	fmt.Stringer
 	Codec[T]
 	name string
 }

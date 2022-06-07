@@ -3,7 +3,7 @@ module github.com/atomix/go-client
 go 1.18
 
 require (
-	github.com/atomix/runtime v0.0.0-20220518011744-eea430e701db
+	github.com/atomix/runtime v0.0.0-20220607105102-e0d027a85595
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.1.2
 	google.golang.org/grpc v1.46.0
@@ -38,5 +38,3 @@ require (
 	gopkg.in/ini.v1 v1.66.4 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
-
-replace github.com/atomix/runtime => ../runtime
