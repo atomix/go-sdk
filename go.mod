@@ -3,7 +3,8 @@ module github.com/atomix/go-client
 go 1.18
 
 require (
-	github.com/atomix/runtime v0.0.0-20220607105102-e0d027a85595
+	github.com/atomix/drivers/local v0.0.0-20220607112331-35b1fff116c6
+	github.com/atomix/runtime v0.0.0-20220607153700-bec623da53d2
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.1.2
 	google.golang.org/grpc v1.46.0
@@ -13,6 +14,7 @@ require (
 require (
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
+	github.com/gofrs/flock v0.8.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/magiconair/properties v1.8.6 // indirect
@@ -38,3 +40,7 @@ require (
 	gopkg.in/ini.v1 v1.66.4 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
+
+replace github.com/atomix/runtime => ../runtime
+
+replace github.com/atomix/drivers/local => ../drivers/local
