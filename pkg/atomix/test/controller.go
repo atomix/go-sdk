@@ -10,14 +10,19 @@ import (
 	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
 	"github.com/atomix/runtime/pkg/atomix/errors"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
-type Controller struct {
-	test *Test
+func newController(runtime *Runtime) *Controller {
+	return &Controller{runtime}
 }
 
-func (t *Controller) CreateCluster(ctx context.Context, cluster *runtimev1.Cluster) error {
-	conn, err := t.connect(ctx)
+type Controller struct {
+	runtime *Runtime
+}
+
+func (c *Controller) CreateCluster(ctx context.Context, cluster *runtimev1.Cluster) error {
+	conn, err := c.connect(ctx)
 	if err != nil {
 		return errors.FromProto(err)
 	}
@@ -33,8 +38,8 @@ func (t *Controller) CreateCluster(ctx context.Context, cluster *runtimev1.Clust
 	return nil
 }
 
-func (t *Controller) GetCluster(ctx context.Context, clusterID runtimev1.ClusterId) (*runtimev1.Cluster, error) {
-	conn, err := t.connect(ctx)
+func (c *Controller) GetCluster(ctx context.Context, clusterID runtimev1.ClusterId) (*runtimev1.Cluster, error) {
+	conn, err := c.connect(ctx)
 	if err != nil {
 		return nil, errors.FromProto(err)
 	}
@@ -50,8 +55,8 @@ func (t *Controller) GetCluster(ctx context.Context, clusterID runtimev1.Cluster
 	return response.Cluster, nil
 }
 
-func (t *Controller) DeleteCluster(ctx context.Context, cluster *runtimev1.Cluster) error {
-	conn, err := t.connect(ctx)
+func (c *Controller) DeleteCluster(ctx context.Context, cluster *runtimev1.Cluster) error {
+	conn, err := c.connect(ctx)
 	if err != nil {
 		return errors.FromProto(err)
 	}
@@ -67,8 +72,8 @@ func (t *Controller) DeleteCluster(ctx context.Context, cluster *runtimev1.Clust
 	return nil
 }
 
-func (t *Controller) CreateApplication(ctx context.Context, application *runtimev1.Application) error {
-	conn, err := t.connect(ctx)
+func (c *Controller) CreateApplication(ctx context.Context, application *runtimev1.Application) error {
+	conn, err := c.connect(ctx)
 	if err != nil {
 		return errors.FromProto(err)
 	}
@@ -84,8 +89,8 @@ func (t *Controller) CreateApplication(ctx context.Context, application *runtime
 	return nil
 }
 
-func (t *Controller) GetApplication(ctx context.Context, clusterID runtimev1.ApplicationId) (*runtimev1.Application, error) {
-	conn, err := t.connect(ctx)
+func (c *Controller) GetApplication(ctx context.Context, clusterID runtimev1.ApplicationId) (*runtimev1.Application, error) {
+	conn, err := c.connect(ctx)
 	if err != nil {
 		return nil, errors.FromProto(err)
 	}
@@ -101,8 +106,8 @@ func (t *Controller) GetApplication(ctx context.Context, clusterID runtimev1.App
 	return response.Application, nil
 }
 
-func (t *Controller) DeleteApplication(ctx context.Context, application *runtimev1.Application) error {
-	conn, err := t.connect(ctx)
+func (c *Controller) DeleteApplication(ctx context.Context, application *runtimev1.Application) error {
+	conn, err := c.connect(ctx)
 	if err != nil {
 		return errors.FromProto(err)
 	}
@@ -118,7 +123,9 @@ func (t *Controller) DeleteApplication(ctx context.Context, application *runtime
 	return nil
 }
 
-func (t *Controller) connect(ctx context.Context) (*grpc.ClientConn, error) {
-	target := fmt.Sprintf(":%d", t.test.runtime.ControlService.Port)
-	return grpc.DialContext(ctx, target, grpc.WithContextDialer(t.test.runtime.Network().Connect))
+func (c *Controller) connect(ctx context.Context) (*grpc.ClientConn, error) {
+	target := fmt.Sprintf(":%d", c.runtime.ControlService.Port)
+	return grpc.DialContext(ctx, target,
+		grpc.WithContextDialer(c.runtime.Network().Connect),
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
 }
