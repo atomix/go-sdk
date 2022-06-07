@@ -7,7 +7,7 @@ package test
 import (
 	"context"
 	"fmt"
-	"github.com/atomix/drivers/local"
+	"github.com/atomix/drivers/memory"
 	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
 	"github.com/atomix/runtime/pkg/atomix/primitive"
 	"github.com/atomix/runtime/pkg/atomix/runtime"
@@ -32,7 +32,7 @@ func NewRuntime(kind primitive.Kind) *Runtime {
 	return &Runtime{
 		Runtime: runtime.New(
 			runtime.NewLocalNetwork(),
-			runtime.WithDrivers(local.Driver),
+			runtime.WithDrivers(memory.Driver),
 			runtime.WithProxyKinds(kind)),
 	}
 }
@@ -71,8 +71,8 @@ func (r *Runtime) createCluster(ctx context.Context) error {
 		},
 		Spec: runtimev1.ClusterSpec{
 			Driver: runtimev1.DriverId{
-				Name:    local.Driver.Name(),
-				Version: local.Driver.Version(),
+				Name:    memory.Driver.Name(),
+				Version: memory.Driver.Version(),
 			},
 		},
 	}
