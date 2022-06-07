@@ -39,6 +39,10 @@ dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
+github.com/atomix/drivers/local v0.0.0-20220607154719-dc0de3d878d1 h1:hfkG0Nvpqd/nccWjXrzgAWEWhgCIyIP+b3MwuPUnzYo=
+github.com/atomix/drivers/local v0.0.0-20220607154719-dc0de3d878d1/go.mod h1:ZP8CnVjkAFwWday2yYkC4Q3bGSqHNitMGhD82YR/eeg=
+github.com/atomix/runtime v0.0.0-20220607153700-bec623da53d2 h1:afnYLM9TTm0513Gh5Qzzew0R2DibJwN9xajOgZKL+Lo=
+github.com/atomix/runtime v0.0.0-20220607153700-bec623da53d2/go.mod h1:Z4SUtJA+63x2LI9fYaKwEkGnjReA9TXl/kacwt/SmdA=
 github.com/benbjohnson/clock v1.1.0 h1:Q92kusRqC1XV2MjkWETPvjJVqKetz1OzxZB7mHJLju8=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/cenkalti/backoff v2.2.1+incompatible h1:tNowT99t7UNflLxfYYSlKYsBpXdEet03Pg2g16Swow4=
