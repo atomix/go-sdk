@@ -296,7 +296,11 @@ values as a `KeyValue` object with the following fields:
 To create a distributed map, get a `Database` and call `GetMap` on the database:
 
 ```go
-myMap, err := atomix.GetMap(context.Background(), "my-map")
+myMap, err := atomix.GetMap[string, string](
+	context.Background(), 
+	"my-map", 
+	_map.WithKeyType(generic.String()),
+	_map.WithValueType(generic.String()))
 if err != nil {
 	...
 }
@@ -307,7 +311,7 @@ defer myMap.Close(context.Background())
 To put a value in a map, call `Put`:
 
 ```go
-entry, err := myMap.Put(context.Background(), "foo", []byte("bar"))
+entry, err := myMap.Put(context.Background(), "foo", "bar")
 if err != nil {
 	...
 }
@@ -324,10 +328,10 @@ if err != nil {
 ```
 
 This entry metadata can be used for optimistic locking when updating the entry using the
-`IfMatch` option:
+`IfTimestamp` option:
 
 ```go
-entry, err := myMap.Put(context.Background(), "foo", []byte("baz"), _map.IfMatch(entry.ObjectMeta))
+entry, err := myMap.Update(context.Background(), "foo", "baz", _map.IfTimestamp(entry.Timestamp))
 if err != nil {
 	...
 }
@@ -345,7 +349,7 @@ if err != nil {
 Again, optimistic locking can be used when removing an entry:
 
 ```go
-entry, err = myMap.Remove(context.Background(), "foo", _map.IfMatch(entry.ObjectMeta))
+entry, err = myMap.Remove(context.Background(), "foo", _map.IfTimestamp(entry.Timestamp))
 if err != nil {
 	...
 }
@@ -363,7 +367,7 @@ if err != nil {
 The `Watch` method can be used to watch the map for changes. When the map is modified an event will be published to all watchers.
 
 ```go
-ch := make(chan _map.Event)
+ch := make(chan _map.Event[string, string])
 err := myMap.Watch(context.Background(), ch)
 for event := range ch {
     ...
@@ -376,7 +380,7 @@ The `Set` primitive is a partitioned distributed set. Set values are stored as `
 on the database in which to create the set:
 
 ```go
-mySet, err := atomix.GetSet(context.Background(), "my-set")
+mySet, err := atomix.GetSet[string](context.Background(), "my-set", set.WithElementType(generic.String()))
 if err != nil {
     ...
 }
@@ -439,9 +443,9 @@ for event := range ch {
 The `Value` primitive is a distributed `[]byte` value that supoorts atomic set-and-get and compare-and-set operations.
 
 ```go
-myValue, err := atomix.GetValue(context.Background(), "my-value")
+myValue, err := atomix.GetValue[string](context.Background(), "my-value", value.WithType(generic.String()))
 if err != nil {
-...
+    ...
 }
 
 defer myValue.Close(context.Background())
@@ -450,27 +454,27 @@ defer myValue.Close(context.Background())
 To set the value call `Set`:
 
 ```go
-meta, err := myValue.Set(context.Background(), []byte("Hello world!"))
+ts, err := myValue.Set(context.Background(), "Hello world!")
 if err != nil {
-...
+    ...
 }
 ```
 
 To get the current value use `Get`:
 
 ```go
-bytes, meta, err := myValue.Get(context.Background())
+value, ts, err := myValue.Get(context.Background())
 if err != nil {
-...
+    ...
 }
 ```
 
-The `ObjectMeta` returned by `Get` and `Set` calls contains versioning information that can be used to perform atomic
+The `Timestamp` returned by `Get` and `Set` calls contains versioning information that can be used to perform atomic
 check-and-set operations using optimistic locking:
 
 ```go
-if string(bytes) == "Hello world!" {
-_, err := myValue.Set(context.Background(), []byte("Goodbye world."), value.IfMatch(meta))
+if value == "Hello world!" {
+    _, err := myValue.Set(context.Background(), "Goodbye world.", value.IfTimestamp(ts))
 }
 ```
 
@@ -481,7 +485,7 @@ published to all watchers.
 ch := make(chan value.Event)
 err := myValue.Watch(context.Background(), ch)
 for event := range ch {
-...
+    ...
 }
 ```
 

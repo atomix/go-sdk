@@ -38,7 +38,7 @@ func (o funcOption[V]) apply(options *Options[V]) {
 	o.f(options)
 }
 
-func WithValueType[V any](valueType generic.Type[V]) Option[V] {
+func WithType[V any](valueType generic.Type[V]) Option[V] {
 	return newFuncOption[V](func(options *Options[V]) {
 		options.ValueType = valueType
 	})
