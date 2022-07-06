@@ -39,10 +39,10 @@ dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
-github.com/atomix/drivers/memory v0.0.0-20220706111915-c02ef53ef9ca h1:0wdOvqYoPkDx2DKZxayQ7/dwaYMu3fAb9gUkz8RSGAc=
-github.com/atomix/drivers/memory v0.0.0-20220706111915-c02ef53ef9ca/go.mod h1:UhfJYNq+hZXty5SAhFFAJFoyBAV23LDO23rMXF0N8Xw=
-github.com/atomix/proxy v0.0.0-20220706102839-cca18a01c5a5 h1:eHZBpNL5mAJ5BRoE09UsJdlTPVT2FCSAsFsluVay4Vk=
-github.com/atomix/proxy v0.0.0-20220706102839-cca18a01c5a5/go.mod h1:w049A21vi5W6kt+UCtr23ph22qyp08vr9B7tW5Dlchg=
+github.com/atomix/drivers/memory v0.0.0-20220706173203-508fef1e156d h1:ZcjZS5bRcVGmSZ6TA8NZKIodNTavrWjxoQVyhqVcGLo=
+github.com/atomix/drivers/memory v0.0.0-20220706173203-508fef1e156d/go.mod h1:UhfJYNq+hZXty5SAhFFAJFoyBAV23LDO23rMXF0N8Xw=
+github.com/atomix/proxy v0.0.0-20220706172533-e89f59e0e907 h1:R1TIFwzuxSFtOHHFh33TrsWpvOF4GhmMNbTmjufXyfw=
+github.com/atomix/proxy v0.0.0-20220706172533-e89f59e0e907/go.mod h1:w049A21vi5W6kt+UCtr23ph22qyp08vr9B7tW5Dlchg=
 github.com/atomix/proxy/api v0.0.0-20220706021812-1ee94c6dc73c h1:oZsrMk4qJxXPuScNVsVyrvSZJxlzVVvM7uEYFq81FM0=
 github.com/atomix/proxy/api v0.0.0-20220706021812-1ee94c6dc73c/go.mod h1:fk7VmVWP4THLC9q+2BXYGza1SmnimnAiAzr50UkKQQ4=
 github.com/atomix/runtime v0.0.0-20220706102709-8e80cf86d1f5 h1:ck87an7VKPQV8p+Ldy5Xg/Iri8hmhrBLyCbFHmLm6zA=

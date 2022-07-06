@@ -29,6 +29,7 @@ type Test struct {
 	types   []runtime.Type
 	network proxy.Network
 	driver  runtime.Driver
+	proxies []*proxy.Proxy
 	port    int
 }
 
@@ -37,11 +38,33 @@ func (t *Test) Connect(ctx context.Context) (*grpc.ClientConn, error) {
 	t.port++
 	runtimePort := t.port
 	t.port++
+
 	proxy := proxy.New(t.network,
 		proxy.WithDrivers(t.driver),
 		proxy.WithTypes(t.types...),
 		proxy.WithProxyPort(proxyPort),
-		proxy.WithRuntimePort(runtimePort))
+		proxy.WithRuntimePort(runtimePort),
+		proxy.WithRouterConfig(proxy.RouterConfig{
+			Routes: []proxy.RouteConfig{
+				{
+					Store: proxy.StoreID{
+						Name: "test",
+					},
+					Rules: []proxy.RuleConfig{
+						{
+							Kinds:       []string{"*"},
+							APIVersions: []string{"*"},
+							Names:       []string{"*"},
+						},
+					},
+				},
+			},
+		}))
+
+	if err := proxy.Start(); err != nil {
+		return nil, err
+	}
+	t.proxies = append(t.proxies, proxy)
 
 	conn, err := t.connect(ctx, fmt.Sprintf(":%d", proxy.ProxyService.Port))
 	if err != nil {
@@ -74,4 +97,10 @@ func (t *Test) connect(ctx context.Context, target string) (*grpc.ClientConn, er
 		return nil, errors.FromProto(err)
 	}
 	return conn, nil
+}
+
+func (t *Test) Cleanup() {
+	for _, proxy := range t.proxies {
+		_ = proxy.Stop()
+	}
 }

@@ -3,8 +3,8 @@ module github.com/atomix/go-client
 go 1.18
 
 require (
-	github.com/atomix/drivers/memory v0.0.0-20220706111915-c02ef53ef9ca
-	github.com/atomix/proxy v0.0.0-20220706102839-cca18a01c5a5
+	github.com/atomix/drivers/memory v0.0.0-20220706173203-508fef1e156d
+	github.com/atomix/proxy v0.0.0-20220706172533-e89f59e0e907
 	github.com/atomix/proxy/api v0.0.0-20220706021812-1ee94c6dc73c
 	github.com/atomix/runtime v0.0.0-20220706102709-8e80cf86d1f5
 	github.com/atomix/runtime/api v0.0.0-20220706095609-037e0d309067

@@ -19,6 +19,7 @@ func TestCounterOperations(t *testing.T) {
 	logging.SetLevel(logging.DebugLevel)
 
 	test := test.New(counterv1.Type)
+	defer test.Cleanup()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
