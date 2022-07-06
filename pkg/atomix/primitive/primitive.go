@@ -6,43 +6,28 @@ package primitive
 
 import (
 	"context"
-	"github.com/atomix/runtime/pkg/atomix/primitive"
-	"google.golang.org/grpc/metadata"
 )
-
-type ID struct {
-	Application string
-	Primitive   string
-	Session     string
-}
-
-func AppendToOutgoingContext(ctx context.Context, id ID) context.Context {
-	return metadata.AppendToOutgoingContext(ctx,
-		primitive.ApplicationIDHeader, id.Application,
-		primitive.PrimitiveIDHeader, id.Primitive,
-		primitive.SessionIDHeader, id.Session)
-}
 
 // Primitive is the base interface for primitives
 type Primitive interface {
-	// ID returns the primitive ID
-	ID() ID
+	// Name returns the primitive ID
+	Name() string
 
 	// Close closes the primitive
 	Close(ctx context.Context) error
 }
 
-func New(id ID) Primitive {
+func New(name string) Primitive {
 	return &managedPrimitive{
-		id: id,
+		name: name,
 	}
 }
 
 type managedPrimitive struct {
 	Primitive
-	id ID
+	name string
 }
 
-func (p *managedPrimitive) ID() ID {
-	return p.id
+func (p *managedPrimitive) Name() string {
+	return p.name
 }

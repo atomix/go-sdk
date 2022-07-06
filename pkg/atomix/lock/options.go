@@ -5,8 +5,9 @@
 package lock
 
 import (
+	"github.com/atomix/go-client/pkg/atomix/primitive"
 	lockv1 "github.com/atomix/runtime/api/atomix/lock/v1"
-	rttime "github.com/atomix/runtime/pkg/atomix/time"
+	rttime "github.com/atomix/runtime/pkg/time"
 	"time"
 )
 
@@ -16,9 +17,11 @@ type Option interface {
 }
 
 // Options is counter options
-type Options struct{}
+type Options struct {
+	primitive.Options
+}
 
-func (o Options) apply(opts ...Option) {
+func (o Options) Apply(opts ...Option) {
 	for _, opt := range opts {
 		opt.apply(&o)
 	}
@@ -34,6 +37,18 @@ type funcOption struct {
 
 func (o funcOption) apply(options *Options) {
 	o.f(options)
+}
+
+func WithTags(tags map[string]string) Option {
+	return newFuncOption(func(options *Options) {
+		primitive.WithTags(tags)(&options.Options)
+	})
+}
+
+func WithTag(key, value string) Option {
+	return newFuncOption(func(options *Options) {
+		primitive.WithTag(key, value)(&options.Options)
+	})
 }
 
 // LockOption is an option for Lock calls

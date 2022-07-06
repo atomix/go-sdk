@@ -6,8 +6,9 @@ package _map //nolint:golint
 
 import (
 	"github.com/atomix/go-client/pkg/atomix/generic"
+	"github.com/atomix/go-client/pkg/atomix/primitive"
 	mapv1 "github.com/atomix/runtime/api/atomix/map/v1"
-	"github.com/atomix/runtime/pkg/atomix/time"
+	"github.com/atomix/runtime/pkg/time"
 )
 
 // Option is a map option
@@ -17,11 +18,12 @@ type Option[K, V any] interface {
 
 // Options is map options
 type Options[K, V any] struct {
+	primitive.Options
 	KeyType   generic.Type[K]
 	ValueType generic.Type[V]
 }
 
-func (o Options[K, V]) apply(opts ...Option[K, V]) {
+func (o Options[K, V]) Apply(opts ...Option[K, V]) {
 	for _, opt := range opts {
 		opt.apply(&o)
 	}
@@ -37,6 +39,18 @@ type funcOption[K, V any] struct {
 
 func (o funcOption[K, V]) apply(options *Options[K, V]) {
 	o.f(options)
+}
+
+func WithTags[K, V any](tags map[string]string) Option[K, V] {
+	return newFuncOption[K, V](func(options *Options[K, V]) {
+		primitive.WithTags(tags)(&options.Options)
+	})
+}
+
+func WithTag[K, V any](key, value string) Option[K, V] {
+	return newFuncOption[K, V](func(options *Options[K, V]) {
+		primitive.WithTag(key, value)(&options.Options)
+	})
 }
 
 func WithKeyType[K, V any](keyType generic.Type[K]) Option[K, V] {

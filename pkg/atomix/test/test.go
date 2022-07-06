@@ -8,9 +8,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/atomix/drivers/memory"
-	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
-	"github.com/atomix/runtime/pkg/atomix/primitive"
-	"github.com/atomix/runtime/pkg/atomix/runtime"
+	proxyv1 "github.com/atomix/proxy/api/atomix/proxy/v1"
+	"github.com/atomix/proxy/pkg/proxy"
+	"github.com/atomix/runtime/pkg/errors"
+	"github.com/atomix/runtime/pkg/runtime"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
@@ -18,97 +19,80 @@ import (
 )
 
 const (
-	clusterName = "test-cluster"
-	appName     = "test-app"
-	envKey      = "Environment"
-	testEnv     = "test"
+	storeName = "test-cluster"
+	appName   = "test-app"
+	envKey    = "Environment"
+	testEnv   = "test"
 )
 
 func Context() context.Context {
 	return metadata.AppendToOutgoingContext(context.TODO(), envKey, testEnv)
 }
 
-func NewRuntime(kind primitive.Kind) *Runtime {
+func NewRuntime(t runtime.Type) *Runtime {
+	network := proxy.NewLocalNetwork()
 	return &Runtime{
-		Runtime: runtime.New(
-			runtime.NewLocalNetwork(),
-			runtime.WithDrivers(memory.Driver),
-			runtime.WithProxyKinds(kind)),
+		network: network,
+		proxy: proxy.New(
+			network,
+			proxy.WithDrivers(memory.NewDriver()),
+			proxy.WithTypes(t)),
 	}
 }
 
 type Runtime struct {
-	*runtime.Runtime
+	network proxy.Network
+	proxy   *proxy.Proxy
 }
 
 func (r *Runtime) Start() error {
-	if err := r.Runtime.Start(); err != nil {
+	if err := r.proxy.Start(); err != nil {
 		return err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	if err := r.createCluster(ctx); err != nil {
-		return err
-	}
-	if err := r.createApplication(ctx); err != nil {
+	if err := r.connectProxy(ctx); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (r *Runtime) Connect(ctx context.Context) (*grpc.ClientConn, error) {
-	target := fmt.Sprintf(":%d", r.ProxyService.Port)
+	target := fmt.Sprintf(":%d", r.proxy.RuntimeService.Port)
 	return r.connect(ctx, target)
 }
 
-func (r *Runtime) createCluster(ctx context.Context) error {
-	controller := newController(r)
-	cluster := &runtimev1.Cluster{
-		ClusterMeta: runtimev1.ClusterMeta{
-			ID: runtimev1.ClusterId{
-				Name: clusterName,
-			},
-		},
-		Spec: runtimev1.ClusterSpec{
-			Driver: runtimev1.DriverId{
-				Name:    memory.Driver.Name(),
-				Version: memory.Driver.Version(),
-			},
-		},
+func (r *Runtime) connectProxy(ctx context.Context) error {
+	target := fmt.Sprintf(":%d", r.proxy.ProxyService.Port)
+	conn, err := r.connect(ctx, target)
+	if err != nil {
+		return err
 	}
-	return controller.CreateCluster(ctx, cluster)
-}
 
-func (r *Runtime) createApplication(ctx context.Context) error {
-	controller := newController(r)
-	application := &runtimev1.Application{
-		ApplicationMeta: runtimev1.ApplicationMeta{
-			ID: runtimev1.ApplicationId{
-				Name: appName,
-			},
+	client := proxyv1.NewProxyClient(conn)
+
+	request := &proxyv1.ConnectRequest{
+		StoreID: proxyv1.StoreId{
+			Name: storeName,
 		},
-		Spec: runtimev1.ApplicationSpec{
-			Bindings: []runtimev1.Binding{
-				{
-					ClusterID: runtimev1.ClusterId{
-						Name: clusterName,
-					},
-					Rules: []runtimev1.BindingRule{
-						{
-							Headers: map[string]string{
-								envKey: testEnv,
-							},
-						},
-					},
-				},
-			},
+		DriverID: proxyv1.DriverId{
+			Name:    memory.Driver.Name(),
+			Version: memory.Driver.Version(),
 		},
 	}
-	return controller.CreateApplication(ctx, application)
+	_, err = client.Connect(ctx, request)
+	if err != nil {
+		return errors.FromProto(err)
+	}
+	return nil
 }
 
 func (r *Runtime) connect(ctx context.Context, target string) (*grpc.ClientConn, error) {
-	return grpc.DialContext(ctx, target,
-		grpc.WithContextDialer(r.Network().Connect),
+	conn, err := grpc.DialContext(ctx, target,
+		grpc.WithContextDialer(r.network.Connect),
 		grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, errors.FromProto(err)
+	}
+	return conn, nil
 }

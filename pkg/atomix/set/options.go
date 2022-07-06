@@ -6,6 +6,7 @@ package set
 
 import (
 	"github.com/atomix/go-client/pkg/atomix/generic"
+	"github.com/atomix/go-client/pkg/atomix/primitive"
 	setv1 "github.com/atomix/runtime/api/atomix/set/v1"
 )
 
@@ -16,10 +17,11 @@ type Option[E any] interface {
 
 // Options is set options
 type Options[E any] struct {
+	primitive.Options
 	ElementType generic.Type[E]
 }
 
-func (o Options[E]) apply(opts ...Option[E]) {
+func (o Options[E]) Apply(opts ...Option[E]) {
 	for _, opt := range opts {
 		opt.apply(&o)
 	}
@@ -35,6 +37,18 @@ type funcOption[E any] struct {
 
 func (o funcOption[E]) apply(options *Options[E]) {
 	o.f(options)
+}
+
+func WithTags[E any](tags map[string]string) Option[E] {
+	return newFuncOption[E](func(options *Options[E]) {
+		primitive.WithTags(tags)(&options.Options)
+	})
+}
+
+func WithTag[E any](key, value string) Option[E] {
+	return newFuncOption[E](func(options *Options[E]) {
+		primitive.WithTag(key, value)(&options.Options)
+	})
 }
 
 func WithElementType[E any](elementType generic.Type[E]) Option[E] {

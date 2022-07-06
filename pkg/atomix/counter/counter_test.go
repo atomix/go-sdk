@@ -9,7 +9,7 @@ import (
 	"github.com/atomix/go-client/pkg/atomix/primitive"
 	"github.com/atomix/go-client/pkg/atomix/test"
 	api "github.com/atomix/runtime/api/atomix/counter/v1"
-	"github.com/atomix/runtime/pkg/atomix/logging"
+	"github.com/atomix/runtime/pkg/logging"
 	counterv1 "github.com/atomix/runtime/primitives/counter/v1"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -20,7 +20,7 @@ import (
 func TestCounterOperations(t *testing.T) {
 	logging.SetLevel(logging.DebugLevel)
 
-	runtime := test.NewRuntime(counterv1.Kind)
+	runtime := test.NewRuntime(counterv1.Type)
 	assert.NoError(t, runtime.Start())
 	defer runtime.Stop()
 

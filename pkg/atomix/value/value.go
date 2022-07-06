@@ -8,10 +8,11 @@ import (
 	"context"
 	"github.com/atomix/go-client/pkg/atomix/generic"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
+	primitivev1 "github.com/atomix/runtime/api/atomix/primitive/v1"
 	valuev1 "github.com/atomix/runtime/api/atomix/value/v1"
-	"github.com/atomix/runtime/pkg/atomix/errors"
-	"github.com/atomix/runtime/pkg/atomix/logging"
-	"github.com/atomix/runtime/pkg/atomix/time"
+	"github.com/atomix/runtime/pkg/errors"
+	"github.com/atomix/runtime/pkg/logging"
+	"github.com/atomix/runtime/pkg/time"
 	"io"
 )
 
@@ -51,10 +52,10 @@ type Event[T any] struct {
 	Timestamp time.Timestamp
 }
 
-func New[T any](client valuev1.ValueClient) func(context.Context, primitive.ID, ...Option[T]) (Value[T], error) {
-	return func(ctx context.Context, id primitive.ID, opts ...Option[T]) (Value[T], error) {
+func New[T any](client valuev1.ValueClient) func(context.Context, string, ...Option[T]) (Value[T], error) {
+	return func(ctx context.Context, name string, opts ...Option[T]) (Value[T], error) {
 		var options Options[T]
-		options.apply(opts...)
+		options.Apply(opts...)
 		if options.ValueType == nil {
 			stringType := generic.Bytes()
 			if valueType, ok := stringType.(generic.Type[T]); ok {
@@ -64,11 +65,11 @@ func New[T any](client valuev1.ValueClient) func(context.Context, primitive.ID, 
 			}
 		}
 		indexedMap := &valuePrimitive[T]{
-			Primitive: primitive.New(id),
+			Primitive: primitive.New(name),
 			client:    client,
 			valueType: options.ValueType,
 		}
-		if err := indexedMap.create(ctx); err != nil {
+		if err := indexedMap.create(ctx, options.Tags); err != nil {
 			return nil, err
 		}
 		return indexedMap, nil
@@ -88,12 +89,14 @@ func (v *valuePrimitive[T]) Set(ctx context.Context, value T, opts ...SetOption)
 		return nil, errors.NewInvalid("element encoding failed", err)
 	}
 	request := &valuev1.SetRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: v.Name(),
+		},
 		Value: bytes,
 	}
 	for i := range opts {
 		opts[i].beforeSet(request)
 	}
-	ctx = primitive.AppendToOutgoingContext(ctx, v.ID())
 	response, err := v.client.Set(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -105,8 +108,11 @@ func (v *valuePrimitive[T]) Set(ctx context.Context, value T, opts ...SetOption)
 }
 
 func (v *valuePrimitive[T]) Get(ctx context.Context) (T, time.Timestamp, error) {
-	request := &valuev1.GetRequest{}
-	ctx = primitive.AppendToOutgoingContext(ctx, v.ID())
+	request := &valuev1.GetRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: v.Name(),
+		},
+	}
 	var r T
 	response, err := v.client.Get(ctx, request)
 	if err != nil {
@@ -120,8 +126,11 @@ func (v *valuePrimitive[T]) Get(ctx context.Context) (T, time.Timestamp, error) 
 }
 
 func (v *valuePrimitive[T]) Watch(ctx context.Context, ch chan<- Event[T]) error {
-	request := &valuev1.EventsRequest{}
-	ctx = primitive.AppendToOutgoingContext(ctx, v.ID())
+	request := &valuev1.EventsRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: v.Name(),
+		},
+	}
 	stream, err := v.client.Events(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -180,11 +189,13 @@ func (v *valuePrimitive[T]) Watch(ctx context.Context, ch chan<- Event[T]) error
 	}
 }
 
-func (v *valuePrimitive[T]) create(ctx context.Context) error {
+func (v *valuePrimitive[T]) create(ctx context.Context, tags map[string]string) error {
 	request := &valuev1.CreateRequest{
-		Config: valuev1.ValueConfig{},
+		ID: primitivev1.PrimitiveId{
+			Name: v.Name(),
+		},
+		Tags: tags,
 	}
-	ctx = primitive.AppendToOutgoingContext(ctx, v.ID())
 	_, err := v.client.Create(ctx, request)
 	if err != nil {
 		err = errors.FromProto(err)
@@ -196,8 +207,11 @@ func (v *valuePrimitive[T]) create(ctx context.Context) error {
 }
 
 func (v *valuePrimitive[T]) Close(ctx context.Context) error {
-	request := &valuev1.CloseRequest{}
-	ctx = primitive.AppendToOutgoingContext(ctx, v.ID())
+	request := &valuev1.CloseRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: v.Name(),
+		},
+	}
 	_, err := v.client.Close(ctx, request)
 	if err != nil {
 		err = errors.FromProto(err)

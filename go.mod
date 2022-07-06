@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/atomix/drivers/memory v0.0.0-20220607181445-6035f16caa86
-	github.com/atomix/runtime v0.0.0-20220607173519-f0def0b01c12
+	github.com/atomix/runtime v0.0.0-20220706102709-8e80cf86d1f5
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.1.2
 	github.com/stretchr/testify v1.7.1
@@ -13,6 +13,7 @@ require (
 )
 
 require (
+	github.com/atomix/proxy v0.0.0-20220706102839-cca18a01c5a5 // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect

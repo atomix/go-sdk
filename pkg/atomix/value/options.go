@@ -6,8 +6,9 @@ package value
 
 import (
 	"github.com/atomix/go-client/pkg/atomix/generic"
+	"github.com/atomix/go-client/pkg/atomix/primitive"
 	valuev1 "github.com/atomix/runtime/api/atomix/value/v1"
-	"github.com/atomix/runtime/pkg/atomix/time"
+	"github.com/atomix/runtime/pkg/time"
 )
 
 // Option is a value option
@@ -17,10 +18,11 @@ type Option[V any] interface {
 
 // Options is value options
 type Options[V any] struct {
+	primitive.Options
 	ValueType generic.Type[V]
 }
 
-func (o Options[V]) apply(opts ...Option[V]) {
+func (o Options[V]) Apply(opts ...Option[V]) {
 	for _, opt := range opts {
 		opt.apply(&o)
 	}
@@ -36,6 +38,18 @@ type funcOption[V any] struct {
 
 func (o funcOption[V]) apply(options *Options[V]) {
 	o.f(options)
+}
+
+func WithTags[V any](tags map[string]string) Option[V] {
+	return newFuncOption[V](func(options *Options[V]) {
+		primitive.WithTags(tags)(&options.Options)
+	})
+}
+
+func WithTag[V any](key, value string) Option[V] {
+	return newFuncOption[V](func(options *Options[V]) {
+		primitive.WithTag(key, value)(&options.Options)
+	})
 }
 
 func WithType[V any](valueType generic.Type[V]) Option[V] {

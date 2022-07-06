@@ -8,8 +8,9 @@ import (
 	"context"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
 	lockv1 "github.com/atomix/runtime/api/atomix/lock/v1"
-	"github.com/atomix/runtime/pkg/atomix/errors"
-	"github.com/atomix/runtime/pkg/atomix/time"
+	primitivev1 "github.com/atomix/runtime/api/atomix/primitive/v1"
+	"github.com/atomix/runtime/pkg/errors"
+	"github.com/atomix/runtime/pkg/time"
 )
 
 // Lock provides distributed concurrency control
@@ -42,15 +43,15 @@ const (
 	StateUnlocked
 )
 
-func New(client lockv1.LockClient) func(context.Context, primitive.ID, ...Option) (Lock, error) {
-	return func(ctx context.Context, id primitive.ID, opts ...Option) (Lock, error) {
+func New(client lockv1.LockClient) func(context.Context, string, ...Option) (Lock, error) {
+	return func(ctx context.Context, name string, opts ...Option) (Lock, error) {
 		var options Options
-		options.apply(opts...)
+		options.Apply(opts...)
 		lock := &lockPrimitive{
-			Primitive: primitive.New(id),
+			Primitive: primitive.New(name),
 			client:    client,
 		}
-		if err := lock.create(ctx); err != nil {
+		if err := lock.create(ctx, options.Tags); err != nil {
 			return nil, err
 		}
 		return lock, nil
@@ -64,11 +65,14 @@ type lockPrimitive struct {
 }
 
 func (l *lockPrimitive) Lock(ctx context.Context, opts ...LockOption) (Status, error) {
-	request := &lockv1.LockRequest{}
+	request := &lockv1.LockRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: l.Name(),
+		},
+	}
 	for i := range opts {
 		opts[i].beforeLock(request)
 	}
-	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
 	response, err := l.client.Lock(ctx, request)
 	if err != nil {
 		return Status{}, errors.FromProto(err)
@@ -90,11 +94,14 @@ func (l *lockPrimitive) Lock(ctx context.Context, opts ...LockOption) (Status, e
 }
 
 func (l *lockPrimitive) Unlock(ctx context.Context, opts ...UnlockOption) error {
-	request := &lockv1.UnlockRequest{}
+	request := &lockv1.UnlockRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: l.Name(),
+		},
+	}
 	for i := range opts {
 		opts[i].beforeUnlock(request)
 	}
-	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
 	response, err := l.client.Unlock(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -106,11 +113,14 @@ func (l *lockPrimitive) Unlock(ctx context.Context, opts ...UnlockOption) error 
 }
 
 func (l *lockPrimitive) Get(ctx context.Context, opts ...GetOption) (Status, error) {
-	request := &lockv1.GetLockRequest{}
+	request := &lockv1.GetLockRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: l.Name(),
+		},
+	}
 	for i := range opts {
 		opts[i].beforeGet(request)
 	}
-	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
 	response, err := l.client.GetLock(ctx, request)
 	if err != nil {
 		return Status{}, errors.FromProto(err)
@@ -131,11 +141,13 @@ func (l *lockPrimitive) Get(ctx context.Context, opts ...GetOption) (Status, err
 	}, nil
 }
 
-func (l *lockPrimitive) create(ctx context.Context) error {
+func (l *lockPrimitive) create(ctx context.Context, tags map[string]string) error {
 	request := &lockv1.CreateRequest{
-		Config: lockv1.LockConfig{},
+		ID: primitivev1.PrimitiveId{
+			Name: l.Name(),
+		},
+		Tags: tags,
 	}
-	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
 	_, err := l.client.Create(ctx, request)
 	if err != nil {
 		err = errors.FromProto(err)
@@ -147,8 +159,11 @@ func (l *lockPrimitive) create(ctx context.Context) error {
 }
 
 func (l *lockPrimitive) Close(ctx context.Context) error {
-	request := &lockv1.CloseRequest{}
-	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
+	request := &lockv1.CloseRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: l.Name(),
+		},
+	}
 	_, err := l.client.Close(ctx, request)
 	if err != nil {
 		err = errors.FromProto(err)

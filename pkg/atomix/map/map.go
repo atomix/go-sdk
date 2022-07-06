@@ -10,9 +10,10 @@ import (
 	"github.com/atomix/go-client/pkg/atomix/generic"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
 	mapv1 "github.com/atomix/runtime/api/atomix/map/v1"
-	"github.com/atomix/runtime/pkg/atomix/errors"
-	"github.com/atomix/runtime/pkg/atomix/logging"
-	"github.com/atomix/runtime/pkg/atomix/time"
+	primitivev1 "github.com/atomix/runtime/api/atomix/primitive/v1"
+	"github.com/atomix/runtime/pkg/errors"
+	"github.com/atomix/runtime/pkg/logging"
+	"github.com/atomix/runtime/pkg/time"
 	"io"
 )
 
@@ -99,10 +100,10 @@ type Event[K, V any] struct {
 	Entry Entry[K, V]
 }
 
-func New[K, V any](client mapv1.MapClient) func(context.Context, primitive.ID, ...Option[K, V]) (Map[K, V], error) {
-	return func(ctx context.Context, id primitive.ID, opts ...Option[K, V]) (Map[K, V], error) {
+func New[K, V any](client mapv1.MapClient) func(context.Context, string, ...Option[K, V]) (Map[K, V], error) {
+	return func(ctx context.Context, name string, opts ...Option[K, V]) (Map[K, V], error) {
 		var options Options[K, V]
-		options.apply(opts...)
+		options.Apply(opts...)
 		if options.KeyType == nil {
 			stringType := generic.String()
 			if keyType, ok := stringType.(generic.Type[K]); ok {
@@ -120,12 +121,12 @@ func New[K, V any](client mapv1.MapClient) func(context.Context, primitive.ID, .
 			}
 		}
 		indexedMap := &mapPrimitive[K, V]{
-			Primitive: primitive.New(id),
+			Primitive: primitive.New(name),
 			client:    client,
 			keyType:   options.KeyType,
 			valueType: options.ValueType,
 		}
-		if err := indexedMap.create(ctx); err != nil {
+		if err := indexedMap.create(ctx, options.Tags); err != nil {
 			return nil, err
 		}
 		return indexedMap, nil
@@ -150,6 +151,9 @@ func (m *mapPrimitive[K, V]) Put(ctx context.Context, key K, value V, opts ...Pu
 	}
 
 	request := &mapv1.PutRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: m.Name(),
+		},
 		Key: string(keyBytes),
 		Value: &mapv1.Value{
 			Value: valueBytes,
@@ -158,7 +162,6 @@ func (m *mapPrimitive[K, V]) Put(ctx context.Context, key K, value V, opts ...Pu
 	for i := range opts {
 		opts[i].beforePut(request)
 	}
-	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	response, err := m.client.Put(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -180,12 +183,14 @@ func (m *mapPrimitive[K, V]) Insert(ctx context.Context, key K, value V) (*Entry
 	}
 
 	request := &mapv1.InsertRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: m.Name(),
+		},
 		Key: string(keyBytes),
 		Value: &mapv1.Value{
 			Value: valueBytes,
 		},
 	}
-	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	response, err := m.client.Insert(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -204,6 +209,9 @@ func (m *mapPrimitive[K, V]) Update(ctx context.Context, key K, value V, opts ..
 	}
 
 	request := &mapv1.UpdateRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: m.Name(),
+		},
 		Key: string(keyBytes),
 		Value: &mapv1.Value{
 			Value: valueBytes,
@@ -212,7 +220,6 @@ func (m *mapPrimitive[K, V]) Update(ctx context.Context, key K, value V, opts ..
 	for i := range opts {
 		opts[i].beforeUpdate(request)
 	}
-	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	response, err := m.client.Update(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -229,12 +236,14 @@ func (m *mapPrimitive[K, V]) Get(ctx context.Context, key K, opts ...GetOption) 
 		return nil, errors.NewInvalid("key encoding failed", err)
 	}
 	request := &mapv1.GetRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: m.Name(),
+		},
 		Key: string(keyBytes),
 	}
 	for i := range opts {
 		opts[i].beforeGet(request)
 	}
-	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	response, err := m.client.Get(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -251,12 +260,14 @@ func (m *mapPrimitive[K, V]) Remove(ctx context.Context, key K, opts ...RemoveOp
 		return nil, errors.NewInvalid("key encoding failed", err)
 	}
 	request := &mapv1.RemoveRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: m.Name(),
+		},
 		Key: string(keyBytes),
 	}
 	for i := range opts {
 		opts[i].beforeRemove(request)
 	}
-	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	response, err := m.client.Remove(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
@@ -268,8 +279,11 @@ func (m *mapPrimitive[K, V]) Remove(ctx context.Context, key K, opts ...RemoveOp
 }
 
 func (m *mapPrimitive[K, V]) Len(ctx context.Context) (int, error) {
-	request := &mapv1.SizeRequest{}
-	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
+	request := &mapv1.SizeRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: m.Name(),
+		},
+	}
 	response, err := m.client.Size(ctx, request)
 	if err != nil {
 		return 0, errors.FromProto(err)
@@ -278,8 +292,11 @@ func (m *mapPrimitive[K, V]) Len(ctx context.Context) (int, error) {
 }
 
 func (m *mapPrimitive[K, V]) Clear(ctx context.Context) error {
-	request := &mapv1.ClearRequest{}
-	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
+	request := &mapv1.ClearRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: m.Name(),
+		},
+	}
 	_, err := m.client.Clear(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -288,8 +305,11 @@ func (m *mapPrimitive[K, V]) Clear(ctx context.Context) error {
 }
 
 func (m *mapPrimitive[K, V]) Entries(ctx context.Context, ch chan<- Entry[K, V]) error {
-	request := &mapv1.EntriesRequest{}
-	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
+	request := &mapv1.EntriesRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: m.Name(),
+		},
+	}
 	stream, err := m.client.Entries(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -322,12 +342,15 @@ func (m *mapPrimitive[K, V]) Entries(ctx context.Context, ch chan<- Entry[K, V])
 }
 
 func (m *mapPrimitive[K, V]) Watch(ctx context.Context, ch chan<- Event[K, V], opts ...WatchOption) error {
-	request := &mapv1.EventsRequest{}
+	request := &mapv1.EventsRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: m.Name(),
+		},
+	}
 	for i := range opts {
 		opts[i].beforeWatch(request)
 	}
 
-	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	stream, err := m.client.Events(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -423,11 +446,13 @@ func (m *mapPrimitive[K, V]) newEntry(entry *mapv1.Entry) (*Entry[K, V], error) 
 	}, nil
 }
 
-func (m *mapPrimitive[K, V]) create(ctx context.Context) error {
+func (m *mapPrimitive[K, V]) create(ctx context.Context, tags map[string]string) error {
 	request := &mapv1.CreateRequest{
-		Config: mapv1.MapConfig{},
+		ID: primitivev1.PrimitiveId{
+			Name: m.Name(),
+		},
+		Tags: tags,
 	}
-	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
 	_, err := m.client.Create(ctx, request)
 	if err != nil {
 		err = errors.FromProto(err)
@@ -439,8 +464,11 @@ func (m *mapPrimitive[K, V]) create(ctx context.Context) error {
 }
 
 func (m *mapPrimitive[K, V]) Close(ctx context.Context) error {
-	request := &mapv1.CloseRequest{}
-	ctx = primitive.AppendToOutgoingContext(ctx, m.ID())
+	request := &mapv1.CloseRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: m.Name(),
+		},
+	}
 	_, err := m.client.Close(ctx, request)
 	if err != nil {
 		err = errors.FromProto(err)

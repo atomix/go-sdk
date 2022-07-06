@@ -10,8 +10,9 @@ import (
 	"github.com/atomix/go-client/pkg/atomix/generic"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
 	listv1 "github.com/atomix/runtime/api/atomix/list/v1"
-	"github.com/atomix/runtime/pkg/atomix/errors"
-	"github.com/atomix/runtime/pkg/atomix/logging"
+	primitivev1 "github.com/atomix/runtime/api/atomix/primitive/v1"
+	"github.com/atomix/runtime/pkg/errors"
+	"github.com/atomix/runtime/pkg/logging"
 	"io"
 )
 
@@ -81,10 +82,10 @@ type Event[E any] struct {
 	Value E
 }
 
-func New[E any](client listv1.ListClient) func(context.Context, primitive.ID, ...Option[E]) (List[E], error) {
-	return func(ctx context.Context, id primitive.ID, opts ...Option[E]) (List[E], error) {
+func New[E any](client listv1.ListClient) func(context.Context, string, ...Option[E]) (List[E], error) {
+	return func(ctx context.Context, name string, opts ...Option[E]) (List[E], error) {
 		var options Options[E]
-		options.apply(opts...)
+		options.Apply(opts...)
 		if options.ElementType == nil {
 			stringType := generic.Bytes()
 			if elementType, ok := stringType.(generic.Type[E]); ok {
@@ -94,11 +95,11 @@ func New[E any](client listv1.ListClient) func(context.Context, primitive.ID, ..
 			}
 		}
 		indexedMap := &listPrimitive[E]{
-			Primitive:   primitive.New(id),
+			Primitive:   primitive.New(name),
 			client:      client,
 			elementType: options.ElementType,
 		}
-		if err := indexedMap.create(ctx); err != nil {
+		if err := indexedMap.create(ctx, options.Tags); err != nil {
 			return nil, err
 		}
 		return indexedMap, nil
@@ -118,11 +119,13 @@ func (l *listPrimitive[E]) Append(ctx context.Context, value E) error {
 		return errors.NewInvalid("element encoding failed", err)
 	}
 	request := &listv1.AppendRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: l.Name(),
+		},
 		Value: listv1.Value{
 			Value: base64.StdEncoding.EncodeToString(bytes),
 		},
 	}
-	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
 	_, err = l.client.Append(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -136,12 +139,14 @@ func (l *listPrimitive[E]) Insert(ctx context.Context, index int, value E) error
 		return errors.NewInvalid("element encoding failed", err)
 	}
 	request := &listv1.InsertRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: l.Name(),
+		},
 		Index: uint32(index),
 		Value: listv1.Value{
 			Value: base64.StdEncoding.EncodeToString(bytes),
 		},
 	}
-	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
 	_, err = l.client.Insert(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -155,12 +160,14 @@ func (l *listPrimitive[E]) Set(ctx context.Context, index int, value E) error {
 		return errors.NewInvalid("element encoding failed", err)
 	}
 	request := &listv1.SetRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: l.Name(),
+		},
 		Index: uint32(index),
 		Value: listv1.Value{
 			Value: base64.StdEncoding.EncodeToString(bytes),
 		},
 	}
-	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
 	_, err = l.client.Set(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -170,9 +177,11 @@ func (l *listPrimitive[E]) Set(ctx context.Context, index int, value E) error {
 
 func (l *listPrimitive[E]) Get(ctx context.Context, index int) (E, error) {
 	request := &listv1.GetRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: l.Name(),
+		},
 		Index: uint32(index),
 	}
-	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
 	var e E
 	response, err := l.client.Get(ctx, request)
 	if err != nil {
@@ -191,9 +200,11 @@ func (l *listPrimitive[E]) Get(ctx context.Context, index int) (E, error) {
 
 func (l *listPrimitive[E]) Remove(ctx context.Context, index int) (E, error) {
 	request := &listv1.RemoveRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: l.Name(),
+		},
 		Index: uint32(index),
 	}
-	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
 	var e E
 	response, err := l.client.Remove(ctx, request)
 	if err != nil {
@@ -211,8 +222,11 @@ func (l *listPrimitive[E]) Remove(ctx context.Context, index int) (E, error) {
 }
 
 func (l *listPrimitive[E]) Len(ctx context.Context) (int, error) {
-	request := &listv1.SizeRequest{}
-	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
+	request := &listv1.SizeRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: l.Name(),
+		},
+	}
 	response, err := l.client.Size(ctx, request)
 	if err != nil {
 		return 0, errors.FromProto(err)
@@ -221,8 +235,11 @@ func (l *listPrimitive[E]) Len(ctx context.Context) (int, error) {
 }
 
 func (l *listPrimitive[E]) Items(ctx context.Context, ch chan<- E) error {
-	request := &listv1.ElementsRequest{}
-	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
+	request := &listv1.ElementsRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: l.Name(),
+		},
+	}
 	stream, err := l.client.Elements(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -261,12 +278,15 @@ func (l *listPrimitive[E]) Items(ctx context.Context, ch chan<- E) error {
 }
 
 func (l *listPrimitive[E]) Watch(ctx context.Context, ch chan<- Event[E], opts ...WatchOption) error {
-	request := &listv1.EventsRequest{}
+	request := &listv1.EventsRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: l.Name(),
+		},
+	}
 	for i := range opts {
 		opts[i].beforeWatch(request)
 	}
 
-	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
 	stream, err := l.client.Events(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -346,8 +366,11 @@ func (l *listPrimitive[E]) Watch(ctx context.Context, ch chan<- Event[E], opts .
 }
 
 func (l *listPrimitive[E]) Clear(ctx context.Context) error {
-	request := &listv1.ClearRequest{}
-	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
+	request := &listv1.ClearRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: l.Name(),
+		},
+	}
 	_, err := l.client.Clear(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -355,11 +378,13 @@ func (l *listPrimitive[E]) Clear(ctx context.Context) error {
 	return nil
 }
 
-func (l *listPrimitive[E]) create(ctx context.Context) error {
+func (l *listPrimitive[E]) create(ctx context.Context, tags map[string]string) error {
 	request := &listv1.CreateRequest{
-		Config: listv1.ListConfig{},
+		ID: primitivev1.PrimitiveId{
+			Name: l.Name(),
+		},
+		Tags: tags,
 	}
-	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
 	_, err := l.client.Create(ctx, request)
 	if err != nil {
 		err = errors.FromProto(err)
@@ -371,8 +396,11 @@ func (l *listPrimitive[E]) create(ctx context.Context) error {
 }
 
 func (l *listPrimitive[E]) Close(ctx context.Context) error {
-	request := &listv1.CloseRequest{}
-	ctx = primitive.AppendToOutgoingContext(ctx, l.ID())
+	request := &listv1.CloseRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: l.Name(),
+		},
+	}
 	_, err := l.client.Close(ctx, request)
 	if err != nil {
 		err = errors.FromProto(err)

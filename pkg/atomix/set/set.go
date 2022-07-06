@@ -9,9 +9,10 @@ import (
 	"encoding/base64"
 	"github.com/atomix/go-client/pkg/atomix/generic"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
+	primitivev1 "github.com/atomix/runtime/api/atomix/primitive/v1"
 	setv1 "github.com/atomix/runtime/api/atomix/set/v1"
-	"github.com/atomix/runtime/pkg/atomix/errors"
-	"github.com/atomix/runtime/pkg/atomix/logging"
+	"github.com/atomix/runtime/pkg/errors"
+	"github.com/atomix/runtime/pkg/logging"
 	"io"
 )
 
@@ -71,10 +72,10 @@ type Event[E any] struct {
 	Value E
 }
 
-func New[E any](client setv1.SetClient) func(context.Context, primitive.ID, ...Option[E]) (Set[E], error) {
-	return func(ctx context.Context, id primitive.ID, opts ...Option[E]) (Set[E], error) {
+func New[E any](client setv1.SetClient) func(context.Context, string, ...Option[E]) (Set[E], error) {
+	return func(ctx context.Context, name string, opts ...Option[E]) (Set[E], error) {
 		var options Options[E]
-		options.apply(opts...)
+		options.Apply(opts...)
 		if options.ElementType == nil {
 			stringType := generic.Bytes()
 			if elementType, ok := stringType.(generic.Type[E]); ok {
@@ -84,11 +85,11 @@ func New[E any](client setv1.SetClient) func(context.Context, primitive.ID, ...O
 			}
 		}
 		indexedMap := &setPrimitive[E]{
-			Primitive:   primitive.New(id),
+			Primitive:   primitive.New(name),
 			client:      client,
 			elementType: options.ElementType,
 		}
-		if err := indexedMap.create(ctx); err != nil {
+		if err := indexedMap.create(ctx, options.Tags); err != nil {
 			return nil, err
 		}
 		return indexedMap, nil
@@ -107,11 +108,13 @@ func (s *setPrimitive[E]) Add(ctx context.Context, value E) (bool, error) {
 		return false, errors.NewInvalid("element encoding failed", err)
 	}
 	request := &setv1.AddRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: s.Name(),
+		},
 		Element: setv1.Element{
 			Value: base64.StdEncoding.EncodeToString(bytes),
 		},
 	}
-	ctx = primitive.AppendToOutgoingContext(ctx, s.ID())
 	_, err = s.client.Add(ctx, request)
 	if err != nil {
 		err = errors.FromProto(err)
@@ -129,11 +132,13 @@ func (s *setPrimitive[E]) Remove(ctx context.Context, value E) (bool, error) {
 		return false, errors.NewInvalid("element encoding failed", err)
 	}
 	request := &setv1.RemoveRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: s.Name(),
+		},
 		Element: setv1.Element{
 			Value: base64.StdEncoding.EncodeToString(bytes),
 		},
 	}
-	ctx = primitive.AppendToOutgoingContext(ctx, s.ID())
 	_, err = s.client.Remove(ctx, request)
 	if err != nil {
 		err = errors.FromProto(err)
@@ -151,11 +156,13 @@ func (s *setPrimitive[E]) Contains(ctx context.Context, value E) (bool, error) {
 		return false, errors.NewInvalid("element encoding failed", err)
 	}
 	request := &setv1.ContainsRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: s.Name(),
+		},
 		Element: setv1.Element{
 			Value: base64.StdEncoding.EncodeToString(bytes),
 		},
 	}
-	ctx = primitive.AppendToOutgoingContext(ctx, s.ID())
 	response, err := s.client.Contains(ctx, request)
 	if err != nil {
 		return false, errors.FromProto(err)
@@ -164,8 +171,11 @@ func (s *setPrimitive[E]) Contains(ctx context.Context, value E) (bool, error) {
 }
 
 func (s *setPrimitive[E]) Len(ctx context.Context) (int, error) {
-	request := &setv1.SizeRequest{}
-	ctx = primitive.AppendToOutgoingContext(ctx, s.ID())
+	request := &setv1.SizeRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: s.Name(),
+		},
+	}
 	response, err := s.client.Size(ctx, request)
 	if err != nil {
 		return 0, errors.FromProto(err)
@@ -174,8 +184,11 @@ func (s *setPrimitive[E]) Len(ctx context.Context) (int, error) {
 }
 
 func (s *setPrimitive[E]) Clear(ctx context.Context) error {
-	request := &setv1.ClearRequest{}
-	ctx = primitive.AppendToOutgoingContext(ctx, s.ID())
+	request := &setv1.ClearRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: s.Name(),
+		},
+	}
 	_, err := s.client.Clear(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -184,8 +197,11 @@ func (s *setPrimitive[E]) Clear(ctx context.Context) error {
 }
 
 func (s *setPrimitive[E]) Elements(ctx context.Context, ch chan<- E) error {
-	request := &setv1.ElementsRequest{}
-	ctx = primitive.AppendToOutgoingContext(ctx, s.ID())
+	request := &setv1.ElementsRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: s.Name(),
+		},
+	}
 	stream, err := s.client.Elements(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -224,12 +240,15 @@ func (s *setPrimitive[E]) Elements(ctx context.Context, ch chan<- E) error {
 }
 
 func (s *setPrimitive[E]) Watch(ctx context.Context, ch chan<- Event[E], opts ...WatchOption) error {
-	request := &setv1.EventsRequest{}
+	request := &setv1.EventsRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: s.Name(),
+		},
+	}
 	for i := range opts {
 		opts[i].beforeWatch(request)
 	}
 
-	ctx = primitive.AppendToOutgoingContext(ctx, s.ID())
 	stream, err := s.client.Events(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -305,11 +324,13 @@ func (s *setPrimitive[E]) Watch(ctx context.Context, ch chan<- Event[E], opts ..
 	}
 }
 
-func (s *setPrimitive[E]) create(ctx context.Context) error {
+func (s *setPrimitive[E]) create(ctx context.Context, tags map[string]string) error {
 	request := &setv1.CreateRequest{
-		Config: setv1.SetConfig{},
+		ID: primitivev1.PrimitiveId{
+			Name: s.Name(),
+		},
+		Tags: tags,
 	}
-	ctx = primitive.AppendToOutgoingContext(ctx, s.ID())
 	_, err := s.client.Create(ctx, request)
 	if err != nil {
 		err = errors.FromProto(err)
@@ -321,8 +342,11 @@ func (s *setPrimitive[E]) create(ctx context.Context) error {
 }
 
 func (s *setPrimitive[E]) Close(ctx context.Context) error {
-	request := &setv1.CloseRequest{}
-	ctx = primitive.AppendToOutgoingContext(ctx, s.ID())
+	request := &setv1.CloseRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: s.Name(),
+		},
+	}
 	_, err := s.client.Close(ctx, request)
 	if err != nil {
 		err = errors.FromProto(err)

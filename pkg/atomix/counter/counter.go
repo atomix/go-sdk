@@ -8,7 +8,8 @@ import (
 	"context"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
 	counterv1 "github.com/atomix/runtime/api/atomix/counter/v1"
-	"github.com/atomix/runtime/pkg/atomix/errors"
+	primitivev1 "github.com/atomix/runtime/api/atomix/primitive/v1"
+	"github.com/atomix/runtime/pkg/errors"
 )
 
 // Counter provides a distributed atomic counter
@@ -28,15 +29,15 @@ type Counter interface {
 	Decrement(ctx context.Context, delta int64) (int64, error)
 }
 
-func New(client counterv1.CounterClient) func(context.Context, primitive.ID, ...Option) (Counter, error) {
-	return func(ctx context.Context, id primitive.ID, opts ...Option) (Counter, error) {
+func New(client counterv1.CounterClient) func(context.Context, string, ...Option) (Counter, error) {
+	return func(ctx context.Context, name string, opts ...Option) (Counter, error) {
 		var options Options
-		options.apply(opts...)
+		options.Apply(opts...)
 		counter := &counterPrimitive{
-			Primitive: primitive.New(id),
+			Primitive: primitive.New(name),
 			client:    client,
 		}
-		if err := counter.create(ctx); err != nil {
+		if err := counter.create(ctx, options.Tags); err != nil {
 			return nil, err
 		}
 		return counter, nil
@@ -50,8 +51,11 @@ type counterPrimitive struct {
 }
 
 func (c *counterPrimitive) Get(ctx context.Context) (int64, error) {
-	request := &counterv1.GetRequest{}
-	ctx = primitive.AppendToOutgoingContext(ctx, c.ID())
+	request := &counterv1.GetRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: c.Name(),
+		},
+	}
 	response, err := c.client.Get(ctx, request)
 	if err != nil {
 		return 0, errors.FromProto(err)
@@ -61,9 +65,11 @@ func (c *counterPrimitive) Get(ctx context.Context) (int64, error) {
 
 func (c *counterPrimitive) Set(ctx context.Context, value int64) error {
 	request := &counterv1.SetRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: c.Name(),
+		},
 		Value: value,
 	}
-	ctx = primitive.AppendToOutgoingContext(ctx, c.ID())
 	_, err := c.client.Set(ctx, request)
 	if err != nil {
 		return errors.FromProto(err)
@@ -73,9 +79,11 @@ func (c *counterPrimitive) Set(ctx context.Context, value int64) error {
 
 func (c *counterPrimitive) Increment(ctx context.Context, delta int64) (int64, error) {
 	request := &counterv1.IncrementRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: c.Name(),
+		},
 		Delta: delta,
 	}
-	ctx = primitive.AppendToOutgoingContext(ctx, c.ID())
 	response, err := c.client.Increment(ctx, request)
 	if err != nil {
 		return 0, errors.FromProto(err)
@@ -85,9 +93,11 @@ func (c *counterPrimitive) Increment(ctx context.Context, delta int64) (int64, e
 
 func (c *counterPrimitive) Decrement(ctx context.Context, delta int64) (int64, error) {
 	request := &counterv1.DecrementRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: c.Name(),
+		},
 		Delta: delta,
 	}
-	ctx = primitive.AppendToOutgoingContext(ctx, c.ID())
 	response, err := c.client.Decrement(ctx, request)
 	if err != nil {
 		return 0, errors.FromProto(err)
@@ -95,11 +105,13 @@ func (c *counterPrimitive) Decrement(ctx context.Context, delta int64) (int64, e
 	return response.Value, nil
 }
 
-func (c *counterPrimitive) create(ctx context.Context) error {
+func (c *counterPrimitive) create(ctx context.Context, tags map[string]string) error {
 	request := &counterv1.CreateRequest{
-		Config: counterv1.CounterConfig{},
+		ID: primitivev1.PrimitiveId{
+			Name: c.Name(),
+		},
+		Tags: tags,
 	}
-	ctx = primitive.AppendToOutgoingContext(ctx, c.ID())
 	_, err := c.client.Create(ctx, request)
 	if err != nil {
 		err = errors.FromProto(err)
@@ -111,8 +123,11 @@ func (c *counterPrimitive) create(ctx context.Context) error {
 }
 
 func (c *counterPrimitive) Close(ctx context.Context) error {
-	request := &counterv1.CloseRequest{}
-	ctx = primitive.AppendToOutgoingContext(ctx, c.ID())
+	request := &counterv1.CloseRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: c.Name(),
+		},
+	}
 	_, err := c.client.Close(ctx, request)
 	if err != nil {
 		err = errors.FromProto(err)
