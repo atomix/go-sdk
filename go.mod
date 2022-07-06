@@ -3,8 +3,11 @@ module github.com/atomix/go-client
 go 1.18
 
 require (
-	github.com/atomix/drivers/memory v0.0.0-20220607181445-6035f16caa86
+	github.com/atomix/drivers/memory v0.0.0-20220706111915-c02ef53ef9ca
+	github.com/atomix/proxy v0.0.0-20220706102839-cca18a01c5a5
+	github.com/atomix/proxy/api v0.0.0-20220706021812-1ee94c6dc73c
 	github.com/atomix/runtime v0.0.0-20220706102709-8e80cf86d1f5
+	github.com/atomix/runtime/api v0.0.0-20220706095609-037e0d309067
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.1.2
 	github.com/stretchr/testify v1.7.1
@@ -13,11 +16,9 @@ require (
 )
 
 require (
-	github.com/atomix/proxy v0.0.0-20220706102839-cca18a01c5a5 // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
-	github.com/gofrs/flock v0.8.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/magiconair/properties v1.8.6 // indirect
