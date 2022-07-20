@@ -7,7 +7,7 @@ package list
 import (
 	"github.com/atomix/go-client/pkg/atomix/generic"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
-	listv1 "github.com/atomix/runtime/api/atomix/list/v1"
+	listv1 "github.com/atomix/runtime/api/atomix/runtime/list/v1"
 )
 
 // Option is a map option

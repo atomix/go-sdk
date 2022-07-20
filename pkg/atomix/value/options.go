@@ -7,8 +7,8 @@ package value
 import (
 	"github.com/atomix/go-client/pkg/atomix/generic"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
-	valuev1 "github.com/atomix/runtime/api/atomix/value/v1"
-	"github.com/atomix/runtime/pkg/time"
+	valuev1 "github.com/atomix/runtime/api/atomix/runtime/value/v1"
+	"github.com/atomix/runtime/sdk/pkg/time"
 )
 
 // Option is a value option

@@ -7,8 +7,8 @@ package indexedmap
 import (
 	"github.com/atomix/go-client/pkg/atomix/generic"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
-	indexedmapv1 "github.com/atomix/runtime/api/atomix/indexed_map/v1"
-	"github.com/atomix/runtime/pkg/time"
+	indexedmapv1 "github.com/atomix/runtime/api/atomix/runtime/indexedmap/v1"
+	"github.com/atomix/runtime/sdk/pkg/time"
 )
 
 // Option is a map option

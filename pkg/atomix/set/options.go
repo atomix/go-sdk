@@ -7,7 +7,7 @@ package set
 import (
 	"github.com/atomix/go-client/pkg/atomix/generic"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
-	setv1 "github.com/atomix/runtime/api/atomix/set/v1"
+	setv1 "github.com/atomix/runtime/api/atomix/runtime/set/v1"
 )
 
 // Option is a set option

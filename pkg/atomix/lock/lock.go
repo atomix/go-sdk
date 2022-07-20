@@ -7,10 +7,10 @@ package lock
 import (
 	"context"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
-	lockv1 "github.com/atomix/runtime/api/atomix/lock/v1"
-	primitivev1 "github.com/atomix/runtime/api/atomix/primitive/v1"
-	"github.com/atomix/runtime/pkg/errors"
-	"github.com/atomix/runtime/pkg/time"
+	lockv1 "github.com/atomix/runtime/api/atomix/runtime/lock/v1"
+	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
+	"github.com/atomix/runtime/sdk/pkg/errors"
+	"github.com/atomix/runtime/sdk/pkg/time"
 )
 
 // Lock provides distributed concurrency control
@@ -66,7 +66,7 @@ type lockPrimitive struct {
 
 func (l *lockPrimitive) Lock(ctx context.Context, opts ...LockOption) (Status, error) {
 	request := &lockv1.LockRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: l.Name(),
 		},
 	}
@@ -95,7 +95,7 @@ func (l *lockPrimitive) Lock(ctx context.Context, opts ...LockOption) (Status, e
 
 func (l *lockPrimitive) Unlock(ctx context.Context, opts ...UnlockOption) error {
 	request := &lockv1.UnlockRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: l.Name(),
 		},
 	}
@@ -114,7 +114,7 @@ func (l *lockPrimitive) Unlock(ctx context.Context, opts ...UnlockOption) error 
 
 func (l *lockPrimitive) Get(ctx context.Context, opts ...GetOption) (Status, error) {
 	request := &lockv1.GetLockRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: l.Name(),
 		},
 	}
@@ -143,7 +143,7 @@ func (l *lockPrimitive) Get(ctx context.Context, opts ...GetOption) (Status, err
 
 func (l *lockPrimitive) create(ctx context.Context, tags map[string]string) error {
 	request := &lockv1.CreateRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: l.Name(),
 		},
 		Tags: tags,
@@ -160,7 +160,7 @@ func (l *lockPrimitive) create(ctx context.Context, tags map[string]string) erro
 
 func (l *lockPrimitive) Close(ctx context.Context) error {
 	request := &lockv1.CloseRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: l.Name(),
 		},
 	}

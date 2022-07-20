@@ -9,11 +9,11 @@ import (
 	"fmt"
 	"github.com/atomix/go-client/pkg/atomix/generic"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
-	mapv1 "github.com/atomix/runtime/api/atomix/map/v1"
-	primitivev1 "github.com/atomix/runtime/api/atomix/primitive/v1"
-	"github.com/atomix/runtime/pkg/errors"
-	"github.com/atomix/runtime/pkg/logging"
-	"github.com/atomix/runtime/pkg/time"
+	mapv1 "github.com/atomix/runtime/api/atomix/runtime/map/v1"
+	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
+	"github.com/atomix/runtime/sdk/pkg/errors"
+	"github.com/atomix/runtime/sdk/pkg/logging"
+	"github.com/atomix/runtime/sdk/pkg/time"
 	"io"
 )
 
@@ -151,7 +151,7 @@ func (m *mapPrimitive[K, V]) Put(ctx context.Context, key K, value V, opts ...Pu
 	}
 
 	request := &mapv1.PutRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: m.Name(),
 		},
 		Key: string(keyBytes),
@@ -183,7 +183,7 @@ func (m *mapPrimitive[K, V]) Insert(ctx context.Context, key K, value V) (*Entry
 	}
 
 	request := &mapv1.InsertRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: m.Name(),
 		},
 		Key: string(keyBytes),
@@ -209,7 +209,7 @@ func (m *mapPrimitive[K, V]) Update(ctx context.Context, key K, value V, opts ..
 	}
 
 	request := &mapv1.UpdateRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: m.Name(),
 		},
 		Key: string(keyBytes),
@@ -236,7 +236,7 @@ func (m *mapPrimitive[K, V]) Get(ctx context.Context, key K, opts ...GetOption) 
 		return nil, errors.NewInvalid("key encoding failed", err)
 	}
 	request := &mapv1.GetRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: m.Name(),
 		},
 		Key: string(keyBytes),
@@ -260,7 +260,7 @@ func (m *mapPrimitive[K, V]) Remove(ctx context.Context, key K, opts ...RemoveOp
 		return nil, errors.NewInvalid("key encoding failed", err)
 	}
 	request := &mapv1.RemoveRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: m.Name(),
 		},
 		Key: string(keyBytes),
@@ -280,7 +280,7 @@ func (m *mapPrimitive[K, V]) Remove(ctx context.Context, key K, opts ...RemoveOp
 
 func (m *mapPrimitive[K, V]) Len(ctx context.Context) (int, error) {
 	request := &mapv1.SizeRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: m.Name(),
 		},
 	}
@@ -293,7 +293,7 @@ func (m *mapPrimitive[K, V]) Len(ctx context.Context) (int, error) {
 
 func (m *mapPrimitive[K, V]) Clear(ctx context.Context) error {
 	request := &mapv1.ClearRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: m.Name(),
 		},
 	}
@@ -306,7 +306,7 @@ func (m *mapPrimitive[K, V]) Clear(ctx context.Context) error {
 
 func (m *mapPrimitive[K, V]) Entries(ctx context.Context, ch chan<- Entry[K, V]) error {
 	request := &mapv1.EntriesRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: m.Name(),
 		},
 	}
@@ -343,7 +343,7 @@ func (m *mapPrimitive[K, V]) Entries(ctx context.Context, ch chan<- Entry[K, V])
 
 func (m *mapPrimitive[K, V]) Watch(ctx context.Context, ch chan<- Event[K, V], opts ...WatchOption) error {
 	request := &mapv1.EventsRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: m.Name(),
 		},
 	}
@@ -448,7 +448,7 @@ func (m *mapPrimitive[K, V]) newEntry(entry *mapv1.Entry) (*Entry[K, V], error) 
 
 func (m *mapPrimitive[K, V]) create(ctx context.Context, tags map[string]string) error {
 	request := &mapv1.CreateRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: m.Name(),
 		},
 		Tags: tags,
@@ -465,7 +465,7 @@ func (m *mapPrimitive[K, V]) create(ctx context.Context, tags map[string]string)
 
 func (m *mapPrimitive[K, V]) Close(ctx context.Context) error {
 	request := &mapv1.CloseRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: m.Name(),
 		},
 	}

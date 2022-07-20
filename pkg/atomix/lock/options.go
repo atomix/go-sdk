@@ -6,8 +6,8 @@ package lock
 
 import (
 	"github.com/atomix/go-client/pkg/atomix/primitive"
-	lockv1 "github.com/atomix/runtime/api/atomix/lock/v1"
-	rttime "github.com/atomix/runtime/pkg/time"
+	lockv1 "github.com/atomix/runtime/api/atomix/runtime/lock/v1"
+	rttime "github.com/atomix/runtime/sdk/pkg/time"
 	"time"
 )
 

@@ -9,10 +9,10 @@ import (
 	"encoding/base64"
 	"github.com/atomix/go-client/pkg/atomix/generic"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
-	primitivev1 "github.com/atomix/runtime/api/atomix/primitive/v1"
-	setv1 "github.com/atomix/runtime/api/atomix/set/v1"
-	"github.com/atomix/runtime/pkg/errors"
-	"github.com/atomix/runtime/pkg/logging"
+	setv1 "github.com/atomix/runtime/api/atomix/runtime/set/v1"
+	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
+	"github.com/atomix/runtime/sdk/pkg/errors"
+	"github.com/atomix/runtime/sdk/pkg/logging"
 	"io"
 )
 
@@ -108,7 +108,7 @@ func (s *setPrimitive[E]) Add(ctx context.Context, value E) (bool, error) {
 		return false, errors.NewInvalid("element encoding failed", err)
 	}
 	request := &setv1.AddRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: s.Name(),
 		},
 		Element: setv1.Element{
@@ -132,7 +132,7 @@ func (s *setPrimitive[E]) Remove(ctx context.Context, value E) (bool, error) {
 		return false, errors.NewInvalid("element encoding failed", err)
 	}
 	request := &setv1.RemoveRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: s.Name(),
 		},
 		Element: setv1.Element{
@@ -156,7 +156,7 @@ func (s *setPrimitive[E]) Contains(ctx context.Context, value E) (bool, error) {
 		return false, errors.NewInvalid("element encoding failed", err)
 	}
 	request := &setv1.ContainsRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: s.Name(),
 		},
 		Element: setv1.Element{
@@ -172,7 +172,7 @@ func (s *setPrimitive[E]) Contains(ctx context.Context, value E) (bool, error) {
 
 func (s *setPrimitive[E]) Len(ctx context.Context) (int, error) {
 	request := &setv1.SizeRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: s.Name(),
 		},
 	}
@@ -185,7 +185,7 @@ func (s *setPrimitive[E]) Len(ctx context.Context) (int, error) {
 
 func (s *setPrimitive[E]) Clear(ctx context.Context) error {
 	request := &setv1.ClearRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: s.Name(),
 		},
 	}
@@ -198,7 +198,7 @@ func (s *setPrimitive[E]) Clear(ctx context.Context) error {
 
 func (s *setPrimitive[E]) Elements(ctx context.Context, ch chan<- E) error {
 	request := &setv1.ElementsRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: s.Name(),
 		},
 	}
@@ -241,7 +241,7 @@ func (s *setPrimitive[E]) Elements(ctx context.Context, ch chan<- E) error {
 
 func (s *setPrimitive[E]) Watch(ctx context.Context, ch chan<- Event[E], opts ...WatchOption) error {
 	request := &setv1.EventsRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: s.Name(),
 		},
 	}
@@ -326,7 +326,7 @@ func (s *setPrimitive[E]) Watch(ctx context.Context, ch chan<- Event[E], opts ..
 
 func (s *setPrimitive[E]) create(ctx context.Context, tags map[string]string) error {
 	request := &setv1.CreateRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: s.Name(),
 		},
 		Tags: tags,
@@ -343,7 +343,7 @@ func (s *setPrimitive[E]) create(ctx context.Context, tags map[string]string) er
 
 func (s *setPrimitive[E]) Close(ctx context.Context) error {
 	request := &setv1.CloseRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: s.Name(),
 		},
 	}

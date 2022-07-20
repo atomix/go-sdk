@@ -7,8 +7,8 @@ package client
 import (
 	"context"
 	"fmt"
-	"github.com/atomix/runtime/pkg/errors"
-	"github.com/atomix/runtime/pkg/grpc/retry"
+	"github.com/atomix/runtime/sdk/pkg/errors"
+	"github.com/atomix/runtime/sdk/pkg/grpc/retry"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"sync"

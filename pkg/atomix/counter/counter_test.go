@@ -7,9 +7,9 @@ package counter
 import (
 	"context"
 	"github.com/atomix/go-client/pkg/atomix/test"
-	api "github.com/atomix/runtime/api/atomix/counter/v1"
-	"github.com/atomix/runtime/pkg/logging"
-	counterv1 "github.com/atomix/runtime/primitives/counter/v1"
+	api "github.com/atomix/runtime/api/atomix/runtime/counter/v1"
+	"github.com/atomix/runtime/sdk/pkg/logging"
+	counterv1 "github.com/atomix/runtime/sdk/primitives/counter/v1"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"

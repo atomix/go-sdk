@@ -7,9 +7,9 @@ package counter
 import (
 	"context"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
-	counterv1 "github.com/atomix/runtime/api/atomix/counter/v1"
-	primitivev1 "github.com/atomix/runtime/api/atomix/primitive/v1"
-	"github.com/atomix/runtime/pkg/errors"
+	counterv1 "github.com/atomix/runtime/api/atomix/runtime/counter/v1"
+	primitivev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
+	"github.com/atomix/runtime/sdk/pkg/errors"
 )
 
 // Counter provides a distributed atomic counter

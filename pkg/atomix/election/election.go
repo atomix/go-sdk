@@ -7,11 +7,11 @@ package election
 import (
 	"context"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
-	electionv1 "github.com/atomix/runtime/api/atomix/election/v1"
-	primitivev1 "github.com/atomix/runtime/api/atomix/primitive/v1"
-	"github.com/atomix/runtime/pkg/errors"
-	"github.com/atomix/runtime/pkg/logging"
-	"github.com/atomix/runtime/pkg/time"
+	electionv1 "github.com/atomix/runtime/api/atomix/runtime/election/v1"
+	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
+	"github.com/atomix/runtime/sdk/pkg/errors"
+	"github.com/atomix/runtime/sdk/pkg/logging"
+	"github.com/atomix/runtime/sdk/pkg/time"
 	"io"
 )
 
@@ -117,7 +117,7 @@ func (e *electionPrimitive) CandidateID() string {
 
 func (e *electionPrimitive) GetTerm(ctx context.Context) (*Term, error) {
 	request := &electionv1.GetTermRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: e.Name(),
 		},
 	}
@@ -130,7 +130,7 @@ func (e *electionPrimitive) GetTerm(ctx context.Context) (*Term, error) {
 
 func (e *electionPrimitive) Enter(ctx context.Context) (*Term, error) {
 	request := &electionv1.EnterRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: e.Name(),
 		},
 		Candidate: e.candidateID,
@@ -144,7 +144,7 @@ func (e *electionPrimitive) Enter(ctx context.Context) (*Term, error) {
 
 func (e *electionPrimitive) Leave(ctx context.Context) (*Term, error) {
 	request := &electionv1.WithdrawRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: e.Name(),
 		},
 		Candidate: e.candidateID,
@@ -158,7 +158,7 @@ func (e *electionPrimitive) Leave(ctx context.Context) (*Term, error) {
 
 func (e *electionPrimitive) Anoint(ctx context.Context, id string) (*Term, error) {
 	request := &electionv1.AnointRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: e.Name(),
 		},
 		Candidate: id,
@@ -172,7 +172,7 @@ func (e *electionPrimitive) Anoint(ctx context.Context, id string) (*Term, error
 
 func (e *electionPrimitive) Promote(ctx context.Context, id string) (*Term, error) {
 	request := &electionv1.PromoteRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: e.Name(),
 		},
 		Candidate: id,
@@ -186,7 +186,7 @@ func (e *electionPrimitive) Promote(ctx context.Context, id string) (*Term, erro
 
 func (e *electionPrimitive) Evict(ctx context.Context, id string) (*Term, error) {
 	request := &electionv1.EvictRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: e.Name(),
 		},
 		Candidate: id,
@@ -200,7 +200,7 @@ func (e *electionPrimitive) Evict(ctx context.Context, id string) (*Term, error)
 
 func (e *electionPrimitive) Watch(ctx context.Context, ch chan<- Event) error {
 	request := &electionv1.EventsRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: e.Name(),
 		},
 	}
@@ -257,7 +257,7 @@ func (e *electionPrimitive) Watch(ctx context.Context, ch chan<- Event) error {
 
 func (e *electionPrimitive) create(ctx context.Context, tags map[string]string) error {
 	request := &electionv1.CreateRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: e.Name(),
 		},
 		Tags: tags,
@@ -274,7 +274,7 @@ func (e *electionPrimitive) create(ctx context.Context, tags map[string]string) 
 
 func (e *electionPrimitive) Close(ctx context.Context) error {
 	request := &electionv1.CloseRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: e.Name(),
 		},
 	}

@@ -8,11 +8,11 @@ import (
 	"context"
 	"github.com/atomix/go-client/pkg/atomix/generic"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
-	primitivev1 "github.com/atomix/runtime/api/atomix/primitive/v1"
-	valuev1 "github.com/atomix/runtime/api/atomix/value/v1"
-	"github.com/atomix/runtime/pkg/errors"
-	"github.com/atomix/runtime/pkg/logging"
-	"github.com/atomix/runtime/pkg/time"
+	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
+	valuev1 "github.com/atomix/runtime/api/atomix/runtime/value/v1"
+	"github.com/atomix/runtime/sdk/pkg/errors"
+	"github.com/atomix/runtime/sdk/pkg/logging"
+	"github.com/atomix/runtime/sdk/pkg/time"
 	"io"
 )
 
@@ -89,7 +89,7 @@ func (v *valuePrimitive[T]) Set(ctx context.Context, value T, opts ...SetOption)
 		return nil, errors.NewInvalid("element encoding failed", err)
 	}
 	request := &valuev1.SetRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: v.Name(),
 		},
 		Value: bytes,
@@ -109,7 +109,7 @@ func (v *valuePrimitive[T]) Set(ctx context.Context, value T, opts ...SetOption)
 
 func (v *valuePrimitive[T]) Get(ctx context.Context) (T, time.Timestamp, error) {
 	request := &valuev1.GetRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: v.Name(),
 		},
 	}
@@ -127,7 +127,7 @@ func (v *valuePrimitive[T]) Get(ctx context.Context) (T, time.Timestamp, error) 
 
 func (v *valuePrimitive[T]) Watch(ctx context.Context, ch chan<- Event[T]) error {
 	request := &valuev1.EventsRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: v.Name(),
 		},
 	}
@@ -191,7 +191,7 @@ func (v *valuePrimitive[T]) Watch(ctx context.Context, ch chan<- Event[T]) error
 
 func (v *valuePrimitive[T]) create(ctx context.Context, tags map[string]string) error {
 	request := &valuev1.CreateRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: v.Name(),
 		},
 		Tags: tags,
@@ -208,7 +208,7 @@ func (v *valuePrimitive[T]) create(ctx context.Context, tags map[string]string) 
 
 func (v *valuePrimitive[T]) Close(ctx context.Context) error {
 	request := &valuev1.CloseRequest{
-		ID: primitivev1.PrimitiveId{
+		ID: runtimev1.PrimitiveId{
 			Name: v.Name(),
 		},
 	}

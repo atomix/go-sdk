@@ -7,8 +7,8 @@ package _map //nolint:golint
 import (
 	"github.com/atomix/go-client/pkg/atomix/generic"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
-	mapv1 "github.com/atomix/runtime/api/atomix/map/v1"
-	"github.com/atomix/runtime/pkg/time"
+	mapv1 "github.com/atomix/runtime/api/atomix/runtime/map/v1"
+	"github.com/atomix/runtime/sdk/pkg/time"
 )
 
 // Option is a map option
