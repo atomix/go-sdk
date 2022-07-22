@@ -15,7 +15,7 @@ import (
 	"github.com/atomix/runtime/proxy/pkg/proxy"
 	"github.com/atomix/runtime/sdk/pkg/errors"
 	"github.com/atomix/runtime/sdk/pkg/runtime"
-	"github.com/gogo/protobuf/proto"
+	"github.com/gogo/protobuf/jsonpb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -26,6 +26,48 @@ func New(t runtime.Type) *Test {
 		types:   []runtime.Type{t},
 		network: network,
 		port:    5000,
+		config: multiraftv1.ClusterConfig{
+			Replicas: []multiraftv1.ReplicaConfig{
+				{
+					NodeID:   1,
+					Host:     "127.0.0.1",
+					ApiPort:  5680,
+					RaftPort: 5690,
+				},
+			},
+			Partitions: []multiraftv1.PartitionConfig{
+				{
+					PartitionID: 1,
+					Host:        "127.0.0.1",
+					Port:        5680,
+					Members: []multiraftv1.MemberConfig{
+						{
+							NodeID: 1,
+						},
+					},
+				},
+				{
+					PartitionID: 2,
+					Host:        "127.0.0.1",
+					Port:        5680,
+					Members: []multiraftv1.MemberConfig{
+						{
+							NodeID: 1,
+						},
+					},
+				},
+				{
+					PartitionID: 3,
+					Host:        "127.0.0.1",
+					Port:        5680,
+					Members: []multiraftv1.MemberConfig{
+						{
+							NodeID: 1,
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -33,6 +75,7 @@ type Test struct {
 	types   []runtime.Type
 	network proxy.Network
 	proxies []*proxy.Proxy
+	config  multiraftv1.ClusterConfig
 	node    *node.MultiRaftNode
 	port    int
 }
@@ -42,12 +85,35 @@ func (t *Test) start() error {
 		return nil
 	}
 	t.node = node.New(t.network,
-		node.WithNodeID(1),
-		node.WithConfig(multiraftv1.MultiRaftConfig{
-			DataDir: "test-data",
+		node.WithHost("127.0.0.1"),
+		node.WithPort(5680),
+		node.WithConfig(multiraftv1.NodeConfig{
+			NodeID: 1,
+			Host:   "127.0.0.1",
+			Port:   5690,
+			MultiRaftConfig: multiraftv1.MultiRaftConfig{
+				DataDir: "test-data",
+			},
 		}),
 		node.WithPrimitiveTypes(counterv1.Type))
-	return t.node.Start()
+	if err := t.node.Start(); err != nil {
+		return err
+	}
+
+	conn, err := t.connect(context.Background(), fmt.Sprintf("%s:%d", t.node.Host, t.node.Port))
+	if err != nil {
+		return err
+	}
+
+	client := multiraftv1.NewNodeClient(conn)
+	request := &multiraftv1.BootstrapRequest{
+		Cluster: t.config,
+	}
+	_, err = client.Bootstrap(context.Background(), request)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (t *Test) Connect(ctx context.Context) (*grpc.ClientConn, error) {
@@ -95,44 +161,8 @@ func (t *Test) Connect(ctx context.Context) (*grpc.ClientConn, error) {
 
 	client := proxyv1.NewProxyClient(conn)
 
-	config := multiraftv1.ClusterConfig{
-		Replicas: []multiraftv1.ReplicaConfig{
-			{
-				NodeID: 1,
-				Port:   5680,
-			},
-		},
-		Partitions: []multiraftv1.PartitionConfig{
-			{
-				PartitionID: 1,
-				Port:        5681,
-				Members: []multiraftv1.MemberConfig{
-					{
-						NodeID: 1,
-					},
-				},
-			},
-			{
-				PartitionID: 2,
-				Port:        5682,
-				Members: []multiraftv1.MemberConfig{
-					{
-						NodeID: 1,
-					},
-				},
-			},
-			{
-				PartitionID: 3,
-				Port:        5683,
-				Members: []multiraftv1.MemberConfig{
-					{
-						NodeID: 1,
-					},
-				},
-			},
-		},
-	}
-	bytes, err := proto.Marshal(&config)
+	marshaller := &jsonpb.Marshaler{}
+	data, err := marshaller.MarshalToString(&t.config)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +175,7 @@ func (t *Test) Connect(ctx context.Context) (*grpc.ClientConn, error) {
 			Name:    driver.ID().Name,
 			Version: driver.ID().Version,
 		},
-		Config: bytes,
+		Config: []byte(data),
 	}
 	_, err = client.Connect(ctx, request)
 	if err != nil {

@@ -3,12 +3,13 @@ module github.com/atomix/go-client
 go 1.18
 
 require (
-	github.com/atomix/multi-raft-storage/api v0.0.0-20220720082116-2afbeb1343a8
+	github.com/atomix/multi-raft-storage/api v0.0.0-20220720221054-77e2e6557faa
 	github.com/atomix/multi-raft-storage/driver v0.0.0-20220720082719-024ea1feebdb
 	github.com/atomix/multi-raft-storage/node v0.0.0-20220720082719-024ea1feebdb
 	github.com/atomix/runtime/api v0.0.0-20220720013020-6146e7ecb7cb
 	github.com/atomix/runtime/proxy v0.0.0-20220720081131-4fb67c7ede1a
-	github.com/atomix/runtime/sdk v0.0.0-20220720073115-4180e2a2a420
+	github.com/atomix/runtime/sdk v0.0.0-20220720203722-fe3ff64774df
+	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.1.2
 	github.com/stretchr/testify v1.7.1
@@ -17,7 +18,12 @@ require (
 )
 
 replace github.com/atomix/multi-raft-storage/driver => ../../storage/multi-raft-storage/driver
+
+replace github.com/atomix/multi-raft-storage/node => ../../storage/multi-raft-storage/node
+
 replace github.com/atomix/runtime/sdk => ../../runtime/sdk
+
+replace github.com/atomix/runtime/proxy => ../../runtime/proxy
 
 require (
 	github.com/VictoriaMetrics/metrics v1.6.2 // indirect
@@ -32,7 +38,6 @@ require (
 	github.com/cockroachdb/sentry-go v0.6.1-cockroachdb.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
-	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/snappy v0.0.3-0.20201103224600-674baa8c7fc3 // indirect
 	github.com/google/btree v1.0.0 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
