@@ -10,7 +10,6 @@ import (
 	multiraftv1 "github.com/atomix/multi-raft-storage/api/atomix/multiraft/v1"
 	"github.com/atomix/multi-raft-storage/driver"
 	"github.com/atomix/multi-raft-storage/node/pkg/node"
-	counterv1 "github.com/atomix/multi-raft-storage/node/pkg/primitive/counter/v1"
 	proxyv1 "github.com/atomix/runtime/api/atomix/proxy/v1"
 	"github.com/atomix/runtime/proxy/pkg/proxy"
 	"github.com/atomix/runtime/sdk/pkg/errors"
@@ -18,6 +17,7 @@ import (
 	"github.com/gogo/protobuf/jsonpb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"os"
 )
 
 func New(t runtime.Type) *Test {
@@ -84,6 +84,9 @@ func (t *Test) start() error {
 	if t.node != nil {
 		return nil
 	}
+	if err := os.RemoveAll("test-data"); err != nil && !os.IsNotExist(err) {
+		return err
+	}
 	t.node = node.New(t.network,
 		node.WithHost("127.0.0.1"),
 		node.WithPort(5680),
@@ -94,8 +97,7 @@ func (t *Test) start() error {
 			MultiRaftConfig: multiraftv1.MultiRaftConfig{
 				DataDir: "test-data",
 			},
-		}),
-		node.WithPrimitiveTypes(counterv1.Type))
+		}))
 	if err := t.node.Start(); err != nil {
 		return err
 	}
