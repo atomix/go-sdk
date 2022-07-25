@@ -537,6 +537,10 @@ func (m *indexedMapPrimitive[K, V]) Watch(ctx context.Context, ch chan<- Event[K
 				open = true
 			}
 
+			if response.Event.Type == indexedmapv1.Event_NONE {
+				continue
+			}
+
 			for i := range opts {
 				opts[i].afterWatch(response)
 			}

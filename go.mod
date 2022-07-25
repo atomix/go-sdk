@@ -3,7 +3,7 @@ module github.com/atomix/go-client
 go 1.18
 
 require (
-	github.com/atomix/multi-raft-storage/api v0.0.0-20220725201503-3f8d95f499c0
+	github.com/atomix/multi-raft-storage/api v0.0.0-20220725205142-9bfaa453c19f
 	github.com/atomix/multi-raft-storage/driver v0.0.0-20220720082719-024ea1feebdb
 	github.com/atomix/multi-raft-storage/node v0.0.0-20220720082719-024ea1feebdb
 	github.com/atomix/runtime/api v0.0.0-20220720013020-6146e7ecb7cb

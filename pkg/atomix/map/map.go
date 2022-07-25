@@ -384,6 +384,10 @@ func (m *mapPrimitive[K, V]) Watch(ctx context.Context, ch chan<- Event[K, V], o
 				open = true
 			}
 
+			if response.Event.Type == mapv1.Event_NONE {
+				continue
+			}
+
 			for i := range opts {
 				opts[i].afterWatch(response)
 			}

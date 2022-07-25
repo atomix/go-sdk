@@ -281,6 +281,11 @@ func (s *setPrimitive[E]) Watch(ctx context.Context, ch chan<- Event[E], opts ..
 				close(openCh)
 				open = true
 			}
+
+			if response.Event.Type == setv1.Event_NONE {
+				continue
+			}
+
 			for i := range opts {
 				opts[i].afterWatch(response)
 			}

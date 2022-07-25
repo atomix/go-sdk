@@ -164,6 +164,10 @@ func (v *valuePrimitive[T]) Watch(ctx context.Context, ch chan<- Event[T]) error
 				open = true
 			}
 
+			if response.Event.Type == valuev1.Event_NONE {
+				continue
+			}
+
 			var value T
 			if err := v.valueType.Unmarshal(response.Event.Value, &value); err != nil {
 				log.Error(err)
