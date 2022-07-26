@@ -9,7 +9,6 @@ import (
 	"github.com/atomix/go-client/pkg/atomix/test"
 	api "github.com/atomix/runtime/api/atomix/runtime/counter/v1"
 	"github.com/atomix/runtime/sdk/pkg/logging"
-	counterv1 "github.com/atomix/runtime/sdk/primitives/counter/v1"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
@@ -18,17 +17,17 @@ import (
 func TestCounterOperations(t *testing.T) {
 	logging.SetLevel(logging.DebugLevel)
 
-	test := test.New(counterv1.Type)
-	defer test.Cleanup()
+	cluster := test.NewCluster(3, 3)
+	defer cluster.Cleanup()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	conn1, err := test.Connect(ctx)
+	conn1, err := cluster.Connect(ctx)
 	assert.NoError(t, err)
 	client1 := api.NewCounterClient(conn1)
 
-	conn2, err := test.Connect(ctx)
+	conn2, err := cluster.Connect(ctx)
 	assert.NoError(t, err)
 	client2 := api.NewCounterClient(conn2)
 

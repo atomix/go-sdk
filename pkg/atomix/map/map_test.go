@@ -11,7 +11,6 @@ import (
 	api "github.com/atomix/runtime/api/atomix/runtime/map/v1"
 	"github.com/atomix/runtime/sdk/pkg/errors"
 	"github.com/atomix/runtime/sdk/pkg/logging"
-	mapv1 "github.com/atomix/runtime/sdk/primitives/map/v1"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
@@ -20,17 +19,17 @@ import (
 func TestMapOperations(t *testing.T) {
 	logging.SetLevel(logging.DebugLevel)
 
-	test := test.New(mapv1.Type)
-	defer test.Cleanup()
+	cluster := test.NewCluster(3, 3)
+	defer cluster.Cleanup()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	conn1, err := test.Connect(ctx)
+	conn1, err := cluster.Connect(ctx)
 	assert.NoError(t, err)
 	client1 := api.NewMapClient(conn1)
 
-	conn2, err := test.Connect(ctx)
+	conn2, err := cluster.Connect(ctx)
 	assert.NoError(t, err)
 	client2 := api.NewMapClient(conn2)
 
@@ -137,17 +136,17 @@ func TestMapOperations(t *testing.T) {
 func TestMapStreams(t *testing.T) {
 	logging.SetLevel(logging.DebugLevel)
 
-	test := test.New(mapv1.Type)
-	defer test.Cleanup()
+	cluster := test.NewCluster(3, 3)
+	defer cluster.Cleanup()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	conn1, err := test.Connect(ctx)
+	conn1, err := cluster.Connect(ctx)
 	assert.NoError(t, err)
 	client1 := api.NewMapClient(conn1)
 
-	conn2, err := test.Connect(ctx)
+	conn2, err := cluster.Connect(ctx)
 	assert.NoError(t, err)
 	client2 := api.NewMapClient(conn2)
 
