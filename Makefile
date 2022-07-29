@@ -11,7 +11,7 @@ build:
 	go build -v ./...
 
 test: # @HELP run the unit tests and source code validation
-test: build license linters
+test: build license #linters
 	go test github.com/atomix/go-client/pkg/...
 
 linters: # @HELP examines Go source code and reports coding problems
