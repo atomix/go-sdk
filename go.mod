@@ -4,11 +4,11 @@ go 1.18
 
 require (
 	github.com/atomix/multi-raft-storage/api v0.0.0-20220728201523-7dcf2d5be56a
-	github.com/atomix/multi-raft-storage/driver v0.0.0-20220720082719-024ea1feebdb
-	github.com/atomix/multi-raft-storage/node v0.0.0-20220720082719-024ea1feebdb
+	github.com/atomix/multi-raft-storage/driver v0.0.0-20220729004735-7ef100a1d8b2
+	github.com/atomix/multi-raft-storage/node v0.0.0-20220729012051-c60720d92bed
 	github.com/atomix/runtime/api v0.0.0-20220720013020-6146e7ecb7cb
-	github.com/atomix/runtime/proxy v0.0.0-20220720081131-4fb67c7ede1a
-	github.com/atomix/runtime/sdk v0.0.0-20220720203722-fe3ff64774df
+	github.com/atomix/runtime/proxy v0.0.0-20220727083205-3cca95915d8b
+	github.com/atomix/runtime/sdk v0.0.0-20220727083205-3cca95915d8b
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.1.2
@@ -16,16 +16,6 @@ require (
 	google.golang.org/grpc v1.46.0
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
-
-replace github.com/atomix/multi-raft-storage/api => ../../storage/multi-raft-storage/api
-
-replace github.com/atomix/multi-raft-storage/driver => ../../storage/multi-raft-storage/driver
-
-replace github.com/atomix/multi-raft-storage/node => ../../storage/multi-raft-storage/node
-
-replace github.com/atomix/runtime/sdk => ../../runtime/sdk
-
-replace github.com/atomix/runtime/proxy => ../../runtime/proxy
 
 require (
 	github.com/VictoriaMetrics/metrics v1.6.2 // indirect
