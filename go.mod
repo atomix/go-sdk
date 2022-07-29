@@ -3,7 +3,7 @@ module github.com/atomix/go-client
 go 1.18
 
 require (
-	github.com/atomix/multi-raft-storage/api v0.0.0-20220726005808-71a3e7ee2854
+	github.com/atomix/multi-raft-storage/api v0.0.0-20220728201523-7dcf2d5be56a
 	github.com/atomix/multi-raft-storage/driver v0.0.0-20220720082719-024ea1feebdb
 	github.com/atomix/multi-raft-storage/node v0.0.0-20220720082719-024ea1feebdb
 	github.com/atomix/runtime/api v0.0.0-20220720013020-6146e7ecb7cb
@@ -16,6 +16,8 @@ require (
 	google.golang.org/grpc v1.46.0
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
+
+replace github.com/atomix/multi-raft-storage/api => ../../storage/multi-raft-storage/api
 
 replace github.com/atomix/multi-raft-storage/driver => ../../storage/multi-raft-storage/driver
 

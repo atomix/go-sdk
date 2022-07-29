@@ -9,6 +9,7 @@ import (
 	"fmt"
 	multiraftv1 "github.com/atomix/multi-raft-storage/api/atomix/multiraft/v1"
 	"github.com/atomix/multi-raft-storage/driver"
+	"github.com/atomix/multi-raft-storage/node/pkg/node"
 	proxyv1 "github.com/atomix/runtime/api/atomix/proxy/v1"
 	"github.com/atomix/runtime/proxy/pkg/proxy"
 	"github.com/atomix/runtime/sdk/pkg/errors"
@@ -21,48 +22,71 @@ import (
 	"os"
 )
 
-func NewCluster(replicas int, partitions int) *Cluster {
-	config := getClusterConfig(replicas, partitions)
+func NewCluster() *Cluster {
 	network := proxy.NewLocalNetwork()
 	return &Cluster{
-		types:   []runtime.Type{counterv1.Type, mapv1.Type},
 		network: network,
+		types:   []runtime.Type{counterv1.Type, mapv1.Type},
 		port:    5000,
-		config:  config,
 	}
 }
 
 type Cluster struct {
-	types   []runtime.Type
 	network proxy.Network
+	node    *node.MultiRaftNode
+	types   []runtime.Type
 	proxies []*proxy.Proxy
-	config  multiraftv1.ClusterConfig
-	nodes   map[multiraftv1.NodeID]*Node
 	port    int
 }
 
-func (c *Cluster) Nodes() []*Node {
-	nodes := make([]*Node, 0, len(c.nodes))
-	for _, node := range c.nodes {
-		nodes = append(nodes, node)
-	}
-	return nodes
+func (c *Cluster) nextPort() int {
+	c.port++
+	return c.port
 }
 
 func (c *Cluster) start() error {
-	if err := os.RemoveAll("test-data"); err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	if c.nodes != nil {
+	if c.node != nil {
 		return nil
 	}
-	c.nodes = make(map[multiraftv1.NodeID]*Node)
-	for _, replica := range c.config.Replicas {
-		node := newNode(c, replica.NodeID)
-		if err := node.Start(); err != nil {
-			return err
-		}
-		c.nodes[node.id] = node
+
+	c.node = node.New(c.network,
+		node.WithHost("localhost"),
+		node.WithPort(5680),
+		node.WithConfig(multiraftv1.NodeConfig{
+			Host: "localhost",
+			Port: 5690,
+			MultiRaftConfig: multiraftv1.MultiRaftConfig{
+				DataDir: "test-data",
+			},
+		}))
+	if err := c.node.Start(); err != nil {
+		return err
+	}
+
+	conn, err := c.connect(context.Background(), fmt.Sprintf("%s:%d", c.node.Host, c.node.Port))
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	client := multiraftv1.NewNodeClient(conn)
+	request := &multiraftv1.BootstrapRequest{
+		Group: multiraftv1.GroupConfig{
+			GroupID:  1,
+			MemberID: 1,
+			Role:     multiraftv1.MemberRole_MEMBER,
+			Members: []multiraftv1.MemberConfig{
+				{
+					MemberID: 1,
+					Host:     "localhost",
+					Port:     5690,
+				},
+			},
+		},
+	}
+	_, err = client.Bootstrap(context.Background(), request)
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -112,8 +136,17 @@ func (c *Cluster) Connect(ctx context.Context) (*grpc.ClientConn, error) {
 
 	client := proxyv1.NewProxyClient(conn)
 
+	config := multiraftv1.DriverConfig{
+		Partitions: []multiraftv1.PartitionConfig{
+			{
+				PartitionID: 1,
+				Leader:      "localhost:5680",
+			},
+		},
+	}
+
 	marshaller := &jsonpb.Marshaler{}
-	data, err := marshaller.MarshalToString(&c.config)
+	data, err := marshaller.MarshalToString(&config)
 	if err != nil {
 		return nil, err
 	}
@@ -149,35 +182,6 @@ func (c *Cluster) Cleanup() {
 	for _, proxy := range c.proxies {
 		_ = proxy.Stop()
 	}
-	for _, node := range c.nodes {
-		_ = node.Stop()
-	}
+	_ = c.node.Stop()
 	_ = os.RemoveAll("test-data")
-}
-
-func getClusterConfig(numReplicas, numPartitions int) multiraftv1.ClusterConfig {
-	var config multiraftv1.ClusterConfig
-	for i := 1; i <= numReplicas; i++ {
-		config.Replicas = append(config.Replicas, multiraftv1.ReplicaConfig{
-			NodeID:   multiraftv1.NodeID(i),
-			Host:     "localhost",
-			ApiPort:  5680 + int32(i),
-			RaftPort: 5690 + int32(i),
-		})
-	}
-	for i := 1; i <= numPartitions; i++ {
-		var members []multiraftv1.MemberConfig
-		for j := 1; j <= numReplicas; j++ {
-			members = append(members, multiraftv1.MemberConfig{
-				NodeID: multiraftv1.NodeID(j),
-			})
-		}
-		config.Partitions = append(config.Partitions, multiraftv1.PartitionConfig{
-			PartitionID: multiraftv1.PartitionID(i),
-			Host:        "localhost",
-			Port:        5681,
-			Members:     members,
-		})
-	}
-	return config
 }

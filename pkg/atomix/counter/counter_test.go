@@ -17,7 +17,7 @@ import (
 func TestCounterOperations(t *testing.T) {
 	logging.SetLevel(logging.DebugLevel)
 
-	cluster := test.NewCluster(3, 3)
+	cluster := test.NewCluster()
 	defer cluster.Cleanup()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)

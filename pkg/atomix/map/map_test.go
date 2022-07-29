@@ -19,7 +19,7 @@ import (
 func TestMapOperations(t *testing.T) {
 	logging.SetLevel(logging.DebugLevel)
 
-	cluster := test.NewCluster(3, 3)
+	cluster := test.NewCluster()
 	defer cluster.Cleanup()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -136,7 +136,7 @@ func TestMapOperations(t *testing.T) {
 func TestMapStreams(t *testing.T) {
 	logging.SetLevel(logging.DebugLevel)
 
-	cluster := test.NewCluster(3, 3)
+	cluster := test.NewCluster()
 	defer cluster.Cleanup()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
