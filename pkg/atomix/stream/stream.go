@@ -26,9 +26,10 @@ type channelStream[T any] struct {
 }
 
 func (s *channelStream[T]) Next() (T, error) {
+	var t T
 	result, ok := <-s.ch
 	if !ok {
-		return nil, io.EOF
+		return t, io.EOF
 	}
 	return result.Value, result.Error
 }

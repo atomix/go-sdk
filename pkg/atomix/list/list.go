@@ -58,7 +58,7 @@ type List[E any] interface {
 	// Events watches the set for change events
 	// This is a non-blocking method. If the method returns without error, set events will be pushed onto
 	// the given channel in the order in which they occur.
-	Events(ctx context.Context) (EventStream[E], error)
+	Events(ctx context.Context, opts ...EventsOption) (EventStream[E], error)
 }
 
 type ItemStream[E any] stream.Stream[E]
@@ -102,7 +102,7 @@ type listPrimitive[E any] struct {
 }
 
 func (l *listPrimitive[E]) Append(ctx context.Context, value E) error {
-	bytes, err := l.codec.Encode(&value)
+	bytes, err := l.codec.Encode(value)
 	if err != nil {
 		return errors.NewInvalid("value encoding failed", err)
 	}
@@ -122,7 +122,7 @@ func (l *listPrimitive[E]) Append(ctx context.Context, value E) error {
 }
 
 func (l *listPrimitive[E]) Insert(ctx context.Context, index int, value E) error {
-	bytes, err := l.codec.Encode(&value)
+	bytes, err := l.codec.Encode(value)
 	if err != nil {
 		return errors.NewInvalid("value encoding failed", err)
 	}
@@ -143,7 +143,7 @@ func (l *listPrimitive[E]) Insert(ctx context.Context, index int, value E) error
 }
 
 func (l *listPrimitive[E]) Set(ctx context.Context, index int, value E) error {
-	bytes, err := l.codec.Encode(&value)
+	bytes, err := l.codec.Encode(value)
 	if err != nil {
 		return errors.NewInvalid("value encoding failed", err)
 	}

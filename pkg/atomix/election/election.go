@@ -44,7 +44,7 @@ type Election interface {
 	Evict(ctx context.Context, id string) (*Term, error)
 
 	// Watch watches the election for changes
-	Watch(ctx context.Context, ch chan<- *Term) error
+	Watch(ctx context.Context) (TermStream, error)
 }
 
 type TermStream stream.Stream[*Term]

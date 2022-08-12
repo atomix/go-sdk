@@ -91,7 +91,7 @@ type setPrimitive[E any] struct {
 }
 
 func (s *setPrimitive[E]) Add(ctx context.Context, value E) (bool, error) {
-	bytes, err := s.codec.Encode(&value)
+	bytes, err := s.codec.Encode(value)
 	if err != nil {
 		return false, errors.NewInvalid("value encoding failed", err)
 	}
@@ -115,7 +115,7 @@ func (s *setPrimitive[E]) Add(ctx context.Context, value E) (bool, error) {
 }
 
 func (s *setPrimitive[E]) Remove(ctx context.Context, value E) (bool, error) {
-	bytes, err := s.codec.Encode(&value)
+	bytes, err := s.codec.Encode(value)
 	if err != nil {
 		return false, errors.NewInvalid("value encoding failed", err)
 	}
@@ -139,7 +139,7 @@ func (s *setPrimitive[E]) Remove(ctx context.Context, value E) (bool, error) {
 }
 
 func (s *setPrimitive[E]) Contains(ctx context.Context, value E) (bool, error) {
-	bytes, err := s.codec.Encode(&value)
+	bytes, err := s.codec.Encode(value)
 	if err != nil {
 		return false, errors.NewInvalid("value encoding failed", err)
 	}

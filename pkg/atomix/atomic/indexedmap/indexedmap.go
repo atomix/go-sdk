@@ -158,7 +158,7 @@ type indexedMapPrimitive[K scalar.Scalar, V any] struct {
 }
 
 func (m *indexedMapPrimitive[K, V]) Append(ctx context.Context, key K, value V) (*Entry[K, V], error) {
-	valueBytes, err := m.valueCodec.Encode(&value)
+	valueBytes, err := m.valueCodec.Encode(value)
 	if err != nil {
 		return nil, errors.NewInvalid("value encoding failed", err)
 	}
@@ -177,7 +177,7 @@ func (m *indexedMapPrimitive[K, V]) Append(ctx context.Context, key K, value V) 
 }
 
 func (m *indexedMapPrimitive[K, V]) Update(ctx context.Context, key K, value V, opts ...UpdateOption) (*Entry[K, V], error) {
-	valueBytes, err := m.valueCodec.Encode(&value)
+	valueBytes, err := m.valueCodec.Encode(value)
 	if err != nil {
 		return nil, errors.NewInvalid("value encoding failed", err)
 	}

@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-type Builder[B Builder[B, T], T Primitive] interface {
+type Builder[B any, T Primitive] interface {
 	Tag(key, value string) B
 	Tags(tags map[string]string) B
 	Get(ctx context.Context) (T, error)

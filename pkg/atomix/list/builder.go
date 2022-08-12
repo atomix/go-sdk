@@ -45,7 +45,7 @@ func (b *Builder[E]) Get(ctx context.Context) (List[E], error) {
 		return nil, err
 	}
 	if b.codec == nil {
-		panic("no codec set for set primitive")
+		panic("no codec set for list primitive")
 	}
 	set := &listPrimitive[E]{
 		Primitive: primitive.New(b.options.Name),

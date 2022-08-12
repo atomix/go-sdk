@@ -110,7 +110,7 @@ type mapPrimitive[K scalar.Scalar, V any] struct {
 }
 
 func (m *mapPrimitive[K, V]) Put(ctx context.Context, key K, value V, opts ...PutOption) error {
-	valueBytes, err := m.valueCodec.Encode(&value)
+	valueBytes, err := m.valueCodec.Encode(value)
 	if err != nil {
 		return errors.NewInvalid("value encoding failed", err)
 	}
@@ -146,9 +146,10 @@ func (m *mapPrimitive[K, V]) Get(ctx context.Context, key K, opts ...GetOption) 
 	for i := range opts {
 		opts[i].beforeGet(request)
 	}
+	var v V
 	response, err := m.client.Get(ctx, request)
 	if err != nil {
-		return nil, errors.FromProto(err)
+		return v, errors.FromProto(err)
 	}
 	for i := range opts {
 		opts[i].afterGet(response)

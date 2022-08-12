@@ -122,7 +122,7 @@ type atomicMapPrimitive[K scalar.Scalar, V any] struct {
 }
 
 func (m *atomicMapPrimitive[K, V]) Put(ctx context.Context, key K, value V, opts ...PutOption) (*Entry[K, V], error) {
-	valueBytes, err := m.valueCodec.Encode(&value)
+	valueBytes, err := m.valueCodec.Encode(value)
 	if err != nil {
 		return nil, errors.NewInvalid("value encoding failed", err)
 	}
@@ -151,7 +151,7 @@ func (m *atomicMapPrimitive[K, V]) Put(ctx context.Context, key K, value V, opts
 }
 
 func (m *atomicMapPrimitive[K, V]) Insert(ctx context.Context, key K, value V, opts ...InsertOption) (*Entry[K, V], error) {
-	valueBytes, err := m.valueCodec.Encode(&value)
+	valueBytes, err := m.valueCodec.Encode(value)
 	if err != nil {
 		return nil, errors.NewInvalid("value encoding failed", err)
 	}
@@ -180,7 +180,7 @@ func (m *atomicMapPrimitive[K, V]) Insert(ctx context.Context, key K, value V, o
 }
 
 func (m *atomicMapPrimitive[K, V]) Update(ctx context.Context, key K, value V, opts ...UpdateOption) (*Entry[K, V], error) {
-	valueBytes, err := m.valueCodec.Encode(&value)
+	valueBytes, err := m.valueCodec.Encode(value)
 	if err != nil {
 		return nil, errors.NewInvalid("value encoding failed", err)
 	}
