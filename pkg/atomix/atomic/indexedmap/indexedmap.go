@@ -8,8 +8,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/atomix/go-client/pkg/atomix/generic"
+	"github.com/atomix/go-client/pkg/atomix/generic/scalar"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
-	indexedmapv1 "github.com/atomix/runtime/api/atomix/runtime/indexedmap/v1"
+	"github.com/atomix/go-client/pkg/atomix/stream"
+	indexedmapv1 "github.com/atomix/runtime/api/atomix/runtime/atomic/indexedmap/v1"
 	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
 	"github.com/atomix/runtime/sdk/pkg/errors"
 	"github.com/atomix/runtime/sdk/pkg/logging"
@@ -26,7 +28,7 @@ type Index uint64
 type Version uint64
 
 // IndexedMap is a distributed linked map
-type IndexedMap[K, V any] interface {
+type IndexedMap[K scalar.Scalar, V any] interface {
 	primitive.Primitive
 
 	// Append appends the given key/value to the map
@@ -77,19 +79,28 @@ type IndexedMap[K, V any] interface {
 	// Clear removes all entries from the map
 	Clear(ctx context.Context) error
 
-	// Entries lists the entries in the map
+	// List lists the entries in the map
 	// This is a non-blocking method. If the method returns without error, key/value paids will be pushed on to the
 	// given channel and the channel will be closed once all entries have been read from the map.
-	Entries(ctx context.Context, ch chan<- Entry[K, V]) error
+	List(ctx context.Context) (EntryStream[K, V], error)
 
 	// Watch watches the map for changes
 	// This is a non-blocking method. If the method returns without error, map events will be pushed onto
 	// the given channel in the order in which they occur.
-	Watch(ctx context.Context, ch chan<- Event[K, V], opts ...WatchOption) error
+	Watch(ctx context.Context) (EntryStream[K, V], error)
+
+	// Events watches the map for change events
+	// This is a non-blocking method. If the method returns without error, map events will be pushed onto
+	// the given channel in the order in which they occur.
+	Events(ctx context.Context, opts ...EventsOption) (EventStream[K, V], error)
 }
 
+type EntryStream[K scalar.Scalar, V any] stream.Stream[*Entry[K, V]]
+
+type EventStream[K scalar.Scalar, V any] stream.Stream[Event[K, V]]
+
 // Entry is an indexed key/value pair
-type Entry[K, V any] struct {
+type Entry[K scalar.Scalar, V any] struct {
 	// Index is the unique, monotonically increasing, globally unique index of the entry. The index is static
 	// for the lifetime of a key.
 	Index Index
@@ -104,121 +115,78 @@ type Entry[K, V any] struct {
 	Timestamp time.Timestamp
 }
 
-func (kv Entry[K, V]) String() string {
+func (kv *Entry[K, V]) String() string {
 	return fmt.Sprintf("key: %v\nvalue: %v", kv.Key, kv.Value)
 }
 
-// EventType is the type of a map event
-type EventType string
-
-const (
-	// EventInsert indicates a key was newly created in the map
-	EventInsert EventType = "insert"
-
-	// EventUpdate indicates the value of an existing key was changed
-	EventUpdate EventType = "update"
-
-	// EventRemove indicates a key was removed from the map
-	EventRemove EventType = "remove"
-
-	// EventReplay indicates an entry was replayed
-	EventReplay EventType = "replay"
-)
-
 // Event is a map change event
-type Event[K, V any] struct {
-	// Type indicates the change event type
-	Type EventType
-
-	// Entry is the event entry
-	Entry Entry[K, V]
+type Event[K scalar.Scalar, V any] interface {
+	event() *indexedmapv1.Event
 }
 
-func New[K, V any](client indexedmapv1.IndexedMapClient) func(context.Context, string, ...Option[K, V]) (IndexedMap[K, V], error) {
-	return func(ctx context.Context, name string, opts ...Option[K, V]) (IndexedMap[K, V], error) {
-		var options Options[K, V]
-		options.Apply(opts...)
-		if options.KeyType == nil {
-			stringType := generic.String()
-			if keyType, ok := stringType.(generic.Type[K]); ok {
-				options.KeyType = keyType
-			} else {
-				return nil, errors.NewInvalid("must configure a generic type for key parameter")
-			}
-		}
-		if options.ValueType == nil {
-			jsonType := generic.JSON[V]()
-			if valueType, ok := jsonType.(generic.Type[V]); ok {
-				options.ValueType = valueType
-			} else {
-				return nil, errors.NewInvalid("must configure a generic type for value parameter")
-			}
-		}
-		indexedMap := &indexedMapPrimitive[K, V]{
-			Primitive: primitive.New(name),
-			client:    client,
-			keyType:   options.KeyType,
-			valueType: options.ValueType,
-		}
-		if err := indexedMap.create(ctx, options.Tags); err != nil {
-			return nil, err
-		}
-		return indexedMap, nil
-	}
+type grpcEvent struct {
+	proto *indexedmapv1.Event
+}
+
+func (e *grpcEvent) event() *indexedmapv1.Event {
+	return e.proto
+}
+
+type Inserted[K scalar.Scalar, V any] struct {
+	*grpcEvent
+	Entry *Entry[K, V]
+}
+
+type Updated[K scalar.Scalar, V any] struct {
+	*grpcEvent
+	NewEntry *Entry[K, V]
+	OldEntry *Entry[K, V]
+}
+
+type Removed[K scalar.Scalar, V any] struct {
+	*grpcEvent
+	Entry *Entry[K, V]
 }
 
 // indexedMapPrimitive is the default single-partition implementation of Map
-type indexedMapPrimitive[K, V any] struct {
+type indexedMapPrimitive[K scalar.Scalar, V any] struct {
 	primitive.Primitive
-	client    indexedmapv1.IndexedMapClient
-	keyType   generic.Type[K]
-	valueType generic.Type[V]
+	client     indexedmapv1.AtomicIndexedMapClient
+	keyEncoder func(K) string
+	keyDecoder func(string) (K, error)
+	valueCodec generic.Codec[V]
 }
 
 func (m *indexedMapPrimitive[K, V]) Append(ctx context.Context, key K, value V) (*Entry[K, V], error) {
-	keyBytes, err := m.keyType.Marshal(&key)
-	if err != nil {
-		return nil, errors.NewInvalid("key encoding failed", err)
-	}
-	valueBytes, err := m.valueType.Marshal(&value)
+	valueBytes, err := m.valueCodec.Encode(&value)
 	if err != nil {
 		return nil, errors.NewInvalid("value encoding failed", err)
 	}
-
 	request := &indexedmapv1.AppendRequest{
 		ID: runtimev1.PrimitiveId{
 			Name: m.Name(),
 		},
-		Key: string(keyBytes),
-		Value: &indexedmapv1.Value{
-			Value: valueBytes,
-		},
+		Key:   m.keyEncoder(key),
+		Value: valueBytes,
 	}
 	response, err := m.client.Append(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
 	}
-	return m.newEntry(response.Entry)
+	return m.decodeEntry(response.Entry)
 }
 
 func (m *indexedMapPrimitive[K, V]) Update(ctx context.Context, key K, value V, opts ...UpdateOption) (*Entry[K, V], error) {
-	keyBytes, err := m.keyType.Marshal(&key)
-	if err != nil {
-		return nil, errors.NewInvalid("key encoding failed", err)
-	}
-	valueBytes, err := m.valueType.Marshal(&value)
+	valueBytes, err := m.valueCodec.Encode(&value)
 	if err != nil {
 		return nil, errors.NewInvalid("value encoding failed", err)
 	}
-
 	request := &indexedmapv1.UpdateRequest{
 		ID: runtimev1.PrimitiveId{
 			Name: m.Name(),
 		},
-		Key: string(keyBytes),
-		Value: &indexedmapv1.Value{
-			Value: valueBytes,
-		},
+		Key:   m.keyEncoder(key),
+		Value: valueBytes,
 	}
 	for i := range opts {
 		opts[i].beforeUpdate(request)
@@ -230,19 +198,15 @@ func (m *indexedMapPrimitive[K, V]) Update(ctx context.Context, key K, value V, 
 	for i := range opts {
 		opts[i].afterUpdate(response)
 	}
-	return m.newEntry(response.Entry)
+	return m.decodeEntry(response.Entry)
 }
 
 func (m *indexedMapPrimitive[K, V]) Get(ctx context.Context, key K, opts ...GetOption) (*Entry[K, V], error) {
-	keyBytes, err := m.keyType.Marshal(&key)
-	if err != nil {
-		return nil, errors.NewInvalid("key encoding failed", err)
-	}
 	request := &indexedmapv1.GetRequest{
 		ID: runtimev1.PrimitiveId{
 			Name: m.Name(),
 		},
-		Key: string(keyBytes),
+		Key: m.keyEncoder(key),
 	}
 	for i := range opts {
 		opts[i].beforeGet(request)
@@ -254,7 +218,7 @@ func (m *indexedMapPrimitive[K, V]) Get(ctx context.Context, key K, opts ...GetO
 	for i := range opts {
 		opts[i].afterGet(response)
 	}
-	return m.newEntry(response.Entry)
+	return m.decodeEntry(response.Entry)
 }
 
 func (m *indexedMapPrimitive[K, V]) GetIndex(ctx context.Context, index Index, opts ...GetOption) (*Entry[K, V], error) {
@@ -274,7 +238,7 @@ func (m *indexedMapPrimitive[K, V]) GetIndex(ctx context.Context, index Index, o
 	for i := range opts {
 		opts[i].afterGet(response)
 	}
-	return m.newEntry(response.Entry)
+	return m.decodeEntry(response.Entry)
 }
 
 func (m *indexedMapPrimitive[K, V]) FirstIndex(ctx context.Context) (Index, error) {
@@ -341,7 +305,7 @@ func (m *indexedMapPrimitive[K, V]) FirstEntry(ctx context.Context) (*Entry[K, V
 	if err != nil {
 		return nil, errors.FromProto(err)
 	}
-	return m.newEntry(response.Entry)
+	return m.decodeEntry(response.Entry)
 }
 
 func (m *indexedMapPrimitive[K, V]) LastEntry(ctx context.Context) (*Entry[K, V], error) {
@@ -354,7 +318,7 @@ func (m *indexedMapPrimitive[K, V]) LastEntry(ctx context.Context) (*Entry[K, V]
 	if err != nil {
 		return nil, errors.FromProto(err)
 	}
-	return m.newEntry(response.Entry)
+	return m.decodeEntry(response.Entry)
 }
 
 func (m *indexedMapPrimitive[K, V]) PrevEntry(ctx context.Context, index Index) (*Entry[K, V], error) {
@@ -368,7 +332,7 @@ func (m *indexedMapPrimitive[K, V]) PrevEntry(ctx context.Context, index Index) 
 	if err != nil {
 		return nil, errors.FromProto(err)
 	}
-	return m.newEntry(response.Entry)
+	return m.decodeEntry(response.Entry)
 }
 
 func (m *indexedMapPrimitive[K, V]) NextEntry(ctx context.Context, index Index) (*Entry[K, V], error) {
@@ -382,20 +346,15 @@ func (m *indexedMapPrimitive[K, V]) NextEntry(ctx context.Context, index Index) 
 	if err != nil {
 		return nil, errors.FromProto(err)
 	}
-	return m.newEntry(response.Entry)
+	return m.decodeEntry(response.Entry)
 }
 
 func (m *indexedMapPrimitive[K, V]) Remove(ctx context.Context, key K, opts ...RemoveOption) (*Entry[K, V], error) {
-	keyBytes, err := m.keyType.Marshal(&key)
-	if err != nil {
-		return nil, errors.NewInvalid("key encoding failed", err)
-	}
-
 	request := &indexedmapv1.RemoveRequest{
 		ID: runtimev1.PrimitiveId{
 			Name: m.Name(),
 		},
-		Key: string(keyBytes),
+		Key: m.keyEncoder(key),
 	}
 	for i := range opts {
 		opts[i].beforeRemove(request)
@@ -407,7 +366,7 @@ func (m *indexedMapPrimitive[K, V]) Remove(ctx context.Context, key K, opts ...R
 	for i := range opts {
 		opts[i].afterRemove(response)
 	}
-	return m.newEntry(response.Entry)
+	return m.decodeEntry(response.Entry)
 }
 
 func (m *indexedMapPrimitive[K, V]) RemoveIndex(ctx context.Context, index Index, opts ...RemoveOption) (*Entry[K, V], error) {
@@ -427,7 +386,7 @@ func (m *indexedMapPrimitive[K, V]) RemoveIndex(ctx context.Context, index Index
 	for i := range opts {
 		opts[i].afterRemove(response)
 	}
-	return m.newEntry(response.Entry)
+	return m.decodeEntry(response.Entry)
 }
 
 func (m *indexedMapPrimitive[K, V]) Len(ctx context.Context) (int, error) {
@@ -456,21 +415,31 @@ func (m *indexedMapPrimitive[K, V]) Clear(ctx context.Context) error {
 	return nil
 }
 
-func (m *indexedMapPrimitive[K, V]) Entries(ctx context.Context, ch chan<- Entry[K, V]) error {
+func (m *indexedMapPrimitive[K, V]) List(ctx context.Context) (EntryStream[K, V], error) {
+	return m.entries(ctx, false)
+}
+
+func (m *indexedMapPrimitive[K, V]) Watch(ctx context.Context) (EntryStream[K, V], error) {
+	return m.entries(ctx, true)
+}
+
+func (m *indexedMapPrimitive[K, V]) entries(ctx context.Context, watch bool) (EntryStream[K, V], error) {
 	request := &indexedmapv1.EntriesRequest{
 		ID: runtimev1.PrimitiveId{
 			Name: m.Name(),
 		},
+		Watch: watch,
 	}
-	stream, err := m.client.Entries(ctx, request)
+	client, err := m.client.Entries(ctx, request)
 	if err != nil {
-		return errors.FromProto(err)
+		return nil, errors.FromProto(err)
 	}
 
+	ch := make(chan stream.Result[*Entry[K, V]])
 	go func() {
 		defer close(ch)
 		for {
-			response, err := stream.Recv()
+			response, err := client.Recv()
 			if err != nil {
 				if err == io.EOF {
 					return
@@ -482,33 +451,35 @@ func (m *indexedMapPrimitive[K, V]) Entries(ctx context.Context, ch chan<- Entry
 				log.Errorf("Entries failed: %v", err)
 				return
 			}
-
-			entry, err := m.newEntry(&response.Entry)
+			entry, err := m.decodeEntry(&response.Entry)
 			if err != nil {
 				log.Error(err)
 			} else {
-				ch <- *entry
+				ch <- stream.Result[*Entry[K, V]]{
+					Value: entry,
+				}
 			}
 		}
 	}()
-	return nil
+	return stream.NewChannelStream[*Entry[K, V]](ch), nil
 }
 
-func (m *indexedMapPrimitive[K, V]) Watch(ctx context.Context, ch chan<- Event[K, V], opts ...WatchOption) error {
+func (m *indexedMapPrimitive[K, V]) Events(ctx context.Context, opts ...EventsOption) (EventStream[K, V], error) {
 	request := &indexedmapv1.EventsRequest{
 		ID: runtimev1.PrimitiveId{
 			Name: m.Name(),
 		},
 	}
 	for i := range opts {
-		opts[i].beforeWatch(request)
+		opts[i].beforeEvents(request)
 	}
 
-	stream, err := m.client.Events(ctx, request)
+	client, err := m.client.Events(ctx, request)
 	if err != nil {
-		return errors.FromProto(err)
+		return nil, errors.FromProto(err)
 	}
 
+	ch := make(chan stream.Result[Event[K, V]])
 	openCh := make(chan struct{})
 	go func() {
 		defer close(ch)
@@ -519,7 +490,7 @@ func (m *indexedMapPrimitive[K, V]) Watch(ctx context.Context, ch chan<- Event[K
 			}
 		}()
 		for {
-			response, err := stream.Recv()
+			response, err := client.Recv()
 			if err != nil {
 				if err == io.EOF {
 					return
@@ -537,40 +508,55 @@ func (m *indexedMapPrimitive[K, V]) Watch(ctx context.Context, ch chan<- Event[K
 				open = true
 			}
 
-			if response.Event.Type == indexedmapv1.Event_NONE {
-				continue
-			}
-
 			for i := range opts {
-				opts[i].afterWatch(response)
+				opts[i].afterEvents(response)
 			}
 
-			entry, err := m.newEntry(&response.Event.Entry)
-			if err != nil {
-				log.Error(err)
-				continue
-			}
+			switch e := response.Event.Event.(type) {
+			case *indexedmapv1.Event_Inserted_:
+				entry, err := m.decodeKeyValue(response.Event.Key, response.Event.Index, &e.Inserted.Value)
+				if err != nil {
+					log.Error(err)
+					continue
+				}
 
-			switch response.Event.Type {
-			case indexedmapv1.Event_INSERT:
-				ch <- Event[K, V]{
-					Type:  EventInsert,
-					Entry: *entry,
+				ch <- stream.Result[Event[K, V]]{
+					Value: &Inserted[K, V]{
+						grpcEvent: &grpcEvent{&response.Event},
+						Entry:     entry,
+					},
 				}
-			case indexedmapv1.Event_UPDATE:
-				ch <- Event[K, V]{
-					Type:  EventUpdate,
-					Entry: *entry,
+			case *indexedmapv1.Event_Updated_:
+				newEntry, err := m.decodeKeyValue(response.Event.Key, response.Event.Index, &e.Updated.NewValue)
+				if err != nil {
+					log.Error(err)
+					continue
 				}
-			case indexedmapv1.Event_REMOVE:
-				ch <- Event[K, V]{
-					Type:  EventRemove,
-					Entry: *entry,
+				oldEntry, err := m.decodeKeyValue(response.Event.Key, response.Event.Index, &e.Updated.PrevValue)
+				if err != nil {
+					log.Error(err)
+					continue
 				}
-			case indexedmapv1.Event_REPLAY:
-				ch <- Event[K, V]{
-					Type:  EventReplay,
-					Entry: *entry,
+
+				ch <- stream.Result[Event[K, V]]{
+					Value: &Updated[K, V]{
+						grpcEvent: &grpcEvent{&response.Event},
+						NewEntry:  newEntry,
+						OldEntry:  oldEntry,
+					},
+				}
+			case *indexedmapv1.Event_Removed_:
+				entry, err := m.decodeKeyValue(response.Event.Key, response.Event.Index, &e.Removed.Value)
+				if err != nil {
+					log.Error(err)
+					continue
+				}
+
+				ch <- stream.Result[Event[K, V]]{
+					Value: &Removed[K, V]{
+						grpcEvent: &grpcEvent{&response.Event},
+						Entry:     entry,
+					},
 				}
 			}
 		}
@@ -578,30 +564,37 @@ func (m *indexedMapPrimitive[K, V]) Watch(ctx context.Context, ch chan<- Event[K
 
 	select {
 	case <-openCh:
-		return nil
+		return stream.NewChannelStream[Event[K, V]](ch), nil
 	case <-ctx.Done():
-		return ctx.Err()
+		return nil, ctx.Err()
 	}
 }
 
-func (m *indexedMapPrimitive[K, V]) newEntry(entry *indexedmapv1.Entry) (*Entry[K, V], error) {
-	if entry == nil {
+func (m *indexedMapPrimitive[K, V]) decodeValue(key K, index Index, value *indexedmapv1.Value) (*Entry[K, V], error) {
+	if value == nil {
 		return nil, nil
 	}
-	var key K
-	if err := m.keyType.Unmarshal([]byte(entry.Key), &key); err != nil {
-		return nil, errors.NewInvalid("key decoding failed", err)
-	}
-	var value V
-	if err := m.valueType.Unmarshal(entry.Value.Value, &value); err != nil {
+	decodedValue, err := m.valueCodec.Decode(value.Value)
+	if err != nil {
 		return nil, errors.NewInvalid("value decoding failed", err)
 	}
 	return &Entry[K, V]{
-		Index:     Index(entry.Index),
-		Key:       key,
-		Value:     value,
-		Timestamp: time.NewTimestamp(*entry.Timestamp),
+		Key:   key,
+		Index: index,
+		Value: decodedValue,
 	}, nil
+}
+
+func (m *indexedMapPrimitive[K, V]) decodeKeyValue(key string, index uint64, value *indexedmapv1.Value) (*Entry[K, V], error) {
+	decodedKey, err := m.keyDecoder(key)
+	if err != nil {
+		return nil, errors.NewInvalid("key decoding failed", err)
+	}
+	return m.decodeValue(decodedKey, Index(index), value)
+}
+
+func (m *indexedMapPrimitive[K, V]) decodeEntry(entry *indexedmapv1.Entry) (*Entry[K, V], error) {
+	return m.decodeKeyValue(entry.Key, entry.Index, entry.Value)
 }
 
 func (m *indexedMapPrimitive[K, V]) create(ctx context.Context, tags map[string]string) error {

@@ -20,9 +20,9 @@ type Options struct {
 	CandidateID string
 }
 
-func (o Options) Apply(opts ...Option) {
+func (o *Options) Apply(opts ...Option) {
 	for _, opt := range opts {
-		opt.apply(&o)
+		opt.apply(o)
 	}
 	if o.CandidateID == "" {
 		o.CandidateID = uuid.New().String()

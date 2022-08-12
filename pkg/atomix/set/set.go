@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"github.com/atomix/go-client/pkg/atomix/generic"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
+	"github.com/atomix/go-client/pkg/atomix/stream"
 	setv1 "github.com/atomix/runtime/api/atomix/runtime/set/v1"
 	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
 	"github.com/atomix/runtime/sdk/pkg/errors"
@@ -41,71 +42,58 @@ type Set[E any] interface {
 	Clear(ctx context.Context) error
 
 	// Elements lists the elements in the set
-	Elements(ctx context.Context, ch chan<- E) error
+	// This is a non-blocking method. If the method returns without error, key/value paids will be pushed on to the
+	// given channel and the channel will be closed once all elements have been read from the set.
+	Elements(ctx context.Context) (ElementStream[E], error)
 
 	// Watch watches the set for changes
 	// This is a non-blocking method. If the method returns without error, set events will be pushed onto
-	// the given channel.
-	Watch(ctx context.Context, ch chan<- Event[E], opts ...WatchOption) error
+	// the given channel in the order in which they occur.
+	Watch(ctx context.Context) (ElementStream[E], error)
+
+	// Events watches the set for change events
+	// This is a non-blocking method. If the method returns without error, set events will be pushed onto
+	// the given channel in the order in which they occur.
+	Events(ctx context.Context) (EventStream[E], error)
 }
 
-// EventType is the type of a set event
-type EventType string
+type ElementStream[E any] stream.Stream[E]
 
-const (
-	// EventAdd indicates a value was added to the set
-	EventAdd EventType = "add"
-
-	// EventRemove indicates a value was removed from the set
-	EventRemove EventType = "remove"
-
-	// EventReplay indicates a value was replayed
-	EventReplay EventType = "replay"
-)
+type EventStream[E any] stream.Stream[Event[E]]
 
 // Event is a set change event
-type Event[E any] struct {
-	// Type is the change event type
-	Type EventType
-
-	// Value is the value that changed
-	Value E
+type Event[E any] interface {
+	event() *setv1.Event
 }
 
-func New[E any](client setv1.SetClient) func(context.Context, string, ...Option[E]) (Set[E], error) {
-	return func(ctx context.Context, name string, opts ...Option[E]) (Set[E], error) {
-		var options Options[E]
-		options.Apply(opts...)
-		if options.ElementType == nil {
-			stringType := generic.Bytes()
-			if elementType, ok := stringType.(generic.Type[E]); ok {
-				options.ElementType = elementType
-			} else {
-				return nil, errors.NewInvalid("must configure a generic type for element parameter")
-			}
-		}
-		indexedMap := &setPrimitive[E]{
-			Primitive:   primitive.New(name),
-			client:      client,
-			elementType: options.ElementType,
-		}
-		if err := indexedMap.create(ctx, options.Tags); err != nil {
-			return nil, err
-		}
-		return indexedMap, nil
-	}
+type grpcEvent struct {
+	proto *setv1.Event
+}
+
+func (e *grpcEvent) event() *setv1.Event {
+	return e.proto
+}
+
+type Added[E any] struct {
+	*grpcEvent
+	Element E
+}
+
+type Removed[E any] struct {
+	*grpcEvent
+	Element E
 }
 
 type setPrimitive[E any] struct {
 	primitive.Primitive
-	client      setv1.SetClient
-	elementType generic.Type[E]
+	client setv1.SetClient
+	codec  generic.Codec[E]
 }
 
 func (s *setPrimitive[E]) Add(ctx context.Context, value E) (bool, error) {
-	bytes, err := s.elementType.Marshal(&value)
+	bytes, err := s.codec.Encode(&value)
 	if err != nil {
-		return false, errors.NewInvalid("element encoding failed", err)
+		return false, errors.NewInvalid("value encoding failed", err)
 	}
 	request := &setv1.AddRequest{
 		ID: runtimev1.PrimitiveId{
@@ -127,9 +115,9 @@ func (s *setPrimitive[E]) Add(ctx context.Context, value E) (bool, error) {
 }
 
 func (s *setPrimitive[E]) Remove(ctx context.Context, value E) (bool, error) {
-	bytes, err := s.elementType.Marshal(&value)
+	bytes, err := s.codec.Encode(&value)
 	if err != nil {
-		return false, errors.NewInvalid("element encoding failed", err)
+		return false, errors.NewInvalid("value encoding failed", err)
 	}
 	request := &setv1.RemoveRequest{
 		ID: runtimev1.PrimitiveId{
@@ -151,9 +139,9 @@ func (s *setPrimitive[E]) Remove(ctx context.Context, value E) (bool, error) {
 }
 
 func (s *setPrimitive[E]) Contains(ctx context.Context, value E) (bool, error) {
-	bytes, err := s.elementType.Marshal(&value)
+	bytes, err := s.codec.Encode(&value)
 	if err != nil {
-		return false, errors.NewInvalid("element encoding failed", err)
+		return false, errors.NewInvalid("value encoding failed", err)
 	}
 	request := &setv1.ContainsRequest{
 		ID: runtimev1.PrimitiveId{
@@ -196,21 +184,31 @@ func (s *setPrimitive[E]) Clear(ctx context.Context) error {
 	return nil
 }
 
-func (s *setPrimitive[E]) Elements(ctx context.Context, ch chan<- E) error {
+func (m *setPrimitive[E]) Elements(ctx context.Context) (ElementStream[E], error) {
+	return m.elements(ctx, false)
+}
+
+func (m *setPrimitive[E]) Watch(ctx context.Context) (ElementStream[E], error) {
+	return m.elements(ctx, true)
+}
+
+func (m *setPrimitive[E]) elements(ctx context.Context, watch bool) (ElementStream[E], error) {
 	request := &setv1.ElementsRequest{
 		ID: runtimev1.PrimitiveId{
-			Name: s.Name(),
+			Name: m.Name(),
 		},
+		Watch: watch,
 	}
-	stream, err := s.client.Elements(ctx, request)
+	client, err := m.client.Elements(ctx, request)
 	if err != nil {
-		return errors.FromProto(err)
+		return nil, errors.FromProto(err)
 	}
 
+	ch := make(chan stream.Result[E])
 	go func() {
 		defer close(ch)
 		for {
-			response, err := stream.Recv()
+			response, err := client.Recv()
 			if err != nil {
 				if err == io.EOF {
 					return
@@ -219,41 +217,40 @@ func (s *setPrimitive[E]) Elements(ctx context.Context, ch chan<- E) error {
 				if errors.IsCanceled(err) || errors.IsTimeout(err) {
 					return
 				}
-				log.Errorf("Elements failed: %v", err)
+				log.Errorf("Entries failed: %v", err)
 				return
 			}
-
 			bytes, err := base64.StdEncoding.DecodeString(response.Element.Value)
 			if err != nil {
-				log.Errorf("Failed to decode list item: %v", err)
-			} else {
-				var elem E
-				if err := s.elementType.Unmarshal(bytes, &elem); err != nil {
-					log.Error(err)
-				} else {
-					ch <- elem
-				}
+				log.Error(err)
+				continue
+			}
+			element, err := m.codec.Decode(bytes)
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+			ch <- stream.Result[E]{
+				Value: element,
 			}
 		}
 	}()
-	return nil
+	return stream.NewChannelStream[E](ch), nil
 }
 
-func (s *setPrimitive[E]) Watch(ctx context.Context, ch chan<- Event[E], opts ...WatchOption) error {
+func (m *setPrimitive[E]) Events(ctx context.Context) (EventStream[E], error) {
 	request := &setv1.EventsRequest{
 		ID: runtimev1.PrimitiveId{
-			Name: s.Name(),
+			Name: m.Name(),
 		},
 	}
-	for i := range opts {
-		opts[i].beforeWatch(request)
-	}
 
-	stream, err := s.client.Events(ctx, request)
+	client, err := m.client.Events(ctx, request)
 	if err != nil {
-		return errors.FromProto(err)
+		return nil, errors.FromProto(err)
 	}
 
+	ch := make(chan stream.Result[Event[E]])
 	openCh := make(chan struct{})
 	go func() {
 		defer close(ch)
@@ -264,7 +261,7 @@ func (s *setPrimitive[E]) Watch(ctx context.Context, ch chan<- Event[E], opts ..
 			}
 		}()
 		for {
-			response, err := stream.Recv()
+			response, err := client.Recv()
 			if err != nil {
 				if err == io.EOF {
 					return
@@ -282,40 +279,40 @@ func (s *setPrimitive[E]) Watch(ctx context.Context, ch chan<- Event[E], opts ..
 				open = true
 			}
 
-			if response.Event.Type == setv1.Event_NONE {
-				continue
-			}
-
-			for i := range opts {
-				opts[i].afterWatch(response)
-			}
-
-			bytes, err := base64.StdEncoding.DecodeString(response.Event.Element.Value)
-			if err != nil {
-				log.Errorf("Failed to decode list item: %v", err)
-			} else {
-				var elem E
-				if err := s.elementType.Unmarshal(bytes, &elem); err != nil {
+			switch e := response.Event.Event.(type) {
+			case *setv1.Event_Added_:
+				bytes, err := base64.StdEncoding.DecodeString(e.Added.Element.Value)
+				if err != nil {
 					log.Error(err)
 					continue
 				}
-
-				switch response.Event.Type {
-				case setv1.Event_ADD:
-					ch <- Event[E]{
-						Type:  EventAdd,
-						Value: elem,
-					}
-				case setv1.Event_REMOVE:
-					ch <- Event[E]{
-						Type:  EventRemove,
-						Value: elem,
-					}
-				case setv1.Event_REPLAY:
-					ch <- Event[E]{
-						Type:  EventReplay,
-						Value: elem,
-					}
+				element, err := m.codec.Decode(bytes)
+				if err != nil {
+					log.Error(err)
+					continue
+				}
+				ch <- stream.Result[Event[E]]{
+					Value: &Added[E]{
+						grpcEvent: &grpcEvent{&response.Event},
+						Element:   element,
+					},
+				}
+			case *setv1.Event_Removed_:
+				bytes, err := base64.StdEncoding.DecodeString(e.Removed.Element.Value)
+				if err != nil {
+					log.Error(err)
+					continue
+				}
+				element, err := m.codec.Decode(bytes)
+				if err != nil {
+					log.Error(err)
+					continue
+				}
+				ch <- stream.Result[Event[E]]{
+					Value: &Removed[E]{
+						grpcEvent: &grpcEvent{&response.Event},
+						Element:   element,
+					},
 				}
 			}
 		}
@@ -323,9 +320,9 @@ func (s *setPrimitive[E]) Watch(ctx context.Context, ch chan<- Event[E], opts ..
 
 	select {
 	case <-openCh:
-		return nil
+		return stream.NewChannelStream[Event[E]](ch), nil
 	case <-ctx.Done():
-		return ctx.Err()
+		return nil, ctx.Err()
 	}
 }
 

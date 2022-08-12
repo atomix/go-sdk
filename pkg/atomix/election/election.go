@@ -7,6 +7,7 @@ package election
 import (
 	"context"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
+	"github.com/atomix/go-client/pkg/atomix/stream"
 	electionv1 "github.com/atomix/runtime/api/atomix/runtime/election/v1"
 	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
 	"github.com/atomix/runtime/sdk/pkg/errors"
@@ -43,8 +44,10 @@ type Election interface {
 	Evict(ctx context.Context, id string) (*Term, error)
 
 	// Watch watches the election for changes
-	Watch(ctx context.Context, ch chan<- Event) error
+	Watch(ctx context.Context, ch chan<- *Term) error
 }
+
+type TermStream stream.Stream[*Term]
 
 // newTerm returns a new term from the response term
 func newTerm(term *electionv1.Term) *Term {
@@ -69,39 +72,6 @@ type Term struct {
 
 	// Timestamp is the timestamp at which the leader was elected
 	Timestamp time.Timestamp
-}
-
-// EventType is the type of an Election event
-type EventType string
-
-const (
-	// EventChange indicates the election term changed
-	EventChange EventType = "change"
-)
-
-// Event is an election event
-type Event struct {
-	// Type is the type of the event
-	Type EventType
-
-	// Term is the term that occurs as a result of the election event
-	Term Term
-}
-
-func New(client electionv1.LeaderElectionClient) func(context.Context, string, ...Option) (Election, error) {
-	return func(ctx context.Context, name string, opts ...Option) (Election, error) {
-		var options Options
-		options.Apply(opts...)
-		election := &electionPrimitive{
-			Primitive:   primitive.New(name),
-			client:      client,
-			candidateID: options.CandidateID,
-		}
-		if err := election.create(ctx, options.Tags); err != nil {
-			return nil, err
-		}
-		return election, nil
-	}
 }
 
 // electionPrimitive is the single partition implementation of Election
@@ -198,28 +168,22 @@ func (e *electionPrimitive) Evict(ctx context.Context, id string) (*Term, error)
 	return newTerm(&response.Term), nil
 }
 
-func (e *electionPrimitive) Watch(ctx context.Context, ch chan<- Event) error {
-	request := &electionv1.EventsRequest{
+func (e *electionPrimitive) Watch(ctx context.Context) (TermStream, error) {
+	request := &electionv1.WatchRequest{
 		ID: runtimev1.PrimitiveId{
 			Name: e.Name(),
 		},
 	}
-	stream, err := e.client.Events(ctx, request)
+	client, err := e.client.Watch(ctx, request)
 	if err != nil {
-		return errors.FromProto(err)
+		return nil, errors.FromProto(err)
 	}
 
-	openCh := make(chan struct{})
+	ch := make(chan stream.Result[*Term])
 	go func() {
 		defer close(ch)
-		open := false
-		defer func() {
-			if !open {
-				close(openCh)
-			}
-		}()
 		for {
-			response, err := stream.Recv()
+			response, err := client.Recv()
 			if err != nil {
 				if err == io.EOF {
 					return
@@ -231,28 +195,12 @@ func (e *electionPrimitive) Watch(ctx context.Context, ch chan<- Event) error {
 				log.Errorf("Watch failed: %v", err)
 				return
 			}
-
-			if !open {
-				close(openCh)
-				open = true
-			}
-
-			switch response.Event.Type {
-			case electionv1.Event_CHANGED:
-				ch <- Event{
-					Type: EventChange,
-					Term: *newTerm(&response.Event.Term),
-				}
+			ch <- stream.Result[*Term]{
+				Value: newTerm(&response.Term),
 			}
 		}
 	}()
-
-	select {
-	case <-openCh:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
+	return stream.NewChannelStream[*Term](ch), nil
 }
 
 func (e *electionPrimitive) create(ctx context.Context, tags map[string]string) error {

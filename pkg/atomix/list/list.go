@@ -6,9 +6,9 @@ package list
 
 import (
 	"context"
-	"encoding/base64"
 	"github.com/atomix/go-client/pkg/atomix/generic"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
+	"github.com/atomix/go-client/pkg/atomix/stream"
 	listv1 "github.com/atomix/runtime/api/atomix/runtime/list/v1"
 	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
 	"github.com/atomix/runtime/sdk/pkg/errors"
@@ -42,88 +42,76 @@ type List[E any] interface {
 	// Len gets the length of the list
 	Len(ctx context.Context) (int, error)
 
-	// Items iterates through the values in the list
-	// This is a non-blocking method. If the method returns without error, values will be pushed on to the
-	// given channel and the channel will be closed once all values have been read from the list.
-	Items(ctx context.Context, ch chan<- E) error
-
-	// Watch watches the list for changes
-	// This is a non-blocking method. If the method returns without error, list events will be pushed onto
-	// the given channel.
-	Watch(ctx context.Context, ch chan<- Event[E], opts ...WatchOption) error
-
 	// Clear removes all values from the list
 	Clear(ctx context.Context) error
+
+	// Items lists the elements in the set
+	// This is a non-blocking method. If the method returns without error, key/value paids will be pushed on to the
+	// given channel and the channel will be closed once all elements have been read from the set.
+	Items(ctx context.Context) (ItemStream[E], error)
+
+	// Watch watches the set for changes
+	// This is a non-blocking method. If the method returns without error, set events will be pushed onto
+	// the given channel in the order in which they occur.
+	Watch(ctx context.Context) (ItemStream[E], error)
+
+	// Events watches the set for change events
+	// This is a non-blocking method. If the method returns without error, set events will be pushed onto
+	// the given channel in the order in which they occur.
+	Events(ctx context.Context) (EventStream[E], error)
 }
 
-// EventType is the type for a list Event
-type EventType string
+type ItemStream[E any] stream.Stream[E]
 
-const (
-	// EventAdd indicates a value was added to the list
-	EventAdd EventType = "add"
+type EventStream[E any] stream.Stream[Event[E]]
 
-	// EventRemove indicates a value was removed from the list
-	EventRemove EventType = "remove"
+// Event is a map change event
+type Event[E any] interface {
+	event() *listv1.Event
+}
 
-	// EventReplay indicates a value was replayed
-	EventReplay EventType = "replay"
-)
+type grpcEvent struct {
+	proto *listv1.Event
+}
 
-// Event is a list change event
-type Event[E any] struct {
-	// Type indicates the event type
-	Type EventType
+func (e *grpcEvent) event() *listv1.Event {
+	return e.proto
+}
 
-	// Index is the index at which the event occurred
-	Index int
-
-	// Value is the value that was changed
+type Inserted[E any] struct {
+	*grpcEvent
 	Value E
 }
 
-func New[E any](client listv1.ListClient) func(context.Context, string, ...Option[E]) (List[E], error) {
-	return func(ctx context.Context, name string, opts ...Option[E]) (List[E], error) {
-		var options Options[E]
-		options.Apply(opts...)
-		if options.ElementType == nil {
-			stringType := generic.Bytes()
-			if elementType, ok := stringType.(generic.Type[E]); ok {
-				options.ElementType = elementType
-			} else {
-				return nil, errors.NewInvalid("must configure a generic type for element parameter")
-			}
-		}
-		indexedMap := &listPrimitive[E]{
-			Primitive:   primitive.New(name),
-			client:      client,
-			elementType: options.ElementType,
-		}
-		if err := indexedMap.create(ctx, options.Tags); err != nil {
-			return nil, err
-		}
-		return indexedMap, nil
-	}
+type Updated[E any] struct {
+	*grpcEvent
+	NewValue E
+	OldValue E
+}
+
+type Removed[E any] struct {
+	*grpcEvent
+	Value E
 }
 
 // listPrimitive is the single partition implementation of List
 type listPrimitive[E any] struct {
 	primitive.Primitive
-	client      listv1.ListClient
-	elementType generic.Type[E]
+	client listv1.ListClient
+	codec  generic.Codec[E]
 }
 
 func (l *listPrimitive[E]) Append(ctx context.Context, value E) error {
-	bytes, err := l.elementType.Marshal(&value)
+	bytes, err := l.codec.Encode(&value)
 	if err != nil {
-		return errors.NewInvalid("element encoding failed", err)
+		return errors.NewInvalid("value encoding failed", err)
 	}
 	request := &listv1.AppendRequest{
 		ID: runtimev1.PrimitiveId{
 			Name: l.Name(),
 		},
 		Value: listv1.Value{
-			Value: base64.StdEncoding.EncodeToString(bytes),
+			Value: bytes,
 		},
 	}
 	_, err = l.client.Append(ctx, request)
@@ -134,9 +122,9 @@ func (l *listPrimitive[E]) Append(ctx context.Context, value E) error {
 }
 
 func (l *listPrimitive[E]) Insert(ctx context.Context, index int, value E) error {
-	bytes, err := l.elementType.Marshal(&value)
+	bytes, err := l.codec.Encode(&value)
 	if err != nil {
-		return errors.NewInvalid("element encoding failed", err)
+		return errors.NewInvalid("value encoding failed", err)
 	}
 	request := &listv1.InsertRequest{
 		ID: runtimev1.PrimitiveId{
@@ -144,7 +132,7 @@ func (l *listPrimitive[E]) Insert(ctx context.Context, index int, value E) error
 		},
 		Index: uint32(index),
 		Value: listv1.Value{
-			Value: base64.StdEncoding.EncodeToString(bytes),
+			Value: bytes,
 		},
 	}
 	_, err = l.client.Insert(ctx, request)
@@ -155,9 +143,9 @@ func (l *listPrimitive[E]) Insert(ctx context.Context, index int, value E) error
 }
 
 func (l *listPrimitive[E]) Set(ctx context.Context, index int, value E) error {
-	bytes, err := l.elementType.Marshal(&value)
+	bytes, err := l.codec.Encode(&value)
 	if err != nil {
-		return errors.NewInvalid("element encoding failed", err)
+		return errors.NewInvalid("value encoding failed", err)
 	}
 	request := &listv1.SetRequest{
 		ID: runtimev1.PrimitiveId{
@@ -165,7 +153,7 @@ func (l *listPrimitive[E]) Set(ctx context.Context, index int, value E) error {
 		},
 		Index: uint32(index),
 		Value: listv1.Value{
-			Value: base64.StdEncoding.EncodeToString(bytes),
+			Value: bytes,
 		},
 	}
 	_, err = l.client.Set(ctx, request)
@@ -182,20 +170,12 @@ func (l *listPrimitive[E]) Get(ctx context.Context, index int) (E, error) {
 		},
 		Index: uint32(index),
 	}
-	var e E
+	var item E
 	response, err := l.client.Get(ctx, request)
 	if err != nil {
-		return e, errors.FromProto(err)
+		return item, errors.FromProto(err)
 	}
-	bytes, err := base64.StdEncoding.DecodeString(response.Item.Value.Value)
-	if err != nil {
-		return e, errors.NewInvalid("element decoding failed", err)
-	}
-	var elem E
-	if err := l.elementType.Unmarshal(bytes, &elem); err != nil {
-		return elem, err
-	}
-	return elem, nil
+	return l.codec.Decode(response.Item.Value.Value)
 }
 
 func (l *listPrimitive[E]) Remove(ctx context.Context, index int) (E, error) {
@@ -210,15 +190,7 @@ func (l *listPrimitive[E]) Remove(ctx context.Context, index int) (E, error) {
 	if err != nil {
 		return e, errors.FromProto(err)
 	}
-	bytes, err := base64.StdEncoding.DecodeString(response.Item.Value.Value)
-	if err != nil {
-		return e, errors.NewInvalid("element decoding failed", err)
-	}
-	var elem E
-	if err := l.elementType.Unmarshal(bytes, &elem); err != nil {
-		return elem, err
-	}
-	return elem, nil
+	return l.codec.Decode(response.Item.Value.Value)
 }
 
 func (l *listPrimitive[E]) Len(ctx context.Context) (int, error) {
@@ -234,21 +206,31 @@ func (l *listPrimitive[E]) Len(ctx context.Context) (int, error) {
 	return int(response.Size_), nil
 }
 
-func (l *listPrimitive[E]) Items(ctx context.Context, ch chan<- E) error {
-	request := &listv1.ElementsRequest{
+func (l *listPrimitive[E]) Items(ctx context.Context) (ItemStream[E], error) {
+	return l.items(ctx, false)
+}
+
+func (l *listPrimitive[E]) Watch(ctx context.Context) (ItemStream[E], error) {
+	return l.items(ctx, true)
+}
+
+func (l *listPrimitive[E]) items(ctx context.Context, watch bool) (ItemStream[E], error) {
+	request := &listv1.ItemsRequest{
 		ID: runtimev1.PrimitiveId{
 			Name: l.Name(),
 		},
+		Watch: watch,
 	}
-	stream, err := l.client.Elements(ctx, request)
+	client, err := l.client.Items(ctx, request)
 	if err != nil {
-		return errors.FromProto(err)
+		return nil, errors.FromProto(err)
 	}
 
+	ch := make(chan stream.Result[E])
 	go func() {
 		defer close(ch)
 		for {
-			response, err := stream.Recv()
+			response, err := client.Recv()
 			if err != nil {
 				if err == io.EOF {
 					return
@@ -260,38 +242,35 @@ func (l *listPrimitive[E]) Items(ctx context.Context, ch chan<- E) error {
 				log.Errorf("Entries failed: %v", err)
 				return
 			}
-
-			bytes, err := base64.StdEncoding.DecodeString(response.Item.Value.Value)
+			item, err := l.codec.Decode(response.Item.Value.Value)
 			if err != nil {
-				log.Errorf("Failed to decode list item: %v", err)
-			} else {
-				var elem E
-				if err := l.elementType.Unmarshal(bytes, &elem); err != nil {
-					log.Error(err)
-				} else {
-					ch <- elem
-				}
+				log.Error(err)
+				continue
+			}
+			ch <- stream.Result[E]{
+				Value: item,
 			}
 		}
 	}()
-	return nil
+	return stream.NewChannelStream[E](ch), nil
 }
 
-func (l *listPrimitive[E]) Watch(ctx context.Context, ch chan<- Event[E], opts ...WatchOption) error {
+func (l *listPrimitive[E]) Events(ctx context.Context, opts ...EventsOption) (EventStream[E], error) {
 	request := &listv1.EventsRequest{
 		ID: runtimev1.PrimitiveId{
 			Name: l.Name(),
 		},
 	}
 	for i := range opts {
-		opts[i].beforeWatch(request)
+		opts[i].beforeEvents(request)
 	}
 
-	stream, err := l.client.Events(ctx, request)
+	client, err := l.client.Events(ctx, request)
 	if err != nil {
-		return errors.FromProto(err)
+		return nil, errors.FromProto(err)
 	}
 
+	ch := make(chan stream.Result[Event[E]])
 	openCh := make(chan struct{})
 	go func() {
 		defer close(ch)
@@ -302,7 +281,7 @@ func (l *listPrimitive[E]) Watch(ctx context.Context, ch chan<- Event[E], opts .
 			}
 		}()
 		for {
-			response, err := stream.Recv()
+			response, err := client.Recv()
 			if err != nil {
 				if err == io.EOF {
 					return
@@ -320,43 +299,53 @@ func (l *listPrimitive[E]) Watch(ctx context.Context, ch chan<- Event[E], opts .
 				open = true
 			}
 
-			if response.Event.Type == listv1.Event_NONE {
-				continue
-			}
-
 			for i := range opts {
-				opts[i].afterWatch(response)
+				opts[i].afterEvents(response)
 			}
 
-			bytes, err := base64.StdEncoding.DecodeString(response.Event.Item.Value.Value)
-			if err != nil {
-				log.Errorf("Failed to decode list item: %v", err)
-			} else {
-				var elem E
-				if err := l.elementType.Unmarshal(bytes, &elem); err != nil {
+			switch e := response.Event.Event.(type) {
+			case *listv1.Event_Inserted_:
+				value, err := l.codec.Decode(e.Inserted.Value.Value)
+				if err != nil {
+					log.Error(err)
+					continue
+				}
+				ch <- stream.Result[Event[E]]{
+					Value: &Inserted[E]{
+						grpcEvent: &grpcEvent{&response.Event},
+						Value:     value,
+					},
+				}
+			case *listv1.Event_Updated_:
+				oldValue, err := l.codec.Decode(e.Updated.NewValue.Value)
+				if err != nil {
+					log.Error(err)
+					continue
+				}
+				newValue, err := l.codec.Decode(e.Updated.PrevValue.Value)
+				if err != nil {
 					log.Error(err)
 					continue
 				}
 
-				switch response.Event.Type {
-				case listv1.Event_ADD:
-					ch <- Event[E]{
-						Type:  EventAdd,
-						Index: int(response.Event.Item.Index),
-						Value: elem,
-					}
-				case listv1.Event_REMOVE:
-					ch <- Event[E]{
-						Type:  EventRemove,
-						Index: int(response.Event.Item.Index),
-						Value: elem,
-					}
-				case listv1.Event_REPLAY:
-					ch <- Event[E]{
-						Type:  EventReplay,
-						Index: int(response.Event.Item.Index),
-						Value: elem,
-					}
+				ch <- stream.Result[Event[E]]{
+					Value: &Updated[E]{
+						grpcEvent: &grpcEvent{&response.Event},
+						NewValue:  newValue,
+						OldValue:  oldValue,
+					},
+				}
+			case *listv1.Event_Removed_:
+				value, err := l.codec.Decode(e.Removed.Value.Value)
+				if err != nil {
+					log.Error(err)
+					continue
+				}
+				ch <- stream.Result[Event[E]]{
+					Value: &Removed[E]{
+						grpcEvent: &grpcEvent{&response.Event},
+						Value:     value,
+					},
 				}
 			}
 		}
@@ -364,9 +353,9 @@ func (l *listPrimitive[E]) Watch(ctx context.Context, ch chan<- Event[E], opts .
 
 	select {
 	case <-openCh:
-		return nil
+		return stream.NewChannelStream[Event[E]](ch), nil
 	case <-ctx.Done():
-		return ctx.Err()
+		return nil, ctx.Err()
 	}
 }
 

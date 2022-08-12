@@ -29,7 +29,7 @@ type Client struct {
 	mu   sync.RWMutex
 }
 
-func (c *Client) connect(ctx context.Context) (*grpc.ClientConn, error) {
+func (c *Client) Connect(ctx context.Context) (*grpc.ClientConn, error) {
 	c.mu.RLock()
 	conn := c.conn
 	c.mu.RUnlock()

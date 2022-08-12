@@ -8,7 +8,6 @@ import (
 	"context"
 	"github.com/atomix/go-client/pkg/atomix/generic"
 	"github.com/atomix/go-client/pkg/atomix/test"
-	api "github.com/atomix/runtime/api/atomix/runtime/map/v1"
 	"github.com/atomix/runtime/sdk/pkg/errors"
 	"github.com/atomix/runtime/sdk/pkg/logging"
 	"github.com/stretchr/testify/assert"
@@ -106,20 +105,20 @@ func TestMapOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 
-	kv2, err = map1.Update(context.Background(), "foo", "baz", IfTimestamp(kv1.Timestamp))
+	kv2, err = map1.Update(context.Background(), "foo", "baz", IfVersion(kv1.Timestamp))
 	assert.NoError(t, err)
 	assert.NotEqual(t, kv1.Timestamp, kv2.Timestamp)
 	assert.Equal(t, "baz", kv2.Value)
 
-	_, err = map1.Update(context.Background(), "foo", "bar", IfTimestamp(kv1.Timestamp))
+	_, err = map1.Update(context.Background(), "foo", "bar", IfVersion(kv1.Timestamp))
 	assert.Error(t, err)
 	assert.True(t, errors.IsConflict(err))
 
-	_, err = map1.Remove(context.Background(), "foo", IfTimestamp(kv1.Timestamp))
+	_, err = map1.Remove(context.Background(), "foo", IfVersion(kv1.Timestamp))
 	assert.Error(t, err)
 	assert.True(t, errors.IsConflict(err))
 
-	removed, err := map1.Remove(context.Background(), "foo", IfTimestamp(kv2.Timestamp))
+	removed, err := map1.Remove(context.Background(), "foo", IfVersion(kv2.Timestamp))
 	assert.NoError(t, err)
 	assert.NotNil(t, removed)
 	assert.Equal(t, kv2.Timestamp, removed.Timestamp)
@@ -134,22 +133,14 @@ func TestMapStreams(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	conn1, err := cluster.Connect(ctx)
-	assert.NoError(t, err)
-	client1 := api.NewMapClient(conn1)
-
-	conn2, err := cluster.Connect(ctx)
-	assert.NoError(t, err)
-	client2 := api.NewMapClient(conn2)
-
-	map1, err := New[string, int](client1)(ctx, "test",
-		WithKeyType[string, int](generic.String()),
-		WithValueType[string, int](generic.Int()))
+	map1, err := NewBuilder[string, string](cluster, "test").
+		Codec(generic.Scalar[string]()).
+		Get(ctx)
 	assert.NoError(t, err)
 
-	map2, err := New[string, int](client2)(ctx, "test",
-		WithKeyType[string, int](generic.String()),
-		WithValueType[string, int](generic.Int()))
+	map2, err := NewBuilder[string, string](cluster, "test").
+		Codec(generic.Scalar[string]()).
+		Get(ctx)
 	assert.NoError(t, err)
 
 	kv, err := map1.Put(context.Background(), "foo", 1)

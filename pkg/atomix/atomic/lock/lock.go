@@ -7,10 +7,9 @@ package lock
 import (
 	"context"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
-	lockv1 "github.com/atomix/runtime/api/atomix/runtime/lock/v1"
+	lockv1 "github.com/atomix/runtime/api/atomix/runtime/atomic/lock/v1"
 	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
 	"github.com/atomix/runtime/sdk/pkg/errors"
-	"github.com/atomix/runtime/sdk/pkg/time"
 )
 
 // Lock provides distributed concurrency control
@@ -18,45 +17,16 @@ type Lock interface {
 	primitive.Primitive
 
 	// Lock acquires the lock
-	Lock(ctx context.Context, opts ...LockOption) (Status, error)
+	Lock(ctx context.Context, opts ...LockOption) (Version, error)
 
 	// Unlock releases the lock
 	Unlock(ctx context.Context, opts ...UnlockOption) error
 
 	// Get gets the lock status
-	Get(ctx context.Context, opts ...GetOption) (Status, error)
+	Get(ctx context.Context, opts ...GetOption) (Version, error)
 }
 
-// Status is the lock status
-type Status struct {
-	State     State
-	Timestamp time.Timestamp
-}
-
-// State is a lock state
-type State int
-
-const (
-	// StateLocked is the State in which the lock is locked
-	StateLocked State = iota
-	// StateUnlocked is the State in which the lock is not locked
-	StateUnlocked
-)
-
-func New(client lockv1.LockClient) func(context.Context, string, ...Option) (Lock, error) {
-	return func(ctx context.Context, name string, opts ...Option) (Lock, error) {
-		var options Options
-		options.Apply(opts...)
-		lock := &lockPrimitive{
-			Primitive: primitive.New(name),
-			client:    client,
-		}
-		if err := lock.create(ctx, options.Tags); err != nil {
-			return nil, err
-		}
-		return lock, nil
-	}
-}
+type Version uint64
 
 // lockPrimitive is the single partition implementation of Lock
 type lockPrimitive struct {
@@ -64,7 +34,7 @@ type lockPrimitive struct {
 	client lockv1.LockClient
 }
 
-func (l *lockPrimitive) Lock(ctx context.Context, opts ...LockOption) (Status, error) {
+func (l *lockPrimitive) Lock(ctx context.Context, opts ...LockOption) (Version, error) {
 	request := &lockv1.LockRequest{
 		ID: runtimev1.PrimitiveId{
 			Name: l.Name(),
@@ -75,22 +45,12 @@ func (l *lockPrimitive) Lock(ctx context.Context, opts ...LockOption) (Status, e
 	}
 	response, err := l.client.Lock(ctx, request)
 	if err != nil {
-		return Status{}, errors.FromProto(err)
+		return 0, errors.FromProto(err)
 	}
 	for i := range opts {
 		opts[i].afterLock(response)
 	}
-	var state State
-	switch response.Lock.State {
-	case lockv1.LockInstance_LOCKED:
-		state = StateLocked
-	case lockv1.LockInstance_UNLOCKED:
-		state = StateUnlocked
-	}
-	return Status{
-		State:     state,
-		Timestamp: time.NewTimestamp(*response.Lock.Timestamp),
-	}, nil
+	return Version(response.Version), nil
 }
 
 func (l *lockPrimitive) Unlock(ctx context.Context, opts ...UnlockOption) error {
@@ -112,7 +72,7 @@ func (l *lockPrimitive) Unlock(ctx context.Context, opts ...UnlockOption) error 
 	return nil
 }
 
-func (l *lockPrimitive) Get(ctx context.Context, opts ...GetOption) (Status, error) {
+func (l *lockPrimitive) Get(ctx context.Context, opts ...GetOption) (Version, error) {
 	request := &lockv1.GetLockRequest{
 		ID: runtimev1.PrimitiveId{
 			Name: l.Name(),
@@ -123,22 +83,12 @@ func (l *lockPrimitive) Get(ctx context.Context, opts ...GetOption) (Status, err
 	}
 	response, err := l.client.GetLock(ctx, request)
 	if err != nil {
-		return Status{}, errors.FromProto(err)
+		return 0, errors.FromProto(err)
 	}
 	for i := range opts {
 		opts[i].afterGet(response)
 	}
-	var state State
-	switch response.Lock.State {
-	case lockv1.LockInstance_LOCKED:
-		state = StateLocked
-	case lockv1.LockInstance_UNLOCKED:
-		state = StateUnlocked
-	}
-	return Status{
-		State:     state,
-		Timestamp: time.NewTimestamp(*response.Lock.Timestamp),
-	}, nil
+	return Version(response.Version), nil
 }
 
 func (l *lockPrimitive) create(ctx context.Context, tags map[string]string) error {

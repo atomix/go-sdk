@@ -21,14 +21,13 @@ const (
 
 // Options is a set of client options
 type Options struct {
-	Host          string
-	Port          int
-	ApplicationID string
+	Host string
+	Port int
 }
 
-func (o Options) apply(opts ...Option) {
+func (o *Options) apply(opts ...Option) {
 	for _, opt := range opts {
-		opt.apply(&o)
+		opt.apply(o)
 	}
 
 	if o.Host == "" {
@@ -94,12 +93,5 @@ func WithHost(host string) Option {
 func WithPort(port int) Option {
 	return newFuncOption(func(options *Options) {
 		options.Port = port
-	})
-}
-
-// WithApplicationID sets the application identifier
-func WithApplicationID(applicationID string) Option {
-	return newFuncOption(func(options *Options) {
-		options.ApplicationID = applicationID
 	})
 }

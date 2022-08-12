@@ -7,17 +7,23 @@ package counter
 import (
 	"context"
 	"github.com/atomix/go-client/pkg/atomix/primitive"
-	counterv1 "github.com/atomix/runtime/api/atomix/runtime/counter/v1"
+	counterv1 "github.com/atomix/runtime/api/atomix/runtime/atomic/counter/v1"
 	primitivev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
 	"github.com/atomix/runtime/sdk/pkg/errors"
 )
 
-// Counter provides a distributed atomic counter
-type Counter interface {
+// AtomicCounter provides a distributed atomic counter
+type AtomicCounter interface {
 	primitive.Primitive
 
 	// Get gets the current value of the counter
 	Get(ctx context.Context) (int64, error)
+
+	// Set sets the value of the counter
+	Set(ctx context.Context, value int64) error
+
+	// Update updates the value of the counter
+	Update(ctx context.Context, current, update int64) error
 
 	// Increment increments the counter by the given delta
 	Increment(ctx context.Context, delta int64) (int64, error)
@@ -26,10 +32,10 @@ type Counter interface {
 	Decrement(ctx context.Context, delta int64) (int64, error)
 }
 
-// counter is the single partition implementation of Counter
+// counter is the single partition implementation of AtomicCounter
 type counterPrimitive struct {
 	primitive.Primitive
-	client counterv1.CounterClient
+	client counterv1.AtomicCounterClient
 }
 
 func (c *counterPrimitive) Get(ctx context.Context) (int64, error) {
@@ -43,6 +49,35 @@ func (c *counterPrimitive) Get(ctx context.Context) (int64, error) {
 		return 0, errors.FromProto(err)
 	}
 	return response.Value, nil
+}
+
+func (c *counterPrimitive) Set(ctx context.Context, value int64) error {
+	request := &counterv1.SetRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: c.Name(),
+		},
+		Value: value,
+	}
+	_, err := c.client.Set(ctx, request)
+	if err != nil {
+		return errors.FromProto(err)
+	}
+	return nil
+}
+
+func (c *counterPrimitive) Update(ctx context.Context, current, update int64) error {
+	request := &counterv1.UpdateRequest{
+		ID: primitivev1.PrimitiveId{
+			Name: c.Name(),
+		},
+		Check:  current,
+		Update: update,
+	}
+	_, err := c.client.Update(ctx, request)
+	if err != nil {
+		return errors.FromProto(err)
+	}
+	return nil
 }
 
 func (c *counterPrimitive) Increment(ctx context.Context, delta int64) (int64, error) {

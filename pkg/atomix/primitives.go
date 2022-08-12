@@ -5,46 +5,51 @@
 package atomix
 
 import (
-	"context"
+	atomiccounter "github.com/atomix/go-client/pkg/atomix/atomic/counter"
+	"github.com/atomix/go-client/pkg/atomix/atomic/indexedmap"
+	"github.com/atomix/go-client/pkg/atomix/atomic/lock"
+	atomicmap "github.com/atomix/go-client/pkg/atomix/atomic/map"
 	"github.com/atomix/go-client/pkg/atomix/client"
 	"github.com/atomix/go-client/pkg/atomix/counter"
 	"github.com/atomix/go-client/pkg/atomix/election"
-	"github.com/atomix/go-client/pkg/atomix/indexedmap"
+	"github.com/atomix/go-client/pkg/atomix/generic/scalar"
 	"github.com/atomix/go-client/pkg/atomix/list"
-	"github.com/atomix/go-client/pkg/atomix/lock"
 	_map "github.com/atomix/go-client/pkg/atomix/map"
 	"github.com/atomix/go-client/pkg/atomix/set"
-	"github.com/atomix/go-client/pkg/atomix/value"
 )
 
-func GetCounter(ctx context.Context, name string, opts ...counter.Option) (counter.Counter, error) {
-	return client.GetCounter(getClient())(ctx, name, opts...)
+func AtomicCounter(name string) *atomiccounter.Builder {
+	return client.AtomicCounter(getClient())(name)
 }
 
-func GetElection(ctx context.Context, name string, opts ...election.Option) (election.Election, error) {
-	return client.GetElection(getClient())(ctx, name, opts...)
+func AtomicMap[K scalar.Scalar, V any](name string) *atomicmap.Builder[K, V] {
+	return client.AtomicMap[K, V](getClient())(name)
 }
 
-func GetIndexedMap[K, V any](ctx context.Context, name string, opts ...indexedmap.Option[K, V]) (indexedmap.IndexedMap[K, V], error) {
-	return client.GetIndexedMap[K, V](getClient())(ctx, name, opts...)
+func IndexedMap[K scalar.Scalar, V any](name string) *indexedmap.Builder[K, V] {
+	return client.IndexedMap[K, V](getClient())(name)
 }
 
-func GetList[E any](ctx context.Context, name string, opts ...list.Option[E]) (list.List[E], error) {
-	return client.GetList[E](getClient())(ctx, name, opts...)
+func Lock(name string) *lock.Builder {
+	return client.Lock(getClient())(name)
 }
 
-func GetLock(ctx context.Context, name string, opts ...lock.Option) (lock.Lock, error) {
-	return client.GetLock(getClient())(ctx, name, opts...)
+func Counter(name string) *counter.Builder {
+	return client.Counter(getClient())(name)
 }
 
-func GetMap[K, V any](ctx context.Context, name string, opts ..._map.Option[K, V]) (_map.Map[K, V], error) {
-	return client.GetMap[K, V](getClient())(ctx, name, opts...)
+func LeaderElection(name string) *election.Builder {
+	return client.LeaderElection(getClient())(name)
 }
 
-func GetSet[E any](ctx context.Context, name string, opts ...set.Option[E]) (set.Set[E], error) {
-	return client.GetSet[E](getClient())(ctx, name, opts...)
+func List[E any](name string) *list.Builder[E] {
+	return client.List[E](getClient())(name)
 }
 
-func GetValue[E any](ctx context.Context, name string, opts ...value.Option[E]) (value.Value[E], error) {
-	return client.GetValue[E](getClient())(ctx, name, opts...)
+func Map[K scalar.Scalar, V any](name string) *_map.Builder[K, V] {
+	return client.Map[K, V](getClient())(name)
+}
+
+func Set[E any](name string) *set.Builder[E] {
+	return client.Set[E](getClient())(name)
 }

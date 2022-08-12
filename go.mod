@@ -6,9 +6,9 @@ require (
 	github.com/atomix/multi-raft-storage/api v0.0.0-20220728201523-7dcf2d5be56a
 	github.com/atomix/multi-raft-storage/driver v0.0.0-20220729004735-7ef100a1d8b2
 	github.com/atomix/multi-raft-storage/node v0.0.0-20220729012051-c60720d92bed
-	github.com/atomix/runtime/api v0.0.0-20220720013020-6146e7ecb7cb
-	github.com/atomix/runtime/proxy v0.0.0-20220727083205-3cca95915d8b
-	github.com/atomix/runtime/sdk v0.0.0-20220727083205-3cca95915d8b
+	github.com/atomix/runtime/api v0.2.1-0.20220812231828-c809d2bc7419
+	github.com/atomix/runtime/proxy v0.2.2-0.20220812231935-10d2e13e40e1
+	github.com/atomix/runtime/sdk v0.2.1-0.20220812231828-c809d2bc7419
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.5.2
 	github.com/google/uuid v1.1.2
