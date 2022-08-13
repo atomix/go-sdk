@@ -16,6 +16,7 @@ import (
 	"github.com/atomix/go-client/pkg/primitive/list"
 	_map "github.com/atomix/go-client/pkg/primitive/map"
 	"github.com/atomix/go-client/pkg/primitive/set"
+	"github.com/atomix/go-client/pkg/primitive/value"
 )
 
 func AtomicCounter(client *Client) func(name string) *atomiccounter.Builder {
@@ -75,5 +76,11 @@ func Map[K scalar.Scalar, V any](client *Client) func(name string) *_map.Builder
 func Set[E any](client *Client) func(name string) *set.Builder[E] {
 	return func(name string) *set.Builder[E] {
 		return set.NewBuilder[E](client, name)
+	}
+}
+
+func Value[V any](client *Client) func(name string) *value.Builder[V] {
+	return func(name string) *value.Builder[V] {
+		return value.NewBuilder[V](client, name)
 	}
 }
