@@ -11,6 +11,7 @@ import (
 	"github.com/atomix/go-client/pkg/primitive/atomic/indexedmap"
 	"github.com/atomix/go-client/pkg/primitive/atomic/lock"
 	atomicmap "github.com/atomix/go-client/pkg/primitive/atomic/map"
+	atomicvalue "github.com/atomix/go-client/pkg/primitive/atomic/value"
 	"github.com/atomix/go-client/pkg/primitive/counter"
 	"github.com/atomix/go-client/pkg/primitive/election"
 	"github.com/atomix/go-client/pkg/primitive/list"
@@ -24,6 +25,10 @@ func AtomicCounter(name string) *atomiccounter.Builder {
 
 func AtomicMap[K scalar.Scalar, V any](name string) *atomicmap.Builder[K, V] {
 	return client.AtomicMap[K, V](getClient())(name)
+}
+
+func AtomicValue[V any](name string) *atomicvalue.Builder[V] {
+	return client.AtomicValue[V](getClient())(name)
 }
 
 func IndexedMap[K scalar.Scalar, V any](name string) *indexedmap.Builder[K, V] {
