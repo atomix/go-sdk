@@ -59,10 +59,10 @@ github.com/armon/go-metrics v0.3.10 h1:FR+drcQStOe+32sYyJYyZ7FIdgoGGBnwLl+flodp8
 github.com/armon/go-metrics v0.3.10/go.mod h1:4O98XIr/9W0sxpJ8UaYkvjk10Iff7SnFrb4QAOwNTFc=
 github.com/atomix/multi-raft-storage/api v0.3.1 h1:tQcTbg7iEvXY5QdZdZO4nIOfAKH+A4EqsaP3Pm22gng=
 github.com/atomix/multi-raft-storage/api v0.3.1/go.mod h1:pyTem+T3db37Xchc6aLtkhEunaqcg6j+KZI+wKE4d5M=
-github.com/atomix/multi-raft-storage/driver v0.3.4 h1:WHIEfnQul8oIVEm/v1tSXPcPXoh+IR5HINnQ4wQRz/c=
-github.com/atomix/multi-raft-storage/driver v0.3.4/go.mod h1:bNbMSVNSahMc5aICuBRolgV5l2HGzKWp9CFV4kgNkwQ=
-github.com/atomix/multi-raft-storage/node v0.3.2 h1:kQOFsklN7DIjp9l1/iXSy7LwCpCEgBtH2pxszb+UAdE=
-github.com/atomix/multi-raft-storage/node v0.3.2/go.mod h1:E/tXaNPNjjQJVomFm4Y49M7+PUee1X7nzEyzHkSb52Q=
+github.com/atomix/multi-raft-storage/driver v0.3.5 h1:XwckMFURttK6SQ8c0KBsq1CMRqXBYet2EI8m+XjFi1Q=
+github.com/atomix/multi-raft-storage/driver v0.3.5/go.mod h1:bNbMSVNSahMc5aICuBRolgV5l2HGzKWp9CFV4kgNkwQ=
+github.com/atomix/multi-raft-storage/node v0.3.3 h1:itKFL9sxhhpihjUluiINvLJpvDQvkoobC3N6bOso2Hg=
+github.com/atomix/multi-raft-storage/node v0.3.3/go.mod h1:E/tXaNPNjjQJVomFm4Y49M7+PUee1X7nzEyzHkSb52Q=
 github.com/atomix/runtime/api v0.3.1 h1:MQZfJfAZXtDJWzY9lHPf8djUNaxGOaFlaH9SMErxkGA=
 github.com/atomix/runtime/api v0.3.1/go.mod h1:X16epZsQDGX+SI+atLVMMXW/qn8F9IPXQ49Hp2qTkZE=
 github.com/atomix/runtime/proxy v0.2.2 h1:qjpSfbETpjU0HRSSqxf2qjtf2d8PbUdT+0UB4S9LmXI=

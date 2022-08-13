@@ -134,6 +134,9 @@ func (m *mapPrimitive[K, V]) Put(ctx context.Context, key K, value V, opts ...Pu
 	for i := range opts {
 		opts[i].afterPut(response)
 	}
+	if response.PrevValue == nil {
+		return prevValue, nil
+	}
 	prevValue, err = m.valueCodec.Decode(response.PrevValue.Value)
 	if err != nil {
 		return prevValue, errors.NewInvalid("value decoding failed", err)
