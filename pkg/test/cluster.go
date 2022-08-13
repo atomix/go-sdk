@@ -14,6 +14,8 @@ import (
 	"github.com/atomix/runtime/proxy/pkg/proxy"
 	"github.com/atomix/runtime/sdk/pkg/errors"
 	"github.com/atomix/runtime/sdk/pkg/runtime"
+	atomiccounterv1 "github.com/atomix/runtime/sdk/pkg/runtime/atomic/counter/v1"
+	atomicmapv1 "github.com/atomix/runtime/sdk/pkg/runtime/atomic/map/v1"
 	counterv1 "github.com/atomix/runtime/sdk/pkg/runtime/counter/v1"
 	mapv1 "github.com/atomix/runtime/sdk/pkg/runtime/map/v1"
 	"github.com/gogo/protobuf/jsonpb"
@@ -22,11 +24,18 @@ import (
 	"os"
 )
 
+var Types = []runtime.Type{
+	atomiccounterv1.Type,
+	atomicmapv1.Type,
+	counterv1.Type,
+	mapv1.Type,
+}
+
 func NewCluster() *Cluster {
 	network := proxy.NewLocalNetwork()
 	return &Cluster{
 		network: network,
-		types:   []runtime.Type{counterv1.Type, mapv1.Type},
+		types:   Types,
 		port:    5000,
 	}
 }

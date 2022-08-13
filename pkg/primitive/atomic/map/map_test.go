@@ -60,9 +60,9 @@ func TestMapOperations(t *testing.T) {
 
 	kv2, err := map1.Remove(context.Background(), "foo")
 	assert.NoError(t, err)
-	assert.NotNil(t, kv)
-	assert.Equal(t, "foo", kv.Key)
-	assert.Equal(t, "bar", kv.Value)
+	assert.NotNil(t, kv2)
+	assert.Equal(t, "foo", kv2.Key)
+	assert.Equal(t, "bar", kv2.Value)
 	assert.Equal(t, kv1.Version, kv2.Version)
 
 	size, err = map2.Len(context.Background())
