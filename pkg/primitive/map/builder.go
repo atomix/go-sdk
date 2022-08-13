@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-package _map
+package _map //nolint:golint
 
 import (
 	"context"
