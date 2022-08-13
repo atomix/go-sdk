@@ -6,6 +6,7 @@ package indexedmap
 
 import (
 	"github.com/atomix/go-client/pkg/generic/scalar"
+	"github.com/atomix/go-client/pkg/primitive/atomic"
 	indexedmapv1 "github.com/atomix/runtime/api/atomix/runtime/atomic/indexedmap/v1"
 )
 
@@ -22,7 +23,7 @@ type RemoveOption interface {
 }
 
 // IfVersion sets the required version for optimistic concurrency control
-func IfVersion(version Version) VersionOption {
+func IfVersion(version atomic.Version) VersionOption {
 	return VersionOption{version: version}
 }
 
@@ -30,7 +31,7 @@ func IfVersion(version Version) VersionOption {
 type VersionOption struct {
 	UpdateOption
 	RemoveOption
-	version Version
+	version atomic.Version
 }
 
 func (o VersionOption) beforeUpdate(request *indexedmapv1.UpdateRequest) {

@@ -10,12 +10,12 @@ import (
 	"github.com/atomix/go-client/pkg/generic"
 	"github.com/atomix/go-client/pkg/generic/scalar"
 	"github.com/atomix/go-client/pkg/primitive"
+	"github.com/atomix/go-client/pkg/primitive/atomic"
 	"github.com/atomix/go-client/pkg/stream"
 	indexedmapv1 "github.com/atomix/runtime/api/atomix/runtime/atomic/indexedmap/v1"
 	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
 	"github.com/atomix/runtime/sdk/pkg/errors"
 	"github.com/atomix/runtime/sdk/pkg/logging"
-	"github.com/atomix/runtime/sdk/pkg/time"
 	"io"
 )
 
@@ -23,9 +23,6 @@ var log = logging.GetLogger()
 
 // Index is the index of an entry
 type Index uint64
-
-// Version is the version of an entry
-type Version uint64
 
 // IndexedMap is a distributed linked map
 type IndexedMap[K scalar.Scalar, V any] interface {
@@ -101,18 +98,14 @@ type EventStream[K scalar.Scalar, V any] stream.Stream[Event[K, V]]
 
 // Entry is an indexed key/value pair
 type Entry[K scalar.Scalar, V any] struct {
+	atomic.Versioned[V]
+
 	// Index is the unique, monotonically increasing, globally unique index of the entry. The index is static
 	// for the lifetime of a key.
 	Index Index
 
 	// Key is the key of the pair
 	Key K
-
-	// Value is the value of the pair
-	Value V
-
-	// Timestamp is the entry timestamp
-	Timestamp time.Timestamp
 }
 
 func (kv *Entry[K, V]) String() string {
@@ -579,9 +572,12 @@ func (m *indexedMapPrimitive[K, V]) decodeValue(key K, index Index, value *index
 		return nil, errors.NewInvalid("value decoding failed", err)
 	}
 	return &Entry[K, V]{
+		Versioned: atomic.Versioned[V]{
+			Version: atomic.Version(value.Version),
+			Value:   decodedValue,
+		},
 		Key:   key,
 		Index: index,
-		Value: decodedValue,
 	}, nil
 }
 
