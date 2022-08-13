@@ -11,6 +11,7 @@ import (
 	"github.com/atomix/runtime/sdk/pkg/errors"
 	"github.com/atomix/runtime/sdk/pkg/logging"
 	"github.com/stretchr/testify/assert"
+	"io"
 	"testing"
 	"time"
 )
@@ -34,6 +35,10 @@ func TestMapOperations(t *testing.T) {
 		Get(ctx)
 	assert.NoError(t, err)
 
+	streamCtx, streamCancel := context.WithCancel(context.Background())
+	stream, err := map1.Watch(streamCtx)
+	assert.NoError(t, err)
+
 	kv, err := map1.Get(context.Background(), "foo")
 	assert.Error(t, err)
 	assert.True(t, errors.IsNotFound(err))
@@ -47,6 +52,10 @@ func TestMapOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "bar", kv.Value)
+
+	value, err := stream.Next()
+	assert.NoError(t, err)
+	assert.NotNil(t, value)
 
 	kv1, err := map1.Get(context.Background(), "foo")
 	assert.NoError(t, err)
@@ -65,6 +74,10 @@ func TestMapOperations(t *testing.T) {
 	assert.Equal(t, "bar", kv2.Value)
 	assert.Equal(t, kv1.Version, kv2.Version)
 
+	value, err = stream.Next()
+	assert.NoError(t, err)
+	assert.NotNil(t, value)
+
 	size, err = map2.Len(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, 0, size)
@@ -74,18 +87,38 @@ func TestMapOperations(t *testing.T) {
 	assert.NotNil(t, kv)
 	assert.Equal(t, "bar", kv.Value)
 
+	value, err = stream.Next()
+	assert.NoError(t, err)
+	assert.NotNil(t, value)
+
 	kv, err = map2.Put(context.Background(), "bar", "baz")
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "baz", kv.Value)
+
+	value, err = stream.Next()
+	assert.NoError(t, err)
+	assert.NotNil(t, value)
 
 	kv, err = map2.Put(context.Background(), "foo", "baz")
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "baz", kv.Value)
 
+	value, err = stream.Next()
+	assert.NoError(t, err)
+	assert.NotNil(t, value)
+
 	err = map2.Clear(context.Background())
 	assert.NoError(t, err)
+
+	value, err = stream.Next()
+	assert.NoError(t, err)
+	assert.NotNil(t, value)
+
+	value, err = stream.Next()
+	assert.NoError(t, err)
+	assert.NotNil(t, value)
 
 	size, err = map1.Len(context.Background())
 	assert.NoError(t, err)
@@ -95,6 +128,10 @@ func TestMapOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 
+	value, err = stream.Next()
+	assert.NoError(t, err)
+	assert.NotNil(t, value)
+
 	kv1, err = map1.Get(context.Background(), "foo")
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
@@ -103,6 +140,16 @@ func TestMapOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotEqual(t, kv1.Version, kv2.Version)
 	assert.Equal(t, "baz", kv2.Value)
+
+	value, err = stream.Next()
+	assert.NoError(t, err)
+	assert.NotNil(t, value)
+
+	streamCancel()
+
+	value, err = stream.Next()
+	assert.Equal(t, io.EOF, err)
+	assert.Nil(t, value)
 
 	_, err = map1.Update(context.Background(), "foo", "bar", IfVersion(kv1.Version))
 	assert.Error(t, err)

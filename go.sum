@@ -61,8 +61,8 @@ github.com/atomix/multi-raft-storage/api v0.3.0 h1:4jjm7zA+/EImjFS2YvtCoESg2lOiN
 github.com/atomix/multi-raft-storage/api v0.3.0/go.mod h1:pyTem+T3db37Xchc6aLtkhEunaqcg6j+KZI+wKE4d5M=
 github.com/atomix/multi-raft-storage/driver v0.3.2 h1:93ZEL9yxMQ5LRKwqqwuVuG4rZYVuJsVjQFbtNGC3FtI=
 github.com/atomix/multi-raft-storage/driver v0.3.2/go.mod h1:nb8IAxSwOLA4ZlPYq0uTkdYEmUUr+auXhJiXvFi524c=
-github.com/atomix/multi-raft-storage/node v0.3.0 h1:YuJmA4CORNWxUi5uvQaXXEzas4nUCJfeFTLhe73ZxdQ=
-github.com/atomix/multi-raft-storage/node v0.3.0/go.mod h1:9OvG7N2t2iD3NnzZIU3q2j6GMSxl8zph+lBAdv2LSjE=
+github.com/atomix/multi-raft-storage/node v0.3.1 h1:p4nPaTO6hHiTrlapGMuwdFqtdzv81l93ouwUziADfRs=
+github.com/atomix/multi-raft-storage/node v0.3.1/go.mod h1:9OvG7N2t2iD3NnzZIU3q2j6GMSxl8zph+lBAdv2LSjE=
 github.com/atomix/runtime/api v0.3.0 h1:LJqOMFAGOELjdPAXVE5YDAhhEVQEAPhWPeWYE/oyz3s=
 github.com/atomix/runtime/api v0.3.0/go.mod h1:X16epZsQDGX+SI+atLVMMXW/qn8F9IPXQ49Hp2qTkZE=
 github.com/atomix/runtime/proxy v0.2.2 h1:qjpSfbETpjU0HRSSqxf2qjtf2d8PbUdT+0UB4S9LmXI=
