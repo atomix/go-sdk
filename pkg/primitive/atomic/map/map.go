@@ -10,6 +10,7 @@ import (
 	"github.com/atomix/go-client/pkg/generic"
 	"github.com/atomix/go-client/pkg/generic/scalar"
 	"github.com/atomix/go-client/pkg/primitive"
+	"github.com/atomix/go-client/pkg/primitive/atomic"
 	"github.com/atomix/go-client/pkg/stream"
 	mapv1 "github.com/atomix/runtime/api/atomix/runtime/atomic/map/v1"
 	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
@@ -65,19 +66,12 @@ type EntryStream[K scalar.Scalar, V any] stream.Stream[*Entry[K, V]]
 
 type EventStream[K scalar.Scalar, V any] stream.Stream[Event[K, V]]
 
-// Version is an entry version
-type Version uint64
-
 // Entry is a versioned key/value pair
 type Entry[K scalar.Scalar, V any] struct {
+	atomic.Versioned[V]
+
 	// Key is the key of the pair
 	Key K
-
-	// Value is the value of the pair
-	Value V
-
-	// Version is the entry version
-	Version Version
 }
 
 func (kv *Entry[K, V]) String() string {
@@ -144,9 +138,11 @@ func (m *atomicMapPrimitive[K, V]) Put(ctx context.Context, key K, value V, opts
 		opts[i].afterPut(response)
 	}
 	return &Entry[K, V]{
-		Key:     key,
-		Value:   value,
-		Version: Version(response.NewVersion),
+		Versioned: atomic.Versioned[V]{
+			Value:   value,
+			Version: atomic.Version(response.NewVersion),
+		},
+		Key: key,
 	}, nil
 }
 
@@ -173,9 +169,11 @@ func (m *atomicMapPrimitive[K, V]) Insert(ctx context.Context, key K, value V, o
 		opts[i].afterInsert(response)
 	}
 	return &Entry[K, V]{
-		Key:     key,
-		Value:   value,
-		Version: Version(response.NewVersion),
+		Versioned: atomic.Versioned[V]{
+			Value:   value,
+			Version: atomic.Version(response.NewVersion),
+		},
+		Key: key,
 	}, nil
 }
 
@@ -202,9 +200,11 @@ func (m *atomicMapPrimitive[K, V]) Update(ctx context.Context, key K, value V, o
 		opts[i].afterUpdate(response)
 	}
 	return &Entry[K, V]{
-		Key:     key,
-		Value:   value,
-		Version: Version(response.NewVersion),
+		Versioned: atomic.Versioned[V]{
+			Value:   value,
+			Version: atomic.Version(response.NewVersion),
+		},
+		Key: key,
 	}, nil
 }
 
@@ -438,9 +438,11 @@ func (m *atomicMapPrimitive[K, V]) decodeValue(key K, value *mapv1.Value) (*Entr
 		return nil, errors.NewInvalid("value decoding failed", err)
 	}
 	return &Entry[K, V]{
-		Key:     key,
-		Value:   decodedValue,
-		Version: Version(value.Version),
+		Versioned: atomic.Versioned[V]{
+			Value:   decodedValue,
+			Version: atomic.Version(value.Version),
+		},
+		Key: key,
 	}, nil
 }
 

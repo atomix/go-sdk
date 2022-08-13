@@ -6,6 +6,7 @@ package _map //nolint:golint
 
 import (
 	"github.com/atomix/go-client/pkg/generic/scalar"
+	"github.com/atomix/go-client/pkg/primitive/atomic"
 	mapv1 "github.com/atomix/runtime/api/atomix/runtime/atomic/map/v1"
 )
 
@@ -34,7 +35,7 @@ type RemoveOption interface {
 }
 
 // IfVersion sets the required version for optimistic concurrency control
-func IfVersion(version Version) VersionOption {
+func IfVersion(version atomic.Version) VersionOption {
 	return VersionOption{version: version}
 }
 
@@ -43,7 +44,7 @@ type VersionOption struct {
 	PutOption
 	UpdateOption
 	RemoveOption
-	version Version
+	version atomic.Version
 }
 
 func (o VersionOption) beforePut(request *mapv1.PutRequest) {
