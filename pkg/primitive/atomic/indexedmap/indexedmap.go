@@ -520,7 +520,7 @@ func (m *indexedMapPrimitive[K, V]) Events(ctx context.Context, opts ...EventsOp
 					},
 				}
 			case *indexedmapv1.Event_Updated_:
-				newEntry, err := m.decodeKeyValue(response.Event.Key, response.Event.Index, &e.Updated.NewValue)
+				newEntry, err := m.decodeKeyValue(response.Event.Key, response.Event.Index, &e.Updated.Value)
 				if err != nil {
 					log.Error(err)
 					continue

@@ -25,13 +25,13 @@ type Map[K scalar.Scalar, V any] interface {
 	primitive.Primitive
 
 	// Put sets a key/value pair in the map
-	Put(ctx context.Context, key K, value V, opts ...PutOption) error
+	Put(ctx context.Context, key K, value V, opts ...PutOption) (V, error)
 
 	// Get gets the value of the given key
 	Get(ctx context.Context, key K, opts ...GetOption) (V, error)
 
 	// Remove removes a key from the map
-	Remove(ctx context.Context, key K, opts ...RemoveOption) error
+	Remove(ctx context.Context, key K, opts ...RemoveOption) (V, error)
 
 	// Len returns the number of entries in the map
 	Len(ctx context.Context) (int, error)
@@ -109,10 +109,11 @@ type mapPrimitive[K scalar.Scalar, V any] struct {
 	valueCodec generic.Codec[V]
 }
 
-func (m *mapPrimitive[K, V]) Put(ctx context.Context, key K, value V, opts ...PutOption) error {
+func (m *mapPrimitive[K, V]) Put(ctx context.Context, key K, value V, opts ...PutOption) (V, error) {
+	var prevValue V
 	valueBytes, err := m.valueCodec.Encode(value)
 	if err != nil {
-		return errors.NewInvalid("value encoding failed", err)
+		return prevValue, errors.NewInvalid("value encoding failed", err)
 	}
 	request := &mapv1.PutRequest{
 		ID: runtimev1.PrimitiveId{
@@ -128,12 +129,16 @@ func (m *mapPrimitive[K, V]) Put(ctx context.Context, key K, value V, opts ...Pu
 	}
 	response, err := m.client.Put(ctx, request)
 	if err != nil {
-		return errors.FromProto(err)
+		return prevValue, errors.FromProto(err)
 	}
 	for i := range opts {
 		opts[i].afterPut(response)
 	}
-	return nil
+	prevValue, err = m.valueCodec.Decode(response.PrevValue.Value)
+	if err != nil {
+		return prevValue, errors.NewInvalid("value decoding failed", err)
+	}
+	return prevValue, nil
 }
 
 func (m *mapPrimitive[K, V]) Get(ctx context.Context, key K, opts ...GetOption) (V, error) {
@@ -146,18 +151,22 @@ func (m *mapPrimitive[K, V]) Get(ctx context.Context, key K, opts ...GetOption) 
 	for i := range opts {
 		opts[i].beforeGet(request)
 	}
-	var v V
+	var value V
 	response, err := m.client.Get(ctx, request)
 	if err != nil {
-		return v, errors.FromProto(err)
+		return value, errors.FromProto(err)
 	}
 	for i := range opts {
 		opts[i].afterGet(response)
 	}
-	return m.valueCodec.Decode(response.Entry.Value.Value)
+	value, err = m.valueCodec.Decode(response.Value.Value)
+	if err != nil {
+		return value, errors.NewInvalid("value decoding failed", err)
+	}
+	return value, nil
 }
 
-func (m *mapPrimitive[K, V]) Remove(ctx context.Context, key K, opts ...RemoveOption) error {
+func (m *mapPrimitive[K, V]) Remove(ctx context.Context, key K, opts ...RemoveOption) (V, error) {
 	request := &mapv1.RemoveRequest{
 		ID: runtimev1.PrimitiveId{
 			Name: m.Name(),
@@ -167,14 +176,19 @@ func (m *mapPrimitive[K, V]) Remove(ctx context.Context, key K, opts ...RemoveOp
 	for i := range opts {
 		opts[i].beforeRemove(request)
 	}
+	var value V
 	response, err := m.client.Remove(ctx, request)
 	if err != nil {
-		return errors.FromProto(err)
+		return value, errors.FromProto(err)
 	}
 	for i := range opts {
 		opts[i].afterRemove(response)
 	}
-	return nil
+	value, err = m.valueCodec.Decode(response.Value.Value)
+	if err != nil {
+		return value, errors.NewInvalid("value decoding failed", err)
+	}
+	return value, nil
 }
 
 func (m *mapPrimitive[K, V]) Len(ctx context.Context) (int, error) {
@@ -315,7 +329,7 @@ func (m *mapPrimitive[K, V]) Events(ctx context.Context, opts ...EventsOption) (
 					},
 				}
 			case *mapv1.Event_Updated_:
-				newEntry, err := m.newEntry(response.Event.Key, &e.Updated.NewValue)
+				newEntry, err := m.newEntry(response.Event.Key, &e.Updated.Value)
 				if err != nil {
 					log.Error(err)
 					continue

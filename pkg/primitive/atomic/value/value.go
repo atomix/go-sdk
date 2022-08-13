@@ -107,7 +107,7 @@ func (m *atomicValuePrimitive[V]) Set(ctx context.Context, value V, opts ...SetO
 		opts[i].afterSet(response)
 	}
 	return atomic.Versioned[V]{
-		Version: atomic.Version(response.NewVersion),
+		Version: atomic.Version(response.Version),
 		Value:   value,
 	}, nil
 }
@@ -134,7 +134,7 @@ func (m *atomicValuePrimitive[V]) Update(ctx context.Context, value V, opts ...U
 		opts[i].afterUpdate(response)
 	}
 	return atomic.Versioned[V]{
-		Version: atomic.Version(response.NewVersion),
+		Version: atomic.Version(response.Version),
 		Value:   value,
 	}, nil
 }
@@ -293,7 +293,7 @@ func (m *atomicValuePrimitive[V]) Events(ctx context.Context, opts ...EventsOpti
 					},
 				}
 			case *valuev1.Event_Updated_:
-				newValue, err := m.codec.Decode(e.Updated.NewValue.Value)
+				newValue, err := m.codec.Decode(e.Updated.Value.Value)
 				if err != nil {
 					log.Error(err)
 					continue
@@ -308,7 +308,7 @@ func (m *atomicValuePrimitive[V]) Events(ctx context.Context, opts ...EventsOpti
 					Value: &Updated[V]{
 						grpcEvent: &grpcEvent{&response.Event},
 						NewValue: atomic.Versioned[V]{
-							Version: atomic.Version(e.Updated.NewValue.Version),
+							Version: atomic.Version(e.Updated.Value.Version),
 							Value:   newValue,
 						},
 						OldValue: atomic.Versioned[V]{

@@ -140,7 +140,7 @@ func (m *atomicMapPrimitive[K, V]) Put(ctx context.Context, key K, value V, opts
 	return &Entry[K, V]{
 		Versioned: atomic.Versioned[V]{
 			Value:   value,
-			Version: atomic.Version(response.NewVersion),
+			Version: atomic.Version(response.Version),
 		},
 		Key: key,
 	}, nil
@@ -171,7 +171,7 @@ func (m *atomicMapPrimitive[K, V]) Insert(ctx context.Context, key K, value V, o
 	return &Entry[K, V]{
 		Versioned: atomic.Versioned[V]{
 			Value:   value,
-			Version: atomic.Version(response.NewVersion),
+			Version: atomic.Version(response.Version),
 		},
 		Key: key,
 	}, nil
@@ -202,7 +202,7 @@ func (m *atomicMapPrimitive[K, V]) Update(ctx context.Context, key K, value V, o
 	return &Entry[K, V]{
 		Versioned: atomic.Versioned[V]{
 			Value:   value,
-			Version: atomic.Version(response.NewVersion),
+			Version: atomic.Version(response.Version),
 		},
 		Key: key,
 	}, nil
@@ -386,7 +386,7 @@ func (m *atomicMapPrimitive[K, V]) Events(ctx context.Context, opts ...EventsOpt
 					},
 				}
 			case *mapv1.Event_Updated_:
-				newEntry, err := m.decodeKeyValue(response.Event.Key, &e.Updated.NewValue)
+				newEntry, err := m.decodeKeyValue(response.Event.Key, &e.Updated.Value)
 				if err != nil {
 					log.Error(err)
 					continue

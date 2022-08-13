@@ -317,7 +317,7 @@ func (l *listPrimitive[E]) Events(ctx context.Context, opts ...EventsOption) (Ev
 					},
 				}
 			case *listv1.Event_Updated_:
-				oldValue, err := l.codec.Decode(e.Updated.NewValue.Value)
+				oldValue, err := l.codec.Decode(e.Updated.Value.Value)
 				if err != nil {
 					log.Error(err)
 					continue
