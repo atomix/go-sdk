@@ -3,12 +3,12 @@ module github.com/atomix/go-client
 go 1.18
 
 require (
-	github.com/atomix/multi-raft-storage/api v0.0.0-20220728201523-7dcf2d5be56a
-	github.com/atomix/multi-raft-storage/driver v0.0.0-20220729004735-7ef100a1d8b2
-	github.com/atomix/multi-raft-storage/node v0.0.0-20220729012051-c60720d92bed
-	github.com/atomix/runtime/api v0.2.1-0.20220812231828-c809d2bc7419
+	github.com/atomix/multi-raft-storage/api v0.2.1-0.20220813003348-09126c77d5ab
+	github.com/atomix/multi-raft-storage/driver v0.2.1-0.20220813003536-d34769ff0d2d
+	github.com/atomix/multi-raft-storage/node v0.2.1-0.20220813003536-d34769ff0d2d
+	github.com/atomix/runtime/api v0.2.1-0.20220813002932-7aea244b0e10
 	github.com/atomix/runtime/proxy v0.2.2-0.20220812231935-10d2e13e40e1
-	github.com/atomix/runtime/sdk v0.2.1-0.20220812231828-c809d2bc7419
+	github.com/atomix/runtime/sdk v0.2.1-0.20220813003031-6ee076fb967f
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.5.2
 	github.com/stretchr/testify v1.7.1

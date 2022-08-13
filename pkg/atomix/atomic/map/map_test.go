@@ -34,12 +34,6 @@ func TestMapOperations(t *testing.T) {
 		Get(ctx)
 	assert.NoError(t, err)
 
-	ch := make(chan Entry[string, string])
-	err = map1.List(context.Background(), ch)
-	assert.NoError(t, err)
-	_, ok := <-ch
-	assert.False(t, ok)
-
 	kv, err := map1.Get(context.Background(), "foo")
 	assert.Error(t, err)
 	assert.True(t, errors.IsNotFound(err))
@@ -69,7 +63,7 @@ func TestMapOperations(t *testing.T) {
 	assert.NotNil(t, kv)
 	assert.Equal(t, "foo", kv.Key)
 	assert.Equal(t, "bar", kv.Value)
-	assert.Equal(t, kv1.Timestamp, kv2.Timestamp)
+	assert.Equal(t, kv1.Version, kv2.Version)
 
 	size, err = map2.Len(context.Background())
 	assert.NoError(t, err)
@@ -105,138 +99,21 @@ func TestMapOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 
-	kv2, err = map1.Update(context.Background(), "foo", "baz", IfVersion(kv1.Timestamp))
+	kv2, err = map1.Update(context.Background(), "foo", "baz", IfVersion(kv1.Version))
 	assert.NoError(t, err)
-	assert.NotEqual(t, kv1.Timestamp, kv2.Timestamp)
+	assert.NotEqual(t, kv1.Version, kv2.Version)
 	assert.Equal(t, "baz", kv2.Value)
 
-	_, err = map1.Update(context.Background(), "foo", "bar", IfVersion(kv1.Timestamp))
+	_, err = map1.Update(context.Background(), "foo", "bar", IfVersion(kv1.Version))
 	assert.Error(t, err)
 	assert.True(t, errors.IsConflict(err))
 
-	_, err = map1.Remove(context.Background(), "foo", IfVersion(kv1.Timestamp))
+	_, err = map1.Remove(context.Background(), "foo", IfVersion(kv1.Version))
 	assert.Error(t, err)
 	assert.True(t, errors.IsConflict(err))
 
-	removed, err := map1.Remove(context.Background(), "foo", IfVersion(kv2.Timestamp))
+	removed, err := map1.Remove(context.Background(), "foo", IfVersion(kv2.Version))
 	assert.NoError(t, err)
 	assert.NotNil(t, removed)
-	assert.Equal(t, kv2.Timestamp, removed.Timestamp)
-}
-
-func TestMapStreams(t *testing.T) {
-	logging.SetLevel(logging.DebugLevel)
-
-	cluster := test.NewCluster()
-	defer cluster.Cleanup()
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-
-	map1, err := NewBuilder[string, string](cluster, "test").
-		Codec(generic.Scalar[string]()).
-		Get(ctx)
-	assert.NoError(t, err)
-
-	map2, err := NewBuilder[string, string](cluster, "test").
-		Codec(generic.Scalar[string]()).
-		Get(ctx)
-	assert.NoError(t, err)
-
-	kv, err := map1.Put(context.Background(), "foo", 1)
-	assert.NoError(t, err)
-	assert.NotNil(t, kv)
-
-	c := make(chan Event[string, int])
-	latch := make(chan struct{})
-	go func() {
-		e := <-c
-		assert.Equal(t, "foo", e.Entry.Key)
-		assert.Equal(t, 2, e.Entry.Value)
-		e = <-c
-		assert.Equal(t, "bar", e.Entry.Key)
-		assert.Equal(t, 3, e.Entry.Value)
-		e = <-c
-		assert.Equal(t, "baz", e.Entry.Key)
-		assert.Equal(t, 4, e.Entry.Value)
-		e = <-c
-		assert.Equal(t, "foo", e.Entry.Key)
-		assert.Equal(t, 5, e.Entry.Value)
-		latch <- struct{}{}
-	}()
-
-	err = map1.Watch(context.Background(), c)
-	assert.NoError(t, err)
-
-	ctx, cancel = context.WithCancel(context.Background())
-	keyCh := make(chan Event[string, int])
-	err = map1.Watch(ctx, keyCh, WithFilter(Filter{
-		Key: "foo",
-	}))
-	assert.NoError(t, err)
-
-	kv, err = map1.Put(context.Background(), "foo", 2)
-	assert.NoError(t, err)
-	assert.NotNil(t, kv)
-	assert.Equal(t, "foo", kv.Key)
-	assert.Equal(t, 2, kv.Value)
-
-	event := <-keyCh
-	assert.Equal(t, EventUpdate, event.Type)
-	assert.NotNil(t, event)
-	assert.Equal(t, "foo", event.Entry.Key)
-	assert.Equal(t, kv.Timestamp, event.Entry.Timestamp)
-
-	kv, err = map1.Put(context.Background(), "bar", 3)
-	assert.NoError(t, err)
-	assert.NotNil(t, kv)
-	assert.Equal(t, "bar", kv.Key)
-	assert.Equal(t, 3, kv.Value)
-
-	kv, err = map1.Put(context.Background(), "baz", 4)
-	assert.NoError(t, err)
-	assert.NotNil(t, kv)
-	assert.Equal(t, "baz", kv.Key)
-	assert.Equal(t, 4, kv.Value)
-
-	kv, err = map1.Put(context.Background(), "foo", 5)
-	assert.NoError(t, err)
-	assert.NotNil(t, kv)
-	assert.Equal(t, "foo", kv.Key)
-	assert.Equal(t, 5, kv.Value)
-
-	event = <-keyCh
-	assert.Equal(t, EventUpdate, event.Type)
-	assert.NotNil(t, event)
-	assert.Equal(t, "foo", event.Entry.Key)
-	assert.Equal(t, kv.Timestamp, event.Entry.Timestamp)
-
-	kv, err = map1.Remove(context.Background(), "foo")
-	assert.NoError(t, err)
-	assert.NotNil(t, kv)
-	assert.Equal(t, "foo", kv.Key)
-	assert.Equal(t, 5, kv.Value)
-
-	event = <-keyCh
-	assert.Equal(t, EventRemove, event.Type)
-	assert.NotNil(t, event)
-	assert.Equal(t, "foo", event.Entry.Key)
-	assert.Equal(t, kv.Timestamp, event.Entry.Timestamp)
-
-	cancel()
-
-	_, ok := <-keyCh
-	assert.False(t, ok)
-
-	<-latch
-
-	err = map1.Close(context.Background())
-	assert.NoError(t, err)
-
-	size, err := map2.Len(context.TODO())
-	assert.NoError(t, err)
-	assert.Equal(t, 2, size)
-
-	err = map2.Close(context.Background())
-	assert.NoError(t, err)
+	assert.Equal(t, kv2.Version, removed.Version)
 }
