@@ -5,7 +5,7 @@
 package atomix
 
 import (
-	"github.com/atomix/go-client/pkg/atomix/client"
+	"github.com/atomix/go-client/pkg/client"
 	"sync"
 )
 

@@ -5,17 +5,17 @@
 package atomix
 
 import (
-	atomiccounter "github.com/atomix/go-client/pkg/atomix/atomic/counter"
-	"github.com/atomix/go-client/pkg/atomix/atomic/indexedmap"
-	"github.com/atomix/go-client/pkg/atomix/atomic/lock"
-	atomicmap "github.com/atomix/go-client/pkg/atomix/atomic/map"
-	"github.com/atomix/go-client/pkg/atomix/client"
-	"github.com/atomix/go-client/pkg/atomix/counter"
-	"github.com/atomix/go-client/pkg/atomix/election"
-	"github.com/atomix/go-client/pkg/atomix/generic/scalar"
-	"github.com/atomix/go-client/pkg/atomix/list"
-	_map "github.com/atomix/go-client/pkg/atomix/map"
-	"github.com/atomix/go-client/pkg/atomix/set"
+	"github.com/atomix/go-client/pkg/client"
+	"github.com/atomix/go-client/pkg/generic/scalar"
+	atomiccounter "github.com/atomix/go-client/pkg/primitive/atomic/counter"
+	"github.com/atomix/go-client/pkg/primitive/atomic/indexedmap"
+	"github.com/atomix/go-client/pkg/primitive/atomic/lock"
+	atomicmap "github.com/atomix/go-client/pkg/primitive/atomic/map"
+	"github.com/atomix/go-client/pkg/primitive/counter"
+	"github.com/atomix/go-client/pkg/primitive/election"
+	"github.com/atomix/go-client/pkg/primitive/list"
+	_map "github.com/atomix/go-client/pkg/primitive/map"
+	"github.com/atomix/go-client/pkg/primitive/set"
 )
 
 func AtomicCounter(name string) *atomiccounter.Builder {
