@@ -22,6 +22,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"os"
+	"sync/atomic"
 )
 
 var Types = []runtime.Type{
@@ -36,7 +37,6 @@ func NewCluster() *Cluster {
 	return &Cluster{
 		network: network,
 		types:   Types,
-		port:    5000,
 	}
 }
 
@@ -45,12 +45,6 @@ type Cluster struct {
 	node    *node.MultiRaftNode
 	types   []runtime.Type
 	proxies []*proxy.Proxy
-	port    int
-}
-
-func (c *Cluster) nextPort() int {
-	c.port++
-	return c.port
 }
 
 func (c *Cluster) start() error {
@@ -58,12 +52,13 @@ func (c *Cluster) start() error {
 		return nil
 	}
 
+	raftPort := int32(nextPort())
 	c.node = node.New(c.network,
 		node.WithHost("localhost"),
-		node.WithPort(5680),
+		node.WithPort(nextPort()),
 		node.WithConfig(multiraftv1.NodeConfig{
 			Host: "localhost",
-			Port: 5690,
+			Port: raftPort,
 			MultiRaftConfig: multiraftv1.MultiRaftConfig{
 				DataDir: "test-data",
 			},
@@ -71,6 +66,7 @@ func (c *Cluster) start() error {
 	if err := c.node.Start(); err != nil {
 		return err
 	}
+	println(fmt.Sprintf("PORT: %d", c.node.Port))
 
 	conn, err := c.connect(context.Background(), fmt.Sprintf("%s:%d", c.node.Host, c.node.Port))
 	if err != nil {
@@ -88,7 +84,7 @@ func (c *Cluster) start() error {
 				{
 					MemberID: 1,
 					Host:     "localhost",
-					Port:     5690,
+					Port:     raftPort,
 				},
 			},
 		},
@@ -105,17 +101,12 @@ func (c *Cluster) Connect(ctx context.Context) (*grpc.ClientConn, error) {
 		return nil, err
 	}
 
-	proxyPort := c.port
-	c.port++
-	runtimePort := c.port
-	c.port++
-
 	driver := driver.New(c.network)
 	proxy := proxy.New(c.network,
 		proxy.WithDrivers(driver),
 		proxy.WithTypes(c.types...),
-		proxy.WithProxyPort(proxyPort),
-		proxy.WithRuntimePort(runtimePort),
+		proxy.WithProxyPort(nextPort()),
+		proxy.WithRuntimePort(nextPort()),
 		proxy.WithRouterConfig(proxy.RouterConfig{
 			Routes: []proxy.RouteConfig{
 				{
@@ -152,7 +143,7 @@ func (c *Cluster) Connect(ctx context.Context) (*grpc.ClientConn, error) {
 		Partitions: []multiraftv1.PartitionConfig{
 			{
 				PartitionID: 1,
-				Leader:      "localhost:5680",
+				Leader:      fmt.Sprintf("localhost:%d", c.node.Port),
 			},
 		},
 	}
@@ -196,4 +187,14 @@ func (c *Cluster) Cleanup() {
 	}
 	_ = c.node.Stop()
 	_ = os.RemoveAll("test-data")
+}
+
+var port = &atomic.Int32{}
+
+func init() {
+	port.Store(5000)
+}
+
+func nextPort() int {
+	return int(port.Add(1))
 }
