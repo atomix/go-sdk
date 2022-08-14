@@ -1,6 +1,6 @@
 module github.com/atomix/go-client
 
-go 1.18
+go 1.19
 
 require (
 	github.com/atomix/multi-raft-storage/api v0.3.1
