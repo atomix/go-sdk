@@ -29,7 +29,7 @@ type IndexedMap[K scalar.Scalar, V any] interface {
 	primitive.Primitive
 
 	// Append appends the given key/value to the map
-	Append(ctx context.Context, key K, value V) (*Entry[K, V], error)
+	Append(ctx context.Context, key K, value V, opts ...AppendOption) (*Entry[K, V], error)
 
 	// Update appends the given key/value in the map
 	Update(ctx context.Context, key K, value V, opts ...UpdateOption) (*Entry[K, V], error)
