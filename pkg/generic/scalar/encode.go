@@ -5,6 +5,7 @@
 package scalar
 
 import (
+	"fmt"
 	"reflect"
 	"strconv"
 )
@@ -61,7 +62,7 @@ func NewEncodeFunc[T Scalar]() func(T) string {
 		switch keyType.Kind() {
 		case reflect.String:
 			return func(key T) string {
-				return string(key)
+				return fmt.Sprint(key)
 			}
 		case reflect.Int:
 			intType := reflect.TypeOf(1)
