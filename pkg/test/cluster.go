@@ -75,7 +75,7 @@ func (c *Cluster) start() error {
 	defer conn.Close()
 
 	client := multiraftv1.NewNodeClient(conn)
-	request := &multiraftv1.BootstrapRequest{
+	_, err = client.Bootstrap(context.Background(), &multiraftv1.BootstrapRequest{
 		Group: multiraftv1.GroupConfig{
 			GroupID:  1,
 			MemberID: 1,
@@ -88,8 +88,41 @@ func (c *Cluster) start() error {
 				},
 			},
 		},
+	})
+	if err != nil {
+		return err
 	}
-	_, err = client.Bootstrap(context.Background(), request)
+	_, err = client.Bootstrap(context.Background(), &multiraftv1.BootstrapRequest{
+		Group: multiraftv1.GroupConfig{
+			GroupID:  2,
+			MemberID: 1,
+			Role:     multiraftv1.MemberRole_MEMBER,
+			Members: []multiraftv1.MemberConfig{
+				{
+					MemberID: 1,
+					Host:     "localhost",
+					Port:     raftPort,
+				},
+			},
+		},
+	})
+	if err != nil {
+		return err
+	}
+	_, err = client.Bootstrap(context.Background(), &multiraftv1.BootstrapRequest{
+		Group: multiraftv1.GroupConfig{
+			GroupID:  3,
+			MemberID: 1,
+			Role:     multiraftv1.MemberRole_MEMBER,
+			Members: []multiraftv1.MemberConfig{
+				{
+					MemberID: 1,
+					Host:     "localhost",
+					Port:     raftPort,
+				},
+			},
+		},
+	})
 	if err != nil {
 		return err
 	}
@@ -143,6 +176,14 @@ func (c *Cluster) Connect(ctx context.Context) (*grpc.ClientConn, error) {
 		Partitions: []multiraftv1.PartitionConfig{
 			{
 				PartitionID: 1,
+				Leader:      fmt.Sprintf("localhost:%d", c.node.Port),
+			},
+			{
+				PartitionID: 2,
+				Leader:      fmt.Sprintf("localhost:%d", c.node.Port),
+			},
+			{
+				PartitionID: 3,
 				Leader:      fmt.Sprintf("localhost:%d", c.node.Port),
 			},
 		},
