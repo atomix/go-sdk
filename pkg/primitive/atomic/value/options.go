@@ -7,6 +7,7 @@ package value
 import (
 	"github.com/atomix/go-client/pkg/primitive/atomic"
 	valuev1 "github.com/atomix/runtime/api/atomix/runtime/atomic/value/v1"
+	"time"
 )
 
 // SetOption is an option for the Put method
@@ -25,6 +26,34 @@ type UpdateOption interface {
 type DeleteOption interface {
 	beforeDelete(request *valuev1.DeleteRequest)
 	afterDelete(response *valuev1.DeleteResponse)
+}
+
+// WithTTL sets time-to-live for an entry
+func WithTTL(ttl time.Duration) TTLOption {
+	return TTLOption{ttl: ttl}
+}
+
+// TTLOption is an option for update operations setting a TTL on the map entry
+type TTLOption struct {
+	SetOption
+	UpdateOption
+	ttl time.Duration
+}
+
+func (o TTLOption) beforeSet(request *valuev1.SetRequest) {
+	request.TTL = &o.ttl
+}
+
+func (o TTLOption) afterSet(response *valuev1.SetResponse) {
+
+}
+
+func (o TTLOption) beforeUpdate(request *valuev1.UpdateRequest) {
+	request.TTL = &o.ttl
+}
+
+func (o TTLOption) afterUpdate(response *valuev1.UpdateResponse) {
+
 }
 
 // IfVersion sets the required version for optimistic concurrency control

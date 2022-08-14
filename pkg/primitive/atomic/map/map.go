@@ -104,7 +104,8 @@ type Updated[K scalar.Scalar, V any] struct {
 
 type Removed[K scalar.Scalar, V any] struct {
 	*grpcEvent
-	Entry *Entry[K, V]
+	Entry   *Entry[K, V]
+	Expired bool
 }
 
 type atomicMapPrimitive[K scalar.Scalar, V any] struct {
@@ -415,6 +416,7 @@ func (m *atomicMapPrimitive[K, V]) Events(ctx context.Context, opts ...EventsOpt
 					Value: &Removed[K, V]{
 						grpcEvent: &grpcEvent{&response.Event},
 						Entry:     entry,
+						Expired:   e.Removed.Expired,
 					},
 				}
 			}

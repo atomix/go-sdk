@@ -76,7 +76,8 @@ type Updated[V any] struct {
 
 type Deleted[V any] struct {
 	*grpcEvent
-	Value atomic.Versioned[V]
+	Value   atomic.Versioned[V]
+	Expired bool
 }
 
 type atomicValuePrimitive[V any] struct {
@@ -331,6 +332,7 @@ func (m *atomicValuePrimitive[V]) Events(ctx context.Context, opts ...EventsOpti
 							Version: atomic.Version(e.Deleted.Value.Version),
 							Value:   value,
 						},
+						Expired: e.Deleted.Expired,
 					},
 				}
 			}

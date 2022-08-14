@@ -7,6 +7,7 @@ package _map //nolint:golint
 import (
 	"github.com/atomix/go-client/pkg/generic/scalar"
 	mapv1 "github.com/atomix/runtime/api/atomix/runtime/map/v1"
+	"time"
 )
 
 // PutOption is an option for the Put method
@@ -31,6 +32,25 @@ type GetOption interface {
 type EventsOption interface {
 	beforeEvents(request *mapv1.EventsRequest)
 	afterEvents(response *mapv1.EventsResponse)
+}
+
+// WithTTL sets time-to-live for an entry
+func WithTTL(ttl time.Duration) TTLOption {
+	return TTLOption{ttl: ttl}
+}
+
+// TTLOption is an option for update operations setting a TTL on the map entry
+type TTLOption struct {
+	PutOption
+	ttl time.Duration
+}
+
+func (o TTLOption) beforePut(request *mapv1.PutRequest) {
+	request.Value.TTL = &o.ttl
+}
+
+func (o TTLOption) afterPut(response *mapv1.PutResponse) {
+
 }
 
 func WithKey[K scalar.Scalar](key K) EventsOption {

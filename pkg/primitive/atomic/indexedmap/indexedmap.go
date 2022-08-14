@@ -138,7 +138,8 @@ type Updated[K scalar.Scalar, V any] struct {
 
 type Removed[K scalar.Scalar, V any] struct {
 	*grpcEvent
-	Entry *Entry[K, V]
+	Entry   *Entry[K, V]
+	Expired bool
 }
 
 // indexedMapPrimitive is the default single-partition implementation of Map
@@ -150,7 +151,7 @@ type indexedMapPrimitive[K scalar.Scalar, V any] struct {
 	valueCodec generic.Codec[V]
 }
 
-func (m *indexedMapPrimitive[K, V]) Append(ctx context.Context, key K, value V) (*Entry[K, V], error) {
+func (m *indexedMapPrimitive[K, V]) Append(ctx context.Context, key K, value V, opts ...AppendOption) (*Entry[K, V], error) {
 	valueBytes, err := m.valueCodec.Encode(value)
 	if err != nil {
 		return nil, errors.NewInvalid("value encoding failed", err)
@@ -162,9 +163,15 @@ func (m *indexedMapPrimitive[K, V]) Append(ctx context.Context, key K, value V) 
 		Key:   m.keyEncoder(key),
 		Value: valueBytes,
 	}
+	for i := range opts {
+		opts[i].beforeAppend(request)
+	}
 	response, err := m.client.Append(ctx, request)
 	if err != nil {
 		return nil, errors.FromProto(err)
+	}
+	for i := range opts {
+		opts[i].afterAppend(response)
 	}
 	return m.decodeEntry(response.Entry)
 }
@@ -549,6 +556,7 @@ func (m *indexedMapPrimitive[K, V]) Events(ctx context.Context, opts ...EventsOp
 					Value: &Removed[K, V]{
 						grpcEvent: &grpcEvent{&response.Event},
 						Entry:     entry,
+						Expired:   e.Removed.Expired,
 					},
 				}
 			}

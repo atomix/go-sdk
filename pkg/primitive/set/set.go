@@ -82,6 +82,7 @@ type Added[E any] struct {
 type Removed[E any] struct {
 	*grpcEvent
 	Element E
+	Expired bool
 }
 
 type setPrimitive[E any] struct {
@@ -312,6 +313,7 @@ func (m *setPrimitive[E]) Events(ctx context.Context) (EventStream[E], error) {
 					Value: &Removed[E]{
 						grpcEvent: &grpcEvent{&response.Event},
 						Element:   element,
+						Expired:   e.Removed.Expired,
 					},
 				}
 			}
