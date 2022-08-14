@@ -32,22 +32,22 @@ var Types = []runtime.Type{
 	mapv1.Type,
 }
 
-func NewCluster() *Cluster {
+func NewClient() *Client {
 	network := proxy.NewLocalNetwork()
-	return &Cluster{
+	return &Client{
 		network: network,
 		types:   Types,
 	}
 }
 
-type Cluster struct {
+type Client struct {
 	network proxy.Network
 	node    *node.MultiRaftNode
 	types   []runtime.Type
 	proxies []*proxy.Proxy
 }
 
-func (c *Cluster) start() error {
+func (c *Client) start() error {
 	if c.node != nil {
 		return nil
 	}
@@ -129,7 +129,7 @@ func (c *Cluster) start() error {
 	return nil
 }
 
-func (c *Cluster) Connect(ctx context.Context) (*grpc.ClientConn, error) {
+func (c *Client) Connect(ctx context.Context) (*grpc.ClientConn, error) {
 	if err := c.start(); err != nil {
 		return nil, err
 	}
@@ -212,7 +212,7 @@ func (c *Cluster) Connect(ctx context.Context) (*grpc.ClientConn, error) {
 	return c.connect(ctx, fmt.Sprintf(":%d", proxy.RuntimeService.Port))
 }
 
-func (c *Cluster) connect(ctx context.Context, target string) (*grpc.ClientConn, error) {
+func (c *Client) connect(ctx context.Context, target string) (*grpc.ClientConn, error) {
 	conn, err := grpc.DialContext(ctx, target,
 		grpc.WithContextDialer(c.network.Connect),
 		grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -222,7 +222,7 @@ func (c *Cluster) connect(ctx context.Context, target string) (*grpc.ClientConn,
 	return conn, nil
 }
 
-func (c *Cluster) Cleanup() {
+func (c *Client) Cleanup() {
 	for _, proxy := range c.proxies {
 		_ = proxy.Stop()
 	}
