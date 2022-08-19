@@ -432,7 +432,9 @@ func (m *atomicMapPrimitive[K, V]) Events(ctx context.Context, opts ...EventsOpt
 
 func (m *atomicMapPrimitive[K, V]) decodeValue(key K, value *mapv1.VersionedValue) (*Entry[K, V], error) {
 	if value == nil {
-		return nil, nil
+		return &Entry[K, V]{
+			Key: key,
+		}, nil
 	}
 	decodedValue, err := m.valueCodec.Decode(value.Value)
 	if err != nil {
