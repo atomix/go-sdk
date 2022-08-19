@@ -5,11 +5,12 @@
 package lock
 
 import (
-	lockv1 "github.com/atomix/runtime/api/atomix/runtime/atomic/lock/v1"
+	lockv1 "github.com/atomix/runtime/api/atomix/runtime/lock/v1"
 	"time"
 )
 
 // LockOption is an option for Lock calls
+//
 //nolint:golint
 type LockOption interface {
 	beforeLock(request *lockv1.LockRequest)

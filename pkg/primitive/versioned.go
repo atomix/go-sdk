@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-package atomic
+package primitive
 
 // Version is a version number for optimistic locking
 type Version uint64

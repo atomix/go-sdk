@@ -10,9 +10,8 @@ import (
 	"github.com/atomix/go-client/pkg/generic"
 	"github.com/atomix/go-client/pkg/generic/scalar"
 	"github.com/atomix/go-client/pkg/primitive"
-	"github.com/atomix/go-client/pkg/primitive/atomic"
 	"github.com/atomix/go-client/pkg/stream"
-	indexedmapv1 "github.com/atomix/runtime/api/atomix/runtime/atomic/indexedmap/v1"
+	indexedmapv1 "github.com/atomix/runtime/api/atomix/runtime/indexedmap/v1"
 	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
 	"github.com/atomix/runtime/sdk/pkg/errors"
 	"github.com/atomix/runtime/sdk/pkg/logging"
@@ -98,7 +97,7 @@ type EventStream[K scalar.Scalar, V any] stream.Stream[Event[K, V]]
 
 // Entry is an indexed key/value pair
 type Entry[K scalar.Scalar, V any] struct {
-	atomic.Versioned[V]
+	primitive.Versioned[V]
 
 	// Index is the unique, monotonically increasing, globally unique index of the entry. The index is static
 	// for the lifetime of a key.
@@ -145,7 +144,7 @@ type Removed[K scalar.Scalar, V any] struct {
 // indexedMapPrimitive is the default single-partition implementation of Map
 type indexedMapPrimitive[K scalar.Scalar, V any] struct {
 	primitive.Primitive
-	client     indexedmapv1.AtomicIndexedMapClient
+	client     indexedmapv1.IndexedMapClient
 	keyEncoder func(K) string
 	keyDecoder func(string) (K, error)
 	valueCodec generic.Codec[V]
@@ -571,7 +570,7 @@ func (m *indexedMapPrimitive[K, V]) Events(ctx context.Context, opts ...EventsOp
 	}
 }
 
-func (m *indexedMapPrimitive[K, V]) decodeValue(key K, index Index, value *indexedmapv1.Value) (*Entry[K, V], error) {
+func (m *indexedMapPrimitive[K, V]) decodeValue(key K, index Index, value *indexedmapv1.VersionedValue) (*Entry[K, V], error) {
 	if value == nil {
 		return nil, nil
 	}
@@ -580,8 +579,8 @@ func (m *indexedMapPrimitive[K, V]) decodeValue(key K, index Index, value *index
 		return nil, errors.NewInvalid("value decoding failed", err)
 	}
 	return &Entry[K, V]{
-		Versioned: atomic.Versioned[V]{
-			Version: atomic.Version(value.Version),
+		Versioned: primitive.Versioned[V]{
+			Version: primitive.Version(value.Version),
 			Value:   decodedValue,
 		},
 		Key:   key,
@@ -589,7 +588,7 @@ func (m *indexedMapPrimitive[K, V]) decodeValue(key K, index Index, value *index
 	}, nil
 }
 
-func (m *indexedMapPrimitive[K, V]) decodeKeyValue(key string, index uint64, value *indexedmapv1.Value) (*Entry[K, V], error) {
+func (m *indexedMapPrimitive[K, V]) decodeKeyValue(key string, index uint64, value *indexedmapv1.VersionedValue) (*Entry[K, V], error) {
 	decodedKey, err := m.keyDecoder(key)
 	if err != nil {
 		return nil, errors.NewInvalid("key decoding failed", err)

@@ -39,109 +39,128 @@ func TestMapOperations(t *testing.T) {
 	stream, err := map1.Watch(streamCtx)
 	assert.NoError(t, err)
 
-	value, err := map1.Get(context.Background(), "foo")
+	kv, err := map1.Get(context.Background(), "foo")
 	assert.Error(t, err)
 	assert.True(t, errors.IsNotFound(err))
-	assert.Equal(t, "", value)
+	assert.Nil(t, kv)
 
 	size, err := map1.Len(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, 0, size)
 
-	value, err = map1.Put(context.Background(), "foo", "bar")
+	kv, err = map1.Put(context.Background(), "foo", "bar")
+	assert.NoError(t, err)
+	assert.NotNil(t, kv)
+	assert.Equal(t, "bar", kv.Value)
+
+	value, err := stream.Next()
 	assert.NoError(t, err)
 	assert.NotNil(t, value)
-	assert.Equal(t, "", value)
 
-	entry, err := stream.Next()
+	kv1, err := map1.Get(context.Background(), "foo")
 	assert.NoError(t, err)
-	assert.Equal(t, "foo", entry.Key)
-	assert.Equal(t, "bar", entry.Value)
-
-	value, err = map1.Get(context.Background(), "foo")
-	assert.NoError(t, err)
-	assert.NotNil(t, value)
-	assert.Equal(t, "bar", value)
+	assert.NotNil(t, kv)
+	assert.Equal(t, "foo", kv.Key)
+	assert.Equal(t, "bar", kv.Value)
 
 	size, err = map1.Len(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, 1, size)
 
-	value, err = map1.Remove(context.Background(), "foo")
+	kv2, err := map1.Remove(context.Background(), "foo")
+	assert.NoError(t, err)
+	assert.NotNil(t, kv2)
+	assert.Equal(t, "foo", kv2.Key)
+	assert.Equal(t, "bar", kv2.Value)
+	assert.Equal(t, kv1.Version, kv2.Version)
+
+	value, err = stream.Next()
 	assert.NoError(t, err)
 	assert.NotNil(t, value)
-	assert.Equal(t, "bar", value)
-
-	entry, err = stream.Next()
-	assert.NoError(t, err)
-	assert.Equal(t, "foo", entry.Key)
-	assert.Equal(t, "", entry.Value)
 
 	size, err = map2.Len(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, 0, size)
 
-	value, err = map2.Put(context.Background(), "foo", "bar")
+	kv, err = map2.Put(context.Background(), "foo", "bar")
+	assert.NoError(t, err)
+	assert.NotNil(t, kv)
+	assert.Equal(t, "bar", kv.Value)
+
+	value, err = stream.Next()
 	assert.NoError(t, err)
 	assert.NotNil(t, value)
-	assert.Equal(t, "", value)
 
-	entry, err = stream.Next()
+	kv, err = map2.Put(context.Background(), "bar", "baz")
 	assert.NoError(t, err)
-	assert.Equal(t, "foo", entry.Key)
-	assert.Equal(t, "bar", entry.Value)
+	assert.NotNil(t, kv)
+	assert.Equal(t, "baz", kv.Value)
 
-	value, err = map2.Put(context.Background(), "bar", "baz")
-	assert.NoError(t, err)
-	assert.NotNil(t, value)
-	assert.Equal(t, "", value)
-
-	entry, err = stream.Next()
-	assert.NoError(t, err)
-	assert.Equal(t, "bar", entry.Key)
-	assert.Equal(t, "baz", entry.Value)
-
-	value, err = map2.Put(context.Background(), "foo", "baz")
+	value, err = stream.Next()
 	assert.NoError(t, err)
 	assert.NotNil(t, value)
-	assert.Equal(t, "bar", value)
 
-	entry, err = stream.Next()
+	kv, err = map2.Put(context.Background(), "foo", "baz")
 	assert.NoError(t, err)
-	assert.Equal(t, "foo", entry.Key)
-	assert.Equal(t, "baz", entry.Value)
+	assert.NotNil(t, kv)
+	assert.Equal(t, "baz", kv.Value)
+
+	value, err = stream.Next()
+	assert.NoError(t, err)
+	assert.NotNil(t, value)
 
 	err = map2.Clear(context.Background())
 	assert.NoError(t, err)
 
-	entry, err = stream.Next()
+	value, err = stream.Next()
 	assert.NoError(t, err)
-	assert.NotNil(t, entry)
+	assert.NotNil(t, value)
 
-	entry, err = stream.Next()
+	value, err = stream.Next()
 	assert.NoError(t, err)
-	assert.NotNil(t, entry)
+	assert.NotNil(t, value)
 
 	size, err = map1.Len(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, 0, size)
 
-	value, err = map1.Put(context.Background(), "foo", "bar")
+	kv, err = map1.Put(context.Background(), "foo", "bar")
+	assert.NoError(t, err)
+	assert.NotNil(t, kv)
+
+	value, err = stream.Next()
 	assert.NoError(t, err)
 	assert.NotNil(t, value)
 
-	entry, err = stream.Next()
+	kv1, err = map1.Get(context.Background(), "foo")
 	assert.NoError(t, err)
-	assert.Equal(t, "foo", entry.Key)
-	assert.Equal(t, "bar", entry.Value)
+	assert.NotNil(t, kv)
 
-	value, err = map1.Get(context.Background(), "foo")
+	kv2, err = map1.Update(context.Background(), "foo", "baz", IfVersion(kv1.Version))
+	assert.NoError(t, err)
+	assert.NotEqual(t, kv1.Version, kv2.Version)
+	assert.Equal(t, "baz", kv2.Value)
+
+	value, err = stream.Next()
 	assert.NoError(t, err)
 	assert.NotNil(t, value)
 
 	streamCancel()
 
-	entry, err = stream.Next()
+	value, err = stream.Next()
 	assert.Equal(t, io.EOF, err)
-	assert.Nil(t, entry)
+	assert.Nil(t, value)
+
+	_, err = map1.Update(context.Background(), "foo", "bar", IfVersion(kv1.Version))
+	assert.Error(t, err)
+	assert.True(t, errors.IsConflict(err))
+
+	_, err = map1.Remove(context.Background(), "foo", IfVersion(kv1.Version))
+	assert.Error(t, err)
+	assert.True(t, errors.IsConflict(err))
+
+	removed, err := map1.Remove(context.Background(), "foo", IfVersion(kv2.Version))
+	assert.NoError(t, err)
+	assert.NotNil(t, removed)
+	assert.Equal(t, kv2.Version, removed.Version)
 }

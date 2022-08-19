@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-func TestCounterOperations(t *testing.T) {
+func TestAtomicCounterOperations(t *testing.T) {
 	logging.SetLevel(logging.DebugLevel)
 
 	cluster := test.NewClient()
@@ -32,17 +32,15 @@ func TestCounterOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, int64(0), value)
 
-	value, err = counter1.Increment(context.TODO(), 1)
+	err = counter1.Set(context.TODO(), 1)
 	assert.NoError(t, err)
-	assert.Equal(t, int64(1), value)
 
 	value, err = counter1.Get(context.TODO())
 	assert.NoError(t, err)
 	assert.Equal(t, int64(1), value)
 
-	value, err = counter1.Decrement(context.TODO(), 2)
+	err = counter1.Set(context.TODO(), -1)
 	assert.NoError(t, err)
-	assert.Equal(t, int64(-1), value)
 
 	value, err = counter1.Get(context.TODO())
 	assert.NoError(t, err)

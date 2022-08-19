@@ -7,7 +7,7 @@ package lock
 import (
 	"context"
 	"github.com/atomix/go-client/pkg/primitive"
-	lockv1 "github.com/atomix/runtime/api/atomix/runtime/atomic/lock/v1"
+	lockv1 "github.com/atomix/runtime/api/atomix/runtime/lock/v1"
 	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
 	"github.com/atomix/runtime/sdk/pkg/errors"
 )

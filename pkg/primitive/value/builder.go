@@ -8,7 +8,7 @@ import (
 	"context"
 	"github.com/atomix/go-client/pkg/generic"
 	"github.com/atomix/go-client/pkg/primitive"
-	valuev1 "github.com/atomix/runtime/api/atomix/runtime/value/v1"
+	atomicvaluev1 "github.com/atomix/runtime/api/atomix/runtime/value/v1"
 )
 
 func NewBuilder[V any](client primitive.Client, name string) *Builder[V] {
@@ -47,9 +47,9 @@ func (b *Builder[V]) Get(ctx context.Context) (Value[V], error) {
 	if b.codec == nil {
 		panic("no codec set for map primitive")
 	}
-	atomicValue := &valuePrimitive[V]{
+	atomicValue := &atomicValuePrimitive[V]{
 		Primitive: primitive.New(b.options.Name),
-		client:    valuev1.NewValueClient(conn),
+		client:    atomicvaluev1.NewValueClient(conn),
 		codec:     b.codec,
 	}
 	if err := atomicValue.create(ctx, b.options.Tags); err != nil {

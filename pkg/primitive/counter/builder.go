@@ -32,7 +32,7 @@ func (b *Builder) Tags(tags map[string]string) *Builder {
 	return b
 }
 
-func (b *Builder) Get(ctx context.Context) (Counter, error) {
+func (b *Builder) Get(ctx context.Context) (AtomicCounter, error) {
 	conn, err := b.client.Connect(ctx)
 	if err != nil {
 		return nil, err
@@ -47,4 +47,4 @@ func (b *Builder) Get(ctx context.Context) (Counter, error) {
 	return counter, nil
 }
 
-var _ primitive.Builder[*Builder, Counter] = (*Builder)(nil)
+var _ primitive.Builder[*Builder, AtomicCounter] = (*Builder)(nil)

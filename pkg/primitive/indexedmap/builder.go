@@ -2,14 +2,14 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-package _map //nolint:golint
+package indexedmap
 
 import (
 	"context"
 	"github.com/atomix/go-client/pkg/generic"
 	"github.com/atomix/go-client/pkg/generic/scalar"
 	"github.com/atomix/go-client/pkg/primitive"
-	atomicmapv1 "github.com/atomix/runtime/api/atomix/runtime/atomic/map/v1"
+	indexedmapv1 "github.com/atomix/runtime/api/atomix/runtime/indexedmap/v1"
 )
 
 func NewBuilder[K scalar.Scalar, V any](client primitive.Client, name string) *Builder[K, V] {
@@ -40,7 +40,7 @@ func (b *Builder[K, V]) Codec(codec generic.Codec[V]) *Builder[K, V] {
 	return b
 }
 
-func (b *Builder[K, V]) Get(ctx context.Context) (Map[K, V], error) {
+func (b *Builder[K, V]) Get(ctx context.Context) (IndexedMap[K, V], error) {
 	conn, err := b.client.Connect(ctx)
 	if err != nil {
 		return nil, err
@@ -48,9 +48,9 @@ func (b *Builder[K, V]) Get(ctx context.Context) (Map[K, V], error) {
 	if b.codec == nil {
 		panic("no codec set for map primitive")
 	}
-	atomicMap := &atomicMapPrimitive[K, V]{
+	atomicMap := &indexedMapPrimitive[K, V]{
 		Primitive:  primitive.New(b.options.Name),
-		client:     atomicmapv1.NewAtomicMapClient(conn),
+		client:     indexedmapv1.NewIndexedMapClient(conn),
 		keyEncoder: scalar.NewEncodeFunc[K](),
 		keyDecoder: scalar.NewDecodeFunc[K](),
 		valueCodec: b.codec,
@@ -61,4 +61,4 @@ func (b *Builder[K, V]) Get(ctx context.Context) (Map[K, V], error) {
 	return atomicMap, nil
 }
 
-var _ primitive.Builder[*Builder[string, any], Map[string, any]] = (*Builder[string, any])(nil)
+var _ primitive.Builder[*Builder[string, any], IndexedMap[string, any]] = (*Builder[string, any])(nil)

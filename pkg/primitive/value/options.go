@@ -5,8 +5,8 @@
 package value
 
 import (
-	"github.com/atomix/go-client/pkg/primitive/atomic"
-	valuev1 "github.com/atomix/runtime/api/atomix/runtime/atomic/value/v1"
+	"github.com/atomix/go-client/pkg/primitive"
+	valuev1 "github.com/atomix/runtime/api/atomix/runtime/value/v1"
 	"time"
 )
 
@@ -57,7 +57,7 @@ func (o TTLOption) afterUpdate(response *valuev1.UpdateResponse) {
 }
 
 // IfVersion sets the required version for optimistic concurrency control
-func IfVersion(version atomic.Version) VersionOption {
+func IfVersion(version primitive.Version) VersionOption {
 	return VersionOption{version: version}
 }
 
@@ -65,7 +65,7 @@ func IfVersion(version atomic.Version) VersionOption {
 type VersionOption struct {
 	UpdateOption
 	DeleteOption
-	version atomic.Version
+	version primitive.Version
 }
 
 func (o VersionOption) beforeUpdate(request *valuev1.UpdateRequest) {
