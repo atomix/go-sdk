@@ -3,12 +3,12 @@ module github.com/atomix/go-client
 go 1.19
 
 require (
-	github.com/atomix/multi-raft-storage/api v0.4.5
-	github.com/atomix/multi-raft-storage/driver v0.4.1
-	github.com/atomix/multi-raft-storage/node v0.4.1
-	github.com/atomix/runtime/api v0.4.0
+	github.com/atomix/multi-raft-storage/api v0.5.9
+	github.com/atomix/multi-raft-storage/driver v0.6.3
+	github.com/atomix/multi-raft-storage/node v0.5.6
+	github.com/atomix/runtime/api v0.5.5
 	github.com/atomix/runtime/proxy v0.2.2
-	github.com/atomix/runtime/sdk v0.4.1
+	github.com/atomix/runtime/sdk v0.5.6
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.5.2
 	github.com/stretchr/testify v1.7.1
@@ -29,6 +29,7 @@ require (
 	github.com/cockroachdb/sentry-go v0.6.1-cockroachdb.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
+	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/snappy v0.0.3-0.20201103224600-674baa8c7fc3 // indirect
 	github.com/google/btree v1.0.0 // indirect
 	github.com/google/uuid v1.1.2 // indirect

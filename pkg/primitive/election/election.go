@@ -12,7 +12,6 @@ import (
 	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
 	"github.com/atomix/runtime/sdk/pkg/errors"
 	"github.com/atomix/runtime/sdk/pkg/logging"
-	"github.com/atomix/runtime/sdk/pkg/time"
 	"io"
 )
 
@@ -55,23 +54,23 @@ func newTerm(term *electionv1.Term) *Term {
 		return nil
 	}
 	return &Term{
+		ID:         term.Term,
 		Leader:     term.Leader,
 		Candidates: term.Candidates,
-		Timestamp:  time.NewTimestamp(*term.Timestamp),
 	}
 }
 
 // Term is a leadership term
 // A term is guaranteed to have a monotonically increasing, globally unique ID.
 type Term struct {
+	// ID is the monotonically increasing term identifier
+	ID uint64
+
 	// Leader is the ID of the leader that was elected
 	Leader string
 
 	// Candidates is a list of candidates currently participating in the election
 	Candidates []string
-
-	// Timestamp is the timestamp at which the leader was elected
-	Timestamp time.Timestamp
 }
 
 // electionPrimitive is the single partition implementation of Election

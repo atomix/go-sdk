@@ -45,21 +45,3 @@ type GetOption interface {
 	beforeGet(request *lockv1.GetLockRequest)
 	afterGet(response *lockv1.GetLockResponse)
 }
-
-// IfVersion sets the lock version to check
-func IfVersion(version Version) UnlockOption {
-	return VersionOption{version: version}
-}
-
-// VersionOption is a lock option for checking the version
-type VersionOption struct {
-	version Version
-}
-
-func (o VersionOption) beforeUnlock(request *lockv1.UnlockRequest) {
-	request.Version = uint64(o.version)
-}
-
-func (o VersionOption) afterUnlock(response *lockv1.UnlockResponse) {
-
-}
