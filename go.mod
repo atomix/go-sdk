@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/atomix/multi-raft-storage/api v0.5.9
 	github.com/atomix/multi-raft-storage/driver v0.6.3
-	github.com/atomix/multi-raft-storage/node v0.5.6
+	github.com/atomix/multi-raft-storage/node v0.5.8
 	github.com/atomix/runtime/api v0.5.5
 	github.com/atomix/runtime/proxy v0.2.2
 	github.com/atomix/runtime/sdk v0.5.6
