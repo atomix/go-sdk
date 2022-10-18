@@ -16,6 +16,40 @@ import (
 	"time"
 )
 
+func TestMapEntries(t *testing.T) {
+	logging.SetLevel(logging.DebugLevel)
+
+	cluster := test.NewClient()
+	defer cluster.Cleanup()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	map1, err := NewBuilder[string, string](cluster, "test").
+		Codec(generic.Scalar[string]()).
+		Get(ctx)
+	assert.NoError(t, err)
+
+	_, err = map1.Put(ctx, "foo", "bar")
+	assert.NoError(t, err)
+	_, err = map1.Put(ctx, "bar", "baz")
+	assert.NoError(t, err)
+	_, err = map1.Put(ctx, "baz", "foo")
+	assert.NoError(t, err)
+
+	stream, err := map1.List(ctx)
+	assert.NoError(t, err)
+
+	for {
+		entry, err := stream.Next()
+		if err == io.EOF {
+			break
+		}
+		assert.NoError(t, err)
+		assert.NotNil(t, entry)
+	}
+}
+
 func TestMapOperations(t *testing.T) {
 	logging.SetLevel(logging.DebugLevel)
 
