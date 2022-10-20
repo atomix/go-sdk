@@ -7,15 +7,14 @@ package test
 import (
 	"context"
 	"fmt"
-	multiraftv1 "github.com/atomix/multi-raft-storage/api/atomix/multiraft/v1"
-	"github.com/atomix/multi-raft-storage/driver"
-	"github.com/atomix/multi-raft-storage/node/pkg/node"
 	proxyv1 "github.com/atomix/runtime/api/atomix/proxy/v1"
 	"github.com/atomix/runtime/proxy/pkg/proxy"
+	counterv1 "github.com/atomix/runtime/proxy/pkg/proxy/counter/v1"
+	mapv1 "github.com/atomix/runtime/proxy/pkg/proxy/map/v1"
 	"github.com/atomix/runtime/sdk/pkg/errors"
-	"github.com/atomix/runtime/sdk/pkg/runtime"
-	counterv1 "github.com/atomix/runtime/sdk/pkg/runtime/counter/v1"
-	mapv1 "github.com/atomix/runtime/sdk/pkg/runtime/map/v1"
+	"github.com/atomix/runtime/sdk/pkg/network"
+	"github.com/atomix/runtime/sdk/pkg/protocol"
+	"github.com/atomix/runtime/sdk/pkg/protocol/node"
 	"github.com/gogo/protobuf/jsonpb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -23,13 +22,13 @@ import (
 	"sync/atomic"
 )
 
-var Types = []runtime.Type{
+var Types = []proxy.Type{
 	counterv1.Type,
 	mapv1.Type,
 }
 
 func NewClient() *Client {
-	network := proxy.NewLocalNetwork()
+	network := network.NewLocalNetwork()
 	return &Client{
 		network: network,
 		types:   Types,
@@ -37,9 +36,9 @@ func NewClient() *Client {
 }
 
 type Client struct {
-	network proxy.Network
-	node    *node.MultiRaftNode
-	types   []runtime.Type
+	network network.Network
+	node    *node.Node
+	types   []proxy.Type
 	proxies []*proxy.Proxy
 }
 
@@ -47,79 +46,8 @@ func (c *Client) start() error {
 	if c.node != nil {
 		return nil
 	}
-
-	raftPort := int32(nextPort())
-	c.node = node.New(c.network,
-		node.WithHost("localhost"),
-		node.WithPort(nextPort()),
-		node.WithConfig(multiraftv1.NodeConfig{
-			Host: "localhost",
-			Port: raftPort,
-			MultiRaftConfig: multiraftv1.MultiRaftConfig{
-				DataDir: "test-data",
-			},
-		}))
+	c.node = newNode(c.network, node.WithHost("localhost"), node.WithPort(nextPort()))
 	if err := c.node.Start(); err != nil {
-		return err
-	}
-	println(fmt.Sprintf("PORT: %d", c.node.Port))
-
-	conn, err := c.connect(context.Background(), fmt.Sprintf("%s:%d", c.node.Host, c.node.Port))
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	client := multiraftv1.NewNodeClient(conn)
-	_, err = client.Bootstrap(context.Background(), &multiraftv1.BootstrapRequest{
-		Group: multiraftv1.GroupConfig{
-			GroupID:  1,
-			MemberID: 1,
-			Role:     multiraftv1.MemberRole_MEMBER,
-			Members: []multiraftv1.MemberConfig{
-				{
-					MemberID: 1,
-					Host:     "localhost",
-					Port:     raftPort,
-				},
-			},
-		},
-	})
-	if err != nil {
-		return err
-	}
-	_, err = client.Bootstrap(context.Background(), &multiraftv1.BootstrapRequest{
-		Group: multiraftv1.GroupConfig{
-			GroupID:  2,
-			MemberID: 1,
-			Role:     multiraftv1.MemberRole_MEMBER,
-			Members: []multiraftv1.MemberConfig{
-				{
-					MemberID: 1,
-					Host:     "localhost",
-					Port:     raftPort,
-				},
-			},
-		},
-	})
-	if err != nil {
-		return err
-	}
-	_, err = client.Bootstrap(context.Background(), &multiraftv1.BootstrapRequest{
-		Group: multiraftv1.GroupConfig{
-			GroupID:  3,
-			MemberID: 1,
-			Role:     multiraftv1.MemberRole_MEMBER,
-			Members: []multiraftv1.MemberConfig{
-				{
-					MemberID: 1,
-					Host:     "localhost",
-					Port:     raftPort,
-				},
-			},
-		},
-	})
-	if err != nil {
 		return err
 	}
 	return nil
@@ -130,31 +58,23 @@ func (c *Client) Connect(ctx context.Context) (*grpc.ClientConn, error) {
 		return nil, err
 	}
 
-	driver := driver.New(c.network)
 	proxy := proxy.New(c.network,
-		proxy.WithDrivers(driver),
+		proxy.WithDrivers(newDriver(c.network)),
 		proxy.WithTypes(c.types...),
 		proxy.WithProxyPort(nextPort()),
 		proxy.WithRuntimePort(nextPort()),
-		proxy.WithRouterConfig(proxy.RouterConfig{
-			Routes: []proxy.RouteConfig{
-				{
-					Store: proxy.StoreID{
-						Name: "test",
-					},
-					Bindings: []proxy.BindingConfig{
+		proxy.WithConfig(
+			proxy.Config{
+				Router: proxy.RouterConfig{
+					Routes: []proxy.RouteConfig{
 						{
-							Services: []proxy.ServiceConfig{},
-							MatchRules: []proxy.MatchRuleConfig{
-								{
-									Names: []string{"*"},
-								},
+							Store: proxy.StoreID{
+								Name: "test",
 							},
 						},
 					},
 				},
-			},
-		}))
+			}))
 
 	if err := proxy.Start(); err != nil {
 		return nil, err
@@ -168,8 +88,8 @@ func (c *Client) Connect(ctx context.Context) (*grpc.ClientConn, error) {
 
 	client := proxyv1.NewProxyClient(conn)
 
-	config := multiraftv1.DriverConfig{
-		Partitions: []multiraftv1.PartitionConfig{
+	config := protocol.ProtocolConfig{
+		Partitions: []protocol.PartitionConfig{
 			{
 				PartitionID: 1,
 				Leader:      fmt.Sprintf("localhost:%d", c.node.Port),
@@ -196,8 +116,8 @@ func (c *Client) Connect(ctx context.Context) (*grpc.ClientConn, error) {
 			Name: "test",
 		},
 		DriverID: proxyv1.DriverId{
-			Name:    driver.ID().Name,
-			Version: driver.ID().Version,
+			Name:    driverID.Name,
+			Version: driverID.Version,
 		},
 		Config: []byte(data),
 	}
