@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/atomix/runtime/api v0.6.0
-	github.com/atomix/runtime/primitives v0.0.0-20221020192447-81e4e25b88d3
+	github.com/atomix/runtime/primitives v0.0.0-20221020214105-c0f4807997af
 	github.com/atomix/runtime/proxy v0.9.1-0.20221020072131-cf0cdcf529cc
 	github.com/atomix/runtime/sdk v0.6.1-0.20221020192447-81e4e25b88d3
 	github.com/gogo/protobuf v1.3.2

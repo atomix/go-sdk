@@ -4,8 +4,8 @@ github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
 github.com/atomix/runtime/api v0.6.0 h1:h6yLhwhlFCEFlRiByahmJ26PJn/2hIjFJrLSLmC1j2Y=
 github.com/atomix/runtime/api v0.6.0/go.mod h1:tjbd3w4yij89ZHCYdQUbmvZMC0HoHQQ/3/gVzQuOCH0=
-github.com/atomix/runtime/primitives v0.0.0-20221020192447-81e4e25b88d3 h1:7lI29CvyDd9XwOAeQTb3JNDkM4jyqvNOnLWoeRFulr0=
-github.com/atomix/runtime/primitives v0.0.0-20221020192447-81e4e25b88d3/go.mod h1:CXLYGEuvfbU9eMffvX7V+t/KEuGKxGlP/vgLhjOd8OU=
+github.com/atomix/runtime/primitives v0.0.0-20221020214105-c0f4807997af h1:KVYDcEiIjBvgWFghQiAJEuq67ydJCFG5flAV5vvSDGo=
+github.com/atomix/runtime/primitives v0.0.0-20221020214105-c0f4807997af/go.mod h1:CXLYGEuvfbU9eMffvX7V+t/KEuGKxGlP/vgLhjOd8OU=
 github.com/atomix/runtime/proxy v0.9.1-0.20221020072131-cf0cdcf529cc h1:TxYxhIFDdqCjRyYCQESLnCgcmoZFaQdUM7UY4vZrYEw=
 github.com/atomix/runtime/proxy v0.9.1-0.20221020072131-cf0cdcf529cc/go.mod h1:Y48gpCVqC5phsyacL19B6HyyO/q/tjw6i58Uy6oVJLI=
 github.com/atomix/runtime/sdk v0.6.1-0.20221020192447-81e4e25b88d3 h1:gX0M2t2Mz9UG3GT+udbj8XxnlS+RXec6+ynLPuEX3Kc=
