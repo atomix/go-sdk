@@ -7,6 +7,7 @@ package test
 import (
 	"context"
 	counterv1 "github.com/atomix/runtime/primitives/pkg/counter/v1"
+	mapv1 "github.com/atomix/runtime/primitives/pkg/map/v1"
 	"github.com/atomix/runtime/sdk/pkg/network"
 	"github.com/atomix/runtime/sdk/pkg/protocol"
 	"github.com/atomix/runtime/sdk/pkg/protocol/node"
@@ -18,6 +19,7 @@ import (
 func newNode(network network.Network, opts ...node.Option) *node.Node {
 	node := node.NewNode(network, newProtocol(), opts...)
 	counterv1.RegisterServer(node)
+	mapv1.RegisterServer(node)
 	return node
 }
 
@@ -51,6 +53,7 @@ func (p *testProtocol) Partition(partitionID protocol.PartitionID) (node.Partiti
 func newExecutor() node.Executor {
 	registry := statemachine.NewPrimitiveTypeRegistry()
 	counterv1.RegisterStateMachine(registry)
+	mapv1.RegisterStateMachine(registry)
 	return &testExecutor{
 		sm: statemachine.NewStateMachine(registry),
 	}

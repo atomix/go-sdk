@@ -7,7 +7,9 @@ package test
 import (
 	"context"
 	counterv1api "github.com/atomix/runtime/api/atomix/runtime/counter/v1"
+	mapv1api "github.com/atomix/runtime/api/atomix/runtime/map/v1"
 	counterv1 "github.com/atomix/runtime/primitives/pkg/counter/v1"
+	mapv1 "github.com/atomix/runtime/primitives/pkg/map/v1"
 	"github.com/atomix/runtime/sdk/pkg/network"
 	"github.com/atomix/runtime/sdk/pkg/protocol"
 	"github.com/atomix/runtime/sdk/pkg/protocol/client"
@@ -45,17 +47,17 @@ func (d *testDriver) String() string {
 	return d.ID().String()
 }
 
-func newConn(network network.Network) *multiRaftConn {
-	return &multiRaftConn{
+func newConn(network network.Network) *testConn {
+	return &testConn{
 		ProtocolClient: client.NewClient(network),
 	}
 }
 
-type multiRaftConn struct {
+type testConn struct {
 	*client.ProtocolClient
 }
 
-func (c *multiRaftConn) Connect(ctx context.Context, spec runtime.ConnSpec) error {
+func (c *testConn) Connect(ctx context.Context, spec runtime.ConnSpec) error {
 	var config protocol.ProtocolConfig
 	if err := spec.UnmarshalConfig(&config); err != nil {
 		return err
@@ -63,7 +65,7 @@ func (c *multiRaftConn) Connect(ctx context.Context, spec runtime.ConnSpec) erro
 	return c.ProtocolClient.Connect(ctx, config)
 }
 
-func (c *multiRaftConn) Configure(ctx context.Context, spec runtime.ConnSpec) error {
+func (c *testConn) Configure(ctx context.Context, spec runtime.ConnSpec) error {
 	var config protocol.ProtocolConfig
 	if err := spec.UnmarshalConfig(&config); err != nil {
 		return err
@@ -71,6 +73,10 @@ func (c *multiRaftConn) Configure(ctx context.Context, spec runtime.ConnSpec) er
 	return c.ProtocolClient.Configure(ctx, config)
 }
 
-func (c *multiRaftConn) NewCounter(spec runtime.PrimitiveSpec) (counterv1api.CounterServer, error) {
+func (c *testConn) NewCounter(spec runtime.PrimitiveSpec) (counterv1api.CounterServer, error) {
 	return counterv1.NewCounterProxy(c.Protocol, spec)
+}
+
+func (c *testConn) NewMap(spec runtime.PrimitiveSpec) (mapv1api.MapServer, error) {
+	return mapv1.NewMapProxy(c.Protocol, spec)
 }
