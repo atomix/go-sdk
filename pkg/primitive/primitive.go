@@ -10,31 +10,22 @@ import (
 )
 
 type Builder[B any, T Primitive] interface {
-	Tag(key, value string) B
-	Tags(tags map[string]string) B
+	Tag(tags ...string) B
 	Get(ctx context.Context) (T, error)
 }
 
 func NewOptions(name string) *Options {
 	return &Options{
 		Name: name,
-		Tags: make(map[string]string),
 	}
 }
 
 type Options struct {
 	Name string
-	Tags map[string]string
+	Tags []string
 }
 
-func (o *Options) SetTag(key, value string) {
-	if o.Tags == nil {
-		o.Tags = make(map[string]string)
-	}
-	o.Tags[key] = value
-}
-
-func (o *Options) SetTags(tags map[string]string) {
+func (o *Options) SetTags(tags ...string) {
 	o.Tags = tags
 }
 

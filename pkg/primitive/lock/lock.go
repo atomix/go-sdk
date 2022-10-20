@@ -91,7 +91,7 @@ func (l *lockPrimitive) Get(ctx context.Context, opts ...GetOption) (Version, er
 	return Version(response.Version), nil
 }
 
-func (l *lockPrimitive) create(ctx context.Context, tags map[string]string) error {
+func (l *lockPrimitive) create(ctx context.Context, tags ...string) error {
 	request := &lockv1.CreateRequest{
 		ID: runtimev1.PrimitiveId{
 			Name: l.Name(),

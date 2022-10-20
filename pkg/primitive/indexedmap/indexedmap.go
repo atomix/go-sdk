@@ -600,7 +600,7 @@ func (m *indexedMapPrimitive[K, V]) decodeEntry(entry *indexedmapv1.Entry) (*Ent
 	return m.decodeKeyValue(entry.Key, entry.Index, entry.Value)
 }
 
-func (m *indexedMapPrimitive[K, V]) create(ctx context.Context, tags map[string]string) error {
+func (m *indexedMapPrimitive[K, V]) create(ctx context.Context, tags ...string) error {
 	request := &indexedmapv1.CreateRequest{
 		ID: runtimev1.PrimitiveId{
 			Name: m.Name(),

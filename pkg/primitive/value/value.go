@@ -346,7 +346,7 @@ func (m *atomicValuePrimitive[V]) Events(ctx context.Context, opts ...EventsOpti
 	}
 }
 
-func (m *atomicValuePrimitive[V]) create(ctx context.Context, tags map[string]string) error {
+func (m *atomicValuePrimitive[V]) create(ctx context.Context, tags ...string) error {
 	request := &valuev1.CreateRequest{
 		ID: runtimev1.PrimitiveId{
 			Name: m.Name(),

@@ -108,7 +108,7 @@ func (c *counterPrimitive) Decrement(ctx context.Context, delta int64) (int64, e
 	return response.Value, nil
 }
 
-func (c *counterPrimitive) create(ctx context.Context, tags map[string]string) error {
+func (c *counterPrimitive) create(ctx context.Context, tags ...string) error {
 	request := &counterv1.CreateRequest{
 		ID: primitivev1.PrimitiveId{
 			Name: c.Name(),

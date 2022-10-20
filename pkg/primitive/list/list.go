@@ -372,7 +372,7 @@ func (l *listPrimitive[E]) Clear(ctx context.Context) error {
 	return nil
 }
 
-func (l *listPrimitive[E]) create(ctx context.Context, tags map[string]string) error {
+func (l *listPrimitive[E]) create(ctx context.Context, tags ...string) error {
 	request := &listv1.CreateRequest{
 		ID: runtimev1.PrimitiveId{
 			Name: l.Name(),

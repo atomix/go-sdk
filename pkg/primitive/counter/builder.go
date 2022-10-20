@@ -22,13 +22,8 @@ type Builder struct {
 	client  primitive.Client
 }
 
-func (b *Builder) Tag(key, value string) *Builder {
-	b.options.SetTag(key, value)
-	return b
-}
-
-func (b *Builder) Tags(tags map[string]string) *Builder {
-	b.options.SetTags(tags)
+func (b *Builder) Tag(tags ...string) *Builder {
+	b.options.SetTags(tags...)
 	return b
 }
 
@@ -41,7 +36,7 @@ func (b *Builder) Get(ctx context.Context) (AtomicCounter, error) {
 		Primitive: primitive.New(b.options.Name),
 		client:    counterv1.NewCounterClient(conn),
 	}
-	if err := counter.create(ctx, b.options.Tags); err != nil {
+	if err := counter.create(ctx, b.options.Tags...); err != nil {
 		return nil, err
 	}
 	return counter, nil

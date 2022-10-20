@@ -25,13 +25,8 @@ type Builder[K scalar.Scalar, V any] struct {
 	codec   generic.Codec[V]
 }
 
-func (b *Builder[K, V]) Tag(key, value string) *Builder[K, V] {
-	b.options.SetTag(key, value)
-	return b
-}
-
-func (b *Builder[K, V]) Tags(tags map[string]string) *Builder[K, V] {
-	b.options.SetTags(tags)
+func (b *Builder[K, V]) Tag(tags ...string) *Builder[K, V] {
+	b.options.SetTags(tags...)
 	return b
 }
 
@@ -55,7 +50,7 @@ func (b *Builder[K, V]) Get(ctx context.Context) (Map[K, V], error) {
 		keyDecoder: scalar.NewDecodeFunc[K](),
 		valueCodec: b.codec,
 	}
-	if err := atomicMap.create(ctx, b.options.Tags); err != nil {
+	if err := atomicMap.create(ctx, b.options.Tags...); err != nil {
 		return nil, err
 	}
 	return atomicMap, nil

@@ -24,13 +24,8 @@ type Builder[E any] struct {
 	codec   generic.Codec[E]
 }
 
-func (b *Builder[E]) Tag(key, value string) *Builder[E] {
-	b.options.SetTag(key, value)
-	return b
-}
-
-func (b *Builder[E]) Tags(tags map[string]string) *Builder[E] {
-	b.options.SetTags(tags)
+func (b *Builder[E]) Tag(tags ...string) *Builder[E] {
+	b.options.SetTags(tags...)
 	return b
 }
 
@@ -52,7 +47,7 @@ func (b *Builder[E]) Get(ctx context.Context) (List[E], error) {
 		client:    listv1.NewListClient(conn),
 		codec:     b.codec,
 	}
-	if err := set.create(ctx, b.options.Tags); err != nil {
+	if err := set.create(ctx, b.options.Tags...); err != nil {
 		return nil, err
 	}
 	return set, nil

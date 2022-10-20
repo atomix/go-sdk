@@ -23,13 +23,8 @@ type Builder struct {
 	candidateID string
 }
 
-func (b *Builder) Tag(key, value string) *Builder {
-	b.options.SetTag(key, value)
-	return b
-}
-
-func (b *Builder) Tags(tags map[string]string) *Builder {
-	b.options.SetTags(tags)
+func (b *Builder) Tag(tags ...string) *Builder {
+	b.options.SetTags(tags...)
 	return b
 }
 
@@ -48,7 +43,7 @@ func (b *Builder) Get(ctx context.Context) (Election, error) {
 		client:      electionv1.NewLeaderElectionClient(conn),
 		candidateID: b.candidateID,
 	}
-	if err := election.create(ctx, b.options.Tags); err != nil {
+	if err := election.create(ctx, b.options.Tags...); err != nil {
 		return nil, err
 	}
 	return election, nil

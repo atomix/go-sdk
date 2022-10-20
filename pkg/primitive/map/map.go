@@ -461,7 +461,7 @@ func (m *atomicMapPrimitive[K, V]) decodeEntry(entry *mapv1.Entry) (*Entry[K, V]
 	return m.decodeKeyValue(entry.Key, entry.Value)
 }
 
-func (m *atomicMapPrimitive[K, V]) create(ctx context.Context, tags map[string]string) error {
+func (m *atomicMapPrimitive[K, V]) create(ctx context.Context, tags ...string) error {
 	request := &mapv1.CreateRequest{
 		ID: runtimev1.PrimitiveId{
 			Name: m.Name(),

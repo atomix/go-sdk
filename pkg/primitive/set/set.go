@@ -328,7 +328,7 @@ func (m *setPrimitive[E]) Events(ctx context.Context) (EventStream[E], error) {
 	}
 }
 
-func (s *setPrimitive[E]) create(ctx context.Context, tags map[string]string) error {
+func (s *setPrimitive[E]) create(ctx context.Context, tags ...string) error {
 	request := &setv1.CreateRequest{
 		ID: runtimev1.PrimitiveId{
 			Name: s.Name(),

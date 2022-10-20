@@ -202,7 +202,7 @@ func (e *electionPrimitive) Watch(ctx context.Context) (TermStream, error) {
 	return stream.NewChannelStream[*Term](ch), nil
 }
 
-func (e *electionPrimitive) create(ctx context.Context, tags map[string]string) error {
+func (e *electionPrimitive) create(ctx context.Context, tags ...string) error {
 	request := &electionv1.CreateRequest{
 		ID: runtimev1.PrimitiveId{
 			Name: e.Name(),

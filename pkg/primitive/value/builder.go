@@ -24,13 +24,8 @@ type Builder[V any] struct {
 	codec   generic.Codec[V]
 }
 
-func (b *Builder[V]) Tag(key, value string) *Builder[V] {
-	b.options.SetTag(key, value)
-	return b
-}
-
-func (b *Builder[V]) Tags(tags map[string]string) *Builder[V] {
-	b.options.SetTags(tags)
+func (b *Builder[V]) Tag(tags ...string) *Builder[V] {
+	b.options.SetTags(tags...)
 	return b
 }
 
@@ -52,7 +47,7 @@ func (b *Builder[V]) Get(ctx context.Context) (Value[V], error) {
 		client:    atomicvaluev1.NewValueClient(conn),
 		codec:     b.codec,
 	}
-	if err := atomicValue.create(ctx, b.options.Tags); err != nil {
+	if err := atomicValue.create(ctx, b.options.Tags...); err != nil {
 		return nil, err
 	}
 	return atomicValue, nil
