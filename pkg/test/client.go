@@ -10,7 +10,13 @@ import (
 	proxyv1 "github.com/atomix/runtime/api/atomix/proxy/v1"
 	"github.com/atomix/runtime/proxy/pkg/proxy"
 	counterv1 "github.com/atomix/runtime/proxy/pkg/proxy/counter/v1"
+	electionv1 "github.com/atomix/runtime/proxy/pkg/proxy/election/v1"
+	indexedmapv1 "github.com/atomix/runtime/proxy/pkg/proxy/indexedmap/v1"
+	listv1 "github.com/atomix/runtime/proxy/pkg/proxy/list/v1"
+	lockv1 "github.com/atomix/runtime/proxy/pkg/proxy/lock/v1"
 	mapv1 "github.com/atomix/runtime/proxy/pkg/proxy/map/v1"
+	setv1 "github.com/atomix/runtime/proxy/pkg/proxy/set/v1"
+	valuev1 "github.com/atomix/runtime/proxy/pkg/proxy/value/v1"
 	"github.com/atomix/runtime/sdk/pkg/errors"
 	"github.com/atomix/runtime/sdk/pkg/network"
 	"github.com/atomix/runtime/sdk/pkg/protocol"
@@ -24,7 +30,13 @@ import (
 
 var Types = []proxy.Type{
 	counterv1.Type,
+	electionv1.Type,
+	indexedmapv1.Type,
+	listv1.Type,
+	lockv1.Type,
 	mapv1.Type,
+	setv1.Type,
+	valuev1.Type,
 }
 
 func NewClient() *Client {
