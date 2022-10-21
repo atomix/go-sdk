@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/atomix/runtime/api v0.6.1-0.20221021064604-da653ed68c8f
-	github.com/atomix/runtime/primitives v0.0.0-20221021085523-e6b823157851
+	github.com/atomix/runtime/primitives v0.0.0-20221021093549-88a0bd9f40d8
 	github.com/atomix/runtime/proxy v0.9.1-0.20221021065021-6468aada0b10
 	github.com/atomix/runtime/sdk v0.6.1-0.20221021064604-da653ed68c8f
 	github.com/gogo/protobuf v1.3.2
@@ -33,3 +33,5 @@ require (
 	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 )
+
+replace github.com/atomix/runtime/primitives => ../../runtime/primitives
