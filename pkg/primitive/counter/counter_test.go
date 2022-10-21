@@ -17,7 +17,7 @@ func TestAtomicCounterOperations(t *testing.T) {
 	logging.SetLevel(logging.DebugLevel)
 
 	cluster := test.NewClient()
-	defer cluster.Cleanup()
+	defer cluster.Close()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()

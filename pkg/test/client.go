@@ -138,7 +138,7 @@ func (c *Client) connect(ctx context.Context, target string) (*grpc.ClientConn, 
 	return conn, nil
 }
 
-func (c *Client) Cleanup() {
+func (c *Client) Close() {
 	for _, proxy := range c.proxies {
 		_ = proxy.Stop()
 	}
