@@ -3,10 +3,10 @@ module github.com/atomix/go-client
 go 1.19
 
 require (
-	github.com/atomix/runtime/api v0.6.1-0.20221021064604-da653ed68c8f
-	github.com/atomix/runtime/primitives v0.0.0-20221021093549-88a0bd9f40d8
-	github.com/atomix/runtime/proxy v0.9.1-0.20221021065021-6468aada0b10
-	github.com/atomix/runtime/sdk v0.6.1-0.20221021064604-da653ed68c8f
+	github.com/atomix/runtime/api v0.7.0
+	github.com/atomix/runtime/primitives v0.7.0
+	github.com/atomix/runtime/proxy v0.10.0
+	github.com/atomix/runtime/sdk v0.7.0
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.5.2
 	github.com/stretchr/testify v1.7.1
