@@ -3,11 +3,11 @@ SPDX-FileCopyrightText: 2019-present Open Networking Foundation <info@opennetwor
 SPDX-License-Identifier: Apache-2.0
 -->
 
-[![Snapshot](https://github.com/atomix/go-client/actions/workflows/build.yml/badge.svg)](https://github.com/atomix/go-client/actions/workflows/build.yml)
-[![Release](https://github.com/atomix/go-client/actions/workflows/release.yml/badge.svg)](https://github.com/atomix/go-client/actions/workflows/release.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/atomix/go-client)](https://goreportcard.com/report/github.com/atomix/go-client)
+[![Snapshot](https://github.com/atomix/go-sdk/actions/workflows/build.yml/badge.svg)](https://github.com/atomix/go-sdk/actions/workflows/build.yml)
+[![Release](https://github.com/atomix/go-sdk/actions/workflows/release.yml/badge.svg)](https://github.com/atomix/go-sdk/actions/workflows/release.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/atomix/go-sdk)](https://goreportcard.com/report/github.com/atomix/go-sdk)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/gojp/goreportcard/blob/master/LICENSE)
-[![GoDoc](https://godoc.org/github.com/atomix/go-client?status.svg)](https://godoc.org/github.com/atomix/go-client)
+[![GoDoc](https://godoc.org/github.com/atomix/go-sdk?status.svg)](https://godoc.org/github.com/atomix/go-sdk)
 
 # Go Client
 
@@ -20,7 +20,7 @@ This project provides a [Go] client for [Atomix Cloud].
 To install the Go client, use `go get`:
 
 ```bash
-$ GO111MODULE=on go get github.com/atomix/go-client
+$ GO111MODULE=on go get github.com/atomix/go-sdk
 ```
 
 ### Usage
@@ -28,7 +28,7 @@ $ GO111MODULE=on go get github.com/atomix/go-client
 To use the client, import the client API:
 
 ```go
-import "github.com/atomix/go-client/pkg/atomix"
+import "github.com/atomix/go-sdk/pkg/atomix"
 ```
 
 The `atomix` package provides functions for working with primitives using the default cluster configuration:

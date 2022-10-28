@@ -6,9 +6,9 @@ package indexedmap
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/generic"
-	"github.com/atomix/go-client/pkg/generic/scalar"
-	"github.com/atomix/go-client/pkg/primitive"
+	"github.com/atomix/go-sdk/pkg/generic"
+	"github.com/atomix/go-sdk/pkg/generic/scalar"
+	"github.com/atomix/go-sdk/pkg/primitive"
 	indexedmapv1 "github.com/atomix/runtime/api/atomix/runtime/indexedmap/v1"
 )
 

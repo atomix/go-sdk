@@ -6,7 +6,7 @@ package counter
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/test"
+	"github.com/atomix/go-sdk/pkg/test"
 	"github.com/atomix/runtime/sdk/pkg/logging"
 	"github.com/stretchr/testify/assert"
 	"testing"

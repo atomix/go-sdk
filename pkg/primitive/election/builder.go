@@ -6,7 +6,7 @@ package election
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/primitive"
+	"github.com/atomix/go-sdk/pkg/primitive"
 	electionv1 "github.com/atomix/runtime/api/atomix/runtime/election/v1"
 )
 

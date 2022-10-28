@@ -6,8 +6,8 @@ package list
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/generic"
-	"github.com/atomix/go-client/pkg/primitive"
+	"github.com/atomix/go-sdk/pkg/generic"
+	"github.com/atomix/go-sdk/pkg/primitive"
 	listv1 "github.com/atomix/runtime/api/atomix/runtime/list/v1"
 )
 

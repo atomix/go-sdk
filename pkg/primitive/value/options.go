@@ -5,7 +5,7 @@
 package value
 
 import (
-	"github.com/atomix/go-client/pkg/primitive"
+	"github.com/atomix/go-sdk/pkg/primitive"
 	valuev1 "github.com/atomix/runtime/api/atomix/runtime/value/v1"
 	"time"
 )

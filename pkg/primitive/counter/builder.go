@@ -6,7 +6,7 @@ package counter
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/primitive"
+	"github.com/atomix/go-sdk/pkg/primitive"
 	counterv1 "github.com/atomix/runtime/api/atomix/runtime/counter/v1"
 )
 

@@ -6,8 +6,8 @@ package _map //nolint:golint
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/generic"
-	"github.com/atomix/go-client/pkg/test"
+	"github.com/atomix/go-sdk/pkg/generic"
+	"github.com/atomix/go-sdk/pkg/test"
 	"github.com/atomix/runtime/sdk/pkg/errors"
 	"github.com/atomix/runtime/sdk/pkg/logging"
 	"github.com/stretchr/testify/assert"

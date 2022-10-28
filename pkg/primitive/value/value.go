@@ -6,9 +6,9 @@ package value
 
 import (
 	"context"
-	"github.com/atomix/go-client/pkg/generic"
-	"github.com/atomix/go-client/pkg/primitive"
-	"github.com/atomix/go-client/pkg/stream"
+	"github.com/atomix/go-sdk/pkg/generic"
+	"github.com/atomix/go-sdk/pkg/primitive"
+	"github.com/atomix/go-sdk/pkg/stream"
 	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
 	valuev1 "github.com/atomix/runtime/api/atomix/runtime/value/v1"
 	"github.com/atomix/runtime/sdk/pkg/errors"

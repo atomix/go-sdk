@@ -1,4 +1,4 @@
-module github.com/atomix/go-client
+module github.com/atomix/go-sdk
 
 go 1.19
 

@@ -6,7 +6,7 @@ package generic
 
 import (
 	"encoding/json"
-	"github.com/atomix/go-client/pkg/generic/scalar"
+	"github.com/atomix/go-sdk/pkg/generic/scalar"
 	gogoproto "github.com/gogo/protobuf/proto"
 	"github.com/golang/protobuf/proto"
 	"gopkg.in/yaml.v3"

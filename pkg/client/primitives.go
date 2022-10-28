@@ -5,16 +5,16 @@
 package client
 
 import (
-	"github.com/atomix/go-client/pkg/generic/scalar"
-	"github.com/atomix/go-client/pkg/primitive"
-	"github.com/atomix/go-client/pkg/primitive/counter"
-	"github.com/atomix/go-client/pkg/primitive/election"
-	"github.com/atomix/go-client/pkg/primitive/indexedmap"
-	"github.com/atomix/go-client/pkg/primitive/list"
-	"github.com/atomix/go-client/pkg/primitive/lock"
-	_map "github.com/atomix/go-client/pkg/primitive/map"
-	"github.com/atomix/go-client/pkg/primitive/set"
-	"github.com/atomix/go-client/pkg/primitive/value"
+	"github.com/atomix/go-sdk/pkg/generic/scalar"
+	"github.com/atomix/go-sdk/pkg/primitive"
+	"github.com/atomix/go-sdk/pkg/primitive/counter"
+	"github.com/atomix/go-sdk/pkg/primitive/election"
+	"github.com/atomix/go-sdk/pkg/primitive/indexedmap"
+	"github.com/atomix/go-sdk/pkg/primitive/list"
+	"github.com/atomix/go-sdk/pkg/primitive/lock"
+	_map "github.com/atomix/go-sdk/pkg/primitive/map"
+	"github.com/atomix/go-sdk/pkg/primitive/set"
+	"github.com/atomix/go-sdk/pkg/primitive/value"
 )
 
 func Counter(client primitive.Client) func(name string) *counter.Builder {
