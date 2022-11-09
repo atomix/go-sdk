@@ -6,12 +6,18 @@ package _map //nolint:golint
 
 import (
 	"context"
+	"fmt"
+	"github.com/atomix/go-sdk/pkg/bench"
 	"github.com/atomix/go-sdk/pkg/generic"
 	"github.com/atomix/go-sdk/pkg/test"
+	"github.com/atomix/runtime/sdk/pkg/async"
 	"github.com/atomix/runtime/sdk/pkg/errors"
 	"github.com/atomix/runtime/sdk/pkg/logging"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"io"
+	"math/rand"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -197,4 +203,139 @@ func TestMapOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, removed)
 	assert.Equal(t, kv2.Version, removed.Version)
+}
+
+func BenchMapPutSerial(t *testing.T) {
+	client := bench.NewConsensusBenchmark(3, 3)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	m, err := NewBuilder[string, string](client, "test").
+		Codec(generic.Scalar[string]()).
+		Get(ctx)
+	assert.NoError(t, err)
+
+	iterations := 1000
+	start := time.Now()
+	for i := 0; i < iterations; i++ {
+		_, err := m.Put(ctx, "foo", "bar")
+		if err != nil {
+			t.Fail()
+		}
+	}
+	end := time.Now()
+	println(fmt.Sprintf("completed %d writes in %s", iterations, end.Sub(start)))
+}
+
+func BenchMapPutConcurrent(t *testing.T) {
+	client := bench.NewConsensusBenchmark(3, 3)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	m, err := NewBuilder[string, string](client, "test").
+		Codec(generic.Scalar[string]()).
+		Get(ctx)
+	assert.NoError(t, err)
+
+	numKeys := 1000
+	keys := make([]string, numKeys)
+	for i := 0; i < numKeys; i++ {
+		keys[i] = uuid.New().String()
+	}
+
+	count := &atomic.Uint64{}
+	concurrency := 10000
+	for i := 0; i < concurrency; i++ {
+		go func() {
+			for {
+				_, err := m.Put(ctx, keys[rand.Intn(numKeys)], "bar")
+				if err != nil {
+					t.Fail()
+				}
+				count.Add(1)
+			}
+		}()
+	}
+
+	ticker := time.NewTicker(10 * time.Second)
+	for {
+		<-ticker.C
+		println(fmt.Sprintf("completed %d writes in 10 seconds", count.Swap(0)))
+	}
+}
+
+func BenchMapGetSerial(t *testing.T) {
+	client := bench.NewConsensusBenchmark(3, 3)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	m, err := NewBuilder[string, string](client, "test").
+		Codec(generic.Scalar[string]()).
+		Get(ctx)
+	assert.NoError(t, err)
+
+	_, err = m.Put(ctx, "foo", "bar")
+	if err != nil {
+		t.Fail()
+	}
+
+	iterations := 1000
+	start := time.Now()
+	for i := 0; i < iterations; i++ {
+		_, err := m.Get(ctx, "foo")
+		if err != nil {
+			t.Fail()
+		}
+	}
+	end := time.Now()
+	println(fmt.Sprintf("completed %d reads in %s", iterations, end.Sub(start)))
+}
+
+func BenchMapGetConcurrent(t *testing.T) {
+	client := bench.NewConsensusBenchmark(3, 3)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	m, err := NewBuilder[string, string](client, "test").
+		Codec(generic.Scalar[string]()).
+		Get(ctx)
+	assert.NoError(t, err)
+
+	numKeys := 1000
+	keys := make([]string, numKeys)
+	for i := 0; i < numKeys; i++ {
+		keys[i] = uuid.New().String()
+	}
+
+	err = async.IterAsync(numKeys, func(i int) error {
+		_, err := m.Put(ctx, keys[i], uuid.New().String())
+		return err
+	})
+	if err != nil {
+		t.Fail()
+	}
+
+	count := &atomic.Uint64{}
+	concurrency := 10000
+	for i := 0; i < concurrency; i++ {
+		go func() {
+			for {
+				_, err := m.Get(ctx, keys[rand.Intn(numKeys)])
+				if err != nil {
+					t.Fail()
+				}
+				count.Add(1)
+			}
+		}()
+	}
+
+	ticker := time.NewTicker(10 * time.Second)
+	for {
+		<-ticker.C
+		println(fmt.Sprintf("completed %d reads in 10 seconds", count.Swap(0)))
+	}
 }
