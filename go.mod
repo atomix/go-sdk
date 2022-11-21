@@ -66,6 +66,8 @@ require (
 )
 
 replace (
+	github.com/atomix/shared-memory-storage/driver => ../../storage/shared-memory/driver
+	github.com/atomix/shared-memory-storage/node => ../../storage/shared-memory/node
 	github.com/atomix/consensus-storage/driver => ../../storage/consensus/driver
 	github.com/atomix/consensus-storage/node => ../../storage/consensus/node
 	github.com/atomix/runtime/primitives => ../../runtime/primitives

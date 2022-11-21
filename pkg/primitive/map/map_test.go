@@ -7,7 +7,6 @@ package _map //nolint:golint
 import (
 	"context"
 	"fmt"
-	"github.com/atomix/go-sdk/pkg/bench"
 	"github.com/atomix/go-sdk/pkg/generic"
 	"github.com/atomix/go-sdk/pkg/test"
 	"github.com/atomix/runtime/sdk/pkg/async"
@@ -25,13 +24,12 @@ import (
 func TestMapEntries(t *testing.T) {
 	logging.SetLevel(logging.DebugLevel)
 
-	cluster := test.NewClient()
-	defer cluster.Close()
+	client := test.NewMemoryClient()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	map1, err := NewBuilder[string, string](cluster, "test").
+	map1, err := NewBuilder[string, string](client, "test").
 		Codec(generic.Scalar[string]()).
 		Get(ctx)
 	assert.NoError(t, err)
@@ -56,21 +54,49 @@ func TestMapEntries(t *testing.T) {
 	}
 }
 
-func TestMapOperations(t *testing.T) {
+func TestHugeEntry(t *testing.T) {
 	logging.SetLevel(logging.DebugLevel)
 
-	cluster := test.NewClient()
-	defer cluster.Close()
+	client := test.NewConsensusClient(3, 3)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	map1, err := NewBuilder[string, string](cluster, "test").
+	m, err := NewBuilder[string, string](client, "test").
 		Codec(generic.Scalar[string]()).
 		Get(ctx)
 	assert.NoError(t, err)
 
-	map2, err := NewBuilder[string, string](cluster, "test").
+	n := 1024 * 1024 * 5
+	b := make([]byte, n)
+	for i := 0; i < n; i++ {
+		b[i] = byte(rand.Int())
+	}
+	s := string(b)
+
+	_, err = m.Put(ctx, "foo", s)
+	assert.NoError(t, err)
+
+	e, err := m.Get(ctx, "foo")
+	assert.NoError(t, err)
+	assert.Equal(t, "foo", e.Key)
+	assert.Equal(t, s, e.Value)
+}
+
+func TestMapOperations(t *testing.T) {
+	logging.SetLevel(logging.DebugLevel)
+
+	client := test.NewMemoryClient()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	map1, err := NewBuilder[string, string](client, "test").
+		Codec(generic.Scalar[string]()).
+		Get(ctx)
+	assert.NoError(t, err)
+
+	map2, err := NewBuilder[string, string](client, "test").
 		Codec(generic.Scalar[string]()).
 		Get(ctx)
 	assert.NoError(t, err)
@@ -206,7 +232,7 @@ func TestMapOperations(t *testing.T) {
 }
 
 func BenchMapPutSerial(t *testing.T) {
-	client := bench.NewConsensusBenchmark(3, 3)
+	client := test.NewConsensusClient(3, 3)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
@@ -229,7 +255,7 @@ func BenchMapPutSerial(t *testing.T) {
 }
 
 func BenchMapPutConcurrent(t *testing.T) {
-	client := bench.NewConsensusBenchmark(3, 3)
+	client := test.NewConsensusClient(3, 3)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
@@ -267,7 +293,7 @@ func BenchMapPutConcurrent(t *testing.T) {
 }
 
 func BenchMapGetSerial(t *testing.T) {
-	client := bench.NewConsensusBenchmark(3, 3)
+	client := test.NewConsensusClient(3, 3)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
@@ -295,7 +321,7 @@ func BenchMapGetSerial(t *testing.T) {
 }
 
 func BenchMapGetConcurrent(t *testing.T) {
-	client := bench.NewConsensusBenchmark(3, 3)
+	client := test.NewConsensusClient(3, 3)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()

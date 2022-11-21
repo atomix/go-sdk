@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-package bench
+package test
 
 import (
 	"context"
@@ -60,7 +60,7 @@ var Types = []proxy.Type{
 	valuev1proxy.Type,
 }
 
-func NewConsensusBenchmark(numReplicas, numPartitions int) primitive.Client {
+func NewConsensusClient(numReplicas, numPartitions int) primitive.Client {
 	_ = os.RemoveAll(dataDir)
 
 	logger.GetLogger("raft").SetLevel(logger.WARNING)
@@ -69,7 +69,7 @@ func NewConsensusBenchmark(numReplicas, numPartitions int) primitive.Client {
 	logger.GetLogger("grpc").SetLevel(logger.WARNING)
 
 	network := network.NewLocalNetwork()
-	return &consensusBenchmark{
+	return &consensusClient{
 		network:       network,
 		types:         Types,
 		numReplicas:   numReplicas,
@@ -77,7 +77,7 @@ func NewConsensusBenchmark(numReplicas, numPartitions int) primitive.Client {
 	}
 }
 
-type consensusBenchmark struct {
+type consensusClient struct {
 	network       network.Network
 	numReplicas   int
 	numPartitions int
@@ -88,7 +88,7 @@ type consensusBenchmark struct {
 	mu            sync.Mutex
 }
 
-func (c *consensusBenchmark) startNode(memberID consensus.MemberID) error {
+func (c *consensusClient) startNode(memberID consensus.MemberID) error {
 	registry := statemachine.NewPrimitiveTypeRegistry()
 	counterv1.RegisterStateMachine(registry)
 	electionv1.RegisterStateMachine(registry)
@@ -110,7 +110,10 @@ func (c *consensusBenchmark) startNode(memberID consensus.MemberID) error {
 		c.network,
 		protocol,
 		node.WithHost("localhost"),
-		node.WithPort(nextPort()))
+		node.WithPort(nextPort()),
+		node.WithGRPCServerOptions(
+			grpc.MaxRecvMsgSize(1024*1024*10),
+			grpc.MaxSendMsgSize(1024*1024*10)))
 
 	counterv1.RegisterServer(node)
 	electionv1.RegisterServer(node)
@@ -152,7 +155,7 @@ func (c *consensusBenchmark) startNode(memberID consensus.MemberID) error {
 	})
 }
 
-func (c *consensusBenchmark) start() error {
+func (c *consensusClient) start() error {
 	if c.nodes != nil {
 		return nil
 	}
@@ -165,10 +168,12 @@ func (c *consensusBenchmark) start() error {
 	})
 }
 
-func (c *consensusBenchmark) Connect(ctx context.Context) (*grpc.ClientConn, error) {
+func (c *consensusClient) Connect(ctx context.Context) (*grpc.ClientConn, error) {
 	if err := c.start(); err != nil {
 		return nil, err
 	}
+
+	s := 1024 * 1024 * 10
 
 	driver := driver.New(c.network)
 	proxy := proxy.New(c.network,
@@ -177,6 +182,10 @@ func (c *consensusBenchmark) Connect(ctx context.Context) (*grpc.ClientConn, err
 		proxy.WithProxyPort(nextPort()),
 		proxy.WithRuntimePort(nextPort()),
 		proxy.WithConfig(proxy.Config{
+			Server: proxy.ServerConfig{
+				MaxRecvMsgSize: &s,
+				MaxSendMsgSize: &s,
+			},
 			Router: proxy.RouterConfig{
 				Routes: []proxy.RouteConfig{
 					{
@@ -289,17 +298,18 @@ func (c *consensusBenchmark) Connect(ctx context.Context) (*grpc.ClientConn, err
 	return c.connect(ctx, fmt.Sprintf(":%d", proxy.RuntimeService.Port))
 }
 
-func (c *consensusBenchmark) connect(ctx context.Context, target string) (*grpc.ClientConn, error) {
+func (c *consensusClient) connect(ctx context.Context, target string) (*grpc.ClientConn, error) {
 	conn, err := grpc.DialContext(ctx, target,
 		grpc.WithContextDialer(c.network.Connect),
-		grpc.WithTransportCredentials(insecure.NewCredentials()))
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(1024*1024*10), grpc.MaxCallRecvMsgSize(1024*1024*10)))
 	if err != nil {
 		return nil, errors.FromProto(err)
 	}
 	return conn, nil
 }
 
-func (c *consensusBenchmark) Close() {
+func (c *consensusClient) Close() {
 	for _, proxy := range c.proxies {
 		_ = proxy.Stop()
 	}

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-package bench
+package test
 
 import (
 	"context"
@@ -27,26 +27,24 @@ import (
 	"github.com/gogo/protobuf/jsonpb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"os"
 )
 
-func NewMemoryBenchmark() primitive.Client {
-	_ = os.RemoveAll("test-data")
+func NewMemoryClient() primitive.Client {
 	network := network.NewLocalNetwork()
-	return &memoryBenchmark{
+	return &memoryClient{
 		network: network,
 		types:   Types,
 	}
 }
 
-type memoryBenchmark struct {
+type memoryClient struct {
 	network network.Network
 	node    *node.Node
 	types   []proxy.Type
 	proxies []*proxy.Proxy
 }
 
-func (c *memoryBenchmark) start() error {
+func (c *memoryClient) start() error {
 	if c.node != nil {
 		return nil
 	}
@@ -64,7 +62,10 @@ func (c *memoryBenchmark) start() error {
 		c.network,
 		sharedmemory.NewProtocol(),
 		node.WithHost("localhost"),
-		node.WithPort(nextPort()))
+		node.WithPort(nextPort()),
+		node.WithGRPCServerOptions(
+			grpc.MaxRecvMsgSize(1024*1024*10),
+			grpc.MaxSendMsgSize(1024*1024*10)))
 
 	counterv1.RegisterServer(c.node)
 	electionv1.RegisterServer(c.node)
@@ -81,10 +82,12 @@ func (c *memoryBenchmark) start() error {
 	return nil
 }
 
-func (c *memoryBenchmark) Connect(ctx context.Context) (*grpc.ClientConn, error) {
+func (c *memoryClient) Connect(ctx context.Context) (*grpc.ClientConn, error) {
 	if err := c.start(); err != nil {
 		return nil, err
 	}
+
+	s := 1024 * 1024 * 10
 
 	driver := driver.New(c.network)
 	proxy := proxy.New(c.network,
@@ -93,6 +96,10 @@ func (c *memoryBenchmark) Connect(ctx context.Context) (*grpc.ClientConn, error)
 		proxy.WithProxyPort(nextPort()),
 		proxy.WithRuntimePort(nextPort()),
 		proxy.WithConfig(proxy.Config{
+			Server: proxy.ServerConfig{
+				MaxRecvMsgSize: &s,
+				MaxSendMsgSize: &s,
+			},
 			Router: proxy.RouterConfig{
 				Routes: []proxy.RouteConfig{
 					{
@@ -156,20 +163,20 @@ func (c *memoryBenchmark) Connect(ctx context.Context) (*grpc.ClientConn, error)
 	return c.connect(ctx, fmt.Sprintf(":%d", proxy.RuntimeService.Port))
 }
 
-func (c *memoryBenchmark) connect(ctx context.Context, target string) (*grpc.ClientConn, error) {
+func (c *memoryClient) connect(ctx context.Context, target string) (*grpc.ClientConn, error) {
 	conn, err := grpc.DialContext(ctx, target,
 		grpc.WithContextDialer(c.network.Connect),
-		grpc.WithTransportCredentials(insecure.NewCredentials()))
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(1024*1024*10), grpc.MaxCallRecvMsgSize(1024*1024*10)))
 	if err != nil {
 		return nil, errors.FromProto(err)
 	}
 	return conn, nil
 }
 
-func (c *memoryBenchmark) Close() {
+func (c *memoryClient) Close() {
 	for _, proxy := range c.proxies {
 		_ = proxy.Stop()
 	}
 	_ = c.node.Stop()
-	_ = os.RemoveAll("test-data")
 }
