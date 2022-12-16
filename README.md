@@ -1,6 +1,6 @@
 <!--
 SPDX-FileCopyrightText: 2019-present Open Networking Foundation <info@opennetworking.org>
-SPDX-License-Identifier: Apache-2.0 
+SPDX-License-Identifier: Apache-2.0    
 -->
 
 [![Snapshot](https://github.com/atomix/go-sdk/actions/workflows/build.yml/badge.svg)](https://github.com/atomix/go-sdk/actions/workflows/build.yml)
