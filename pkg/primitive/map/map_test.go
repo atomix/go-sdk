@@ -231,7 +231,7 @@ func TestMapOperations(t *testing.T) {
 	assert.Equal(t, kv2.Version, removed.Version)
 }
 
-func BenchMapPutSerial(t *testing.T) {
+func TestMapPutSerial(t *testing.T) {
 	client := test.NewConsensusClient(3, 3)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -254,7 +254,7 @@ func BenchMapPutSerial(t *testing.T) {
 	println(fmt.Sprintf("completed %d writes in %s", iterations, end.Sub(start)))
 }
 
-func BenchMapPutConcurrent(t *testing.T) {
+func TestMapPutConcurrent(t *testing.T) {
 	client := test.NewConsensusClient(3, 3)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -292,7 +292,7 @@ func BenchMapPutConcurrent(t *testing.T) {
 	}
 }
 
-func BenchMapGetSerial(t *testing.T) {
+func TestMapGetSerial(t *testing.T) {
 	client := test.NewConsensusClient(3, 3)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -320,7 +320,7 @@ func BenchMapGetSerial(t *testing.T) {
 	println(fmt.Sprintf("completed %d reads in %s", iterations, end.Sub(start)))
 }
 
-func BenchMapGetConcurrent(t *testing.T) {
+func TestMapGetConcurrent(t *testing.T) {
 	client := test.NewConsensusClient(3, 3)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -346,7 +346,7 @@ func BenchMapGetConcurrent(t *testing.T) {
 	}
 
 	count := &atomic.Uint64{}
-	concurrency := 10000
+	concurrency := 1000
 	for i := 0; i < concurrency; i++ {
 		go func() {
 			for {
@@ -363,5 +363,66 @@ func BenchMapGetConcurrent(t *testing.T) {
 	for {
 		<-ticker.C
 		println(fmt.Sprintf("completed %d reads in 10 seconds", count.Swap(0)))
+	}
+}
+
+func TestMapPutGetConcurrent(t *testing.T) {
+	client := test.NewConsensusClient(3, 3)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	m, err := NewBuilder[string, string](client, "test").
+		Codec(generic.Scalar[string]()).
+		Get(ctx)
+	assert.NoError(t, err)
+
+	numKeys := 1000
+	keys := make([]string, numKeys)
+	for i := 0; i < numKeys; i++ {
+		keys[i] = uuid.New().String()
+	}
+
+	err = async.IterAsync(numKeys, func(i int) error {
+		_, err := m.Put(ctx, keys[i], uuid.New().String())
+		return err
+	})
+	if err != nil {
+		t.Fail()
+	}
+
+	putCount := &atomic.Uint64{}
+	putConcurrency := 100
+	for i := 0; i < putConcurrency; i++ {
+		go func() {
+			for {
+				_, err := m.Put(ctx, keys[rand.Intn(numKeys)], keys[rand.Intn(numKeys)])
+				if err != nil {
+					t.Fail()
+				}
+				putCount.Add(1)
+			}
+		}()
+	}
+
+	getCount := &atomic.Uint64{}
+	getConcurrency := 100
+	for i := 0; i < getConcurrency; i++ {
+		go func() {
+			for {
+				_, err := m.Get(ctx, keys[rand.Intn(numKeys)])
+				if err != nil {
+					t.Fail()
+				}
+				getCount.Add(1)
+			}
+		}()
+	}
+
+	ticker := time.NewTicker(10 * time.Second)
+	for {
+		<-ticker.C
+		println(fmt.Sprintf("completed %d puts in 10 seconds", putCount.Swap(0)))
+		println(fmt.Sprintf("completed %d gets in 10 seconds", getCount.Swap(0)))
 	}
 }

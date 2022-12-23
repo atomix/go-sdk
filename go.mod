@@ -6,13 +6,14 @@ require (
 	github.com/atomix/consensus-storage/driver v0.13.1
 	github.com/atomix/consensus-storage/node v0.13.1
 	github.com/atomix/runtime/api v0.7.0
-	github.com/atomix/runtime/primitives v0.7.7
+	github.com/atomix/runtime/primitives v0.7.8
 	github.com/atomix/runtime/proxy v0.10.0
-	github.com/atomix/runtime/sdk v0.7.5
+	github.com/atomix/runtime/sdk v0.7.6
 	github.com/atomix/shared-memory-storage/driver v0.1.3
 	github.com/atomix/shared-memory-storage/node v0.1.2
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.5.2
+	github.com/google/uuid v1.1.2
 	github.com/lni/dragonboat/v3 v3.3.5
 	github.com/stretchr/testify v1.7.1
 	google.golang.org/grpc v1.46.0
@@ -34,7 +35,6 @@ require (
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/snappy v0.0.3-0.20201103224600-674baa8c7fc3 // indirect
 	github.com/google/btree v1.0.0 // indirect
-	github.com/google/uuid v1.1.2 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
 	github.com/hashicorp/go-msgpack v0.5.3 // indirect
@@ -66,11 +66,11 @@ require (
 )
 
 replace (
-	github.com/atomix/shared-memory-storage/driver => ../../storage/shared-memory/driver
-	github.com/atomix/shared-memory-storage/node => ../../storage/shared-memory/node
 	github.com/atomix/consensus-storage/driver => ../../storage/consensus/driver
 	github.com/atomix/consensus-storage/node => ../../storage/consensus/node
 	github.com/atomix/runtime/primitives => ../../runtime/primitives
 	github.com/atomix/runtime/proxy => ../../runtime/proxy
 	github.com/atomix/runtime/sdk => ../../runtime/sdk
+	github.com/atomix/shared-memory-storage/driver => ../../storage/shared-memory/driver
+	github.com/atomix/shared-memory-storage/node => ../../storage/shared-memory/node
 )
