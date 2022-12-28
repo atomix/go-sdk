@@ -43,7 +43,7 @@ func (b *Builder[K, V]) Get(ctx context.Context) (Map[K, V], error) {
 	if b.codec == nil {
 		panic("no codec set for map primitive")
 	}
-	atomicMap := &atomicMapPrimitive[K, V]{
+	atomicMap := &mapPrimitive[K, V]{
 		Primitive:  primitive.New(b.options.Name),
 		client:     mapv1.NewMapClient(conn),
 		keyEncoder: scalar.NewEncodeFunc[K](),

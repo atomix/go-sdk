@@ -79,7 +79,9 @@ func (c *Client) Connect(ctx context.Context) (*grpc.ClientConn, error) {
 			},
 		}))
 
-	service := proxy.NewService(runtime, proxy.WithPort(nextPort())).(*proxy.Service)
+	service := proxy.NewService(runtime,
+		proxy.WithNetwork(c.network),
+		proxy.WithPort(nextPort())).(*proxy.Service)
 	if err := service.Start(); err != nil {
 		return nil, err
 	}

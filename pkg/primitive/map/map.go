@@ -107,7 +107,7 @@ type Removed[K scalar.Scalar, V any] struct {
 	Expired bool
 }
 
-type atomicMapPrimitive[K scalar.Scalar, V any] struct {
+type mapPrimitive[K scalar.Scalar, V any] struct {
 	primitive.Primitive
 	client     mapv1.MapClient
 	keyEncoder func(K) string
@@ -115,7 +115,7 @@ type atomicMapPrimitive[K scalar.Scalar, V any] struct {
 	valueCodec types.Codec[V]
 }
 
-func (m *atomicMapPrimitive[K, V]) Put(ctx context.Context, key K, value V, opts ...PutOption) (*Entry[K, V], error) {
+func (m *mapPrimitive[K, V]) Put(ctx context.Context, key K, value V, opts ...PutOption) (*Entry[K, V], error) {
 	valueBytes, err := m.valueCodec.Encode(value)
 	if err != nil {
 		return nil, errors.NewInvalid("value encoding failed", err)
@@ -146,7 +146,7 @@ func (m *atomicMapPrimitive[K, V]) Put(ctx context.Context, key K, value V, opts
 	}, nil
 }
 
-func (m *atomicMapPrimitive[K, V]) Insert(ctx context.Context, key K, value V, opts ...InsertOption) (*Entry[K, V], error) {
+func (m *mapPrimitive[K, V]) Insert(ctx context.Context, key K, value V, opts ...InsertOption) (*Entry[K, V], error) {
 	valueBytes, err := m.valueCodec.Encode(value)
 	if err != nil {
 		return nil, errors.NewInvalid("value encoding failed", err)
@@ -177,7 +177,7 @@ func (m *atomicMapPrimitive[K, V]) Insert(ctx context.Context, key K, value V, o
 	}, nil
 }
 
-func (m *atomicMapPrimitive[K, V]) Update(ctx context.Context, key K, value V, opts ...UpdateOption) (*Entry[K, V], error) {
+func (m *mapPrimitive[K, V]) Update(ctx context.Context, key K, value V, opts ...UpdateOption) (*Entry[K, V], error) {
 	valueBytes, err := m.valueCodec.Encode(value)
 	if err != nil {
 		return nil, errors.NewInvalid("value encoding failed", err)
@@ -208,7 +208,7 @@ func (m *atomicMapPrimitive[K, V]) Update(ctx context.Context, key K, value V, o
 	}, nil
 }
 
-func (m *atomicMapPrimitive[K, V]) Get(ctx context.Context, key K, opts ...GetOption) (*Entry[K, V], error) {
+func (m *mapPrimitive[K, V]) Get(ctx context.Context, key K, opts ...GetOption) (*Entry[K, V], error) {
 	request := &mapv1.GetRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: m.Name(),
@@ -228,7 +228,7 @@ func (m *atomicMapPrimitive[K, V]) Get(ctx context.Context, key K, opts ...GetOp
 	return m.decodeValue(key, &response.Value)
 }
 
-func (m *atomicMapPrimitive[K, V]) Remove(ctx context.Context, key K, opts ...RemoveOption) (*Entry[K, V], error) {
+func (m *mapPrimitive[K, V]) Remove(ctx context.Context, key K, opts ...RemoveOption) (*Entry[K, V], error) {
 	request := &mapv1.RemoveRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: m.Name(),
@@ -248,7 +248,7 @@ func (m *atomicMapPrimitive[K, V]) Remove(ctx context.Context, key K, opts ...Re
 	return m.decodeValue(key, &response.Value)
 }
 
-func (m *atomicMapPrimitive[K, V]) Len(ctx context.Context) (int, error) {
+func (m *mapPrimitive[K, V]) Len(ctx context.Context) (int, error) {
 	request := &mapv1.SizeRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: m.Name(),
@@ -261,7 +261,7 @@ func (m *atomicMapPrimitive[K, V]) Len(ctx context.Context) (int, error) {
 	return int(response.Size_), nil
 }
 
-func (m *atomicMapPrimitive[K, V]) Clear(ctx context.Context) error {
+func (m *mapPrimitive[K, V]) Clear(ctx context.Context) error {
 	request := &mapv1.ClearRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: m.Name(),
@@ -274,15 +274,15 @@ func (m *atomicMapPrimitive[K, V]) Clear(ctx context.Context) error {
 	return nil
 }
 
-func (m *atomicMapPrimitive[K, V]) List(ctx context.Context) (EntryStream[K, V], error) {
+func (m *mapPrimitive[K, V]) List(ctx context.Context) (EntryStream[K, V], error) {
 	return m.entries(ctx, false)
 }
 
-func (m *atomicMapPrimitive[K, V]) Watch(ctx context.Context) (EntryStream[K, V], error) {
+func (m *mapPrimitive[K, V]) Watch(ctx context.Context) (EntryStream[K, V], error) {
 	return m.entries(ctx, true)
 }
 
-func (m *atomicMapPrimitive[K, V]) entries(ctx context.Context, watch bool) (EntryStream[K, V], error) {
+func (m *mapPrimitive[K, V]) entries(ctx context.Context, watch bool) (EntryStream[K, V], error) {
 	request := &mapv1.EntriesRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: m.Name(),
@@ -322,7 +322,7 @@ func (m *atomicMapPrimitive[K, V]) entries(ctx context.Context, watch bool) (Ent
 	return stream.NewChannelStream[*Entry[K, V]](ch), nil
 }
 
-func (m *atomicMapPrimitive[K, V]) Events(ctx context.Context, opts ...EventsOption) (EventStream[K, V], error) {
+func (m *mapPrimitive[K, V]) Events(ctx context.Context, opts ...EventsOption) (EventStream[K, V], error) {
 	request := &mapv1.EventsRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: m.Name(),
@@ -428,7 +428,7 @@ func (m *atomicMapPrimitive[K, V]) Events(ctx context.Context, opts ...EventsOpt
 	}
 }
 
-func (m *atomicMapPrimitive[K, V]) decodeValue(key K, value *mapv1.VersionedValue) (*Entry[K, V], error) {
+func (m *mapPrimitive[K, V]) decodeValue(key K, value *mapv1.VersionedValue) (*Entry[K, V], error) {
 	if value == nil {
 		return &Entry[K, V]{
 			Key: key,
@@ -447,7 +447,7 @@ func (m *atomicMapPrimitive[K, V]) decodeValue(key K, value *mapv1.VersionedValu
 	}, nil
 }
 
-func (m *atomicMapPrimitive[K, V]) decodeKeyValue(key string, value *mapv1.VersionedValue) (*Entry[K, V], error) {
+func (m *mapPrimitive[K, V]) decodeKeyValue(key string, value *mapv1.VersionedValue) (*Entry[K, V], error) {
 	decodedKey, err := m.keyDecoder(key)
 	if err != nil {
 		return nil, errors.NewInvalid("key decoding failed", err)
@@ -455,11 +455,11 @@ func (m *atomicMapPrimitive[K, V]) decodeKeyValue(key string, value *mapv1.Versi
 	return m.decodeValue(decodedKey, value)
 }
 
-func (m *atomicMapPrimitive[K, V]) decodeEntry(entry *mapv1.Entry) (*Entry[K, V], error) {
+func (m *mapPrimitive[K, V]) decodeEntry(entry *mapv1.Entry) (*Entry[K, V], error) {
 	return m.decodeKeyValue(entry.Key, entry.Value)
 }
 
-func (m *atomicMapPrimitive[K, V]) create(ctx context.Context, tags ...string) error {
+func (m *mapPrimitive[K, V]) create(ctx context.Context, tags ...string) error {
 	request := &mapv1.CreateRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: m.Name(),
@@ -475,7 +475,7 @@ func (m *atomicMapPrimitive[K, V]) create(ctx context.Context, tags ...string) e
 	return nil
 }
 
-func (m *atomicMapPrimitive[K, V]) Close(ctx context.Context) error {
+func (m *mapPrimitive[K, V]) Close(ctx context.Context) error {
 	request := &mapv1.CloseRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: m.Name(),
