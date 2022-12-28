@@ -5,7 +5,7 @@
 package lock
 
 import (
-	lockv1 "github.com/atomix/runtime/api/atomix/runtime/lock/v1"
+	lockv1 "github.com/atomix/atomix/api/runtime/lock/v1"
 	"time"
 )
 

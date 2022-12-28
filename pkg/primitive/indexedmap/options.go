@@ -5,9 +5,9 @@
 package indexedmap
 
 import (
-	"github.com/atomix/go-sdk/pkg/generic/scalar"
+	indexedmapv1 "github.com/atomix/atomix/api/runtime/indexedmap/v1"
 	"github.com/atomix/go-sdk/pkg/primitive"
-	indexedmapv1 "github.com/atomix/runtime/api/atomix/runtime/indexedmap/v1"
+	"github.com/atomix/go-sdk/pkg/types/scalar"
 	"time"
 )
 

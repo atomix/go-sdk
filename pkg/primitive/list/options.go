@@ -5,7 +5,7 @@
 package list
 
 import (
-	listv1 "github.com/atomix/runtime/api/atomix/runtime/list/v1"
+	listv1 "github.com/atomix/atomix/api/runtime/list/v1"
 )
 
 // EventsOption is an option for list Events calls

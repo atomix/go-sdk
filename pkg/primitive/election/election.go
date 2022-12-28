@@ -6,12 +6,12 @@ package election
 
 import (
 	"context"
+	"github.com/atomix/atomix/api/errors"
+	electionv1 "github.com/atomix/atomix/api/runtime/election/v1"
+	runtimev1 "github.com/atomix/atomix/api/runtime/v1"
+	"github.com/atomix/atomix/runtime/pkg/logging"
 	"github.com/atomix/go-sdk/pkg/primitive"
 	"github.com/atomix/go-sdk/pkg/stream"
-	electionv1 "github.com/atomix/runtime/api/atomix/runtime/election/v1"
-	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
-	"github.com/atomix/runtime/sdk/pkg/errors"
-	"github.com/atomix/runtime/sdk/pkg/logging"
 	"io"
 )
 
@@ -86,96 +86,96 @@ func (e *electionPrimitive) CandidateID() string {
 
 func (e *electionPrimitive) GetTerm(ctx context.Context) (*Term, error) {
 	request := &electionv1.GetTermRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: e.Name(),
 		},
 	}
 	response, err := e.client.GetTerm(ctx, request)
 	if err != nil {
-		return nil, errors.FromProto(err)
+		return nil, err
 	}
 	return newTerm(&response.Term), nil
 }
 
 func (e *electionPrimitive) Enter(ctx context.Context) (*Term, error) {
 	request := &electionv1.EnterRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: e.Name(),
 		},
 		Candidate: e.candidateID,
 	}
 	response, err := e.client.Enter(ctx, request)
 	if err != nil {
-		return nil, errors.FromProto(err)
+		return nil, err
 	}
 	return newTerm(&response.Term), nil
 }
 
 func (e *electionPrimitive) Leave(ctx context.Context) (*Term, error) {
 	request := &electionv1.WithdrawRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: e.Name(),
 		},
 		Candidate: e.candidateID,
 	}
 	response, err := e.client.Withdraw(ctx, request)
 	if err != nil {
-		return nil, errors.FromProto(err)
+		return nil, err
 	}
 	return newTerm(&response.Term), nil
 }
 
 func (e *electionPrimitive) Anoint(ctx context.Context, id string) (*Term, error) {
 	request := &electionv1.AnointRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: e.Name(),
 		},
 		Candidate: id,
 	}
 	response, err := e.client.Anoint(ctx, request)
 	if err != nil {
-		return nil, errors.FromProto(err)
+		return nil, err
 	}
 	return newTerm(&response.Term), nil
 }
 
 func (e *electionPrimitive) Promote(ctx context.Context, id string) (*Term, error) {
 	request := &electionv1.PromoteRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: e.Name(),
 		},
 		Candidate: id,
 	}
 	response, err := e.client.Promote(ctx, request)
 	if err != nil {
-		return nil, errors.FromProto(err)
+		return nil, err
 	}
 	return newTerm(&response.Term), nil
 }
 
 func (e *electionPrimitive) Evict(ctx context.Context, id string) (*Term, error) {
 	request := &electionv1.EvictRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: e.Name(),
 		},
 		Candidate: id,
 	}
 	response, err := e.client.Evict(ctx, request)
 	if err != nil {
-		return nil, errors.FromProto(err)
+		return nil, err
 	}
 	return newTerm(&response.Term), nil
 }
 
 func (e *electionPrimitive) Watch(ctx context.Context) (TermStream, error) {
 	request := &electionv1.WatchRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: e.Name(),
 		},
 	}
 	client, err := e.client.Watch(ctx, request)
 	if err != nil {
-		return nil, errors.FromProto(err)
+		return nil, err
 	}
 
 	ch := make(chan stream.Result[*Term])
@@ -187,7 +187,6 @@ func (e *electionPrimitive) Watch(ctx context.Context) (TermStream, error) {
 				if err == io.EOF {
 					return
 				}
-				err = errors.FromProto(err)
 				if errors.IsCanceled(err) || errors.IsTimeout(err) {
 					return
 				}
@@ -204,14 +203,13 @@ func (e *electionPrimitive) Watch(ctx context.Context) (TermStream, error) {
 
 func (e *electionPrimitive) create(ctx context.Context, tags ...string) error {
 	request := &electionv1.CreateRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: e.Name(),
 		},
 		Tags: tags,
 	}
 	_, err := e.client.Create(ctx, request)
 	if err != nil {
-		err = errors.FromProto(err)
 		if !errors.IsAlreadyExists(err) {
 			return err
 		}
@@ -221,13 +219,12 @@ func (e *electionPrimitive) create(ctx context.Context, tags ...string) error {
 
 func (e *electionPrimitive) Close(ctx context.Context) error {
 	request := &electionv1.CloseRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: e.Name(),
 		},
 	}
 	_, err := e.client.Close(ctx, request)
 	if err != nil {
-		err = errors.FromProto(err)
 		if !errors.IsNotFound(err) {
 			return err
 		}

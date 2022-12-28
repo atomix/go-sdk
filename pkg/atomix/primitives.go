@@ -6,8 +6,7 @@ package atomix
 
 import (
 	"github.com/atomix/go-sdk/pkg/client"
-	"github.com/atomix/go-sdk/pkg/generic/scalar"
-	counter "github.com/atomix/go-sdk/pkg/primitive/counter"
+	"github.com/atomix/go-sdk/pkg/primitive/counter"
 	"github.com/atomix/go-sdk/pkg/primitive/election"
 	"github.com/atomix/go-sdk/pkg/primitive/indexedmap"
 	"github.com/atomix/go-sdk/pkg/primitive/list"
@@ -15,6 +14,7 @@ import (
 	_map "github.com/atomix/go-sdk/pkg/primitive/map"
 	"github.com/atomix/go-sdk/pkg/primitive/set"
 	"github.com/atomix/go-sdk/pkg/primitive/value"
+	"github.com/atomix/go-sdk/pkg/types/scalar"
 )
 
 func Counter(name string) *counter.Builder {

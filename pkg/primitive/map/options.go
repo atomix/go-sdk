@@ -5,9 +5,9 @@
 package _map //nolint:golint
 
 import (
-	"github.com/atomix/go-sdk/pkg/generic/scalar"
+	mapv1 "github.com/atomix/atomix/api/runtime/map/v1"
 	"github.com/atomix/go-sdk/pkg/primitive"
-	mapv1 "github.com/atomix/runtime/api/atomix/runtime/map/v1"
+	"github.com/atomix/go-sdk/pkg/types/scalar"
 	"time"
 )
 

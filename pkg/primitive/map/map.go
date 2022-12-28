@@ -7,14 +7,14 @@ package _map //nolint:golint
 import (
 	"context"
 	"fmt"
-	"github.com/atomix/go-sdk/pkg/generic"
-	"github.com/atomix/go-sdk/pkg/generic/scalar"
+	"github.com/atomix/atomix/api/errors"
+	mapv1 "github.com/atomix/atomix/api/runtime/map/v1"
+	runtimev1 "github.com/atomix/atomix/api/runtime/v1"
+	"github.com/atomix/atomix/runtime/pkg/logging"
 	"github.com/atomix/go-sdk/pkg/primitive"
 	"github.com/atomix/go-sdk/pkg/stream"
-	mapv1 "github.com/atomix/runtime/api/atomix/runtime/map/v1"
-	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
-	"github.com/atomix/runtime/sdk/pkg/errors"
-	"github.com/atomix/runtime/sdk/pkg/logging"
+	"github.com/atomix/go-sdk/pkg/types"
+	"github.com/atomix/go-sdk/pkg/types/scalar"
 	"io"
 )
 
@@ -112,7 +112,7 @@ type atomicMapPrimitive[K scalar.Scalar, V any] struct {
 	client     mapv1.MapClient
 	keyEncoder func(K) string
 	keyDecoder func(string) (K, error)
-	valueCodec generic.Codec[V]
+	valueCodec types.Codec[V]
 }
 
 func (m *atomicMapPrimitive[K, V]) Put(ctx context.Context, key K, value V, opts ...PutOption) (*Entry[K, V], error) {
@@ -121,7 +121,7 @@ func (m *atomicMapPrimitive[K, V]) Put(ctx context.Context, key K, value V, opts
 		return nil, errors.NewInvalid("value encoding failed", err)
 	}
 	request := &mapv1.PutRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: m.Name(),
 		},
 		Key:   m.keyEncoder(key),
@@ -132,7 +132,7 @@ func (m *atomicMapPrimitive[K, V]) Put(ctx context.Context, key K, value V, opts
 	}
 	response, err := m.client.Put(ctx, request)
 	if err != nil {
-		return nil, errors.FromProto(err)
+		return nil, err
 	}
 	for i := range opts {
 		opts[i].afterPut(response)
@@ -152,7 +152,7 @@ func (m *atomicMapPrimitive[K, V]) Insert(ctx context.Context, key K, value V, o
 		return nil, errors.NewInvalid("value encoding failed", err)
 	}
 	request := &mapv1.InsertRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: m.Name(),
 		},
 		Key:   m.keyEncoder(key),
@@ -163,7 +163,7 @@ func (m *atomicMapPrimitive[K, V]) Insert(ctx context.Context, key K, value V, o
 	}
 	response, err := m.client.Insert(ctx, request)
 	if err != nil {
-		return nil, errors.FromProto(err)
+		return nil, err
 	}
 	for i := range opts {
 		opts[i].afterInsert(response)
@@ -183,7 +183,7 @@ func (m *atomicMapPrimitive[K, V]) Update(ctx context.Context, key K, value V, o
 		return nil, errors.NewInvalid("value encoding failed", err)
 	}
 	request := &mapv1.UpdateRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: m.Name(),
 		},
 		Key:   m.keyEncoder(key),
@@ -194,7 +194,7 @@ func (m *atomicMapPrimitive[K, V]) Update(ctx context.Context, key K, value V, o
 	}
 	response, err := m.client.Update(ctx, request)
 	if err != nil {
-		return nil, errors.FromProto(err)
+		return nil, err
 	}
 	for i := range opts {
 		opts[i].afterUpdate(response)
@@ -210,7 +210,7 @@ func (m *atomicMapPrimitive[K, V]) Update(ctx context.Context, key K, value V, o
 
 func (m *atomicMapPrimitive[K, V]) Get(ctx context.Context, key K, opts ...GetOption) (*Entry[K, V], error) {
 	request := &mapv1.GetRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: m.Name(),
 		},
 		Key: m.keyEncoder(key),
@@ -220,7 +220,7 @@ func (m *atomicMapPrimitive[K, V]) Get(ctx context.Context, key K, opts ...GetOp
 	}
 	response, err := m.client.Get(ctx, request)
 	if err != nil {
-		return nil, errors.FromProto(err)
+		return nil, err
 	}
 	for i := range opts {
 		opts[i].afterGet(response)
@@ -230,7 +230,7 @@ func (m *atomicMapPrimitive[K, V]) Get(ctx context.Context, key K, opts ...GetOp
 
 func (m *atomicMapPrimitive[K, V]) Remove(ctx context.Context, key K, opts ...RemoveOption) (*Entry[K, V], error) {
 	request := &mapv1.RemoveRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: m.Name(),
 		},
 		Key: m.keyEncoder(key),
@@ -240,7 +240,7 @@ func (m *atomicMapPrimitive[K, V]) Remove(ctx context.Context, key K, opts ...Re
 	}
 	response, err := m.client.Remove(ctx, request)
 	if err != nil {
-		return nil, errors.FromProto(err)
+		return nil, err
 	}
 	for i := range opts {
 		opts[i].afterRemove(response)
@@ -250,26 +250,26 @@ func (m *atomicMapPrimitive[K, V]) Remove(ctx context.Context, key K, opts ...Re
 
 func (m *atomicMapPrimitive[K, V]) Len(ctx context.Context) (int, error) {
 	request := &mapv1.SizeRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: m.Name(),
 		},
 	}
 	response, err := m.client.Size(ctx, request)
 	if err != nil {
-		return 0, errors.FromProto(err)
+		return 0, err
 	}
 	return int(response.Size_), nil
 }
 
 func (m *atomicMapPrimitive[K, V]) Clear(ctx context.Context) error {
 	request := &mapv1.ClearRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: m.Name(),
 		},
 	}
 	_, err := m.client.Clear(ctx, request)
 	if err != nil {
-		return errors.FromProto(err)
+		return err
 	}
 	return nil
 }
@@ -284,14 +284,14 @@ func (m *atomicMapPrimitive[K, V]) Watch(ctx context.Context) (EntryStream[K, V]
 
 func (m *atomicMapPrimitive[K, V]) entries(ctx context.Context, watch bool) (EntryStream[K, V], error) {
 	request := &mapv1.EntriesRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: m.Name(),
 		},
 		Watch: watch,
 	}
 	client, err := m.client.Entries(ctx, request)
 	if err != nil {
-		return nil, errors.FromProto(err)
+		return nil, err
 	}
 
 	ch := make(chan stream.Result[*Entry[K, V]])
@@ -303,7 +303,6 @@ func (m *atomicMapPrimitive[K, V]) entries(ctx context.Context, watch bool) (Ent
 				if err == io.EOF {
 					return
 				}
-				err = errors.FromProto(err)
 				if errors.IsCanceled(err) || errors.IsTimeout(err) {
 					return
 				}
@@ -325,7 +324,7 @@ func (m *atomicMapPrimitive[K, V]) entries(ctx context.Context, watch bool) (Ent
 
 func (m *atomicMapPrimitive[K, V]) Events(ctx context.Context, opts ...EventsOption) (EventStream[K, V], error) {
 	request := &mapv1.EventsRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: m.Name(),
 		},
 	}
@@ -335,7 +334,7 @@ func (m *atomicMapPrimitive[K, V]) Events(ctx context.Context, opts ...EventsOpt
 
 	client, err := m.client.Events(ctx, request)
 	if err != nil {
-		return nil, errors.FromProto(err)
+		return nil, err
 	}
 
 	ch := make(chan stream.Result[Event[K, V]])
@@ -354,7 +353,6 @@ func (m *atomicMapPrimitive[K, V]) Events(ctx context.Context, opts ...EventsOpt
 				if err == io.EOF {
 					return
 				}
-				err = errors.FromProto(err)
 				if errors.IsCanceled(err) || errors.IsTimeout(err) {
 					return
 				}
@@ -463,14 +461,13 @@ func (m *atomicMapPrimitive[K, V]) decodeEntry(entry *mapv1.Entry) (*Entry[K, V]
 
 func (m *atomicMapPrimitive[K, V]) create(ctx context.Context, tags ...string) error {
 	request := &mapv1.CreateRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: m.Name(),
 		},
 		Tags: tags,
 	}
 	_, err := m.client.Create(ctx, request)
 	if err != nil {
-		err = errors.FromProto(err)
 		if !errors.IsAlreadyExists(err) {
 			return err
 		}
@@ -480,13 +477,12 @@ func (m *atomicMapPrimitive[K, V]) create(ctx context.Context, tags ...string) e
 
 func (m *atomicMapPrimitive[K, V]) Close(ctx context.Context) error {
 	request := &mapv1.CloseRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: m.Name(),
 		},
 	}
 	_, err := m.client.Close(ctx, request)
 	if err != nil {
-		err = errors.FromProto(err)
 		if !errors.IsNotFound(err) {
 			return err
 		}

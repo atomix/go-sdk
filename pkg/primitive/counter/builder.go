@@ -6,8 +6,8 @@ package counter
 
 import (
 	"context"
+	counterv1 "github.com/atomix/atomix/api/runtime/counter/v1"
 	"github.com/atomix/go-sdk/pkg/primitive"
-	counterv1 "github.com/atomix/runtime/api/atomix/runtime/counter/v1"
 )
 
 func NewBuilder(client primitive.Client, name string) *Builder {

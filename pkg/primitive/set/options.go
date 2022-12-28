@@ -5,7 +5,7 @@
 package set
 
 import (
-	setv1 "github.com/atomix/runtime/api/atomix/runtime/set/v1"
+	setv1 "github.com/atomix/atomix/api/runtime/set/v1"
 	"time"
 )
 

@@ -5,7 +5,6 @@
 package client
 
 import (
-	"github.com/atomix/go-sdk/pkg/generic/scalar"
 	"github.com/atomix/go-sdk/pkg/primitive"
 	"github.com/atomix/go-sdk/pkg/primitive/counter"
 	"github.com/atomix/go-sdk/pkg/primitive/election"
@@ -15,6 +14,7 @@ import (
 	_map "github.com/atomix/go-sdk/pkg/primitive/map"
 	"github.com/atomix/go-sdk/pkg/primitive/set"
 	"github.com/atomix/go-sdk/pkg/primitive/value"
+	"github.com/atomix/go-sdk/pkg/types/scalar"
 )
 
 func Counter(client primitive.Client) func(name string) *counter.Builder {

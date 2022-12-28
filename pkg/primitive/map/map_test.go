@@ -6,10 +6,10 @@ package _map //nolint:golint
 
 import (
 	"context"
-	"github.com/atomix/go-sdk/pkg/generic"
+	"github.com/atomix/atomix/api/errors"
+	"github.com/atomix/atomix/runtime/pkg/logging"
 	"github.com/atomix/go-sdk/pkg/test"
-	"github.com/atomix/runtime/sdk/pkg/errors"
-	"github.com/atomix/runtime/sdk/pkg/logging"
+	"github.com/atomix/go-sdk/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"io"
 	"testing"
@@ -26,7 +26,7 @@ func TestMapEntries(t *testing.T) {
 	defer cancel()
 
 	map1, err := NewBuilder[string, string](cluster, "test").
-		Codec(generic.Scalar[string]()).
+		Codec(types.Scalar[string]()).
 		Get(ctx)
 	assert.NoError(t, err)
 
@@ -60,12 +60,12 @@ func TestMapOperations(t *testing.T) {
 	defer cancel()
 
 	map1, err := NewBuilder[string, string](cluster, "test").
-		Codec(generic.Scalar[string]()).
+		Codec(types.Scalar[string]()).
 		Get(ctx)
 	assert.NoError(t, err)
 
 	map2, err := NewBuilder[string, string](cluster, "test").
-		Codec(generic.Scalar[string]()).
+		Codec(types.Scalar[string]()).
 		Get(ctx)
 	assert.NoError(t, err)
 

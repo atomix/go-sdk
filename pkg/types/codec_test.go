@@ -2,10 +2,10 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-package generic
+package types
 
 import (
-	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
+	runtimev1 "github.com/atomix/atomix/api/runtime/v1"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -82,8 +82,8 @@ func TestYAMLPointerCodec(t *testing.T) {
 }
 
 func TestGoGoProtoCodec(t *testing.T) {
-	codec := GoGoProto[*runtimev1.PrimitiveId](&runtimev1.PrimitiveId{})
-	bytes, err := codec.Encode(&runtimev1.PrimitiveId{
+	codec := GoGoProto[*runtimev1.PrimitiveID](&runtimev1.PrimitiveID{})
+	bytes, err := codec.Encode(&runtimev1.PrimitiveID{
 		Name: "foo",
 	})
 	assert.NoError(t, err)

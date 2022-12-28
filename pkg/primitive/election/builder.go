@@ -6,8 +6,8 @@ package election
 
 import (
 	"context"
+	electionv1 "github.com/atomix/atomix/api/runtime/election/v1"
 	"github.com/atomix/go-sdk/pkg/primitive"
-	electionv1 "github.com/atomix/runtime/api/atomix/runtime/election/v1"
 )
 
 func NewBuilder(client primitive.Client, name string) *Builder {

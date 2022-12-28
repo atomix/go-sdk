@@ -2,11 +2,11 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-package generic
+package types
 
 import (
 	"encoding/json"
-	"github.com/atomix/go-sdk/pkg/generic/scalar"
+	"github.com/atomix/go-sdk/pkg/types/scalar"
 	gogoproto "github.com/gogo/protobuf/proto"
 	"github.com/golang/protobuf/proto"
 	"gopkg.in/yaml.v3"

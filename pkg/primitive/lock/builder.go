@@ -6,8 +6,8 @@ package lock
 
 import (
 	"context"
+	lockv1 "github.com/atomix/atomix/api/runtime/lock/v1"
 	"github.com/atomix/go-sdk/pkg/primitive"
-	lockv1 "github.com/atomix/runtime/api/atomix/runtime/lock/v1"
 )
 
 func NewBuilder(client primitive.Client, name string) *Builder {

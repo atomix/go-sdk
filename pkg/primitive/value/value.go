@@ -6,13 +6,13 @@ package value
 
 import (
 	"context"
-	"github.com/atomix/go-sdk/pkg/generic"
+	"github.com/atomix/atomix/api/errors"
+	runtimev1 "github.com/atomix/atomix/api/runtime/v1"
+	valuev1 "github.com/atomix/atomix/api/runtime/value/v1"
+	"github.com/atomix/atomix/runtime/pkg/logging"
 	"github.com/atomix/go-sdk/pkg/primitive"
 	"github.com/atomix/go-sdk/pkg/stream"
-	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
-	valuev1 "github.com/atomix/runtime/api/atomix/runtime/value/v1"
-	"github.com/atomix/runtime/sdk/pkg/errors"
-	"github.com/atomix/runtime/sdk/pkg/logging"
+	"github.com/atomix/go-sdk/pkg/types"
 	"io"
 )
 
@@ -82,7 +82,7 @@ type Deleted[V any] struct {
 type atomicValuePrimitive[V any] struct {
 	primitive.Primitive
 	client valuev1.ValueClient
-	codec  generic.Codec[V]
+	codec  types.Codec[V]
 }
 
 func (m *atomicValuePrimitive[V]) Set(ctx context.Context, value V, opts ...SetOption) (primitive.Versioned[V], error) {
@@ -91,7 +91,7 @@ func (m *atomicValuePrimitive[V]) Set(ctx context.Context, value V, opts ...SetO
 		return primitive.Versioned[V]{}, errors.NewInvalid("value encoding failed", err)
 	}
 	request := &valuev1.SetRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: m.Name(),
 		},
 		Value: bytes,
@@ -101,7 +101,7 @@ func (m *atomicValuePrimitive[V]) Set(ctx context.Context, value V, opts ...SetO
 	}
 	response, err := m.client.Set(ctx, request)
 	if err != nil {
-		return primitive.Versioned[V]{}, errors.FromProto(err)
+		return primitive.Versioned[V]{}, err
 	}
 	for i := range opts {
 		opts[i].afterSet(response)
@@ -118,7 +118,7 @@ func (m *atomicValuePrimitive[V]) Update(ctx context.Context, value V, opts ...U
 		return primitive.Versioned[V]{}, errors.NewInvalid("value encoding failed", err)
 	}
 	request := &valuev1.UpdateRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: m.Name(),
 		},
 		Value: bytes,
@@ -128,7 +128,7 @@ func (m *atomicValuePrimitive[V]) Update(ctx context.Context, value V, opts ...U
 	}
 	response, err := m.client.Update(ctx, request)
 	if err != nil {
-		return primitive.Versioned[V]{}, errors.FromProto(err)
+		return primitive.Versioned[V]{}, err
 	}
 	for i := range opts {
 		opts[i].afterUpdate(response)
@@ -141,7 +141,7 @@ func (m *atomicValuePrimitive[V]) Update(ctx context.Context, value V, opts ...U
 
 func (m *atomicValuePrimitive[V]) Get(ctx context.Context, opts ...GetOption) (primitive.Versioned[V], error) {
 	request := &valuev1.GetRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: m.Name(),
 		},
 	}
@@ -150,7 +150,7 @@ func (m *atomicValuePrimitive[V]) Get(ctx context.Context, opts ...GetOption) (p
 	}
 	response, err := m.client.Get(ctx, request)
 	if err != nil {
-		return primitive.Versioned[V]{}, errors.FromProto(err)
+		return primitive.Versioned[V]{}, err
 	}
 	for i := range opts {
 		opts[i].afterGet(response)
@@ -167,7 +167,7 @@ func (m *atomicValuePrimitive[V]) Get(ctx context.Context, opts ...GetOption) (p
 
 func (m *atomicValuePrimitive[V]) Delete(ctx context.Context, opts ...DeleteOption) error {
 	request := &valuev1.DeleteRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: m.Name(),
 		},
 	}
@@ -176,7 +176,7 @@ func (m *atomicValuePrimitive[V]) Delete(ctx context.Context, opts ...DeleteOpti
 	}
 	response, err := m.client.Delete(ctx, request)
 	if err != nil {
-		return errors.FromProto(err)
+		return err
 	}
 	for i := range opts {
 		opts[i].afterDelete(response)
@@ -186,13 +186,13 @@ func (m *atomicValuePrimitive[V]) Delete(ctx context.Context, opts ...DeleteOpti
 
 func (m *atomicValuePrimitive[V]) Watch(ctx context.Context) (ValueStream[V], error) {
 	request := &valuev1.WatchRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: m.Name(),
 		},
 	}
 	client, err := m.client.Watch(ctx, request)
 	if err != nil {
-		return nil, errors.FromProto(err)
+		return nil, err
 	}
 
 	ch := make(chan stream.Result[primitive.Versioned[V]])
@@ -204,7 +204,6 @@ func (m *atomicValuePrimitive[V]) Watch(ctx context.Context) (ValueStream[V], er
 				if err == io.EOF {
 					return
 				}
-				err = errors.FromProto(err)
 				if errors.IsCanceled(err) || errors.IsTimeout(err) {
 					return
 				}
@@ -229,7 +228,7 @@ func (m *atomicValuePrimitive[V]) Watch(ctx context.Context) (ValueStream[V], er
 
 func (m *atomicValuePrimitive[V]) Events(ctx context.Context, opts ...EventsOption) (EventStream[V], error) {
 	request := &valuev1.EventsRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: m.Name(),
 		},
 	}
@@ -239,7 +238,7 @@ func (m *atomicValuePrimitive[V]) Events(ctx context.Context, opts ...EventsOpti
 
 	client, err := m.client.Events(ctx, request)
 	if err != nil {
-		return nil, errors.FromProto(err)
+		return nil, err
 	}
 
 	ch := make(chan stream.Result[Event[V]])
@@ -258,7 +257,6 @@ func (m *atomicValuePrimitive[V]) Events(ctx context.Context, opts ...EventsOpti
 				if err == io.EOF {
 					return
 				}
-				err = errors.FromProto(err)
 				if errors.IsCanceled(err) || errors.IsTimeout(err) {
 					return
 				}
@@ -348,14 +346,13 @@ func (m *atomicValuePrimitive[V]) Events(ctx context.Context, opts ...EventsOpti
 
 func (m *atomicValuePrimitive[V]) create(ctx context.Context, tags ...string) error {
 	request := &valuev1.CreateRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: m.Name(),
 		},
 		Tags: tags,
 	}
 	_, err := m.client.Create(ctx, request)
 	if err != nil {
-		err = errors.FromProto(err)
 		if !errors.IsAlreadyExists(err) {
 			return err
 		}
@@ -365,13 +362,12 @@ func (m *atomicValuePrimitive[V]) create(ctx context.Context, tags ...string) er
 
 func (m *atomicValuePrimitive[V]) Close(ctx context.Context) error {
 	request := &valuev1.CloseRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: m.Name(),
 		},
 	}
 	_, err := m.client.Close(ctx, request)
 	if err != nil {
-		err = errors.FromProto(err)
 		if !errors.IsNotFound(err) {
 			return err
 		}

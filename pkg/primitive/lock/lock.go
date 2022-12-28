@@ -6,10 +6,10 @@ package lock
 
 import (
 	"context"
+	"github.com/atomix/atomix/api/errors"
+	lockv1 "github.com/atomix/atomix/api/runtime/lock/v1"
+	runtimev1 "github.com/atomix/atomix/api/runtime/v1"
 	"github.com/atomix/go-sdk/pkg/primitive"
-	lockv1 "github.com/atomix/runtime/api/atomix/runtime/lock/v1"
-	runtimev1 "github.com/atomix/runtime/api/atomix/runtime/v1"
-	"github.com/atomix/runtime/sdk/pkg/errors"
 )
 
 // Lock provides distributed concurrency control
@@ -36,7 +36,7 @@ type lockPrimitive struct {
 
 func (l *lockPrimitive) Lock(ctx context.Context, opts ...LockOption) (Version, error) {
 	request := &lockv1.LockRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: l.Name(),
 		},
 	}
@@ -45,7 +45,7 @@ func (l *lockPrimitive) Lock(ctx context.Context, opts ...LockOption) (Version, 
 	}
 	response, err := l.client.Lock(ctx, request)
 	if err != nil {
-		return 0, errors.FromProto(err)
+		return 0, err
 	}
 	for i := range opts {
 		opts[i].afterLock(response)
@@ -55,7 +55,7 @@ func (l *lockPrimitive) Lock(ctx context.Context, opts ...LockOption) (Version, 
 
 func (l *lockPrimitive) Unlock(ctx context.Context, opts ...UnlockOption) error {
 	request := &lockv1.UnlockRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: l.Name(),
 		},
 	}
@@ -64,7 +64,7 @@ func (l *lockPrimitive) Unlock(ctx context.Context, opts ...UnlockOption) error 
 	}
 	response, err := l.client.Unlock(ctx, request)
 	if err != nil {
-		return errors.FromProto(err)
+		return err
 	}
 	for i := range opts {
 		opts[i].afterUnlock(response)
@@ -74,7 +74,7 @@ func (l *lockPrimitive) Unlock(ctx context.Context, opts ...UnlockOption) error 
 
 func (l *lockPrimitive) Get(ctx context.Context, opts ...GetOption) (Version, error) {
 	request := &lockv1.GetLockRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: l.Name(),
 		},
 	}
@@ -83,7 +83,7 @@ func (l *lockPrimitive) Get(ctx context.Context, opts ...GetOption) (Version, er
 	}
 	response, err := l.client.GetLock(ctx, request)
 	if err != nil {
-		return 0, errors.FromProto(err)
+		return 0, err
 	}
 	for i := range opts {
 		opts[i].afterGet(response)
@@ -93,14 +93,13 @@ func (l *lockPrimitive) Get(ctx context.Context, opts ...GetOption) (Version, er
 
 func (l *lockPrimitive) create(ctx context.Context, tags ...string) error {
 	request := &lockv1.CreateRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: l.Name(),
 		},
 		Tags: tags,
 	}
 	_, err := l.client.Create(ctx, request)
 	if err != nil {
-		err = errors.FromProto(err)
 		if !errors.IsAlreadyExists(err) {
 			return err
 		}
@@ -110,13 +109,12 @@ func (l *lockPrimitive) create(ctx context.Context, tags ...string) error {
 
 func (l *lockPrimitive) Close(ctx context.Context) error {
 	request := &lockv1.CloseRequest{
-		ID: runtimev1.PrimitiveId{
+		ID: runtimev1.PrimitiveID{
 			Name: l.Name(),
 		},
 	}
 	_, err := l.client.Close(ctx, request)
 	if err != nil {
-		err = errors.FromProto(err)
 		if !errors.IsNotFound(err) {
 			return err
 		}

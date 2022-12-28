@@ -6,11 +6,11 @@ package indexedmap
 
 import (
 	"context"
-	"github.com/atomix/go-sdk/pkg/generic"
+	"github.com/atomix/atomix/api/errors"
+	"github.com/atomix/atomix/runtime/pkg/logging"
 	"github.com/atomix/go-sdk/pkg/primitive"
 	"github.com/atomix/go-sdk/pkg/test"
-	"github.com/atomix/runtime/sdk/pkg/errors"
-	"github.com/atomix/runtime/sdk/pkg/logging"
+	"github.com/atomix/go-sdk/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"math"
 	"testing"
@@ -27,7 +27,7 @@ func TestIndexedMapOperations(t *testing.T) {
 	defer cancel()
 
 	map1, err := NewBuilder[string, string](cluster, "test").
-		Codec(generic.Scalar[string]()).
+		Codec(types.Scalar[string]()).
 		Get(ctx)
 	assert.NoError(t, err)
 
@@ -201,7 +201,7 @@ func TestIndexedMapStreams(t *testing.T) {
 	defer cancel()
 
 	map1, err := NewBuilder[string, string](cluster, "test").
-		Codec(generic.Scalar[string]()).
+		Codec(types.Scalar[string]()).
 		Get(ctx)
 	assert.NoError(t, err)
 

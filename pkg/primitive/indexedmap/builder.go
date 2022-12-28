@@ -6,10 +6,10 @@ package indexedmap
 
 import (
 	"context"
-	"github.com/atomix/go-sdk/pkg/generic"
-	"github.com/atomix/go-sdk/pkg/generic/scalar"
+	indexedmapv1 "github.com/atomix/atomix/api/runtime/indexedmap/v1"
 	"github.com/atomix/go-sdk/pkg/primitive"
-	indexedmapv1 "github.com/atomix/runtime/api/atomix/runtime/indexedmap/v1"
+	"github.com/atomix/go-sdk/pkg/types"
+	"github.com/atomix/go-sdk/pkg/types/scalar"
 )
 
 func NewBuilder[K scalar.Scalar, V any](client primitive.Client, name string) *Builder[K, V] {
@@ -22,7 +22,7 @@ func NewBuilder[K scalar.Scalar, V any](client primitive.Client, name string) *B
 type Builder[K scalar.Scalar, V any] struct {
 	options *primitive.Options
 	client  primitive.Client
-	codec   generic.Codec[V]
+	codec   types.Codec[V]
 }
 
 func (b *Builder[K, V]) Tag(tags ...string) *Builder[K, V] {
@@ -30,7 +30,7 @@ func (b *Builder[K, V]) Tag(tags ...string) *Builder[K, V] {
 	return b
 }
 
-func (b *Builder[K, V]) Codec(codec generic.Codec[V]) *Builder[K, V] {
+func (b *Builder[K, V]) Codec(codec types.Codec[V]) *Builder[K, V] {
 	b.codec = codec
 	return b
 }

@@ -6,9 +6,9 @@ package set
 
 import (
 	"context"
-	"github.com/atomix/go-sdk/pkg/generic"
+	setv1 "github.com/atomix/atomix/api/runtime/set/v1"
 	"github.com/atomix/go-sdk/pkg/primitive"
-	setv1 "github.com/atomix/runtime/api/atomix/runtime/set/v1"
+	"github.com/atomix/go-sdk/pkg/types"
 )
 
 func NewBuilder[E any](client primitive.Client, name string) *Builder[E] {
@@ -21,7 +21,7 @@ func NewBuilder[E any](client primitive.Client, name string) *Builder[E] {
 type Builder[E any] struct {
 	options *primitive.Options
 	client  primitive.Client
-	codec   generic.Codec[E]
+	codec   types.Codec[E]
 }
 
 func (b *Builder[E]) Tag(tags ...string) *Builder[E] {
@@ -29,7 +29,7 @@ func (b *Builder[E]) Tag(tags ...string) *Builder[E] {
 	return b
 }
 
-func (b *Builder[E]) Codec(codec generic.Codec[E]) *Builder[E] {
+func (b *Builder[E]) Codec(codec types.Codec[E]) *Builder[E] {
 	b.codec = codec
 	return b
 }

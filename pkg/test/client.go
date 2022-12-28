@@ -7,51 +7,52 @@ package test
 import (
 	"context"
 	"fmt"
-	proxyv1 "github.com/atomix/runtime/api/atomix/proxy/v1"
-	"github.com/atomix/runtime/proxy/pkg/proxy"
-	counterv1 "github.com/atomix/runtime/proxy/pkg/proxy/counter/v1"
-	electionv1 "github.com/atomix/runtime/proxy/pkg/proxy/election/v1"
-	indexedmapv1 "github.com/atomix/runtime/proxy/pkg/proxy/indexedmap/v1"
-	listv1 "github.com/atomix/runtime/proxy/pkg/proxy/list/v1"
-	lockv1 "github.com/atomix/runtime/proxy/pkg/proxy/lock/v1"
-	mapv1 "github.com/atomix/runtime/proxy/pkg/proxy/map/v1"
-	setv1 "github.com/atomix/runtime/proxy/pkg/proxy/set/v1"
-	valuev1 "github.com/atomix/runtime/proxy/pkg/proxy/value/v1"
-	"github.com/atomix/runtime/sdk/pkg/errors"
-	"github.com/atomix/runtime/sdk/pkg/network"
-	"github.com/atomix/runtime/sdk/pkg/protocol"
-	"github.com/atomix/runtime/sdk/pkg/protocol/node"
+	counterv1 "github.com/atomix/atomix/api/runtime/counter/v1"
+	electionv1 "github.com/atomix/atomix/api/runtime/election/v1"
+	indexedmapv1 "github.com/atomix/atomix/api/runtime/indexedmap/v1"
+	listv1 "github.com/atomix/atomix/api/runtime/list/v1"
+	lockv1 "github.com/atomix/atomix/api/runtime/lock/v1"
+	mapv1 "github.com/atomix/atomix/api/runtime/map/v1"
+	setv1 "github.com/atomix/atomix/api/runtime/set/v1"
+	runtimeapiv1 "github.com/atomix/atomix/api/runtime/v1"
+	valuev1 "github.com/atomix/atomix/api/runtime/value/v1"
+	rsmapiv1 "github.com/atomix/atomix/protocols/rsm/api/v1"
+	"github.com/atomix/atomix/protocols/rsm/pkg/node"
+	"github.com/atomix/atomix/proxy/pkg/proxy"
+	runtimev1 "github.com/atomix/atomix/proxy/pkg/runtime/v1"
+	"github.com/atomix/atomix/runtime/pkg/network"
+	"github.com/atomix/atomix/runtime/pkg/utils/grpc/interceptors"
 	"github.com/gogo/protobuf/jsonpb"
+	"github.com/gogo/protobuf/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"os"
 	"sync/atomic"
 )
 
-var Types = []proxy.Type{
-	counterv1.Type,
-	electionv1.Type,
-	indexedmapv1.Type,
-	listv1.Type,
-	lockv1.Type,
-	mapv1.Type,
-	setv1.Type,
-	valuev1.Type,
+var PrimitiveTypes = []runtimeapiv1.PrimitiveType{
+	counterv1.PrimitiveType,
+	electionv1.PrimitiveType,
+	indexedmapv1.PrimitiveType,
+	listv1.PrimitiveType,
+	lockv1.PrimitiveType,
+	mapv1.PrimitiveType,
+	setv1.PrimitiveType,
+	valuev1.PrimitiveType,
 }
 
 func NewClient() *Client {
-	network := network.NewLocalNetwork()
 	return &Client{
-		network: network,
-		types:   Types,
+		network: network.NewLocalDriver(),
+		types:   PrimitiveTypes,
 	}
 }
 
 type Client struct {
-	network network.Network
+	network network.Driver
 	node    *node.Node
-	types   []proxy.Type
-	proxies []*proxy.Proxy
+	types   []runtimeapiv1.PrimitiveType
+	proxies []*proxy.Service
 }
 
 func (c *Client) start() error {
@@ -70,38 +71,22 @@ func (c *Client) Connect(ctx context.Context) (*grpc.ClientConn, error) {
 		return nil, err
 	}
 
-	proxy := proxy.New(c.network,
-		proxy.WithDrivers(newDriver(c.network)),
-		proxy.WithTypes(c.types...),
-		proxy.WithProxyPort(nextPort()),
-		proxy.WithRuntimePort(nextPort()),
-		proxy.WithConfig(
-			proxy.Config{
-				Router: proxy.RouterConfig{
-					Routes: []proxy.RouteConfig{
-						{
-							Store: proxy.StoreID{
-								Name: "test",
-							},
-						},
-					},
-				},
-			}))
+	runtime := runtimev1.New(
+		runtimev1.WithDriver(driverID, newDriver(c.network)),
+		runtimev1.WithRoutes(&runtimeapiv1.Route{
+			StoreID: runtimeapiv1.StoreID{
+				Name: "test",
+			},
+		}))
 
-	if err := proxy.Start(); err != nil {
+	service := proxy.NewService(runtime, proxy.WithPort(nextPort())).(*proxy.Service)
+	if err := service.Start(); err != nil {
 		return nil, err
 	}
-	c.proxies = append(c.proxies, proxy)
+	c.proxies = append(c.proxies, service)
 
-	conn, err := c.connect(ctx, fmt.Sprintf(":%d", proxy.ProxyService.Port))
-	if err != nil {
-		return nil, err
-	}
-
-	client := proxyv1.NewProxyClient(conn)
-
-	config := protocol.ProtocolConfig{
-		Partitions: []protocol.PartitionConfig{
+	config := rsmapiv1.ProtocolConfig{
+		Partitions: []rsmapiv1.PartitionConfig{
 			{
 				PartitionID: 1,
 				Leader:      fmt.Sprintf("localhost:%d", c.node.Port),
@@ -123,29 +108,32 @@ func (c *Client) Connect(ctx context.Context) (*grpc.ClientConn, error) {
 		return nil, err
 	}
 
-	request := &proxyv1.ConnectRequest{
-		StoreID: proxyv1.StoreId{
+	err = runtime.Connect(ctx, driverID, runtimeapiv1.Store{
+		StoreID: runtimeapiv1.StoreID{
 			Name: "test",
 		},
-		DriverID: proxyv1.DriverId{
-			Name:    driverID.Name,
-			Version: driverID.Version,
+		Spec: &types.Any{
+			Value: []byte(data),
 		},
-		Config: []byte(data),
-	}
-	_, err = client.Connect(ctx, request)
+	})
 	if err != nil {
 		return nil, err
 	}
-	return c.connect(ctx, fmt.Sprintf(":%d", proxy.RuntimeService.Port))
+	return c.connect(ctx, fmt.Sprintf(":%d", service.Port))
 }
 
 func (c *Client) connect(ctx context.Context, target string) (*grpc.ClientConn, error) {
 	conn, err := grpc.DialContext(ctx, target,
 		grpc.WithContextDialer(c.network.Connect),
-		grpc.WithTransportCredentials(insecure.NewCredentials()))
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithChainUnaryInterceptor(
+			interceptors.ErrorHandlingUnaryClientInterceptor(),
+			interceptors.RetryingUnaryClientInterceptor()),
+		grpc.WithChainStreamInterceptor(
+			interceptors.ErrorHandlingStreamClientInterceptor(),
+			interceptors.RetryingStreamClientInterceptor()))
 	if err != nil {
-		return nil, errors.FromProto(err)
+		return nil, err
 	}
 	return conn, nil
 }

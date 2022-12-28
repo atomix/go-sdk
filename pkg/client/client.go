@@ -7,8 +7,7 @@ package client
 import (
 	"context"
 	"fmt"
-	"github.com/atomix/runtime/sdk/pkg/errors"
-	"github.com/atomix/runtime/sdk/pkg/grpc/retry"
+	"github.com/atomix/atomix/runtime/pkg/utils/grpc/interceptors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"sync"
@@ -46,10 +45,14 @@ func (c *Client) Connect(ctx context.Context) (*grpc.ClientConn, error) {
 	target := fmt.Sprintf("%s:%d", c.Host, c.Port)
 	conn, err := grpc.DialContext(ctx, target,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithUnaryInterceptor(retry.RetryingUnaryClientInterceptor()),
-		grpc.WithStreamInterceptor(retry.RetryingStreamClientInterceptor()))
+		grpc.WithChainUnaryInterceptor(
+			interceptors.ErrorHandlingUnaryClientInterceptor(),
+			interceptors.RetryingUnaryClientInterceptor()),
+		grpc.WithChainStreamInterceptor(
+			interceptors.ErrorHandlingStreamClientInterceptor(),
+			interceptors.RetryingStreamClientInterceptor()))
 	if err != nil {
-		return nil, errors.FromProto(err)
+		return nil, err
 	}
 	c.conn = conn
 	return conn, nil
