@@ -4,9 +4,9 @@ go 1.19
 
 require (
 	github.com/atomix/atomix/api v0.0.0-20221228191831-4af56aa1f978
-	github.com/atomix/atomix/protocols/rsm v0.0.0-20221228202308-01f44400a9fa
-	github.com/atomix/atomix/proxy v0.0.0-20221228202308-01f44400a9fa
-	github.com/atomix/atomix/runtime v0.0.0-20221228200236-1b3b36b1e41d
+	github.com/atomix/atomix/protocols/rsm v0.0.0-20221228222855-b2275fb2adbe
+	github.com/atomix/atomix/proxy v0.0.0-20221228222855-b2275fb2adbe
+	github.com/atomix/atomix/runtime v0.0.0-20221228222855-b2275fb2adbe
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.5.2
 	github.com/stretchr/testify v1.8.0
