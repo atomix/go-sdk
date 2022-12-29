@@ -4,8 +4,8 @@ github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
 github.com/atomix/atomix/api v0.0.0-20221228191831-4af56aa1f978 h1:QwDDxnD2rLVsJxxxrmXj8xWOR7dOvPT6euefiayl4gw=
 github.com/atomix/atomix/api v0.0.0-20221228191831-4af56aa1f978/go.mod h1:PNMOo77ofCaaZqmj3uC7cfclGEI9NCcue/G5VXSon7k=
-github.com/atomix/atomix/protocols/rsm v0.0.0-20221228222855-b2275fb2adbe h1:rSHxRFf73HzKeFfPu0dy6pIbQ4hYApABbnJqugpjF+0=
-github.com/atomix/atomix/protocols/rsm v0.0.0-20221228222855-b2275fb2adbe/go.mod h1:JKQ9+w+jID9mdXyy/CLUy7+DQcDwQX4whaBMXpAc57k=
+github.com/atomix/atomix/protocols/rsm v0.0.0-20221229101327-2067e53b3fe4 h1:ZY3IC5L0qW2VLkldvzptDB/CA1BSuhRkzZBgjlfaD9k=
+github.com/atomix/atomix/protocols/rsm v0.0.0-20221229101327-2067e53b3fe4/go.mod h1:JKQ9+w+jID9mdXyy/CLUy7+DQcDwQX4whaBMXpAc57k=
 github.com/atomix/atomix/proxy v0.0.0-20221228222855-b2275fb2adbe h1:a8/BTLPZzyPk10jKJPuzrmdZ/B/NWxQpRgrKZ8hinxQ=
 github.com/atomix/atomix/proxy v0.0.0-20221228222855-b2275fb2adbe/go.mod h1:tdtkFw1d08kvHn/0Re5NWbX0ZMyVQ0ElcaBqEOwv/Ig=
 github.com/atomix/atomix/runtime v0.0.0-20221228222855-b2275fb2adbe h1:2Xcf/yJ//IKyPNU60ouJ2MzBCmKmr6C8EFVde6qdYiw=
