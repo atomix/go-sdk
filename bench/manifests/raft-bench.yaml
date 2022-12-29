@@ -8,6 +8,13 @@ spec:
   imagePullPolicy: Never
   #logging:
   #  rootLevel: debug
+  volumeClaimTemplate:
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
 ---
 apiVersion: raft.atomix.io/v1beta2
 kind: RaftStore
@@ -62,4 +69,4 @@ spec:
           imagePullPolicy: IfNotPresent
           args:
             - --concurrency=100
-            - --write-percentage=.5
+            - --write-percentage=.2
