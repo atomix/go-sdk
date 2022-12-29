@@ -14,6 +14,14 @@ test: # @HELP run the unit tests and source code validation
 test: build license #linters
 	go test github.com/atomix/go-sdk/pkg/... -p 1
 
+.PHONY: bench
+bench:
+	docker build . -t atomix/go-sdk-bench:latest -f bench/Dockerfile
+
+kind: bench
+	@if [ "`kind get clusters`" = '' ]; then echo "no kind cluster found" && exit 1; fi
+	kind load docker-image atomix/go-sdk-bench:latest
+
 linters: # @HELP examines Go source code and reports coding problems
 	golangci-lint run
 
