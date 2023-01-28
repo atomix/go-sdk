@@ -4,8 +4,8 @@ github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
 github.com/atomix/atomix/api v0.7.0 h1:m/lltpvqQfNZDP73yTJB5HxVpm7yaqoVgSyMvtIVtKM=
 github.com/atomix/atomix/api v0.7.0/go.mod h1:Fz8zXQH6n28U0NTu5xctKhkNrN5RsWgX56lrMhqXlPg=
-github.com/atomix/atomix/protocols/rsm v0.2.1 h1:m+0NKI5Oi62vfUlKDfAruT38Rz+rlS/komsG5OKm8+Q=
-github.com/atomix/atomix/protocols/rsm v0.2.1/go.mod h1:ru77mhnrrvZVVUfIH53p4TVzTVbjcKgA+csp/g6mZRU=
+github.com/atomix/atomix/protocols/rsm v0.4.0 h1:M5wganT92ai7D32CzjPN7c0n7FDgNzf3kWBh+j84IH0=
+github.com/atomix/atomix/protocols/rsm v0.4.0/go.mod h1:TqF0Mm5YRMLqBSQHR3Vxn4arX3r3mV3oL/m/El5BNO8=
 github.com/atomix/atomix/runtime v0.7.0 h1:uILT7V/Hs0vHWsn9D6uoXzLWzMPZQOop0D23cjy4CWg=
 github.com/atomix/atomix/runtime v0.7.0/go.mod h1:eTQn0odbw9v7dEUwRnNXz91dMUh1IEJjxnH4OKzbmKU=
 github.com/atomix/atomix/sidecar v0.2.0 h1:pwMh9xXc6n34TCnxhzzMVe4fO1Xm1URf8exlIrvvtI4=

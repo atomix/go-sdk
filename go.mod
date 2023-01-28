@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/atomix/atomix/api v0.7.0
-	github.com/atomix/atomix/protocols/rsm v0.2.1
+	github.com/atomix/atomix/protocols/rsm v0.4.0
 	github.com/atomix/atomix/runtime v0.7.0
 	github.com/atomix/atomix/sidecar v0.2.0
 	github.com/gogo/protobuf v1.3.2
