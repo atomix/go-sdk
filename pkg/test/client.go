@@ -49,10 +49,10 @@ func NewClient() *Client {
 }
 
 type Client struct {
-	network network.Driver
-	node    *node.Node
-	types   []runtimeapiv1.PrimitiveType
-	proxies []*sidecar.Service
+	network  network.Driver
+	node     *node.Node
+	types    []runtimeapiv1.PrimitiveType
+	runtimes []*sidecar.Service
 }
 
 func (c *Client) start() error {
@@ -73,13 +73,28 @@ func (c *Client) Connect(ctx context.Context) (*grpc.ClientConn, error) {
 
 	runtime := runtimev1.New(runtimev1.WithDriver(driverID, newDriver(c.network)))
 
+	storeID := runtimeapiv1.StoreID{
+		Name: "test",
+	}
+	err := runtime.Program(ctx, runtimeapiv1.Route{
+		StoreID: storeID,
+		Rules: []runtimeapiv1.RoutingRule{
+			{
+				Names: []string{"*"},
+			},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	service := sidecar.NewService(runtime,
 		sidecar.WithNetwork(c.network),
 		sidecar.WithPort(nextPort())).(*sidecar.Service)
 	if err := service.Start(); err != nil {
 		return nil, err
 	}
-	c.proxies = append(c.proxies, service)
+	c.runtimes = append(c.runtimes, service)
 
 	config := rsmapiv1.ProtocolConfig{
 		Partitions: []rsmapiv1.PartitionConfig{
@@ -103,15 +118,8 @@ func (c *Client) Connect(ctx context.Context) (*grpc.ClientConn, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	err = runtime.ConnectRoute(ctx, driverID, runtimeapiv1.Route{
-		RouteID: runtimeapiv1.RouteID{
-			Name: "test",
-		},
-		Config: &types.Any{
-			Value: []byte(data),
-		},
-		Rules: []runtimeapiv1.RoutingRule{{}},
+	err = runtime.Connect(ctx, storeID, driverID, &types.Any{
+		Value: []byte(data),
 	})
 	if err != nil {
 		return nil, err
@@ -136,7 +144,7 @@ func (c *Client) connect(ctx context.Context, target string) (*grpc.ClientConn, 
 }
 
 func (c *Client) Close() {
-	for _, proxy := range c.proxies {
+	for _, proxy := range c.runtimes {
 		_ = proxy.Stop()
 	}
 	_ = c.node.Stop()
