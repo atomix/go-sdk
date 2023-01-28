@@ -41,10 +41,11 @@ var PrimitiveTypes = []runtimeapiv1.PrimitiveType{
 	valuev1.PrimitiveType,
 }
 
-func NewClient() *Client {
+func NewClient(rules ...runtimeapiv1.RoutingRule) *Client {
 	return &Client{
 		network: network.NewLocalDriver(),
 		types:   PrimitiveTypes,
+		rules:   rules,
 	}
 }
 
@@ -52,6 +53,7 @@ type Client struct {
 	network  network.Driver
 	node     *node.Node
 	types    []runtimeapiv1.PrimitiveType
+	rules    []runtimeapiv1.RoutingRule
 	runtimes []*sidecar.Service
 }
 
@@ -76,13 +78,17 @@ func (c *Client) Connect(ctx context.Context) (*grpc.ClientConn, error) {
 	storeID := runtimeapiv1.StoreID{
 		Name: "test",
 	}
+
+	rules := c.rules
+	if len(rules) == 0 {
+		rules = append(rules, runtimeapiv1.RoutingRule{
+			Names: []string{"*"},
+		})
+	}
+
 	err := runtime.Program(ctx, runtimeapiv1.Route{
 		StoreID: storeID,
-		Rules: []runtimeapiv1.RoutingRule{
-			{
-				Names: []string{"*"},
-			},
-		},
+		Rules:   rules,
 	})
 	if err != nil {
 		return nil, err

@@ -6,10 +6,14 @@ package _map //nolint:golint
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/atomix/atomix/api/errors"
+	mapv1 "github.com/atomix/atomix/api/runtime/map/v1"
+	runtimev1 "github.com/atomix/atomix/api/runtime/v1"
 	"github.com/atomix/atomix/runtime/pkg/logging"
 	"github.com/atomix/go-sdk/pkg/test"
 	"github.com/atomix/go-sdk/pkg/types"
+	gogotypes "github.com/gogo/protobuf/types"
 	"github.com/stretchr/testify/assert"
 	"io"
 	"testing"
@@ -51,20 +55,57 @@ func TestMapEntries(t *testing.T) {
 }
 
 func TestMapOperations(t *testing.T) {
+	testMapOperations(t, runtimev1.RoutingRule{Names: []string{"*"}})
+}
+
+func TestCachingMapOperations(t *testing.T) {
+	config := mapv1.MapConfig{
+		Cache: mapv1.MapCacheConfig{
+			Enabled: true,
+			Size_:   3,
+		},
+	}
+	bytes, err := json.Marshal(config)
+	assert.NoError(t, err)
+	testMapOperations(t, runtimev1.RoutingRule{
+		Names: []string{"*"},
+		Config: &gogotypes.Any{
+			Value: bytes,
+		},
+	})
+}
+
+func TestMirroredMapOperations(t *testing.T) {
+	config := mapv1.MapConfig{
+		Cache: mapv1.MapCacheConfig{
+			Enabled: true,
+		},
+	}
+	bytes, err := json.Marshal(config)
+	assert.NoError(t, err)
+	testMapOperations(t, runtimev1.RoutingRule{
+		Names: []string{"*"},
+		Config: &gogotypes.Any{
+			Value: bytes,
+		},
+	})
+}
+
+func testMapOperations(t *testing.T, rule runtimev1.RoutingRule) {
 	logging.SetLevel(logging.DebugLevel)
 
-	cluster := test.NewClient()
-	defer cluster.Close()
+	client := test.NewClient(rule)
+	defer client.Close()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	map1, err := NewBuilder[string, string](cluster, "test").
+	map1, err := NewBuilder[string, string](client, "test").
 		Codec(types.Scalar[string]()).
 		Get(ctx)
 	assert.NoError(t, err)
 
-	map2, err := NewBuilder[string, string](cluster, "test").
+	map2, err := NewBuilder[string, string](client, "test").
 		Codec(types.Scalar[string]()).
 		Get(ctx)
 	assert.NoError(t, err)
