@@ -53,7 +53,7 @@ func (b *Builder[K, V]) Get(ctx context.Context) (Map[K, V], error) {
 		},
 		Tags: b.options.Tags,
 	}
-	_, err = client.Create(ctx, request)
+	response, err := client.Create(ctx, request)
 	if err != nil && !errors.IsAlreadyExists(err) {
 		return nil, err
 	}
@@ -66,13 +66,27 @@ func (b *Builder[K, V]) Get(ctx context.Context) (Map[K, V], error) {
 		return nil
 	}
 
-	return &mapPrimitive[K, V]{
+	var _map Map[K, V]
+	_map = &mapPrimitive[K, V]{
 		Primitive:  primitive.New(b.options.Name, closer),
 		client:     mapv1.NewMapClient(conn),
 		keyEncoder: scalar.NewEncodeFunc[K](),
 		keyDecoder: scalar.NewDecodeFunc[K](),
 		valueCodec: b.codec,
-	}, nil
+	}
+
+	config := response.Config
+	if config.Cache.Enabled {
+		if config.Cache.Size_ == 0 {
+			_map = newMirroredMap[K, V](_map)
+		} else {
+			_map, err = newCachingMap[K, V](_map, int(config.Cache.Size_))
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return _map, nil
 }
 
 var _ primitive.Builder[*Builder[string, any], Map[string, any]] = (*Builder[string, any])(nil)
