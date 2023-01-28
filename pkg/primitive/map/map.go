@@ -458,34 +458,3 @@ func (m *mapPrimitive[K, V]) decodeKeyValue(key string, value *mapv1.VersionedVa
 func (m *mapPrimitive[K, V]) decodeEntry(entry *mapv1.Entry) (*Entry[K, V], error) {
 	return m.decodeKeyValue(entry.Key, entry.Value)
 }
-
-func (m *mapPrimitive[K, V]) create(ctx context.Context, tags ...string) error {
-	request := &mapv1.CreateRequest{
-		ID: runtimev1.PrimitiveID{
-			Name: m.Name(),
-		},
-		Tags: tags,
-	}
-	_, err := m.client.Create(ctx, request)
-	if err != nil {
-		if !errors.IsAlreadyExists(err) {
-			return err
-		}
-	}
-	return nil
-}
-
-func (m *mapPrimitive[K, V]) Close(ctx context.Context) error {
-	request := &mapv1.CloseRequest{
-		ID: runtimev1.PrimitiveID{
-			Name: m.Name(),
-		},
-	}
-	_, err := m.client.Close(ctx, request)
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			return err
-		}
-	}
-	return nil
-}

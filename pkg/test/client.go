@@ -18,10 +18,10 @@ import (
 	valuev1 "github.com/atomix/atomix/api/runtime/value/v1"
 	rsmapiv1 "github.com/atomix/atomix/protocols/rsm/api/v1"
 	"github.com/atomix/atomix/protocols/rsm/pkg/node"
-	"github.com/atomix/atomix/proxy/pkg/proxy"
-	runtimev1 "github.com/atomix/atomix/proxy/pkg/runtime/v1"
 	"github.com/atomix/atomix/runtime/pkg/network"
+	runtimev1 "github.com/atomix/atomix/runtime/pkg/runtime/v1"
 	"github.com/atomix/atomix/runtime/pkg/utils/grpc/interceptors"
+	"github.com/atomix/atomix/sidecar/pkg/sidecar"
 	"github.com/gogo/protobuf/jsonpb"
 	"github.com/gogo/protobuf/types"
 	"google.golang.org/grpc"
@@ -52,7 +52,7 @@ type Client struct {
 	network network.Driver
 	node    *node.Node
 	types   []runtimeapiv1.PrimitiveType
-	proxies []*proxy.Service
+	proxies []*sidecar.Service
 }
 
 func (c *Client) start() error {
@@ -71,17 +71,11 @@ func (c *Client) Connect(ctx context.Context) (*grpc.ClientConn, error) {
 		return nil, err
 	}
 
-	runtime := runtimev1.New(
-		runtimev1.WithDriver(driverID, newDriver(c.network)),
-		runtimev1.WithRoutes(&runtimeapiv1.Route{
-			StoreID: runtimeapiv1.StoreID{
-				Name: "test",
-			},
-		}))
+	runtime := runtimev1.New(runtimev1.WithDriver(driverID, newDriver(c.network)))
 
-	service := proxy.NewService(runtime,
-		proxy.WithNetwork(c.network),
-		proxy.WithPort(nextPort())).(*proxy.Service)
+	service := sidecar.NewService(runtime,
+		sidecar.WithNetwork(c.network),
+		sidecar.WithPort(nextPort())).(*sidecar.Service)
 	if err := service.Start(); err != nil {
 		return nil, err
 	}
@@ -110,13 +104,14 @@ func (c *Client) Connect(ctx context.Context) (*grpc.ClientConn, error) {
 		return nil, err
 	}
 
-	err = runtime.Connect(ctx, driverID, runtimeapiv1.Store{
-		StoreID: runtimeapiv1.StoreID{
+	err = runtime.ConnectRoute(ctx, driverID, runtimeapiv1.Route{
+		RouteID: runtimeapiv1.RouteID{
 			Name: "test",
 		},
-		Spec: &types.Any{
+		Config: &types.Any{
 			Value: []byte(data),
 		},
+		Rules: []runtimeapiv1.RoutingRule{{}},
 	})
 	if err != nil {
 		return nil, err

@@ -597,34 +597,3 @@ func (m *indexedMapPrimitive[K, V]) decodeKeyValue(key string, index uint64, val
 func (m *indexedMapPrimitive[K, V]) decodeEntry(entry *indexedmapv1.Entry) (*Entry[K, V], error) {
 	return m.decodeKeyValue(entry.Key, entry.Index, entry.Value)
 }
-
-func (m *indexedMapPrimitive[K, V]) create(ctx context.Context, tags ...string) error {
-	request := &indexedmapv1.CreateRequest{
-		ID: runtimev1.PrimitiveID{
-			Name: m.Name(),
-		},
-		Tags: tags,
-	}
-	_, err := m.client.Create(ctx, request)
-	if err != nil {
-		if !errors.IsAlreadyExists(err) {
-			return err
-		}
-	}
-	return nil
-}
-
-func (m *indexedMapPrimitive[K, V]) Close(ctx context.Context) error {
-	request := &indexedmapv1.CloseRequest{
-		ID: runtimev1.PrimitiveID{
-			Name: m.Name(),
-		},
-	}
-	_, err := m.client.Close(ctx, request)
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			return err
-		}
-	}
-	return nil
-}

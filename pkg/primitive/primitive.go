@@ -42,17 +42,25 @@ type Primitive interface {
 	Close(ctx context.Context) error
 }
 
-func New(name string) Primitive {
+type CloseFunc func(ctx context.Context) error
+
+func New(name string, closer CloseFunc) Primitive {
 	return &managedPrimitive{
-		name: name,
+		name:   name,
+		closer: closer,
 	}
 }
 
 type managedPrimitive struct {
 	Primitive
-	name string
+	name   string
+	closer CloseFunc
 }
 
 func (p *managedPrimitive) Name() string {
 	return p.name
+}
+
+func (p *managedPrimitive) Close(ctx context.Context) error {
+	return p.closer(ctx)
 }

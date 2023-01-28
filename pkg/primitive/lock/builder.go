@@ -6,7 +6,9 @@ package lock
 
 import (
 	"context"
+	"github.com/atomix/atomix/api/errors"
 	lockv1 "github.com/atomix/atomix/api/runtime/lock/v1"
+	runtimev1 "github.com/atomix/atomix/api/runtime/v1"
 	"github.com/atomix/go-sdk/pkg/primitive"
 )
 
@@ -32,14 +34,31 @@ func (b *Builder) Get(ctx context.Context) (Lock, error) {
 	if err != nil {
 		return nil, err
 	}
-	counter := &lockPrimitive{
-		Primitive: primitive.New(b.options.Name),
-		client:    lockv1.NewLockClient(conn),
+
+	client := lockv1.NewLocksClient(conn)
+	request := &lockv1.CreateRequest{
+		ID: runtimev1.PrimitiveID{
+			Name: b.options.Name,
+		},
+		Tags: b.options.Tags,
 	}
-	if err := counter.create(ctx, b.options.Tags...); err != nil {
+	_, err = client.Create(ctx, request)
+	if err != nil && !errors.IsAlreadyExists(err) {
 		return nil, err
 	}
-	return counter, nil
+
+	closer := func(ctx context.Context) error {
+		_, err := client.Close(ctx, &lockv1.CloseRequest{})
+		if err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+		return nil
+	}
+
+	return &lockPrimitive{
+		Primitive: primitive.New(b.options.Name, closer),
+		client:    lockv1.NewLockClient(conn),
+	}, nil
 }
 
 var _ primitive.Builder[*Builder, Lock] = (*Builder)(nil)

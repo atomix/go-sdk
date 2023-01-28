@@ -6,7 +6,9 @@ package counter
 
 import (
 	"context"
+	"github.com/atomix/atomix/api/errors"
 	counterv1 "github.com/atomix/atomix/api/runtime/counter/v1"
+	runtimev1 "github.com/atomix/atomix/api/runtime/v1"
 	"github.com/atomix/go-sdk/pkg/primitive"
 )
 
@@ -32,14 +34,31 @@ func (b *Builder) Get(ctx context.Context) (AtomicCounter, error) {
 	if err != nil {
 		return nil, err
 	}
-	counter := &counterPrimitive{
-		Primitive: primitive.New(b.options.Name),
-		client:    counterv1.NewCounterClient(conn),
+
+	client := counterv1.NewCountersClient(conn)
+	request := &counterv1.CreateRequest{
+		ID: runtimev1.PrimitiveID{
+			Name: b.options.Name,
+		},
+		Tags: b.options.Tags,
 	}
-	if err := counter.create(ctx, b.options.Tags...); err != nil {
+	_, err = client.Create(ctx, request)
+	if err != nil && !errors.IsAlreadyExists(err) {
 		return nil, err
 	}
-	return counter, nil
+
+	closer := func(ctx context.Context) error {
+		_, err := client.Close(ctx, &counterv1.CloseRequest{})
+		if err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+		return nil
+	}
+
+	return &counterPrimitive{
+		Primitive: primitive.New(b.options.Name, closer),
+		client:    counterv1.NewCounterClient(conn),
+	}, nil
 }
 
 var _ primitive.Builder[*Builder, AtomicCounter] = (*Builder)(nil)

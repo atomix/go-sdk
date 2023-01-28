@@ -6,7 +6,9 @@ package list
 
 import (
 	"context"
+	"github.com/atomix/atomix/api/errors"
 	listv1 "github.com/atomix/atomix/api/runtime/list/v1"
+	runtimev1 "github.com/atomix/atomix/api/runtime/v1"
 	"github.com/atomix/go-sdk/pkg/primitive"
 	"github.com/atomix/go-sdk/pkg/types"
 )
@@ -42,15 +44,32 @@ func (b *Builder[E]) Get(ctx context.Context) (List[E], error) {
 	if b.codec == nil {
 		panic("no codec set for list primitive")
 	}
-	set := &listPrimitive[E]{
-		Primitive: primitive.New(b.options.Name),
-		client:    listv1.NewListClient(conn),
-		codec:     b.codec,
+
+	client := listv1.NewListsClient(conn)
+	request := &listv1.CreateRequest{
+		ID: runtimev1.PrimitiveID{
+			Name: b.options.Name,
+		},
+		Tags: b.options.Tags,
 	}
-	if err := set.create(ctx, b.options.Tags...); err != nil {
+	_, err = client.Create(ctx, request)
+	if err != nil && !errors.IsAlreadyExists(err) {
 		return nil, err
 	}
-	return set, nil
+
+	closer := func(ctx context.Context) error {
+		_, err := client.Close(ctx, &listv1.CloseRequest{})
+		if err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+		return nil
+	}
+
+	return &listPrimitive[E]{
+		Primitive: primitive.New(b.options.Name, closer),
+		client:    listv1.NewListClient(conn),
+		codec:     b.codec,
+	}, nil
 }
 
 var _ primitive.Builder[*Builder[any], List[any]] = (*Builder[any])(nil)

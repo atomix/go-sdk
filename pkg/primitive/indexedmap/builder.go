@@ -6,7 +6,9 @@ package indexedmap
 
 import (
 	"context"
+	"github.com/atomix/atomix/api/errors"
 	indexedmapv1 "github.com/atomix/atomix/api/runtime/indexedmap/v1"
+	runtimev1 "github.com/atomix/atomix/api/runtime/v1"
 	"github.com/atomix/go-sdk/pkg/primitive"
 	"github.com/atomix/go-sdk/pkg/types"
 	"github.com/atomix/go-sdk/pkg/types/scalar"
@@ -43,17 +45,34 @@ func (b *Builder[K, V]) Get(ctx context.Context) (IndexedMap[K, V], error) {
 	if b.codec == nil {
 		panic("no codec set for map primitive")
 	}
-	atomicMap := &indexedMapPrimitive[K, V]{
-		Primitive:  primitive.New(b.options.Name),
+
+	client := indexedmapv1.NewIndexedMapsClient(conn)
+	request := &indexedmapv1.CreateRequest{
+		ID: runtimev1.PrimitiveID{
+			Name: b.options.Name,
+		},
+		Tags: b.options.Tags,
+	}
+	_, err = client.Create(ctx, request)
+	if err != nil && !errors.IsAlreadyExists(err) {
+		return nil, err
+	}
+
+	closer := func(ctx context.Context) error {
+		_, err := client.Close(ctx, &indexedmapv1.CloseRequest{})
+		if err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+		return nil
+	}
+
+	return &indexedMapPrimitive[K, V]{
+		Primitive:  primitive.New(b.options.Name, closer),
 		client:     indexedmapv1.NewIndexedMapClient(conn),
 		keyEncoder: scalar.NewEncodeFunc[K](),
 		keyDecoder: scalar.NewDecodeFunc[K](),
 		valueCodec: b.codec,
-	}
-	if err := atomicMap.create(ctx, b.options.Tags...); err != nil {
-		return nil, err
-	}
-	return atomicMap, nil
+	}, nil
 }
 
 var _ primitive.Builder[*Builder[string, any], IndexedMap[string, any]] = (*Builder[string, any])(nil)

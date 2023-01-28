@@ -323,34 +323,3 @@ func (m *setPrimitive[E]) Events(ctx context.Context) (EventStream[E], error) {
 		return nil, ctx.Err()
 	}
 }
-
-func (s *setPrimitive[E]) create(ctx context.Context, tags ...string) error {
-	request := &setv1.CreateRequest{
-		ID: runtimev1.PrimitiveID{
-			Name: s.Name(),
-		},
-		Tags: tags,
-	}
-	_, err := s.client.Create(ctx, request)
-	if err != nil {
-		if !errors.IsAlreadyExists(err) {
-			return err
-		}
-	}
-	return nil
-}
-
-func (s *setPrimitive[E]) Close(ctx context.Context) error {
-	request := &setv1.CloseRequest{
-		ID: runtimev1.PrimitiveID{
-			Name: s.Name(),
-		},
-	}
-	_, err := s.client.Close(ctx, request)
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			return err
-		}
-	}
-	return nil
-}

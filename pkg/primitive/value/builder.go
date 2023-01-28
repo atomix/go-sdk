@@ -6,7 +6,10 @@ package value
 
 import (
 	"context"
+	"github.com/atomix/atomix/api/errors"
+	runtimev1 "github.com/atomix/atomix/api/runtime/v1"
 	atomicvaluev1 "github.com/atomix/atomix/api/runtime/value/v1"
+	valuev1 "github.com/atomix/atomix/api/runtime/value/v1"
 	"github.com/atomix/go-sdk/pkg/primitive"
 	"github.com/atomix/go-sdk/pkg/types"
 )
@@ -42,15 +45,32 @@ func (b *Builder[V]) Get(ctx context.Context) (Value[V], error) {
 	if b.codec == nil {
 		panic("no codec set for map primitive")
 	}
-	atomicValue := &atomicValuePrimitive[V]{
-		Primitive: primitive.New(b.options.Name),
-		client:    atomicvaluev1.NewValueClient(conn),
-		codec:     b.codec,
+
+	client := valuev1.NewValuesClient(conn)
+	request := &valuev1.CreateRequest{
+		ID: runtimev1.PrimitiveID{
+			Name: b.options.Name,
+		},
+		Tags: b.options.Tags,
 	}
-	if err := atomicValue.create(ctx, b.options.Tags...); err != nil {
+	_, err = client.Create(ctx, request)
+	if err != nil && !errors.IsAlreadyExists(err) {
 		return nil, err
 	}
-	return atomicValue, nil
+
+	closer := func(ctx context.Context) error {
+		_, err := client.Close(ctx, &valuev1.CloseRequest{})
+		if err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+		return nil
+	}
+
+	return &atomicValuePrimitive[V]{
+		Primitive: primitive.New(b.options.Name, closer),
+		client:    atomicvaluev1.NewValueClient(conn),
+		codec:     b.codec,
+	}, nil
 }
 
 var _ primitive.Builder[*Builder[any], Value[any]] = (*Builder[any])(nil)

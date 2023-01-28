@@ -6,7 +6,9 @@ package election
 
 import (
 	"context"
+	"github.com/atomix/atomix/api/errors"
 	electionv1 "github.com/atomix/atomix/api/runtime/election/v1"
+	runtimev1 "github.com/atomix/atomix/api/runtime/v1"
 	"github.com/atomix/go-sdk/pkg/primitive"
 )
 
@@ -38,15 +40,32 @@ func (b *Builder) Get(ctx context.Context) (Election, error) {
 	if err != nil {
 		return nil, err
 	}
-	election := &electionPrimitive{
-		Primitive:   primitive.New(b.options.Name),
-		client:      electionv1.NewLeaderElectionClient(conn),
-		candidateID: b.candidateID,
+
+	client := electionv1.NewLeaderElectionsClient(conn)
+	request := &electionv1.CreateRequest{
+		ID: runtimev1.PrimitiveID{
+			Name: b.options.Name,
+		},
+		Tags: b.options.Tags,
 	}
-	if err := election.create(ctx, b.options.Tags...); err != nil {
+	_, err = client.Create(ctx, request)
+	if err != nil && !errors.IsAlreadyExists(err) {
 		return nil, err
 	}
-	return election, nil
+
+	closer := func(ctx context.Context) error {
+		_, err := client.Close(ctx, &electionv1.CloseRequest{})
+		if err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+		return nil
+	}
+
+	return &electionPrimitive{
+		Primitive:   primitive.New(b.options.Name, closer),
+		client:      electionv1.NewLeaderElectionClient(conn),
+		candidateID: b.candidateID,
+	}, nil
 }
 
 var _ primitive.Builder[*Builder, Election] = (*Builder)(nil)

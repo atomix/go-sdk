@@ -6,7 +6,6 @@ package counter
 
 import (
 	"context"
-	"github.com/atomix/atomix/api/errors"
 	counterv1 "github.com/atomix/atomix/api/runtime/counter/v1"
 	runtimev1 "github.com/atomix/atomix/api/runtime/v1"
 	"github.com/atomix/go-sdk/pkg/primitive"
@@ -106,35 +105,4 @@ func (c *counterPrimitive) Decrement(ctx context.Context, delta int64) (int64, e
 		return 0, err
 	}
 	return response.Value, nil
-}
-
-func (c *counterPrimitive) create(ctx context.Context, tags ...string) error {
-	request := &counterv1.CreateRequest{
-		ID: runtimev1.PrimitiveID{
-			Name: c.Name(),
-		},
-		Tags: tags,
-	}
-	_, err := c.client.Create(ctx, request)
-	if err != nil {
-		if !errors.IsAlreadyExists(err) {
-			return err
-		}
-	}
-	return nil
-}
-
-func (c *counterPrimitive) Close(ctx context.Context) error {
-	request := &counterv1.CloseRequest{
-		ID: runtimev1.PrimitiveID{
-			Name: c.Name(),
-		},
-	}
-	_, err := c.client.Close(ctx, request)
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			return err
-		}
-	}
-	return nil
 }

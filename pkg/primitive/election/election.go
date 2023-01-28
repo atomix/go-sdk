@@ -200,34 +200,3 @@ func (e *electionPrimitive) Watch(ctx context.Context) (TermStream, error) {
 	}()
 	return stream.NewChannelStream[*Term](ch), nil
 }
-
-func (e *electionPrimitive) create(ctx context.Context, tags ...string) error {
-	request := &electionv1.CreateRequest{
-		ID: runtimev1.PrimitiveID{
-			Name: e.Name(),
-		},
-		Tags: tags,
-	}
-	_, err := e.client.Create(ctx, request)
-	if err != nil {
-		if !errors.IsAlreadyExists(err) {
-			return err
-		}
-	}
-	return nil
-}
-
-func (e *electionPrimitive) Close(ctx context.Context) error {
-	request := &electionv1.CloseRequest{
-		ID: runtimev1.PrimitiveID{
-			Name: e.Name(),
-		},
-	}
-	_, err := e.client.Close(ctx, request)
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			return err
-		}
-	}
-	return nil
-}

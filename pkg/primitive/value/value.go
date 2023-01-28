@@ -343,34 +343,3 @@ func (m *atomicValuePrimitive[V]) Events(ctx context.Context, opts ...EventsOpti
 		return nil, ctx.Err()
 	}
 }
-
-func (m *atomicValuePrimitive[V]) create(ctx context.Context, tags ...string) error {
-	request := &valuev1.CreateRequest{
-		ID: runtimev1.PrimitiveID{
-			Name: m.Name(),
-		},
-		Tags: tags,
-	}
-	_, err := m.client.Create(ctx, request)
-	if err != nil {
-		if !errors.IsAlreadyExists(err) {
-			return err
-		}
-	}
-	return nil
-}
-
-func (m *atomicValuePrimitive[V]) Close(ctx context.Context) error {
-	request := &valuev1.CloseRequest{
-		ID: runtimev1.PrimitiveID{
-			Name: m.Name(),
-		},
-	}
-	_, err := m.client.Close(ctx, request)
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			return err
-		}
-	}
-	return nil
-}

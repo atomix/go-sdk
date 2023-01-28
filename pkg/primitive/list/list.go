@@ -369,34 +369,3 @@ func (l *listPrimitive[E]) Clear(ctx context.Context) error {
 	}
 	return nil
 }
-
-func (l *listPrimitive[E]) create(ctx context.Context, tags ...string) error {
-	request := &listv1.CreateRequest{
-		ID: runtimev1.PrimitiveID{
-			Name: l.Name(),
-		},
-		Tags: tags,
-	}
-	_, err := l.client.Create(ctx, request)
-	if err != nil {
-		if !errors.IsAlreadyExists(err) {
-			return err
-		}
-	}
-	return nil
-}
-
-func (l *listPrimitive[E]) Close(ctx context.Context) error {
-	request := &listv1.CloseRequest{
-		ID: runtimev1.PrimitiveID{
-			Name: l.Name(),
-		},
-	}
-	_, err := l.client.Close(ctx, request)
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			return err
-		}
-	}
-	return nil
-}
