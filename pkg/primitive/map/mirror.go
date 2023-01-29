@@ -37,14 +37,14 @@ func (m *mirroredMap[K, V]) open(ctx context.Context) {
 }
 
 func (m *mirroredMap[K, V]) watch(ctx context.Context) {
-	entries, err := m.Map.Watch(ctx)
+	events, err := m.Map.Events(ctx)
 	if err != nil {
 		time.AfterFunc(time.Second, func() {
 			m.watch(ctx)
 		})
 	}
 	for {
-		entry, err := entries.Next()
+		event, err := events.Next()
 		if errors.IsCanceled(err) {
 			return
 		}
@@ -56,7 +56,14 @@ func (m *mirroredMap[K, V]) watch(ctx context.Context) {
 		if err != nil {
 			log.Error(err)
 		} else {
-			m.update(entry.Key, entry.Versioned)
+			switch e := event.(type) {
+			case *Inserted[K, V]:
+				m.update(e.Entry.Key, e.Entry.Versioned)
+			case *Updated[K, V]:
+				m.update(e.NewEntry.Key, e.NewEntry.Versioned)
+			case *Removed[K, V]:
+				m.remove(e.Entry.Key, e.Entry.Version)
+			}
 		}
 	}
 }
@@ -78,13 +85,19 @@ func (m *mirroredMap[K, V]) update(key K, versioned primitive.Versioned[V]) {
 	m.entries[key] = versioned
 }
 
-func (m *mirroredMap[K, V]) invalidate(key K, version primitive.Version) {
+func (m *mirroredMap[K, V]) remove(key K, version primitive.Version) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	value, ok := m.entries[key]
 	if !ok || value.Version > version {
 		return
 	}
+	delete(m.entries, key)
+}
+
+func (m *mirroredMap[K, V]) invalidate(key K) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	delete(m.entries, key)
 }
 
@@ -98,7 +111,7 @@ func (m *mirroredMap[K, V]) Put(ctx context.Context, key K, value V, opts ...Put
 	entry, err := m.Map.Put(ctx, key, value, opts...)
 	if err != nil {
 		if !errors.IsAlreadyExists(err) && !errors.IsConflict(err) {
-			m.invalidate(key, entry.Version)
+			m.invalidate(key)
 		}
 		return nil, err
 	}
@@ -110,7 +123,7 @@ func (m *mirroredMap[K, V]) Insert(ctx context.Context, key K, value V, opts ...
 	entry, err := m.Map.Insert(ctx, key, value, opts...)
 	if err != nil {
 		if !errors.IsAlreadyExists(err) && !errors.IsConflict(err) {
-			m.invalidate(key, entry.Version)
+			m.invalidate(key)
 		}
 		return nil, err
 	}
@@ -122,7 +135,7 @@ func (m *mirroredMap[K, V]) Update(ctx context.Context, key K, value V, opts ...
 	entry, err := m.Map.Update(ctx, key, value, opts...)
 	if err != nil {
 		if !errors.IsConflict(err) {
-			m.invalidate(key, entry.Version)
+			m.invalidate(key)
 		}
 		return nil, err
 	}
@@ -147,11 +160,11 @@ func (m *mirroredMap[K, V]) Remove(ctx context.Context, key K, opts ...RemoveOpt
 	entry, err := m.Map.Remove(ctx, key, opts...)
 	if err != nil {
 		if !errors.IsConflict(err) {
-			m.invalidate(key, entry.Version)
+			m.invalidate(key)
 		}
 		return nil, err
 	}
-	m.invalidate(key, entry.Version)
+	m.remove(key, entry.Version)
 	return entry, nil
 }
 
@@ -160,5 +173,15 @@ func (m *mirroredMap[K, V]) Clear(ctx context.Context) error {
 		return err
 	}
 	m.purge()
+	return nil
+}
+
+func (m *mirroredMap[K, V]) Close(ctx context.Context) error {
+	if err := m.Map.Close(ctx); err != nil {
+		return err
+	}
+	if m.cancel != nil {
+		m.cancel()
+	}
 	return nil
 }
