@@ -35,7 +35,7 @@ func (b *Builder) Get(ctx context.Context) (AtomicCounter, error) {
 		return nil, err
 	}
 
-	client := counterv1.NewCountersClient(conn)
+	client := counterv1.NewCounterClient(conn)
 	request := &counterv1.CreateRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: b.options.Name,

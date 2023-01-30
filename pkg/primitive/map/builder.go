@@ -46,7 +46,7 @@ func (b *Builder[K, V]) Get(ctx context.Context) (Map[K, V], error) {
 		panic("no codec set for map primitive")
 	}
 
-	client := mapv1.NewMapsClient(conn)
+	client := mapv1.NewMapClient(conn)
 	request := &mapv1.CreateRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: b.options.Name,

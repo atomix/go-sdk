@@ -45,7 +45,7 @@ func (b *Builder[E]) Get(ctx context.Context) (List[E], error) {
 		panic("no codec set for list primitive")
 	}
 
-	client := listv1.NewListsClient(conn)
+	client := listv1.NewListClient(conn)
 	request := &listv1.CreateRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: b.options.Name,
