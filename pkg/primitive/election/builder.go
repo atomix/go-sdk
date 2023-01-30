@@ -41,7 +41,7 @@ func (b *Builder) Get(ctx context.Context) (Election, error) {
 		return nil, err
 	}
 
-	client := electionv1.NewLeaderElectionClient(conn)
+	client := electionv1.NewLeaderElectionsClient(conn)
 	request := &electionv1.CreateRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: b.options.Name,

@@ -46,7 +46,7 @@ func (b *Builder[K, V]) Get(ctx context.Context) (IndexedMap[K, V], error) {
 		panic("no codec set for map primitive")
 	}
 
-	client := indexedmapv1.NewIndexedMapClient(conn)
+	client := indexedmapv1.NewIndexedMapsClient(conn)
 	request := &indexedmapv1.CreateRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: b.options.Name,

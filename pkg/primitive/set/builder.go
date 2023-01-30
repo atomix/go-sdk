@@ -45,7 +45,7 @@ func (b *Builder[E]) Get(ctx context.Context) (Set[E], error) {
 		panic("no codec set for set primitive")
 	}
 
-	client := setv1.NewSetClient(conn)
+	client := setv1.NewSetsClient(conn)
 	request := &setv1.CreateRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: b.options.Name,

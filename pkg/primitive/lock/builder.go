@@ -35,7 +35,7 @@ func (b *Builder) Get(ctx context.Context) (Lock, error) {
 		return nil, err
 	}
 
-	client := lockv1.NewLockClient(conn)
+	client := lockv1.NewLocksClient(conn)
 	request := &lockv1.CreateRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: b.options.Name,
