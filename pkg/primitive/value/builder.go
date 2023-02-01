@@ -53,7 +53,7 @@ func (b *Builder[V]) Get(ctx context.Context) (Value[V], error) {
 		},
 		Tags: b.options.Tags,
 	}
-	_, err = client.Create(ctx, request)
+	response, err := client.Create(ctx, request)
 	if err != nil && !errors.IsAlreadyExists(err) {
 		return nil, err
 	}
@@ -66,11 +66,17 @@ func (b *Builder[V]) Get(ctx context.Context) (Value[V], error) {
 		return nil
 	}
 
-	return &atomicValuePrimitive[V]{
+	var value Value[V] = &atomicValuePrimitive[V]{
 		Primitive: primitive.New(b.options.Name, closer),
 		client:    atomicvaluev1.NewValueClient(conn),
 		codec:     b.codec,
-	}, nil
+	}
+
+	config := response.Config
+	if config.Cache.Enabled {
+		value = newCachingValue[V](value)
+	}
+	return value, nil
 }
 
 var _ primitive.Builder[*Builder[any], Value[any]] = (*Builder[any])(nil)
