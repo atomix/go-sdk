@@ -7,7 +7,6 @@ package set
 import (
 	"context"
 	"github.com/atomix/atomix/api/errors"
-	"github.com/atomix/go-sdk/pkg/primitive"
 	"github.com/atomix/go-sdk/pkg/util"
 	"io"
 )
@@ -31,7 +30,7 @@ func newCachingSet(ctx context.Context, m Set[string], size int) (Set[string], e
 			if err != nil {
 				return nil, err
 			}
-			cm.cache.Store(element, primitive.Versioned[bool]{Value: true})
+			cm.cache.Store(element, true, 0)
 		}
 	} else {
 		cache, err := util.NewKeyValueLRU[string, bool](size)
@@ -81,7 +80,7 @@ func (m *cachingSet) open() error {
 			} else {
 				switch e := event.(type) {
 				case *Added[string]:
-					m.cache.Store(e.Element, primitive.Versioned[bool]{Value: true})
+					m.cache.Store(e.Element, true, 0)
 				case *Removed[string]:
 					m.cache.Invalidate(e.Element)
 				}
@@ -98,7 +97,7 @@ func (m *cachingSet) Add(ctx context.Context, value string) (bool, error) {
 		}
 		return false, err
 	} else if ok {
-		m.cache.Store(value, primitive.Versioned[bool]{Value: true})
+		m.cache.Store(value, true, 0)
 		return true, nil
 	}
 	return false, nil
@@ -112,7 +111,7 @@ func (m *cachingSet) Contains(ctx context.Context, value string) (bool, error) {
 	if ok, err := m.Set.Contains(ctx, value); err != nil {
 		return false, err
 	} else if ok {
-		m.cache.Store(value, primitive.Versioned[bool]{Value: true})
+		m.cache.Store(value, true, 0)
 		return true, nil
 	}
 	return false, nil

@@ -14,11 +14,6 @@ import (
 	"github.com/atomix/go-sdk/pkg/types/scalar"
 )
 
-type Builder[K scalar.Scalar, V any] interface {
-	primitive.Builder[Builder[K, V], Map[K, V]]
-	Codec(codec types.Codec[V]) Builder[K, V]
-}
-
 func NewBuilder[K scalar.Scalar, V any](client primitive.Client, name string) Builder[K, V] {
 	return &mapBuilder[K, V]{
 		options: primitive.NewOptions(name),

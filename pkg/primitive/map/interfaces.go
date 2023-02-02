@@ -20,6 +20,11 @@ import (
 
 var log = logging.GetLogger()
 
+type Builder[K scalar.Scalar, V any] interface {
+	primitive.Builder[Builder[K, V], Map[K, V]]
+	Codec(codec types.Codec[V]) Builder[K, V]
+}
+
 // Map is a distributed set of keys and values
 type Map[K scalar.Scalar, V any] interface {
 	primitive.Primitive

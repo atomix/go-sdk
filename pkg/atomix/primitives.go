@@ -21,7 +21,7 @@ func Counter(name string) counter.Builder {
 	return client.Counter(getClient())(name)
 }
 
-func IndexedMap[K scalar.Scalar, V any](name string) *indexedmap.Builder[K, V] {
+func IndexedMap[K scalar.Scalar, V any](name string) indexedmap.Builder[K, V] {
 	return client.IndexedMap[K, V](getClient())(name)
 }
 

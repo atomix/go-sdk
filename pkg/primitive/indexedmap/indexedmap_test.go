@@ -6,11 +6,15 @@ package indexedmap
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/atomix/atomix/api/errors"
+	mapv1 "github.com/atomix/atomix/api/runtime/map/v1"
+	runtimev1 "github.com/atomix/atomix/api/runtime/v1"
 	"github.com/atomix/atomix/runtime/pkg/logging"
 	"github.com/atomix/go-sdk/pkg/primitive"
 	"github.com/atomix/go-sdk/pkg/test"
 	"github.com/atomix/go-sdk/pkg/types"
+	gogotypes "github.com/gogo/protobuf/types"
 	"github.com/stretchr/testify/assert"
 	"math"
 	"testing"
@@ -18,6 +22,43 @@ import (
 )
 
 func TestIndexedMapOperations(t *testing.T) {
+	testIndexedMapOperations(t, runtimev1.RoutingRule{Names: []string{"*"}})
+}
+
+func TestCachingMapOperations(t *testing.T) {
+	config := mapv1.Config{
+		Cache: mapv1.CacheConfig{
+			Enabled: true,
+			Size_:   3,
+		},
+	}
+	bytes, err := json.Marshal(config)
+	assert.NoError(t, err)
+	testIndexedMapOperations(t, runtimev1.RoutingRule{
+		Names: []string{"*"},
+		Config: &gogotypes.Any{
+			Value: bytes,
+		},
+	})
+}
+
+func TestMirroredMapOperations(t *testing.T) {
+	config := mapv1.Config{
+		Cache: mapv1.CacheConfig{
+			Enabled: true,
+		},
+	}
+	bytes, err := json.Marshal(config)
+	assert.NoError(t, err)
+	testIndexedMapOperations(t, runtimev1.RoutingRule{
+		Names: []string{"*"},
+		Config: &gogotypes.Any{
+			Value: bytes,
+		},
+	})
+}
+
+func testIndexedMapOperations(t *testing.T, rule runtimev1.RoutingRule) {
 	logging.SetLevel(logging.DebugLevel)
 
 	cluster := test.NewClient()

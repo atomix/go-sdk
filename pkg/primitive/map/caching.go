@@ -60,7 +60,7 @@ func (m *cachedMap) Get(ctx context.Context, key string, opts ...GetOption) (*En
 	if err != nil {
 		return nil, err
 	}
-	m.cache.Store(entry.Key, entry.Versioned)
+	m.cache.Store(entry.Key, entry.Value, entry.Version)
 	return entry, nil
 }
 
@@ -82,7 +82,7 @@ func (m *mirroredMap) open(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		m.cache.Store(entry.Key, entry.Versioned)
+		m.cache.Store(entry.Key, entry.Value, entry.Version)
 	}
 	return m.cachingMap.open()
 }
@@ -140,9 +140,9 @@ func (m *cachingMap) open() error {
 			} else {
 				switch e := event.(type) {
 				case *Inserted[string, []byte]:
-					m.cache.Store(e.Entry.Key, e.Entry.Versioned)
+					m.cache.Store(e.Entry.Key, e.Entry.Value, e.Entry.Version)
 				case *Updated[string, []byte]:
-					m.cache.Store(e.NewEntry.Key, e.NewEntry.Versioned)
+					m.cache.Store(e.NewEntry.Key, e.NewEntry.Value, e.NewEntry.Version)
 				case *Removed[string, []byte]:
 					m.cache.Delete(e.Entry.Key, e.Entry.Version)
 				}
@@ -160,7 +160,7 @@ func (m *cachingMap) Put(ctx context.Context, key string, value []byte, opts ...
 		}
 		return nil, err
 	}
-	m.cache.Store(key, entry.Versioned)
+	m.cache.Store(key, entry.Value, entry.Version)
 	return entry, nil
 }
 
@@ -172,7 +172,7 @@ func (m *cachingMap) Insert(ctx context.Context, key string, value []byte, opts 
 		}
 		return nil, err
 	}
-	m.cache.Store(key, entry.Versioned)
+	m.cache.Store(key, entry.Value, entry.Version)
 	return entry, nil
 }
 
@@ -184,7 +184,7 @@ func (m *cachingMap) Update(ctx context.Context, key string, value []byte, opts 
 		}
 		return nil, err
 	}
-	m.cache.Store(key, entry.Versioned)
+	m.cache.Store(key, entry.Value, entry.Version)
 	return entry, nil
 }
 
@@ -201,7 +201,7 @@ func (m *cachingMap) Remove(ctx context.Context, key string, opts ...RemoveOptio
 }
 
 func (m *cachingMap) Clear(ctx context.Context) error {
-	defer m.cache.Purge()
+	m.cache.Purge()
 	if err := m.Map.Clear(ctx); err != nil {
 		return err
 	}

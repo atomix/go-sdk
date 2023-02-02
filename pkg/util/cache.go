@@ -55,7 +55,7 @@ func (c *ValueCache[V]) Invalidate() {
 }
 
 type KeyValueCache[K comparable, V any] interface {
-	Store(key K, value primitive.Versioned[V]) bool
+	Store(key K, value V, version primitive.Version) bool
 	Load(key K) (*primitive.Versioned[V], bool)
 	Delete(key K, version primitive.Version) bool
 	Invalidate(key K) bool
@@ -77,11 +77,14 @@ type KeyValueLRU[K comparable, V any] struct {
 	mu    sync.RWMutex
 }
 
-func (c *KeyValueLRU[K, V]) Store(key K, value primitive.Versioned[V]) bool {
+func (c *KeyValueLRU[K, V]) Store(key K, value V, version primitive.Version) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if cached, ok := c.cache.Peek(key); !ok || value.Version == 0 || value.Version > cached.Version {
-		c.cache.Add(key, value)
+	if cached, ok := c.cache.Peek(key); !ok || version == 0 || version > cached.Version {
+		c.cache.Add(key, primitive.Versioned[V]{
+			Value:   value,
+			Version: version,
+		})
 		return true
 	}
 	return false
@@ -128,11 +131,14 @@ type KeyValueMirror[K comparable, V any] struct {
 	mu     sync.RWMutex
 }
 
-func (c *KeyValueMirror[K, V]) Store(key K, value primitive.Versioned[V]) bool {
+func (c *KeyValueMirror[K, V]) Store(key K, value V, version primitive.Version) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if cached, ok := c.values[key]; !ok || value.Version == 0 || value.Version > cached.Version {
-		c.values[key] = value
+	if cached, ok := c.values[key]; !ok || version == 0 || version > cached.Version {
+		c.values[key] = primitive.Versioned[V]{
+			Value:   value,
+			Version: version,
+		}
 		return true
 	}
 	return false

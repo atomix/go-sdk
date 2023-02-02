@@ -23,8 +23,8 @@ func Counter(client primitive.Client) func(name string) counter.Builder {
 	}
 }
 
-func IndexedMap[K scalar.Scalar, V any](client primitive.Client) func(name string) *indexedmap.Builder[K, V] {
-	return func(name string) *indexedmap.Builder[K, V] {
+func IndexedMap[K scalar.Scalar, V any](client primitive.Client) func(name string) indexedmap.Builder[K, V] {
+	return func(name string) indexedmap.Builder[K, V] {
 		return indexedmap.NewBuilder[K, V](client, name)
 	}
 }

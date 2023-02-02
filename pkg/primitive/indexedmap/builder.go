@@ -14,36 +14,36 @@ import (
 	"github.com/atomix/go-sdk/pkg/types/scalar"
 )
 
-func NewBuilder[K scalar.Scalar, V any](client primitive.Client, name string) *Builder[K, V] {
-	return &Builder[K, V]{
+func NewBuilder[K scalar.Scalar, V any](client primitive.Client, name string) Builder[K, V] {
+	return &indexedMapBuilder[K, V]{
 		options: primitive.NewOptions(name),
 		client:  client,
 	}
 }
 
-type Builder[K scalar.Scalar, V any] struct {
+type indexedMapBuilder[K scalar.Scalar, V any] struct {
 	options *primitive.Options
 	client  primitive.Client
 	codec   types.Codec[V]
 }
 
-func (b *Builder[K, V]) Tag(tags ...string) *Builder[K, V] {
+func (b *indexedMapBuilder[K, V]) Tag(tags ...string) Builder[K, V] {
 	b.options.SetTags(tags...)
 	return b
 }
 
-func (b *Builder[K, V]) Codec(codec types.Codec[V]) *Builder[K, V] {
+func (b *indexedMapBuilder[K, V]) Codec(codec types.Codec[V]) Builder[K, V] {
 	b.codec = codec
 	return b
 }
 
-func (b *Builder[K, V]) Get(ctx context.Context) (IndexedMap[K, V], error) {
+func (b *indexedMapBuilder[K, V]) Get(ctx context.Context) (IndexedMap[K, V], error) {
 	conn, err := b.client.Connect(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if b.codec == nil {
-		panic("no codec set for map primitive")
+		panic("no codec set for IndexedMap primitive")
 	}
 
 	client := indexedmapv1.NewIndexedMapsClient(conn)
@@ -53,26 +53,20 @@ func (b *Builder[K, V]) Get(ctx context.Context) (IndexedMap[K, V], error) {
 		},
 		Tags: b.options.Tags,
 	}
-	_, err = client.Create(ctx, request)
+	response, err := client.Create(ctx, request)
 	if err != nil && !errors.IsAlreadyExists(err) {
 		return nil, err
 	}
 
-	closer := func(ctx context.Context) error {
-		_, err := client.Close(ctx, &indexedmapv1.CloseRequest{})
-		if err != nil && !errors.IsNotFound(err) {
-			return err
+	_map := newIndexedMapClient(b.options.Name, indexedmapv1.NewIndexedMapClient(conn))
+	config := response.Config
+	if config.Cache.Enabled {
+		_map, err = newCachingIndexedMap(ctx, _map, int(config.Cache.Size_))
+		if err != nil {
+			return nil, err
 		}
-		return nil
 	}
-
-	return &indexedMapPrimitive[K, V]{
-		Primitive:  primitive.New(b.options.Name, closer),
-		client:     indexedmapv1.NewIndexedMapClient(conn),
-		keyEncoder: scalar.NewEncodeFunc[K](),
-		keyDecoder: scalar.NewDecodeFunc[K](),
-		valueCodec: b.codec,
-	}, nil
+	return newTranscodingIndexedMap[K, V](_map, types.Scalar[K](), b.codec), nil
 }
 
-var _ primitive.Builder[*Builder[string, any], IndexedMap[string, any]] = (*Builder[string, any])(nil)
+var _ Builder[string, any] = (*indexedMapBuilder[string, any])(nil)
