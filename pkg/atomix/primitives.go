@@ -25,7 +25,7 @@ func IndexedMap[K scalar.Scalar, V any](name string) *indexedmap.Builder[K, V] {
 	return client.IndexedMap[K, V](getClient())(name)
 }
 
-func LeaderElection(name string) *election.Builder {
+func LeaderElection(name string) election.Builder {
 	return client.LeaderElection(getClient())(name)
 }
 

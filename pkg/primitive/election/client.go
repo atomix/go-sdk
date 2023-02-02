@@ -9,82 +9,55 @@ import (
 	"github.com/atomix/atomix/api/errors"
 	electionv1 "github.com/atomix/atomix/api/runtime/election/v1"
 	runtimev1 "github.com/atomix/atomix/api/runtime/v1"
-	"github.com/atomix/atomix/runtime/pkg/logging"
 	"github.com/atomix/go-sdk/pkg/primitive"
 	"github.com/atomix/go-sdk/pkg/stream"
 	"io"
 )
 
-var log = logging.GetLogger()
-
-// Election provides distributed leader election
-type Election interface {
-	primitive.Primitive
-
-	// CandidateID returns the candidate identifier
-	CandidateID() string
-
-	// GetTerm gets the current election term
-	GetTerm(ctx context.Context) (*Term, error)
-
-	// Enter enters the instance into the election
-	Enter(ctx context.Context) (*Term, error)
-
-	// Leave removes the instance from the election
-	Leave(ctx context.Context) (*Term, error)
-
-	// Anoint assigns leadership to the instance with the given ID
-	Anoint(ctx context.Context, id string) (*Term, error)
-
-	// Promote increases the priority of the instance with the given ID in the election queue
-	Promote(ctx context.Context, id string) (*Term, error)
-
-	// Evict removes the instance with the given ID from the election
-	Evict(ctx context.Context, id string) (*Term, error)
-
-	// Watch watches the election for changes
-	Watch(ctx context.Context) (TermStream, error)
-}
-
-type TermStream stream.Stream[*Term]
-
-// newTerm returns a new term from the response term
-func newTerm(term *electionv1.Term) *Term {
-	if term == nil {
-		return nil
-	}
-	return &Term{
-		ID:         term.Term,
-		Leader:     term.Leader,
-		Candidates: term.Candidates,
+func newElectionsClient(name string, client electionv1.LeaderElectionsClient) primitive.Primitive {
+	return &electionsClient{
+		name:   name,
+		client: client,
 	}
 }
 
-// Term is a leadership term
-// A term is guaranteed to have a monotonically increasing, globally unique ID.
-type Term struct {
-	// ID is the monotonically increasing term identifier
-	ID uint64
-
-	// Leader is the ID of the leader that was elected
-	Leader string
-
-	// Candidates is a list of candidates currently participating in the election
-	Candidates []string
+type electionsClient struct {
+	name   string
+	client electionv1.LeaderElectionsClient
 }
 
-// electionPrimitive is the single partition implementation of Election
-type electionPrimitive struct {
+func (s *electionsClient) Name() string {
+	return s.name
+}
+
+func (s *electionsClient) Close(ctx context.Context) error {
+	_, err := s.client.Close(ctx, &electionv1.CloseRequest{})
+	if err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
+func newElectionClient(name string, candidateID string, client electionv1.LeaderElectionClient) Election {
+	return &electionClient{
+		Primitive:   newElectionsClient(name, client),
+		client:      client,
+		candidateID: candidateID,
+	}
+}
+
+// electionClient is the single partition implementation of Election
+type electionClient struct {
 	primitive.Primitive
 	client      electionv1.LeaderElectionClient
 	candidateID string
 }
 
-func (e *electionPrimitive) CandidateID() string {
+func (e *electionClient) CandidateID() string {
 	return e.candidateID
 }
 
-func (e *electionPrimitive) GetTerm(ctx context.Context) (*Term, error) {
+func (e *electionClient) GetTerm(ctx context.Context) (*Term, error) {
 	request := &electionv1.GetTermRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: e.Name(),
@@ -97,7 +70,7 @@ func (e *electionPrimitive) GetTerm(ctx context.Context) (*Term, error) {
 	return newTerm(&response.Term), nil
 }
 
-func (e *electionPrimitive) Enter(ctx context.Context) (*Term, error) {
+func (e *electionClient) Enter(ctx context.Context) (*Term, error) {
 	request := &electionv1.EnterRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: e.Name(),
@@ -111,7 +84,7 @@ func (e *electionPrimitive) Enter(ctx context.Context) (*Term, error) {
 	return newTerm(&response.Term), nil
 }
 
-func (e *electionPrimitive) Leave(ctx context.Context) (*Term, error) {
+func (e *electionClient) Leave(ctx context.Context) (*Term, error) {
 	request := &electionv1.WithdrawRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: e.Name(),
@@ -125,7 +98,7 @@ func (e *electionPrimitive) Leave(ctx context.Context) (*Term, error) {
 	return newTerm(&response.Term), nil
 }
 
-func (e *electionPrimitive) Anoint(ctx context.Context, id string) (*Term, error) {
+func (e *electionClient) Anoint(ctx context.Context, id string) (*Term, error) {
 	request := &electionv1.AnointRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: e.Name(),
@@ -139,7 +112,7 @@ func (e *electionPrimitive) Anoint(ctx context.Context, id string) (*Term, error
 	return newTerm(&response.Term), nil
 }
 
-func (e *electionPrimitive) Promote(ctx context.Context, id string) (*Term, error) {
+func (e *electionClient) Promote(ctx context.Context, id string) (*Term, error) {
 	request := &electionv1.PromoteRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: e.Name(),
@@ -153,7 +126,7 @@ func (e *electionPrimitive) Promote(ctx context.Context, id string) (*Term, erro
 	return newTerm(&response.Term), nil
 }
 
-func (e *electionPrimitive) Evict(ctx context.Context, id string) (*Term, error) {
+func (e *electionClient) Evict(ctx context.Context, id string) (*Term, error) {
 	request := &electionv1.EvictRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: e.Name(),
@@ -167,7 +140,7 @@ func (e *electionPrimitive) Evict(ctx context.Context, id string) (*Term, error)
 	return newTerm(&response.Term), nil
 }
 
-func (e *electionPrimitive) Watch(ctx context.Context) (TermStream, error) {
+func (e *electionClient) Watch(ctx context.Context) (TermStream, error) {
 	request := &electionv1.WatchRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: e.Name(),

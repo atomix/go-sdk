@@ -12,30 +12,30 @@ import (
 	"github.com/atomix/go-sdk/pkg/primitive"
 )
 
-func NewBuilder(client primitive.Client, name string) *Builder {
-	return &Builder{
+func NewBuilder(client primitive.Client, name string) Builder {
+	return &electionBuilder{
 		options: primitive.NewOptions(name),
 		client:  client,
 	}
 }
 
-type Builder struct {
+type electionBuilder struct {
 	options     *primitive.Options
 	client      primitive.Client
 	candidateID string
 }
 
-func (b *Builder) Tag(tags ...string) *Builder {
+func (b *electionBuilder) Tag(tags ...string) Builder {
 	b.options.SetTags(tags...)
 	return b
 }
 
-func (b *Builder) CandidateID(candidateID string) *Builder {
+func (b *electionBuilder) CandidateID(candidateID string) Builder {
 	b.candidateID = candidateID
 	return b
 }
 
-func (b *Builder) Get(ctx context.Context) (Election, error) {
+func (b *electionBuilder) Get(ctx context.Context) (Election, error) {
 	conn, err := b.client.Connect(ctx)
 	if err != nil {
 		return nil, err
@@ -52,20 +52,7 @@ func (b *Builder) Get(ctx context.Context) (Election, error) {
 	if err != nil && !errors.IsAlreadyExists(err) {
 		return nil, err
 	}
-
-	closer := func(ctx context.Context) error {
-		_, err := client.Close(ctx, &electionv1.CloseRequest{})
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-		return nil
-	}
-
-	return &electionPrimitive{
-		Primitive:   primitive.New(b.options.Name, closer),
-		client:      electionv1.NewLeaderElectionClient(conn),
-		candidateID: b.candidateID,
-	}, nil
+	return newElectionClient(b.options.Name, b.candidateID, electionv1.NewLeaderElectionClient(conn)), nil
 }
 
-var _ primitive.Builder[*Builder, Election] = (*Builder)(nil)
+var _ Builder = (*electionBuilder)(nil)
