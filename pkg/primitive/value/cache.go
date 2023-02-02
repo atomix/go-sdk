@@ -10,12 +10,12 @@ import (
 	"github.com/atomix/go-sdk/pkg/primitive"
 	"github.com/atomix/go-sdk/pkg/util"
 	"io"
-	"sync"
 )
 
 func newCachingValue[V any](value Value[V]) (Value[V], error) {
 	cm := &cachingValue[V]{
 		Value: value,
+		cache: util.NewValueCache[V](),
 	}
 	if err := cm.open(); err != nil {
 		return nil, err
@@ -25,14 +25,17 @@ func newCachingValue[V any](value Value[V]) (Value[V], error) {
 
 type cachingValue[V any] struct {
 	Value[V]
-	cache  *util.ValueCache[V]
-	mu     sync.RWMutex
-	cancel context.CancelFunc
+	cache   *util.ValueCache[V]
+	closeCh chan struct{}
 }
 
 func (v *cachingValue[V]) open() error {
 	ctx, cancel := context.WithCancel(context.Background())
-	v.cancel = cancel
+	v.closeCh = make(chan struct{})
+	go func() {
+		<-v.closeCh
+		cancel()
+	}()
 
 	events, err := v.Value.Events(ctx)
 	if err != nil {
@@ -106,11 +109,6 @@ func (v *cachingValue[V]) Delete(ctx context.Context, opts ...DeleteOption) erro
 }
 
 func (v *cachingValue[V]) Close(ctx context.Context) error {
-	if err := v.Value.Close(ctx); err != nil {
-		return err
-	}
-	if v.cancel != nil {
-		v.cancel()
-	}
-	return nil
+	defer close(v.closeCh)
+	return v.Value.Close(ctx)
 }

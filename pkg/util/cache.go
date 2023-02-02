@@ -62,13 +62,6 @@ type KeyValueCache[K comparable, V any] interface {
 	Purge()
 }
 
-func NewKeyValueCache[K comparable, V any](size int) (KeyValueCache[K, V], error) {
-	if size == 0 {
-		return NewKeyValueMirror[K, V](), nil
-	}
-	return NewKeyValueLRU[K, V](size)
-}
-
 func NewKeyValueLRU[K comparable, V any](size int) (*KeyValueLRU[K, V], error) {
 	cache, err := simplelru.NewLRU[K, primitive.Versioned[V]](size, nil)
 	if err != nil {

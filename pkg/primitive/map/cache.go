@@ -10,35 +10,63 @@ import (
 	"github.com/atomix/go-sdk/pkg/types/scalar"
 	"github.com/atomix/go-sdk/pkg/util"
 	"io"
-	"sync"
 )
 
-func newCachingMap[K scalar.Scalar, V any](m Map[K, V], size int) (Map[K, V], error) {
-	cache, err := util.NewKeyValueCache[K, V](size)
-	if err != nil {
+func newCachingMap[K scalar.Scalar, V any](ctx context.Context, m Map[K, V], size int) (Map[K, V], error) {
+	var cm *cachingMap[K, V]
+	if size == 0 {
+		cm = &cachingMap[K, V]{
+			Map:   m,
+			cache: util.NewKeyValueMirror[K, V](),
+		}
+		entries, err := m.List(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for {
+			entry, err := entries.Next()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				return nil, err
+			}
+			cm.cache.Store(entry.Key, entry.Versioned)
+		}
+	} else {
+		cache, err := util.NewKeyValueLRU[K, V](size)
+		if err != nil {
+			return nil, err
+		}
+		cm = &cachingMap[K, V]{
+			Map:   m,
+			cache: cache,
+		}
+	}
+
+	if err := cm.open(); err != nil {
 		return nil, err
 	}
-	cm := &cachingMap[K, V]{
-		Map:   m,
-		cache: cache,
-	}
-	cm.open()
 	return cm, nil
 }
 
 type cachingMap[K scalar.Scalar, V any] struct {
 	Map[K, V]
-	cache  util.KeyValueCache[K, V]
-	mu     sync.RWMutex
-	cancel context.CancelFunc
+	cache   util.KeyValueCache[K, V]
+	closeCh chan struct{}
 }
 
 func (m *cachingMap[K, V]) open() error {
 	ctx, cancel := context.WithCancel(context.Background())
-	m.cancel = cancel
+	m.closeCh = make(chan struct{})
+	go func() {
+		<-m.closeCh
+		cancel()
+	}()
 
 	events, err := m.Map.Events(ctx)
 	if err != nil {
+		cancel()
 		return err
 	}
 
@@ -138,11 +166,6 @@ func (m *cachingMap[K, V]) Clear(ctx context.Context) error {
 }
 
 func (m *cachingMap[K, V]) Close(ctx context.Context) error {
-	if err := m.Map.Close(ctx); err != nil {
-		return err
-	}
-	if m.cancel != nil {
-		m.cancel()
-	}
-	return nil
+	defer close(m.closeCh)
+	return m.Map.Close(ctx)
 }

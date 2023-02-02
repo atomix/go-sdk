@@ -77,7 +77,7 @@ func (b *Builder[K, V]) Get(ctx context.Context) (Map[K, V], error) {
 
 	config := response.Config
 	if config.Cache.Enabled {
-		_map, err = newCachingMap[K, V](_map, int(config.Cache.Size_))
+		_map, err = newCachingMap[K, V](ctx, _map, int(config.Cache.Size_))
 		if err != nil {
 			return nil, err
 		}
