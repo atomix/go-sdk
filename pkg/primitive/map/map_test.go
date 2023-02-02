@@ -59,8 +59,8 @@ func TestMapOperations(t *testing.T) {
 }
 
 func TestCachingMapOperations(t *testing.T) {
-	config := mapv1.MapConfig{
-		Cache: mapv1.MapCacheConfig{
+	config := mapv1.Config{
+		Cache: mapv1.CacheConfig{
 			Enabled: true,
 			Size_:   3,
 		},
@@ -76,8 +76,8 @@ func TestCachingMapOperations(t *testing.T) {
 }
 
 func TestMirroredMapOperations(t *testing.T) {
-	config := mapv1.MapConfig{
-		Cache: mapv1.MapCacheConfig{
+	config := mapv1.Config{
+		Cache: mapv1.CacheConfig{
 			Enabled: true,
 		},
 	}

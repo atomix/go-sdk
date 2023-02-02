@@ -37,7 +37,7 @@ func Lock(name string) *lock.Builder {
 	return client.Lock(getClient())(name)
 }
 
-func Map[K scalar.Scalar, V any](name string) *_map.Builder[K, V] {
+func Map[K scalar.Scalar, V any](name string) _map.Builder[K, V] {
 	return client.Map[K, V](getClient())(name)
 }
 

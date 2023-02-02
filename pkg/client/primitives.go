@@ -47,8 +47,8 @@ func Lock(client primitive.Client) func(name string) *lock.Builder {
 	}
 }
 
-func Map[K scalar.Scalar, V any](client primitive.Client) func(name string) *_map.Builder[K, V] {
-	return func(name string) *_map.Builder[K, V] {
+func Map[K scalar.Scalar, V any](client primitive.Client) func(name string) _map.Builder[K, V] {
+	return func(name string) _map.Builder[K, V] {
 		return _map.NewBuilder[K, V](client, name)
 	}
 }

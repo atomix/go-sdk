@@ -14,30 +14,35 @@ import (
 	"github.com/atomix/go-sdk/pkg/types/scalar"
 )
 
-func NewBuilder[K scalar.Scalar, V any](client primitive.Client, name string) *Builder[K, V] {
-	return &Builder[K, V]{
+type Builder[K scalar.Scalar, V any] interface {
+	primitive.Builder[Builder[K, V], Map[K, V]]
+	Codec(codec types.Codec[V]) Builder[K, V]
+}
+
+func NewBuilder[K scalar.Scalar, V any](client primitive.Client, name string) Builder[K, V] {
+	return &mapBuilder[K, V]{
 		options: primitive.NewOptions(name),
 		client:  client,
 	}
 }
 
-type Builder[K scalar.Scalar, V any] struct {
+type mapBuilder[K scalar.Scalar, V any] struct {
 	options *primitive.Options
 	client  primitive.Client
 	codec   types.Codec[V]
 }
 
-func (b *Builder[K, V]) Tag(tags ...string) *Builder[K, V] {
+func (b *mapBuilder[K, V]) Tag(tags ...string) Builder[K, V] {
 	b.options.SetTags(tags...)
 	return b
 }
 
-func (b *Builder[K, V]) Codec(codec types.Codec[V]) *Builder[K, V] {
+func (b *mapBuilder[K, V]) Codec(codec types.Codec[V]) Builder[K, V] {
 	b.codec = codec
 	return b
 }
 
-func (b *Builder[K, V]) Get(ctx context.Context) (Map[K, V], error) {
+func (b *mapBuilder[K, V]) Get(ctx context.Context) (Map[K, V], error) {
 	conn, err := b.client.Connect(ctx)
 	if err != nil {
 		return nil, err
@@ -58,31 +63,15 @@ func (b *Builder[K, V]) Get(ctx context.Context) (Map[K, V], error) {
 		return nil, err
 	}
 
-	closer := func(ctx context.Context) error {
-		_, err := client.Close(ctx, &mapv1.CloseRequest{})
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-		return nil
-	}
-
-	var _map Map[K, V]
-	_map = &mapPrimitive[K, V]{
-		Primitive:  primitive.New(b.options.Name, closer),
-		client:     mapv1.NewMapClient(conn),
-		keyEncoder: scalar.NewEncodeFunc[K](),
-		keyDecoder: scalar.NewDecodeFunc[K](),
-		valueCodec: b.codec,
-	}
-
+	_map := newMapClient(b.options.Name, mapv1.NewMapClient(conn))
 	config := response.Config
 	if config.Cache.Enabled {
-		_map, err = newCachingMap[K, V](ctx, _map, int(config.Cache.Size_))
+		_map, err = newCachingMap(ctx, _map, int(config.Cache.Size_))
 		if err != nil {
 			return nil, err
 		}
 	}
-	return _map, nil
+	return newTranscodingMap[K, V](_map, types.Scalar[K](), b.codec), nil
 }
 
-var _ primitive.Builder[*Builder[string, any], Map[string, any]] = (*Builder[string, any])(nil)
+var _ Builder[string, any] = (*mapBuilder[string, any])(nil)
