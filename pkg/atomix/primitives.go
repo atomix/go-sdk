@@ -45,6 +45,6 @@ func Set[E any](name string) set.Builder[E] {
 	return client.Set[E](getClient())(name)
 }
 
-func Value[V any](name string) *value.Builder[V] {
+func Value[V any](name string) value.Builder[V] {
 	return client.Value[V](getClient())(name)
 }

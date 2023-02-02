@@ -18,6 +18,11 @@ import (
 
 var log = logging.GetLogger()
 
+type Builder[V any] interface {
+	primitive.Builder[Builder[V], Value[V]]
+	Codec(codec types.Codec[V]) Builder[V]
+}
+
 // Value is a distributed value supporting atomic check-and-set operations
 type Value[V any] interface {
 	primitive.Primitive

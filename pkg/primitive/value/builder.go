@@ -14,30 +14,30 @@ import (
 	"github.com/atomix/go-sdk/pkg/types"
 )
 
-func NewBuilder[V any](client primitive.Client, name string) *Builder[V] {
-	return &Builder[V]{
+func NewBuilder[V any](client primitive.Client, name string) Builder[V] {
+	return &valueBuilder[V]{
 		options: primitive.NewOptions(name),
 		client:  client,
 	}
 }
 
-type Builder[V any] struct {
+type valueBuilder[V any] struct {
 	options *primitive.Options
 	client  primitive.Client
 	codec   types.Codec[V]
 }
 
-func (b *Builder[V]) Tag(tags ...string) *Builder[V] {
+func (b *valueBuilder[V]) Tag(tags ...string) Builder[V] {
 	b.options.SetTags(tags...)
 	return b
 }
 
-func (b *Builder[V]) Codec(codec types.Codec[V]) *Builder[V] {
+func (b *valueBuilder[V]) Codec(codec types.Codec[V]) Builder[V] {
 	b.codec = codec
 	return b
 }
 
-func (b *Builder[V]) Get(ctx context.Context) (Value[V], error) {
+func (b *valueBuilder[V]) Get(ctx context.Context) (Value[V], error) {
 	conn, err := b.client.Connect(ctx)
 	if err != nil {
 		return nil, err
@@ -82,4 +82,4 @@ func (b *Builder[V]) Get(ctx context.Context) (Value[V], error) {
 	return value, nil
 }
 
-var _ primitive.Builder[*Builder[any], Value[any]] = (*Builder[any])(nil)
+var _ Builder[any] = (*valueBuilder[any])(nil)

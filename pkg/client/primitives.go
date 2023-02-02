@@ -59,8 +59,8 @@ func Set[E any](client primitive.Client) func(name string) set.Builder[E] {
 	}
 }
 
-func Value[V any](client primitive.Client) func(name string) *value.Builder[V] {
-	return func(name string) *value.Builder[V] {
+func Value[V any](client primitive.Client) func(name string) value.Builder[V] {
+	return func(name string) value.Builder[V] {
 		return value.NewBuilder[V](client, name)
 	}
 }

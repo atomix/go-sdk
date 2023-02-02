@@ -54,3 +54,24 @@ func (s *transcodingStream[I, O]) Next() (O, error) {
 	}
 	return s.transcoder(in)
 }
+
+func NewSliceStream[T any](elems []T) Stream[T] {
+	return &sliceStream[T]{
+		elems: elems,
+	}
+}
+
+type sliceStream[T any] struct {
+	elems []T
+	index int
+}
+
+func (s *sliceStream[T]) Next() (T, error) {
+	var elem T
+	if s.index > len(s.elems) {
+		return elem, io.EOF
+	}
+	s.index++
+	elem = s.elems[s.index]
+	return elem, nil
+}
