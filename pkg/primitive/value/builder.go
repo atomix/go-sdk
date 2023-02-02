@@ -74,7 +74,10 @@ func (b *Builder[V]) Get(ctx context.Context) (Value[V], error) {
 
 	config := response.Config
 	if config.Cache.Enabled {
-		value = newCachingValue[V](value)
+		value, err = newCachingValue[V](value)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return value, nil
 }

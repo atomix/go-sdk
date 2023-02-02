@@ -77,13 +77,9 @@ func (b *Builder[K, V]) Get(ctx context.Context) (Map[K, V], error) {
 
 	config := response.Config
 	if config.Cache.Enabled {
-		if config.Cache.Size_ == 0 {
-			_map = newMirroredMap[K, V](_map)
-		} else {
-			_map, err = newCachingMap[K, V](_map, int(config.Cache.Size_))
-			if err != nil {
-				return nil, err
-			}
+		_map, err = newCachingMap[K, V](_map, int(config.Cache.Size_))
+		if err != nil {
+			return nil, err
 		}
 	}
 	return _map, nil
