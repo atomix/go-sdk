@@ -6,38 +6,50 @@ package counter
 
 import (
 	"context"
+	"github.com/atomix/atomix/api/errors"
 	counterv1 "github.com/atomix/atomix/api/runtime/counter/v1"
 	runtimev1 "github.com/atomix/atomix/api/runtime/v1"
 	"github.com/atomix/go-sdk/pkg/primitive"
 )
 
-// AtomicCounter provides a distributed atomic counter
-type AtomicCounter interface {
-	primitive.Primitive
-
-	// Get gets the current value of the counter
-	Get(ctx context.Context) (int64, error)
-
-	// Set sets the value of the counter
-	Set(ctx context.Context, value int64) error
-
-	// Update updates the value of the counter
-	Update(ctx context.Context, current, update int64) error
-
-	// Increment increments the counter by the given delta
-	Increment(ctx context.Context, delta int64) (int64, error)
-
-	// Decrement decrements the counter by the given delta
-	Decrement(ctx context.Context, delta int64) (int64, error)
+func newCountersClient(name string, client counterv1.CountersClient) primitive.Primitive {
+	return &countersClient{
+		name:   name,
+		client: client,
+	}
 }
 
-// counter is the single partition implementation of AtomicCounter
-type counterPrimitive struct {
+type countersClient struct {
+	name   string
+	client counterv1.CountersClient
+}
+
+func (s *countersClient) Name() string {
+	return s.name
+}
+
+func (s *countersClient) Close(ctx context.Context) error {
+	_, err := s.client.Close(ctx, &counterv1.CloseRequest{})
+	if err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
+func newCounterClient(name string, client counterv1.CounterClient) Counter {
+	return &counterClient{
+		Primitive: newCountersClient(name, client),
+		client:    client,
+	}
+}
+
+// counter is the single partition implementation of Counter
+type counterClient struct {
 	primitive.Primitive
 	client counterv1.CounterClient
 }
 
-func (c *counterPrimitive) Get(ctx context.Context) (int64, error) {
+func (c *counterClient) Get(ctx context.Context) (int64, error) {
 	request := &counterv1.GetRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: c.Name(),
@@ -50,7 +62,7 @@ func (c *counterPrimitive) Get(ctx context.Context) (int64, error) {
 	return response.Value, nil
 }
 
-func (c *counterPrimitive) Set(ctx context.Context, value int64) error {
+func (c *counterClient) Set(ctx context.Context, value int64) error {
 	request := &counterv1.SetRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: c.Name(),
@@ -64,7 +76,7 @@ func (c *counterPrimitive) Set(ctx context.Context, value int64) error {
 	return nil
 }
 
-func (c *counterPrimitive) Update(ctx context.Context, current, update int64) error {
+func (c *counterClient) Update(ctx context.Context, current, update int64) error {
 	request := &counterv1.UpdateRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: c.Name(),
@@ -79,7 +91,7 @@ func (c *counterPrimitive) Update(ctx context.Context, current, update int64) er
 	return nil
 }
 
-func (c *counterPrimitive) Increment(ctx context.Context, delta int64) (int64, error) {
+func (c *counterClient) Increment(ctx context.Context, delta int64) (int64, error) {
 	request := &counterv1.IncrementRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: c.Name(),
@@ -93,7 +105,7 @@ func (c *counterPrimitive) Increment(ctx context.Context, delta int64) (int64, e
 	return response.Value, nil
 }
 
-func (c *counterPrimitive) Decrement(ctx context.Context, delta int64) (int64, error) {
+func (c *counterClient) Decrement(ctx context.Context, delta int64) (int64, error) {
 	request := &counterv1.DecrementRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: c.Name(),

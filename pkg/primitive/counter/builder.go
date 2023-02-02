@@ -12,24 +12,24 @@ import (
 	"github.com/atomix/go-sdk/pkg/primitive"
 )
 
-func NewBuilder(client primitive.Client, name string) *Builder {
-	return &Builder{
+func NewBuilder(client primitive.Client, name string) Builder {
+	return &counterBuilder{
 		options: primitive.NewOptions(name),
 		client:  client,
 	}
 }
 
-type Builder struct {
+type counterBuilder struct {
 	options *primitive.Options
 	client  primitive.Client
 }
 
-func (b *Builder) Tag(tags ...string) *Builder {
+func (b *counterBuilder) Tag(tags ...string) Builder {
 	b.options.SetTags(tags...)
 	return b
 }
 
-func (b *Builder) Get(ctx context.Context) (AtomicCounter, error) {
+func (b *counterBuilder) Get(ctx context.Context) (Counter, error) {
 	conn, err := b.client.Connect(ctx)
 	if err != nil {
 		return nil, err
@@ -46,19 +46,7 @@ func (b *Builder) Get(ctx context.Context) (AtomicCounter, error) {
 	if err != nil && !errors.IsAlreadyExists(err) {
 		return nil, err
 	}
-
-	closer := func(ctx context.Context) error {
-		_, err := client.Close(ctx, &counterv1.CloseRequest{})
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-		return nil
-	}
-
-	return &counterPrimitive{
-		Primitive: primitive.New(b.options.Name, closer),
-		client:    counterv1.NewCounterClient(conn),
-	}, nil
+	return newCounterClient(b.options.Name, counterv1.NewCounterClient(conn)), nil
 }
 
-var _ primitive.Builder[*Builder, AtomicCounter] = (*Builder)(nil)
+var _ Builder = (*counterBuilder)(nil)

@@ -17,8 +17,8 @@ import (
 	"github.com/atomix/go-sdk/pkg/types/scalar"
 )
 
-func Counter(client primitive.Client) func(name string) *counter.Builder {
-	return func(name string) *counter.Builder {
+func Counter(client primitive.Client) func(name string) counter.Builder {
+	return func(name string) counter.Builder {
 		return counter.NewBuilder(client, name)
 	}
 }
