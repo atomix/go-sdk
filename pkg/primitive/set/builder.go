@@ -13,30 +13,30 @@ import (
 	"github.com/atomix/go-sdk/pkg/types"
 )
 
-func NewBuilder[E any](client primitive.Client, name string) *Builder[E] {
-	return &Builder[E]{
+func NewBuilder[E any](client primitive.Client, name string) Builder[E] {
+	return &setBuilder[E]{
 		options: primitive.NewOptions(name),
 		client:  client,
 	}
 }
 
-type Builder[E any] struct {
+type setBuilder[E any] struct {
 	options *primitive.Options
 	client  primitive.Client
 	codec   types.Codec[E]
 }
 
-func (b *Builder[E]) Tag(tags ...string) *Builder[E] {
+func (b *setBuilder[E]) Tag(tags ...string) Builder[E] {
 	b.options.SetTags(tags...)
 	return b
 }
 
-func (b *Builder[E]) Codec(codec types.Codec[E]) *Builder[E] {
+func (b *setBuilder[E]) Codec(codec types.Codec[E]) Builder[E] {
 	b.codec = codec
 	return b
 }
 
-func (b *Builder[E]) Get(ctx context.Context) (Set[E], error) {
+func (b *setBuilder[E]) Get(ctx context.Context) (Set[E], error) {
 	conn, err := b.client.Connect(ctx)
 	if err != nil {
 		return nil, err
@@ -52,24 +52,21 @@ func (b *Builder[E]) Get(ctx context.Context) (Set[E], error) {
 		},
 		Tags: b.options.Tags,
 	}
-	_, err = client.Create(ctx, request)
+	response, err := client.Create(ctx, request)
 	if err != nil && !errors.IsAlreadyExists(err) {
 		return nil, err
 	}
 
-	closer := func(ctx context.Context) error {
-		_, err := client.Close(ctx, &setv1.CloseRequest{})
-		if err != nil && !errors.IsNotFound(err) {
-			return err
+	var set Set[string]
+	config := response.Config
+	set = newSetClient(b.options.Name, setv1.NewSetClient(conn))
+	if config.Cache.Enabled {
+		set, err = newCachingSet(ctx, set, int(config.Cache.Size_))
+		if err != nil {
+			return nil, err
 		}
-		return nil
 	}
-
-	return &setPrimitive[E]{
-		Primitive: primitive.New(b.options.Name, closer),
-		client:    setv1.NewSetClient(conn),
-		codec:     b.codec,
-	}, nil
+	return newTranscodingSet[E](set, b.codec), nil
 }
 
-var _ primitive.Builder[*Builder[any], Set[any]] = (*Builder[any])(nil)
+var _ Builder[any] = (*setBuilder[any])(nil)

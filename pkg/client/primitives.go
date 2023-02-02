@@ -53,8 +53,8 @@ func Map[K scalar.Scalar, V any](client primitive.Client) func(name string) *_ma
 	}
 }
 
-func Set[E any](client primitive.Client) func(name string) *set.Builder[E] {
-	return func(name string) *set.Builder[E] {
+func Set[E any](client primitive.Client) func(name string) set.Builder[E] {
+	return func(name string) set.Builder[E] {
 		return set.NewBuilder[E](client, name)
 	}
 }

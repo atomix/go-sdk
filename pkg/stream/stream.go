@@ -33,3 +33,24 @@ func (s *channelStream[T]) Next() (T, error) {
 	}
 	return result.Value, result.Error
 }
+
+func NewTranscodingStream[I, O any](stream Stream[I], transcoder func(I) (O, error)) Stream[O] {
+	return &transcodingStream[I, O]{
+		stream:     stream,
+		transcoder: transcoder,
+	}
+}
+
+type transcodingStream[I, O any] struct {
+	stream     Stream[I]
+	transcoder func(I) (O, error)
+}
+
+func (s *transcodingStream[I, O]) Next() (O, error) {
+	var out O
+	in, err := s.stream.Next()
+	if err != nil {
+		return out, err
+	}
+	return s.transcoder(in)
+}

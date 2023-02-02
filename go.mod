@@ -3,9 +3,9 @@ module github.com/atomix/go-sdk
 go 1.19
 
 require (
-	github.com/atomix/atomix/api v0.8.0
+	github.com/atomix/atomix/api v0.9.2
 	github.com/atomix/atomix/protocols/rsm v0.5.2
-	github.com/atomix/atomix/runtime v0.8.3
+	github.com/atomix/atomix/runtime v0.9.0
 	github.com/atomix/atomix/sidecar v0.4.4
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.5.2
