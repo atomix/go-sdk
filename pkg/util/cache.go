@@ -172,3 +172,13 @@ func (c *KeyValueMirror[K, V]) Purge() {
 	c.values = make(map[K]primitive.Versioned[V])
 	c.mu.Unlock()
 }
+
+func (c *KeyValueMirror[K, V]) Copy() map[K]primitive.Versioned[V] {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	entries := make(map[K]primitive.Versioned[V])
+	for key, value := range c.values {
+		entries[key] = value
+	}
+	return entries
+}
