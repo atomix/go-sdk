@@ -166,7 +166,12 @@ func testMapOperations(t *testing.T, rule runtimev1.RoutingRule) {
 	assert.NoError(t, err)
 	assert.NotNil(t, value)
 
-	kv, err = map2.Put(context.Background(), "bar", "baz")
+	kv, err = map2.Insert(context.Background(), "foo", "baz")
+	assert.Error(t, err)
+	assert.True(t, errors.IsAlreadyExists(err))
+	assert.Nil(t, kv)
+
+	kv, err = map2.Insert(context.Background(), "bar", "baz")
 	assert.NoError(t, err)
 	assert.NotNil(t, kv)
 	assert.Equal(t, "baz", kv.Value)
@@ -183,6 +188,15 @@ func testMapOperations(t *testing.T, rule runtimev1.RoutingRule) {
 	value, err = stream.Next()
 	assert.NoError(t, err)
 	assert.NotNil(t, value)
+
+	entries, err := map1.List(context.Background())
+	for {
+		entry, err := entries.Next()
+		if err == io.EOF {
+			break
+		}
+		assert.NotNil(t, entry)
+	}
 
 	err = map2.Clear(context.Background())
 	assert.NoError(t, err)

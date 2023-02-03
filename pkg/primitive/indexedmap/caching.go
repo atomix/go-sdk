@@ -10,6 +10,7 @@ import (
 	"github.com/atomix/go-sdk/pkg/stream"
 	"github.com/atomix/go-sdk/pkg/util"
 	"io"
+	"sort"
 )
 
 func newCachingIndexedMap(ctx context.Context, m IndexedMap[string, []byte], size int) (IndexedMap[string, []byte], error) {
@@ -129,6 +130,9 @@ func (m *mirroredIndexedMap) Entries(ctx context.Context) (EntryStream[string, [
 	for _, value := range mirror {
 		entries = append(entries, value.Value)
 	}
+	sort.Slice(len(entries), func(i, j int) bool {
+		return entries[i].Index < entries[j].Index
+	})
 	return stream.NewSliceStream[*Entry[string, []byte]](entries), nil
 }
 

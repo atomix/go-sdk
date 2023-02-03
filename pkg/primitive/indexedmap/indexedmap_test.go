@@ -16,6 +16,7 @@ import (
 	"github.com/atomix/go-sdk/pkg/types"
 	gogotypes "github.com/gogo/protobuf/types"
 	"github.com/stretchr/testify/assert"
+	"io"
 	"math"
 	"testing"
 	"time"
@@ -77,6 +78,11 @@ func testIndexedMapOperations(t *testing.T, rule runtimev1.RoutingRule) {
 	assert.Nil(t, kv)
 	assert.True(t, errors.IsNotFound(err))
 
+	kv, err = map1.GetIndex(context.Background(), 0)
+	assert.Error(t, err)
+	assert.True(t, errors.IsNotFound(err))
+	assert.Nil(t, kv)
+
 	size, err := map1.Len(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, 0, size)
@@ -103,6 +109,11 @@ func testIndexedMapOperations(t *testing.T, rule runtimev1.RoutingRule) {
 	assert.Equal(t, "bar", kv.Value)
 	assert.NotEqual(t, primitive.Version(0), kv.Version)
 	version := kv.Version
+
+	kv, err = map1.GetIndex(context.Background(), 0)
+	assert.Error(t, err)
+	assert.True(t, errors.IsNotFound(err))
+	assert.Nil(t, kv)
 
 	size, err = map1.Len(context.Background())
 	assert.NoError(t, err)
@@ -212,6 +223,18 @@ func testIndexedMapOperations(t *testing.T, rule runtimev1.RoutingRule) {
 	assert.Error(t, err)
 	assert.Nil(t, kv)
 	assert.True(t, errors.IsNotFound(err))
+
+	entries, err := map1.List(context.Background())
+	kv, err = entries.Next()
+	assert.NoError(t, err)
+	assert.Equal(t, Index(3), kv.Index)
+	kv, err = entries.Next()
+	assert.NoError(t, err)
+	assert.Equal(t, Index(4), kv.Index)
+	kv, err = entries.Next()
+	assert.Error(t, err)
+	assert.Equal(t, io.EOF, err)
+	assert.Nil(t, kv)
 
 	kv, err = map1.RemoveIndex(context.Background(), 4)
 	assert.NoError(t, err)

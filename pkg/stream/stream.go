@@ -68,10 +68,10 @@ type sliceStream[T any] struct {
 
 func (s *sliceStream[T]) Next() (T, error) {
 	var elem T
-	if s.index > len(s.elems) {
+	if s.index >= len(s.elems) {
 		return elem, io.EOF
 	}
-	s.index++
 	elem = s.elems[s.index]
+	s.index++
 	return elem, nil
 }
