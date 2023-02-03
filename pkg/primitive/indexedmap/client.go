@@ -31,7 +31,11 @@ func (s *indexedMapsClient) Name() string {
 }
 
 func (s *indexedMapsClient) Close(ctx context.Context) error {
-	_, err := s.client.Close(ctx, &indexedmapv1.CloseRequest{})
+	_, err := s.client.Close(ctx, &indexedmapv1.CloseRequest{
+		ID: runtimev1.PrimitiveID{
+			Name: s.name,
+		},
+	})
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}

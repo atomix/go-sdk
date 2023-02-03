@@ -12,10 +12,10 @@ import (
 	"io"
 )
 
-func newCachingValue[V any](value Value[V]) (Value[V], error) {
-	cm := &cachingValue[V]{
+func newCachingValue(value Value[[]byte]) (Value[[]byte], error) {
+	cm := &cachingValue{
 		Value: value,
-		cache: util.NewValueCache[V](),
+		cache: util.NewValueCache[[]byte](),
 	}
 	if err := cm.open(); err != nil {
 		return nil, err
@@ -23,13 +23,13 @@ func newCachingValue[V any](value Value[V]) (Value[V], error) {
 	return cm, nil
 }
 
-type cachingValue[V any] struct {
-	Value[V]
-	cache   *util.ValueCache[V]
+type cachingValue struct {
+	Value[[]byte]
+	cache   *util.ValueCache[[]byte]
 	closeCh chan struct{}
 }
 
-func (v *cachingValue[V]) open() error {
+func (v *cachingValue) open() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	v.closeCh = make(chan struct{})
 	go func() {
@@ -52,11 +52,11 @@ func (v *cachingValue[V]) open() error {
 				log.Error(err)
 			} else {
 				switch e := event.(type) {
-				case *Created[V]:
+				case *Created[[]byte]:
 					v.cache.Store(e.Value)
-				case *Updated[V]:
+				case *Updated[[]byte]:
 					v.cache.Store(e.Value)
-				case *Deleted[V]:
+				case *Deleted[[]byte]:
 					v.cache.Delete(e.Value.Version)
 				}
 			}
@@ -65,7 +65,7 @@ func (v *cachingValue[V]) open() error {
 	return nil
 }
 
-func (v *cachingValue[V]) Set(ctx context.Context, value V, opts ...SetOption) (primitive.Versioned[V], error) {
+func (v *cachingValue) Set(ctx context.Context, value []byte, opts ...SetOption) (primitive.Versioned[[]byte], error) {
 	versioned, err := v.Value.Set(ctx, value, opts...)
 	if err != nil {
 		v.cache.Invalidate()
@@ -75,7 +75,7 @@ func (v *cachingValue[V]) Set(ctx context.Context, value V, opts ...SetOption) (
 	return versioned, err
 }
 
-func (v *cachingValue[V]) Update(ctx context.Context, value V, opts ...UpdateOption) (primitive.Versioned[V], error) {
+func (v *cachingValue) Update(ctx context.Context, value []byte, opts ...UpdateOption) (primitive.Versioned[[]byte], error) {
 	versioned, err := v.Value.Update(ctx, value, opts...)
 	if err != nil {
 		v.cache.Invalidate()
@@ -85,7 +85,7 @@ func (v *cachingValue[V]) Update(ctx context.Context, value V, opts ...UpdateOpt
 	return versioned, err
 }
 
-func (v *cachingValue[V]) Get(ctx context.Context, opts ...GetOption) (primitive.Versioned[V], error) {
+func (v *cachingValue) Get(ctx context.Context, opts ...GetOption) (primitive.Versioned[[]byte], error) {
 	if value, ok := v.cache.Load(); ok {
 		return *value, nil
 	}
@@ -93,13 +93,13 @@ func (v *cachingValue[V]) Get(ctx context.Context, opts ...GetOption) (primitive
 	value, err := v.Value.Get(ctx, opts...)
 	if err != nil {
 		v.cache.Invalidate()
-		return primitive.Versioned[V]{}, err
+		return primitive.Versioned[[]byte]{}, err
 	}
 	v.cache.Store(value)
 	return value, err
 }
 
-func (v *cachingValue[V]) Delete(ctx context.Context, opts ...DeleteOption) error {
+func (v *cachingValue) Delete(ctx context.Context, opts ...DeleteOption) error {
 	err := v.Value.Delete(ctx, opts...)
 	v.cache.Delete(0)
 	if err != nil {
@@ -108,7 +108,7 @@ func (v *cachingValue[V]) Delete(ctx context.Context, opts ...DeleteOption) erro
 	return nil
 }
 
-func (v *cachingValue[V]) Close(ctx context.Context) error {
+func (v *cachingValue) Close(ctx context.Context) error {
 	defer close(v.closeCh)
 	return v.Value.Close(ctx)
 }

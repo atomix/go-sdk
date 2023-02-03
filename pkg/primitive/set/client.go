@@ -31,7 +31,11 @@ func (s *setsClient) Name() string {
 }
 
 func (s *setsClient) Close(ctx context.Context) error {
-	_, err := s.client.Close(ctx, &setv1.CloseRequest{})
+	_, err := s.client.Close(ctx, &setv1.CloseRequest{
+		ID: runtimev1.PrimitiveID{
+			Name: s.name,
+		},
+	})
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}

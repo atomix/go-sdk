@@ -8,7 +8,6 @@ import (
 	"context"
 	"github.com/atomix/atomix/api/errors"
 	runtimev1 "github.com/atomix/atomix/api/runtime/v1"
-	atomicvaluev1 "github.com/atomix/atomix/api/runtime/value/v1"
 	valuev1 "github.com/atomix/atomix/api/runtime/value/v1"
 	"github.com/atomix/go-sdk/pkg/primitive"
 	"github.com/atomix/go-sdk/pkg/types"
@@ -58,28 +57,16 @@ func (b *valueBuilder[V]) Get(ctx context.Context) (Value[V], error) {
 		return nil, err
 	}
 
-	closer := func(ctx context.Context) error {
-		_, err := client.Close(ctx, &valuev1.CloseRequest{})
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-		return nil
-	}
-
-	var value Value[V] = &atomicValuePrimitive[V]{
-		Primitive: primitive.New(b.options.Name, closer),
-		client:    atomicvaluev1.NewValueClient(conn),
-		codec:     b.codec,
-	}
-
+	var value Value[[]byte]
 	config := response.Config
+	value = newValueClient(b.options.Name, valuev1.NewValueClient(conn))
 	if config.Cache.Enabled {
-		value, err = newCachingValue[V](value)
+		value, err = newCachingValue(value)
 		if err != nil {
 			return nil, err
 		}
 	}
-	return value, nil
+	return newTranscodingValue[V](value, b.codec), nil
 }
 
 var _ Builder[any] = (*valueBuilder[any])(nil)

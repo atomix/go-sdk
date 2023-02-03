@@ -31,7 +31,11 @@ func (s *electionsClient) Name() string {
 }
 
 func (s *electionsClient) Close(ctx context.Context) error {
-	_, err := s.client.Close(ctx, &electionv1.CloseRequest{})
+	_, err := s.client.Close(ctx, &electionv1.CloseRequest{
+		ID: runtimev1.PrimitiveID{
+			Name: s.name,
+		},
+	})
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
