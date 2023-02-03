@@ -20,6 +20,7 @@ func newCachingIndexedMap(ctx context.Context, m IndexedMap[string, []byte], siz
 			cachingIndexedMap: &cachingIndexedMap{
 				IndexedMap: m,
 				entries:    entries,
+				indexes:    indexes,
 			},
 			entries: entries,
 			indexes: indexes,
@@ -57,13 +58,24 @@ type cachedIndexedMap struct {
 
 func (m *cachedIndexedMap) Get(ctx context.Context, key string, opts ...GetOption) (*Entry[string, []byte], error) {
 	if value, ok := m.entries.Load(key); ok {
-		return &Entry[string, []byte]{
-			Key:       key,
-			Versioned: value.Value.Versioned,
-		}, nil
+		return value.Value, nil
 	}
 
 	entry, err := m.IndexedMap.Get(ctx, key, opts...)
+	if err != nil {
+		return nil, err
+	}
+	m.entries.Store(entry.Key, entry, entry.Version)
+	m.indexes.Store(entry.Index, entry, entry.Version)
+	return entry, nil
+}
+
+func (m *cachedIndexedMap) GetIndex(ctx context.Context, index Index, opts ...GetOption) (*Entry[string, []byte], error) {
+	if value, ok := m.indexes.Load(index); ok {
+		return value.Value, nil
+	}
+
+	entry, err := m.IndexedMap.GetIndex(ctx, index, opts...)
 	if err != nil {
 		return nil, err
 	}

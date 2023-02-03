@@ -8,7 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/atomix/atomix/api/errors"
-	mapv1 "github.com/atomix/atomix/api/runtime/map/v1"
+	indexedmapv1 "github.com/atomix/atomix/api/runtime/indexedmap/v1"
 	runtimev1 "github.com/atomix/atomix/api/runtime/v1"
 	"github.com/atomix/atomix/runtime/pkg/logging"
 	"github.com/atomix/go-sdk/pkg/primitive"
@@ -25,9 +25,9 @@ func TestIndexedMapOperations(t *testing.T) {
 	testIndexedMapOperations(t, runtimev1.RoutingRule{Names: []string{"*"}})
 }
 
-func TestCachingMapOperations(t *testing.T) {
-	config := mapv1.Config{
-		Cache: mapv1.CacheConfig{
+func TestCachingIndexedMapOperations(t *testing.T) {
+	config := indexedmapv1.Config{
+		Cache: indexedmapv1.CacheConfig{
 			Enabled: true,
 			Size_:   3,
 		},
@@ -42,9 +42,9 @@ func TestCachingMapOperations(t *testing.T) {
 	})
 }
 
-func TestMirroredMapOperations(t *testing.T) {
-	config := mapv1.Config{
-		Cache: mapv1.CacheConfig{
+func TestMirroredIndexedMapOperations(t *testing.T) {
+	config := indexedmapv1.Config{
+		Cache: indexedmapv1.CacheConfig{
 			Enabled: true,
 		},
 	}
@@ -61,7 +61,7 @@ func TestMirroredMapOperations(t *testing.T) {
 func testIndexedMapOperations(t *testing.T, rule runtimev1.RoutingRule) {
 	logging.SetLevel(logging.DebugLevel)
 
-	cluster := test.NewClient()
+	cluster := test.NewClient(rule)
 	defer cluster.Close()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
