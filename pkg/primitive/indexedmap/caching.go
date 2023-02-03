@@ -59,7 +59,10 @@ type cachedIndexedMap struct {
 }
 
 func (m *cachedIndexedMap) Get(ctx context.Context, key string, opts ...GetOption) (*Entry[string, []byte], error) {
-	if entry, ok := m.entries.Load(key); ok {
+	m.mu.RLock()
+	entry, ok := m.entries.Load(key)
+	m.mu.RUnlock()
+	if ok {
 		return entry, nil
 	}
 
@@ -72,7 +75,10 @@ func (m *cachedIndexedMap) Get(ctx context.Context, key string, opts ...GetOptio
 }
 
 func (m *cachedIndexedMap) GetIndex(ctx context.Context, index Index, opts ...GetOption) (*Entry[string, []byte], error) {
-	if entry, ok := m.indexes.Load(index); ok {
+	m.mu.RLock()
+	entry, ok := m.indexes.Load(index)
+	m.mu.RUnlock()
+	if ok {
 		return entry, nil
 	}
 
@@ -109,6 +115,8 @@ func (m *mirroredIndexedMap) open(ctx context.Context) error {
 }
 
 func (m *mirroredIndexedMap) Get(ctx context.Context, key string, opts ...GetOption) (*Entry[string, []byte], error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if entry, ok := m.entries.Load(key); ok {
 		return entry, nil
 	}
@@ -116,6 +124,8 @@ func (m *mirroredIndexedMap) Get(ctx context.Context, key string, opts ...GetOpt
 }
 
 func (m *mirroredIndexedMap) GetIndex(ctx context.Context, index Index, opts ...GetOption) (*Entry[string, []byte], error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if entry, ok := m.indexes.Load(index); ok {
 		return entry, nil
 	}
