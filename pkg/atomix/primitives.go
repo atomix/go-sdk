@@ -29,7 +29,7 @@ func LeaderElection(name string) election.Builder {
 	return client.LeaderElection(getClient())(name)
 }
 
-func List[E any](name string) *list.Builder[E] {
+func List[E any](name string) list.Builder[E] {
 	return client.List[E](getClient())(name)
 }
 

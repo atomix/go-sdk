@@ -13,30 +13,30 @@ import (
 	"github.com/atomix/go-sdk/pkg/types"
 )
 
-func NewBuilder[E any](client primitive.Client, name string) *Builder[E] {
-	return &Builder[E]{
+func NewBuilder[E any](client primitive.Client, name string) Builder[E] {
+	return &listBuilder[E]{
 		options: primitive.NewOptions(name),
 		client:  client,
 	}
 }
 
-type Builder[E any] struct {
+type listBuilder[E any] struct {
 	options *primitive.Options
 	client  primitive.Client
 	codec   types.Codec[E]
 }
 
-func (b *Builder[E]) Tag(tags ...string) *Builder[E] {
+func (b *listBuilder[E]) Tag(tags ...string) Builder[E] {
 	b.options.SetTags(tags...)
 	return b
 }
 
-func (b *Builder[E]) Codec(codec types.Codec[E]) *Builder[E] {
+func (b *listBuilder[E]) Codec(codec types.Codec[E]) Builder[E] {
 	b.codec = codec
 	return b
 }
 
-func (b *Builder[E]) Get(ctx context.Context) (List[E], error) {
+func (b *listBuilder[E]) Get(ctx context.Context) (List[E], error) {
 	conn, err := b.client.Connect(ctx)
 	if err != nil {
 		return nil, err
@@ -57,19 +57,9 @@ func (b *Builder[E]) Get(ctx context.Context) (List[E], error) {
 		return nil, err
 	}
 
-	closer := func(ctx context.Context) error {
-		_, err := client.Close(ctx, &listv1.CloseRequest{})
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-		return nil
-	}
-
-	return &listPrimitive[E]{
-		Primitive: primitive.New(b.options.Name, closer),
-		client:    listv1.NewListClient(conn),
-		codec:     b.codec,
-	}, nil
+	var list List[[]byte]
+	list = newListClient(b.options.Name, listv1.NewListClient(conn))
+	return newTranscodingList[E](list, b.codec), nil
 }
 
-var _ primitive.Builder[*Builder[any], List[any]] = (*Builder[any])(nil)
+var _ Builder[any] = (*listBuilder[any])(nil)

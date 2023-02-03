@@ -35,8 +35,8 @@ func LeaderElection(client primitive.Client) func(name string) election.Builder 
 	}
 }
 
-func List[E any](client primitive.Client) func(name string) *list.Builder[E] {
-	return func(name string) *list.Builder[E] {
+func List[E any](client primitive.Client) func(name string) list.Builder[E] {
+	return func(name string) list.Builder[E] {
 		return list.NewBuilder[E](client, name)
 	}
 }
