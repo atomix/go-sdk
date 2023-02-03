@@ -8,6 +8,7 @@ import (
 	"context"
 	"github.com/atomix/atomix/api/errors"
 	"github.com/atomix/go-sdk/pkg/primitive"
+	"github.com/atomix/go-sdk/pkg/stream"
 	"github.com/atomix/go-sdk/pkg/util/cache"
 	"io"
 )
@@ -117,6 +118,29 @@ func (v *cachingValue) Delete(ctx context.Context, opts ...DeleteOption) error {
 		return err
 	}
 	return nil
+}
+
+func (v *cachingValue) Events(ctx context.Context, opts ...EventsOption) (EventStream[[]byte], error) {
+	events, err := v.Value.Events(ctx, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return stream.NewInterceptingStream[Event[[]byte]](events, func(event Event[[]byte]) {
+		switch e := event.(type) {
+		case *Created[[]byte]:
+			v.cache.Store(e.Value, func(stored primitive.Versioned[[]byte]) bool {
+				return e.Value.Version == 0 || e.Value.Version > stored.Version
+			})
+		case *Updated[[]byte]:
+			v.cache.Store(e.Value, func(stored primitive.Versioned[[]byte]) bool {
+				return e.Value.Version == 0 || e.Value.Version > stored.Version
+			})
+		case *Deleted[[]byte]:
+			v.cache.Delete(func(stored primitive.Versioned[[]byte]) bool {
+				return e.Value.Version == 0 || e.Value.Version > stored.Version
+			})
+		}
+	}), nil
 }
 
 func (v *cachingValue) Close(ctx context.Context) error {

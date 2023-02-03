@@ -24,12 +24,12 @@ type transcodingValue[V any] struct {
 	codec types.Codec[V]
 }
 
-func (m *transcodingValue[V]) Set(ctx context.Context, value V, opts ...SetOption) (primitive.Versioned[V], error) {
-	bytes, err := m.codec.Encode(value)
+func (v *transcodingValue[V]) Set(ctx context.Context, value V, opts ...SetOption) (primitive.Versioned[V], error) {
+	bytes, err := v.codec.Encode(value)
 	if err != nil {
 		return primitive.Versioned[V]{}, errors.NewInvalid("value encoding failed", err)
 	}
-	versioned, err := m.Value.Set(ctx, bytes, opts...)
+	versioned, err := v.Value.Set(ctx, bytes, opts...)
 	if err != nil {
 		return primitive.Versioned[V]{}, err
 	}
@@ -39,12 +39,12 @@ func (m *transcodingValue[V]) Set(ctx context.Context, value V, opts ...SetOptio
 	}, nil
 }
 
-func (m *transcodingValue[V]) Update(ctx context.Context, value V, opts ...UpdateOption) (primitive.Versioned[V], error) {
-	bytes, err := m.codec.Encode(value)
+func (v *transcodingValue[V]) Update(ctx context.Context, value V, opts ...UpdateOption) (primitive.Versioned[V], error) {
+	bytes, err := v.codec.Encode(value)
 	if err != nil {
 		return primitive.Versioned[V]{}, errors.NewInvalid("value encoding failed", err)
 	}
-	versioned, err := m.Value.Update(ctx, bytes, opts...)
+	versioned, err := v.Value.Update(ctx, bytes, opts...)
 	if err != nil {
 		return primitive.Versioned[V]{}, err
 	}
@@ -54,12 +54,12 @@ func (m *transcodingValue[V]) Update(ctx context.Context, value V, opts ...Updat
 	}, nil
 }
 
-func (m *transcodingValue[V]) Get(ctx context.Context, opts ...GetOption) (primitive.Versioned[V], error) {
-	versioned, err := m.Value.Get(ctx, opts...)
+func (v *transcodingValue[V]) Get(ctx context.Context, opts ...GetOption) (primitive.Versioned[V], error) {
+	versioned, err := v.Value.Get(ctx, opts...)
 	if err != nil {
 		return primitive.Versioned[V]{}, err
 	}
-	value, err := m.codec.Decode(versioned.Value)
+	value, err := v.codec.Decode(versioned.Value)
 	if err != nil {
 		return primitive.Versioned[V]{}, errors.NewInvalid("value decoding failed", err)
 	}
@@ -69,13 +69,13 @@ func (m *transcodingValue[V]) Get(ctx context.Context, opts ...GetOption) (primi
 	}, nil
 }
 
-func (m *transcodingValue[V]) Watch(ctx context.Context) (ValueStream[V], error) {
-	elements, err := m.Value.Watch(ctx)
+func (v *transcodingValue[V]) Watch(ctx context.Context) (ValueStream[V], error) {
+	elements, err := v.Value.Watch(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return stream.NewTranscodingStream[primitive.Versioned[[]byte], primitive.Versioned[V]](elements, func(versioned primitive.Versioned[[]byte]) (primitive.Versioned[V], error) {
-		value, err := m.codec.Decode(versioned.Value)
+		value, err := v.codec.Decode(versioned.Value)
 		if err != nil {
 			return primitive.Versioned[V]{}, errors.NewInvalid("value decoding failed", err)
 		}
@@ -87,7 +87,7 @@ func (m *transcodingValue[V]) Watch(ctx context.Context) (ValueStream[V], error)
 }
 
 func (v *transcodingValue[V]) Events(ctx context.Context, opts ...EventsOption) (EventStream[V], error) {
-	events, err := v.Value.Events(ctx)
+	events, err := v.Value.Events(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}

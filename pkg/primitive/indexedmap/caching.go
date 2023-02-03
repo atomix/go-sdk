@@ -213,7 +213,7 @@ func (m *cachingIndexedMap) remove(entry *Entry[string, []byte]) {
 	m.mu.RLock()
 	stored, ok := m.indexes.Load(entry.Index)
 	m.mu.RUnlock()
-	if !ok || (entry.Version != 0 && stored.Version >= entry.Version) {
+	if !ok || (entry.Version != 0 && stored.Version > entry.Version) {
 		return
 	}
 

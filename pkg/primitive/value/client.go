@@ -54,17 +54,17 @@ type valueClient struct {
 	client valuev1.ValueClient
 }
 
-func (m *valueClient) Set(ctx context.Context, value []byte, opts ...SetOption) (primitive.Versioned[[]byte], error) {
+func (v *valueClient) Set(ctx context.Context, value []byte, opts ...SetOption) (primitive.Versioned[[]byte], error) {
 	request := &valuev1.SetRequest{
 		ID: runtimev1.PrimitiveID{
-			Name: m.Name(),
+			Name: v.Name(),
 		},
 		Value: value,
 	}
 	for i := range opts {
 		opts[i].beforeSet(request)
 	}
-	response, err := m.client.Set(ctx, request)
+	response, err := v.client.Set(ctx, request)
 	if err != nil {
 		return primitive.Versioned[[]byte]{}, err
 	}
@@ -77,17 +77,17 @@ func (m *valueClient) Set(ctx context.Context, value []byte, opts ...SetOption) 
 	}, nil
 }
 
-func (m *valueClient) Update(ctx context.Context, value []byte, opts ...UpdateOption) (primitive.Versioned[[]byte], error) {
+func (v *valueClient) Update(ctx context.Context, value []byte, opts ...UpdateOption) (primitive.Versioned[[]byte], error) {
 	request := &valuev1.UpdateRequest{
 		ID: runtimev1.PrimitiveID{
-			Name: m.Name(),
+			Name: v.Name(),
 		},
 		Value: value,
 	}
 	for i := range opts {
 		opts[i].beforeUpdate(request)
 	}
-	response, err := m.client.Update(ctx, request)
+	response, err := v.client.Update(ctx, request)
 	if err != nil {
 		return primitive.Versioned[[]byte]{}, err
 	}
@@ -100,16 +100,16 @@ func (m *valueClient) Update(ctx context.Context, value []byte, opts ...UpdateOp
 	}, nil
 }
 
-func (m *valueClient) Get(ctx context.Context, opts ...GetOption) (primitive.Versioned[[]byte], error) {
+func (v *valueClient) Get(ctx context.Context, opts ...GetOption) (primitive.Versioned[[]byte], error) {
 	request := &valuev1.GetRequest{
 		ID: runtimev1.PrimitiveID{
-			Name: m.Name(),
+			Name: v.Name(),
 		},
 	}
 	for i := range opts {
 		opts[i].beforeGet(request)
 	}
-	response, err := m.client.Get(ctx, request)
+	response, err := v.client.Get(ctx, request)
 	if err != nil {
 		return primitive.Versioned[[]byte]{}, err
 	}
@@ -122,16 +122,16 @@ func (m *valueClient) Get(ctx context.Context, opts ...GetOption) (primitive.Ver
 	}, nil
 }
 
-func (m *valueClient) Delete(ctx context.Context, opts ...DeleteOption) error {
+func (v *valueClient) Delete(ctx context.Context, opts ...DeleteOption) error {
 	request := &valuev1.DeleteRequest{
 		ID: runtimev1.PrimitiveID{
-			Name: m.Name(),
+			Name: v.Name(),
 		},
 	}
 	for i := range opts {
 		opts[i].beforeDelete(request)
 	}
-	response, err := m.client.Delete(ctx, request)
+	response, err := v.client.Delete(ctx, request)
 	if err != nil {
 		return err
 	}
@@ -141,13 +141,13 @@ func (m *valueClient) Delete(ctx context.Context, opts ...DeleteOption) error {
 	return nil
 }
 
-func (m *valueClient) Watch(ctx context.Context) (ValueStream[[]byte], error) {
+func (v *valueClient) Watch(ctx context.Context) (ValueStream[[]byte], error) {
 	request := &valuev1.WatchRequest{
 		ID: runtimev1.PrimitiveID{
-			Name: m.Name(),
+			Name: v.Name(),
 		},
 	}
-	client, err := m.client.Watch(ctx, request)
+	client, err := v.client.Watch(ctx, request)
 	if err != nil {
 		return nil, err
 	}
@@ -178,17 +178,17 @@ func (m *valueClient) Watch(ctx context.Context) (ValueStream[[]byte], error) {
 	return stream.NewChannelStream[primitive.Versioned[[]byte]](ch), nil
 }
 
-func (m *valueClient) Events(ctx context.Context, opts ...EventsOption) (EventStream[[]byte], error) {
+func (v *valueClient) Events(ctx context.Context, opts ...EventsOption) (EventStream[[]byte], error) {
 	request := &valuev1.EventsRequest{
 		ID: runtimev1.PrimitiveID{
-			Name: m.Name(),
+			Name: v.Name(),
 		},
 	}
 	for i := range opts {
 		opts[i].beforeEvents(request)
 	}
 
-	client, err := m.client.Events(ctx, request)
+	client, err := v.client.Events(ctx, request)
 	if err != nil {
 		return nil, err
 	}

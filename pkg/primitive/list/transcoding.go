@@ -83,7 +83,7 @@ func (l *transcodingList[E]) Watch(ctx context.Context) (ItemStream[E], error) {
 }
 
 func (l *transcodingList[E]) Events(ctx context.Context, opts ...EventsOption) (EventStream[E], error) {
-	events, err := l.List.Events(ctx)
+	events, err := l.List.Events(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}

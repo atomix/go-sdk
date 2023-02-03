@@ -134,7 +134,7 @@ func (m *transcodingIndexedMap[K, V]) Watch(ctx context.Context) (EntryStream[K,
 }
 
 func (m *transcodingIndexedMap[K, V]) Events(ctx context.Context, opts ...EventsOption) (EventStream[K, V], error) {
-	events, err := m.IndexedMap.Events(ctx)
+	events, err := m.IndexedMap.Events(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}

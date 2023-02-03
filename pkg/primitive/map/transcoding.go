@@ -163,7 +163,7 @@ func (m *transcodingMap[K, V]) Watch(ctx context.Context) (EntryStream[K, V], er
 }
 
 func (m *transcodingMap[K, V]) Events(ctx context.Context, opts ...EventsOption) (EventStream[K, V], error) {
-	events, err := m.Map.Events(ctx)
+	events, err := m.Map.Events(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
