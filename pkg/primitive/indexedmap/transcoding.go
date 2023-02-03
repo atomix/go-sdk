@@ -16,7 +16,8 @@ import (
 func newTranscodingIndexedMap[K scalar.Scalar, V any](parent IndexedMap[string, []byte], keyCodec types.Codec[K], valueCodec types.Codec[V]) IndexedMap[K, V] {
 	return &transcodingIndexedMap[K, V]{
 		IndexedMap: parent,
-		keyCodec:   keyCodec,
+		keyEncoder: scalar.NewEncodeFunc[K](),
+		keyDecoder: scalar.NewDecodeFunc[K](),
 		valueCodec: valueCodec,
 	}
 }
@@ -24,20 +25,17 @@ func newTranscodingIndexedMap[K scalar.Scalar, V any](parent IndexedMap[string, 
 // transcodingIndexedMap is the default single-partition implementation of Map
 type transcodingIndexedMap[K scalar.Scalar, V any] struct {
 	IndexedMap[string, []byte]
-	keyCodec   types.Codec[K]
+	keyEncoder func(K) string
+	keyDecoder func(string) (K, error)
 	valueCodec types.Codec[V]
 }
 
 func (m *transcodingIndexedMap[K, V]) Append(ctx context.Context, key K, value V, opts ...AppendOption) (*Entry[K, V], error) {
-	keyBytes, err := m.keyCodec.Encode(key)
-	if err != nil {
-		return nil, errors.NewInvalid("value encoding failed", err)
-	}
 	valueBytes, err := m.valueCodec.Encode(value)
 	if err != nil {
 		return nil, errors.NewInvalid("value encoding failed", err)
 	}
-	entry, err := m.IndexedMap.Append(ctx, string(keyBytes), valueBytes, opts...)
+	entry, err := m.IndexedMap.Append(ctx, m.keyEncoder(key), valueBytes, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -45,15 +43,11 @@ func (m *transcodingIndexedMap[K, V]) Append(ctx context.Context, key K, value V
 }
 
 func (m *transcodingIndexedMap[K, V]) Update(ctx context.Context, key K, value V, opts ...UpdateOption) (*Entry[K, V], error) {
-	keyBytes, err := m.keyCodec.Encode(key)
-	if err != nil {
-		return nil, errors.NewInvalid("value encoding failed", err)
-	}
 	valueBytes, err := m.valueCodec.Encode(value)
 	if err != nil {
 		return nil, errors.NewInvalid("value encoding failed", err)
 	}
-	entry, err := m.IndexedMap.Update(ctx, string(keyBytes), valueBytes, opts...)
+	entry, err := m.IndexedMap.Update(ctx, m.keyEncoder(key), valueBytes, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -61,11 +55,7 @@ func (m *transcodingIndexedMap[K, V]) Update(ctx context.Context, key K, value V
 }
 
 func (m *transcodingIndexedMap[K, V]) Get(ctx context.Context, key K, opts ...GetOption) (*Entry[K, V], error) {
-	keyBytes, err := m.keyCodec.Encode(key)
-	if err != nil {
-		return nil, errors.NewInvalid("value encoding failed", err)
-	}
-	entry, err := m.IndexedMap.Get(ctx, string(keyBytes), opts...)
+	entry, err := m.IndexedMap.Get(ctx, m.keyEncoder(key), opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -112,11 +102,7 @@ func (m *transcodingIndexedMap[K, V]) NextEntry(ctx context.Context, index Index
 	return m.decode(entry)
 }
 func (m *transcodingIndexedMap[K, V]) Remove(ctx context.Context, key K, opts ...RemoveOption) (*Entry[K, V], error) {
-	keyBytes, err := m.keyCodec.Encode(key)
-	if err != nil {
-		return nil, errors.NewInvalid("value encoding failed", err)
-	}
-	entry, err := m.IndexedMap.Remove(ctx, string(keyBytes), opts...)
+	entry, err := m.IndexedMap.Remove(ctx, m.keyEncoder(key), opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +177,7 @@ func (m *transcodingIndexedMap[K, V]) Events(ctx context.Context, opts ...Events
 }
 
 func (m *transcodingIndexedMap[K, V]) decode(entry *Entry[string, []byte]) (*Entry[K, V], error) {
-	key, err := m.keyCodec.Decode([]byte(entry.Key))
+	key, err := m.keyDecoder(entry.Key)
 	if err != nil {
 		return nil, errors.NewInvalid("key decoding failed", err)
 	}
