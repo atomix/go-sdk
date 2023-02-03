@@ -6,34 +6,50 @@ package lock
 
 import (
 	"context"
+	"github.com/atomix/atomix/api/errors"
 	lockv1 "github.com/atomix/atomix/api/runtime/lock/v1"
 	runtimev1 "github.com/atomix/atomix/api/runtime/v1"
 	"github.com/atomix/go-sdk/pkg/primitive"
 )
 
-// Lock provides distributed concurrency control
-type Lock interface {
-	primitive.Primitive
-
-	// Lock acquires the lock
-	Lock(ctx context.Context, opts ...LockOption) (Version, error)
-
-	// Unlock releases the lock
-	Unlock(ctx context.Context, opts ...UnlockOption) error
-
-	// Get gets the lock status
-	Get(ctx context.Context, opts ...GetOption) (Version, error)
+func newLocksClient(name string, client lockv1.LocksClient) primitive.Primitive {
+	return &locksClient{
+		name:   name,
+		client: client,
+	}
 }
 
-type Version uint64
+type locksClient struct {
+	name   string
+	client lockv1.LocksClient
+}
 
-// lockPrimitive is the single partition implementation of Lock
-type lockPrimitive struct {
+func (s *locksClient) Name() string {
+	return s.name
+}
+
+func (s *locksClient) Close(ctx context.Context) error {
+	_, err := s.client.Close(ctx, &lockv1.CloseRequest{})
+	if err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
+func newLockClient(name string, client lockv1.LockClient) Lock {
+	return &lockClient{
+		Primitive: newLocksClient(name, client),
+		client:    client,
+	}
+}
+
+// lockClient is the single partition implementation of Lock
+type lockClient struct {
 	primitive.Primitive
 	client lockv1.LockClient
 }
 
-func (l *lockPrimitive) Lock(ctx context.Context, opts ...LockOption) (Version, error) {
+func (l *lockClient) Lock(ctx context.Context, opts ...LockOption) (Version, error) {
 	request := &lockv1.LockRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: l.Name(),
@@ -52,7 +68,7 @@ func (l *lockPrimitive) Lock(ctx context.Context, opts ...LockOption) (Version, 
 	return Version(response.Version), nil
 }
 
-func (l *lockPrimitive) Unlock(ctx context.Context, opts ...UnlockOption) error {
+func (l *lockClient) Unlock(ctx context.Context, opts ...UnlockOption) error {
 	request := &lockv1.UnlockRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: l.Name(),
@@ -71,7 +87,7 @@ func (l *lockPrimitive) Unlock(ctx context.Context, opts ...UnlockOption) error 
 	return nil
 }
 
-func (l *lockPrimitive) Get(ctx context.Context, opts ...GetOption) (Version, error) {
+func (l *lockClient) Get(ctx context.Context, opts ...GetOption) (Version, error) {
 	request := &lockv1.GetLockRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: l.Name(),

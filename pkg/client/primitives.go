@@ -41,8 +41,8 @@ func List[E any](client primitive.Client) func(name string) list.Builder[E] {
 	}
 }
 
-func Lock(client primitive.Client) func(name string) *lock.Builder {
-	return func(name string) *lock.Builder {
+func Lock(client primitive.Client) func(name string) lock.Builder {
+	return func(name string) lock.Builder {
 		return lock.NewBuilder(client, name)
 	}
 }

@@ -12,24 +12,24 @@ import (
 	"github.com/atomix/go-sdk/pkg/primitive"
 )
 
-func NewBuilder(client primitive.Client, name string) *Builder {
-	return &Builder{
+func NewBuilder(client primitive.Client, name string) Builder {
+	return &lockBuilder{
 		options: primitive.NewOptions(name),
 		client:  client,
 	}
 }
 
-type Builder struct {
+type lockBuilder struct {
 	options *primitive.Options
 	client  primitive.Client
 }
 
-func (b *Builder) Tag(tags ...string) *Builder {
+func (b *lockBuilder) Tag(tags ...string) Builder {
 	b.options.SetTags(tags...)
 	return b
 }
 
-func (b *Builder) Get(ctx context.Context) (Lock, error) {
+func (b *lockBuilder) Get(ctx context.Context) (Lock, error) {
 	conn, err := b.client.Connect(ctx)
 	if err != nil {
 		return nil, err
@@ -46,19 +46,7 @@ func (b *Builder) Get(ctx context.Context) (Lock, error) {
 	if err != nil && !errors.IsAlreadyExists(err) {
 		return nil, err
 	}
-
-	closer := func(ctx context.Context) error {
-		_, err := client.Close(ctx, &lockv1.CloseRequest{})
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-		return nil
-	}
-
-	return &lockPrimitive{
-		Primitive: primitive.New(b.options.Name, closer),
-		client:    lockv1.NewLockClient(conn),
-	}, nil
+	return newLockClient(b.options.Name, lockv1.NewLockClient(conn)), nil
 }
 
-var _ primitive.Builder[*Builder, Lock] = (*Builder)(nil)
+var _ Builder = (*lockBuilder)(nil)

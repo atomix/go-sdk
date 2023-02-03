@@ -33,7 +33,7 @@ func List[E any](name string) list.Builder[E] {
 	return client.List[E](getClient())(name)
 }
 
-func Lock(name string) *lock.Builder {
+func Lock(name string) lock.Builder {
 	return client.Lock(getClient())(name)
 }
 
