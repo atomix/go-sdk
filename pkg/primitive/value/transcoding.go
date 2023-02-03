@@ -105,22 +105,22 @@ func (v *transcodingValue[V]) Events(ctx context.Context, opts ...EventsOption) 
 				},
 			}, nil
 		case *Updated[[]byte]:
-			oldValue, err := v.codec.Decode(e.OldValue.Value)
+			oldValue, err := v.codec.Decode(e.PrevValue.Value)
 			if err != nil {
 				return nil, errors.NewInvalid("value decoding failed", err)
 			}
-			newValue, err := v.codec.Decode(e.NewValue.Value)
+			newValue, err := v.codec.Decode(e.Value.Value)
 			if err != nil {
 				return nil, errors.NewInvalid("value decoding failed", err)
 			}
 			return &Updated[V]{
-				OldValue: primitive.Versioned[V]{
+				PrevValue: primitive.Versioned[V]{
 					Value:   oldValue,
-					Version: e.OldValue.Version,
+					Version: e.PrevValue.Version,
 				},
-				NewValue: primitive.Versioned[V]{
+				Value: primitive.Versioned[V]{
 					Value:   newValue,
-					Version: e.NewValue.Version,
+					Version: e.Value.Version,
 				},
 			}, nil
 		case *Deleted[[]byte]:

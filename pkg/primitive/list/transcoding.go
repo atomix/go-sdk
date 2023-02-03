@@ -98,17 +98,17 @@ func (l *transcodingList[E]) Events(ctx context.Context, opts ...EventsOption) (
 				Value: value,
 			}, nil
 		case *Updated[[]byte]:
-			oldValue, err := l.codec.Decode(e.OldValue)
+			oldValue, err := l.codec.Decode(e.PrevValue)
 			if err != nil {
 				return nil, err
 			}
-			newValue, err := l.codec.Decode(e.NewValue)
+			newValue, err := l.codec.Decode(e.Value)
 			if err != nil {
 				return nil, err
 			}
 			return &Updated[E]{
-				OldValue: oldValue,
-				NewValue: newValue,
+				PrevValue: oldValue,
+				Value:     newValue,
 			}, nil
 		case *Removed[[]byte]:
 			value, err := l.codec.Decode(e.Value)

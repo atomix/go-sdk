@@ -165,17 +165,17 @@ func (m *transcodingIndexedMap[K, V]) Events(ctx context.Context, opts ...Events
 				Entry: entry,
 			}, nil
 		case *Updated[string, []byte]:
-			oldEntry, err := m.decode(e.OldEntry)
+			oldEntry, err := m.decode(e.PrevEntry)
 			if err != nil {
 				return nil, err
 			}
-			newEntry, err := m.decode(e.NewEntry)
+			newEntry, err := m.decode(e.Entry)
 			if err != nil {
 				return nil, err
 			}
 			return &Updated[K, V]{
-				OldEntry: oldEntry,
-				NewEntry: newEntry,
+				PrevEntry: oldEntry,
+				Entry:     newEntry,
 			}, nil
 		case *Removed[string, []byte]:
 			entry, err := m.decode(e.Entry)

@@ -87,8 +87,8 @@ type Inserted[E any] struct {
 
 type Updated[E any] struct {
 	*grpcEvent
-	NewValue E
-	OldValue E
+	Value     E
+	PrevValue E
 }
 
 type Removed[E any] struct {

@@ -244,8 +244,8 @@ func (l *listClient) Events(ctx context.Context, opts ...EventsOption) (EventStr
 				ch <- stream.Result[Event[[]byte]]{
 					Value: &Updated[[]byte]{
 						grpcEvent: &grpcEvent{&response.Event},
-						NewValue:  e.Updated.Value.Value,
-						OldValue:  e.Updated.PrevValue.Value,
+						Value:     e.Updated.Value.Value,
+						PrevValue: e.Updated.PrevValue.Value,
 					},
 				}
 			case *listv1.Event_Removed_:

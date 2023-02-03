@@ -133,8 +133,8 @@ type Inserted[K scalar.Scalar, V any] struct {
 
 type Updated[K scalar.Scalar, V any] struct {
 	*grpcEvent
-	NewEntry *Entry[K, V]
-	OldEntry *Entry[K, V]
+	Entry     *Entry[K, V]
+	PrevEntry *Entry[K, V]
 }
 
 type Removed[K scalar.Scalar, V any] struct {

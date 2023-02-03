@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-func TestAtomicCounterOperations(t *testing.T) {
+func TestCounterOperations(t *testing.T) {
 	logging.SetLevel(logging.DebugLevel)
 
 	cluster := test.NewClient()

@@ -323,14 +323,14 @@ func (m *mapClient) Events(ctx context.Context, opts ...EventsOption) (EventStre
 				ch <- stream.Result[Event[string, []byte]]{
 					Value: &Updated[string, []byte]{
 						grpcEvent: &grpcEvent{&response.Event},
-						OldEntry: &Entry[string, []byte]{
+						PrevEntry: &Entry[string, []byte]{
 							Key: response.Event.Key,
 							Versioned: primitive.Versioned[[]byte]{
 								Value:   e.Updated.PrevValue.Value,
 								Version: primitive.Version(e.Updated.PrevValue.Version),
 							},
 						},
-						NewEntry: &Entry[string, []byte]{
+						Entry: &Entry[string, []byte]{
 							Key: response.Event.Key,
 							Versioned: primitive.Versioned[[]byte]{
 								Value:   e.Updated.Value.Value,

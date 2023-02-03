@@ -493,7 +493,7 @@ func (m *indexedMapClient) Events(ctx context.Context, opts ...EventsOption) (Ev
 				ch <- stream.Result[Event[string, []byte]]{
 					Value: &Updated[string, []byte]{
 						grpcEvent: &grpcEvent{&response.Event},
-						NewEntry: &Entry[string, []byte]{
+						Entry: &Entry[string, []byte]{
 							Key:   response.Event.Key,
 							Index: Index(response.Event.Index),
 							Versioned: primitive.Versioned[[]byte]{
@@ -501,7 +501,7 @@ func (m *indexedMapClient) Events(ctx context.Context, opts ...EventsOption) (Ev
 								Version: primitive.Version(e.Updated.Value.Version),
 							},
 						},
-						OldEntry: &Entry[string, []byte]{
+						PrevEntry: &Entry[string, []byte]{
 							Key:   response.Event.Key,
 							Index: Index(response.Event.Index),
 							Versioned: primitive.Versioned[[]byte]{

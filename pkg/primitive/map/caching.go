@@ -142,7 +142,7 @@ func (m *cachingMap) open() error {
 				case *Inserted[string, []byte]:
 					m.cache.Store(e.Entry.Key, e.Entry.Value, e.Entry.Version)
 				case *Updated[string, []byte]:
-					m.cache.Store(e.NewEntry.Key, e.NewEntry.Value, e.NewEntry.Version)
+					m.cache.Store(e.Entry.Key, e.Entry.Value, e.Entry.Version)
 				case *Removed[string, []byte]:
 					m.cache.Delete(e.Entry.Key, e.Entry.Version)
 				}

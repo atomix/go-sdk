@@ -236,11 +236,11 @@ func (m *valueClient) Events(ctx context.Context, opts ...EventsOption) (EventSt
 				ch <- stream.Result[Event[[]byte]]{
 					Value: &Updated[[]byte]{
 						grpcEvent: &grpcEvent{&response.Event},
-						NewValue: primitive.Versioned[[]byte]{
+						Value: primitive.Versioned[[]byte]{
 							Version: primitive.Version(e.Updated.Value.Version),
 							Value:   e.Updated.Value.Value,
 						},
-						OldValue: primitive.Versioned[[]byte]{
+						PrevValue: primitive.Versioned[[]byte]{
 							Version: primitive.Version(e.Updated.PrevValue.Version),
 							Value:   e.Updated.PrevValue.Value,
 						},

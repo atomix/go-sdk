@@ -55,7 +55,7 @@ func (v *cachingValue[V]) open() error {
 				case *Created[V]:
 					v.cache.Store(e.Value)
 				case *Updated[V]:
-					v.cache.Store(e.NewValue)
+					v.cache.Store(e.Value)
 				case *Deleted[V]:
 					v.cache.Delete(e.Value.Version)
 				}

@@ -155,8 +155,8 @@ func (m *cachingIndexedMap) open() error {
 					m.entries.Store(e.Entry.Key, e.Entry, e.Entry.Version)
 					m.indexes.Store(e.Entry.Index, e.Entry, e.Entry.Version)
 				case *Updated[string, []byte]:
-					m.entries.Store(e.NewEntry.Key, e.NewEntry, e.NewEntry.Version)
-					m.indexes.Store(e.NewEntry.Index, e.NewEntry, e.NewEntry.Version)
+					m.entries.Store(e.Entry.Key, e.Entry, e.Entry.Version)
+					m.indexes.Store(e.Entry.Index, e.Entry, e.Entry.Version)
 				case *Removed[string, []byte]:
 					m.entries.Delete(e.Entry.Key, e.Entry.Version)
 					m.indexes.Delete(e.Entry.Index, e.Entry.Version)
