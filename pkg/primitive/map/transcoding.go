@@ -6,7 +6,6 @@ package _map //nolint:golint
 
 import (
 	"context"
-	"encoding/base64"
 	"github.com/atomix/atomix/api/errors"
 	"github.com/atomix/go-sdk/pkg/primitive"
 	"github.com/atomix/go-sdk/pkg/stream"
@@ -37,7 +36,7 @@ func (m *transcodingMap[K, V]) Put(ctx context.Context, key K, value V, opts ...
 	if err != nil {
 		return nil, errors.NewInvalid("value encoding failed", err)
 	}
-	entry, err := m.Map.Put(ctx, base64.StdEncoding.EncodeToString(keyBytes), valueBytes, opts...)
+	entry, err := m.Map.Put(ctx, string(keyBytes), valueBytes, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +65,7 @@ func (m *transcodingMap[K, V]) Insert(ctx context.Context, key K, value V, opts 
 	if err != nil {
 		return nil, errors.NewInvalid("value encoding failed", err)
 	}
-	entry, err := m.Map.Insert(ctx, base64.StdEncoding.EncodeToString(keyBytes), valueBytes, opts...)
+	entry, err := m.Map.Insert(ctx, string(keyBytes), valueBytes, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +94,7 @@ func (m *transcodingMap[K, V]) Update(ctx context.Context, key K, value V, opts 
 	if err != nil {
 		return nil, errors.NewInvalid("value encoding failed", err)
 	}
-	entry, err := m.Map.Update(ctx, base64.StdEncoding.EncodeToString(keyBytes), valueBytes, opts...)
+	entry, err := m.Map.Update(ctx, string(keyBytes), valueBytes, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +119,7 @@ func (m *transcodingMap[K, V]) Get(ctx context.Context, key K, opts ...GetOption
 	if err != nil {
 		return nil, errors.NewInvalid("value encoding failed", err)
 	}
-	entry, err := m.Map.Get(ctx, base64.StdEncoding.EncodeToString(keyBytes), opts...)
+	entry, err := m.Map.Get(ctx, string(keyBytes), opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +144,7 @@ func (m *transcodingMap[K, V]) Remove(ctx context.Context, key K, opts ...Remove
 	if err != nil {
 		return nil, errors.NewInvalid("value encoding failed", err)
 	}
-	entry, err := m.Map.Remove(ctx, base64.StdEncoding.EncodeToString(keyBytes), opts...)
+	entry, err := m.Map.Remove(ctx, string(keyBytes), opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -225,11 +224,7 @@ func (m *transcodingMap[K, V]) Events(ctx context.Context, opts ...EventsOption)
 }
 
 func (m *transcodingMap[K, V]) decode(entry *Entry[string, []byte]) (*Entry[K, V], error) {
-	keyBytes, err := base64.StdEncoding.DecodeString(entry.Key)
-	if err != nil {
-		return nil, errors.NewInvalid("key decoding failed", err)
-	}
-	key, err := m.keyCodec.Decode(keyBytes)
+	key, err := m.keyCodec.Decode([]byte(entry.Key))
 	if err != nil {
 		return nil, errors.NewInvalid("key decoding failed", err)
 	}

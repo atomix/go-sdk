@@ -6,7 +6,6 @@ package indexedmap
 
 import (
 	"context"
-	"encoding/base64"
 	"github.com/atomix/atomix/api/errors"
 	"github.com/atomix/go-sdk/pkg/primitive"
 	"github.com/atomix/go-sdk/pkg/stream"
@@ -38,7 +37,7 @@ func (m *transcodingIndexedMap[K, V]) Append(ctx context.Context, key K, value V
 	if err != nil {
 		return nil, errors.NewInvalid("value encoding failed", err)
 	}
-	entry, err := m.IndexedMap.Append(ctx, base64.StdEncoding.EncodeToString(keyBytes), valueBytes, opts...)
+	entry, err := m.IndexedMap.Append(ctx, string(keyBytes), valueBytes, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +53,7 @@ func (m *transcodingIndexedMap[K, V]) Update(ctx context.Context, key K, value V
 	if err != nil {
 		return nil, errors.NewInvalid("value encoding failed", err)
 	}
-	entry, err := m.IndexedMap.Update(ctx, base64.StdEncoding.EncodeToString(keyBytes), valueBytes, opts...)
+	entry, err := m.IndexedMap.Update(ctx, string(keyBytes), valueBytes, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +65,7 @@ func (m *transcodingIndexedMap[K, V]) Get(ctx context.Context, key K, opts ...Ge
 	if err != nil {
 		return nil, errors.NewInvalid("value encoding failed", err)
 	}
-	entry, err := m.IndexedMap.Get(ctx, base64.StdEncoding.EncodeToString(keyBytes), opts...)
+	entry, err := m.IndexedMap.Get(ctx, string(keyBytes), opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -112,13 +111,12 @@ func (m *transcodingIndexedMap[K, V]) NextEntry(ctx context.Context, index Index
 	}
 	return m.decode(entry)
 }
-
 func (m *transcodingIndexedMap[K, V]) Remove(ctx context.Context, key K, opts ...RemoveOption) (*Entry[K, V], error) {
 	keyBytes, err := m.keyCodec.Encode(key)
 	if err != nil {
 		return nil, errors.NewInvalid("value encoding failed", err)
 	}
-	entry, err := m.IndexedMap.Remove(ctx, base64.StdEncoding.EncodeToString(keyBytes), opts...)
+	entry, err := m.IndexedMap.Remove(ctx, string(keyBytes), opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -193,11 +191,7 @@ func (m *transcodingIndexedMap[K, V]) Events(ctx context.Context, opts ...Events
 }
 
 func (m *transcodingIndexedMap[K, V]) decode(entry *Entry[string, []byte]) (*Entry[K, V], error) {
-	keyBytes, err := base64.StdEncoding.DecodeString(entry.Key)
-	if err != nil {
-		return nil, errors.NewInvalid("key decoding failed", err)
-	}
-	key, err := m.keyCodec.Decode(keyBytes)
+	key, err := m.keyCodec.Decode([]byte(entry.Key))
 	if err != nil {
 		return nil, errors.NewInvalid("key decoding failed", err)
 	}
