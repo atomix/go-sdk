@@ -8,14 +8,14 @@ import (
 	"context"
 	"github.com/atomix/atomix/api/errors"
 	"github.com/atomix/go-sdk/pkg/primitive"
-	"github.com/atomix/go-sdk/pkg/util"
+	"github.com/atomix/go-sdk/pkg/util/cache"
 	"io"
 )
 
 func newCachingValue(value Value[[]byte]) (Value[[]byte], error) {
 	cm := &cachingValue{
 		Value: value,
-		cache: util.NewValueCache[[]byte](),
+		cache: cache.NewValueCache[primitive.Versioned[[]byte]](),
 	}
 	if err := cm.open(); err != nil {
 		return nil, err
@@ -25,7 +25,7 @@ func newCachingValue(value Value[[]byte]) (Value[[]byte], error) {
 
 type cachingValue struct {
 	Value[[]byte]
-	cache   *util.ValueCache[[]byte]
+	cache   *cache.ValueCache[primitive.Versioned[[]byte]]
 	closeCh chan struct{}
 }
 
@@ -53,11 +53,17 @@ func (v *cachingValue) open() error {
 			} else {
 				switch e := event.(type) {
 				case *Created[[]byte]:
-					v.cache.Store(e.Value)
+					v.cache.Store(e.Value, func(stored primitive.Versioned[[]byte]) bool {
+						return e.Value.Version == 0 || e.Value.Version > stored.Version
+					})
 				case *Updated[[]byte]:
-					v.cache.Store(e.Value)
+					v.cache.Store(e.Value, func(stored primitive.Versioned[[]byte]) bool {
+						return e.Value.Version == 0 || e.Value.Version > stored.Version
+					})
 				case *Deleted[[]byte]:
-					v.cache.Delete(e.Value.Version)
+					v.cache.Delete(func(stored primitive.Versioned[[]byte]) bool {
+						return e.Value.Version == 0 || e.Value.Version > stored.Version
+					})
 				}
 			}
 		}
@@ -68,40 +74,45 @@ func (v *cachingValue) open() error {
 func (v *cachingValue) Set(ctx context.Context, value []byte, opts ...SetOption) (primitive.Versioned[[]byte], error) {
 	versioned, err := v.Value.Set(ctx, value, opts...)
 	if err != nil {
-		v.cache.Invalidate()
 		return versioned, err
 	}
-	v.cache.Store(versioned)
+	v.cache.Store(versioned, func(stored primitive.Versioned[[]byte]) bool {
+		return versioned.Version == 0 || versioned.Version > stored.Version
+	})
 	return versioned, err
 }
 
 func (v *cachingValue) Update(ctx context.Context, value []byte, opts ...UpdateOption) (primitive.Versioned[[]byte], error) {
 	versioned, err := v.Value.Update(ctx, value, opts...)
 	if err != nil {
-		v.cache.Invalidate()
 		return versioned, err
 	}
-	v.cache.Store(versioned)
+	v.cache.Store(versioned, func(stored primitive.Versioned[[]byte]) bool {
+		return versioned.Version == 0 || versioned.Version > stored.Version
+	})
 	return versioned, err
 }
 
 func (v *cachingValue) Get(ctx context.Context, opts ...GetOption) (primitive.Versioned[[]byte], error) {
 	if value, ok := v.cache.Load(); ok {
-		return *value, nil
+		return value, nil
 	}
 
 	value, err := v.Value.Get(ctx, opts...)
 	if err != nil {
-		v.cache.Invalidate()
 		return primitive.Versioned[[]byte]{}, err
 	}
-	v.cache.Store(value)
+	v.cache.Store(value, func(stored primitive.Versioned[[]byte]) bool {
+		return value.Version == 0 || value.Version > stored.Version
+	})
 	return value, err
 }
 
 func (v *cachingValue) Delete(ctx context.Context, opts ...DeleteOption) error {
 	err := v.Value.Delete(ctx, opts...)
-	v.cache.Delete(0)
+	v.cache.Delete(func(stored primitive.Versioned[[]byte]) bool {
+		return true
+	})
 	if err != nil {
 		return err
 	}

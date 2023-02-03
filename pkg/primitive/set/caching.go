@@ -7,7 +7,7 @@ package set
 import (
 	"context"
 	"github.com/atomix/atomix/api/errors"
-	"github.com/atomix/go-sdk/pkg/util"
+	"github.com/atomix/go-sdk/pkg/util/cache"
 	"io"
 )
 
@@ -16,7 +16,7 @@ func newCachingSet(ctx context.Context, m Set[string], size int) (Set[string], e
 	if size == 0 {
 		cm = &cachingSet{
 			Set:   m,
-			cache: util.NewKeyValueMirror[string, bool](),
+			cache: cache.NewKeyValueMirror[string, bool](),
 		}
 		elements, err := m.Elements(ctx)
 		if err != nil {
@@ -30,10 +30,12 @@ func newCachingSet(ctx context.Context, m Set[string], size int) (Set[string], e
 			if err != nil {
 				return nil, err
 			}
-			cm.cache.Store(element, true, 0)
+			cm.cache.Store(element, true, func(value bool) bool {
+				return true
+			})
 		}
 	} else {
-		cache, err := util.NewKeyValueLRU[string, bool](size)
+		cache, err := cache.NewKeyValueLRU[string, bool](size)
 		if err != nil {
 			return nil, err
 		}
@@ -51,7 +53,7 @@ func newCachingSet(ctx context.Context, m Set[string], size int) (Set[string], e
 
 type cachingSet struct {
 	Set[string]
-	cache   util.KeyValueCache[string, bool]
+	cache   cache.KeyValueCache[string, bool]
 	closeCh chan struct{}
 }
 
@@ -80,9 +82,13 @@ func (m *cachingSet) open() error {
 			} else {
 				switch e := event.(type) {
 				case *Added[string]:
-					m.cache.Store(e.Element, true, 0)
+					m.cache.Store(e.Element, true, func(value bool) bool {
+						return true
+					})
 				case *Removed[string]:
-					m.cache.Invalidate(e.Element)
+					m.cache.Delete(e.Element, func(value bool) bool {
+						return true
+					})
 				}
 			}
 		}
@@ -92,12 +98,11 @@ func (m *cachingSet) open() error {
 
 func (m *cachingSet) Add(ctx context.Context, value string) (bool, error) {
 	if ok, err := m.Set.Add(ctx, value); err != nil {
-		if !errors.IsAlreadyExists(err) && !errors.IsConflict(err) {
-			m.cache.Invalidate(value)
-		}
 		return false, err
 	} else if ok {
-		m.cache.Store(value, true, 0)
+		m.cache.Store(value, true, func(value bool) bool {
+			return true
+		})
 		return true, nil
 	}
 	return false, nil
@@ -105,13 +110,15 @@ func (m *cachingSet) Add(ctx context.Context, value string) (bool, error) {
 
 func (m *cachingSet) Contains(ctx context.Context, value string) (bool, error) {
 	if exists, ok := m.cache.Load(value); ok {
-		return exists.Value, nil
+		return exists, nil
 	}
 
 	if ok, err := m.Set.Contains(ctx, value); err != nil {
 		return false, err
 	} else if ok {
-		m.cache.Store(value, true, 0)
+		m.cache.Store(value, true, func(value bool) bool {
+			return true
+		})
 		return true, nil
 	}
 	return false, nil
@@ -119,12 +126,11 @@ func (m *cachingSet) Contains(ctx context.Context, value string) (bool, error) {
 
 func (m *cachingSet) Remove(ctx context.Context, value string) (bool, error) {
 	if ok, err := m.Set.Remove(ctx, value); err != nil {
-		if !errors.IsConflict(err) {
-			m.cache.Invalidate(value)
-		}
 		return false, err
 	} else if ok {
-		m.cache.Invalidate(value)
+		m.cache.Delete(value, func(value bool) bool {
+			return true
+		})
 		return true, nil
 	}
 	return false, nil

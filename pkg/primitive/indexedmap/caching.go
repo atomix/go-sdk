@@ -8,15 +8,16 @@ import (
 	"context"
 	"github.com/atomix/atomix/api/errors"
 	"github.com/atomix/go-sdk/pkg/stream"
-	"github.com/atomix/go-sdk/pkg/util"
+	"github.com/atomix/go-sdk/pkg/util/cache"
 	"io"
 	"sort"
+	"sync"
 )
 
 func newCachingIndexedMap(ctx context.Context, m IndexedMap[string, []byte], size int) (IndexedMap[string, []byte], error) {
 	if size == 0 {
-		entries := util.NewKeyValueMirror[string, *Entry[string, []byte]]()
-		indexes := util.NewKeyValueMirror[Index, *Entry[string, []byte]]()
+		entries := cache.NewUnsafeKeyValueMirror[string, *Entry[string, []byte]]()
+		indexes := cache.NewUnsafeKeyValueMirror[Index, *Entry[string, []byte]]()
 		mm := &mirroredIndexedMap{
 			cachingIndexedMap: &cachingIndexedMap{
 				IndexedMap: m,
@@ -32,11 +33,11 @@ func newCachingIndexedMap(ctx context.Context, m IndexedMap[string, []byte], siz
 		return mm, nil
 	}
 
-	entries, err := util.NewKeyValueLRU[string, *Entry[string, []byte]](size)
+	entries, err := cache.NewUnsafeKeyValueLRU[string, *Entry[string, []byte]](size)
 	if err != nil {
 		return nil, err
 	}
-	indexes, err := util.NewKeyValueLRU[Index, *Entry[string, []byte]](size)
+	indexes, err := cache.NewUnsafeKeyValueLRU[Index, *Entry[string, []byte]](size)
 	if err != nil {
 		return nil, err
 	}
@@ -58,37 +59,35 @@ type cachedIndexedMap struct {
 }
 
 func (m *cachedIndexedMap) Get(ctx context.Context, key string, opts ...GetOption) (*Entry[string, []byte], error) {
-	if value, ok := m.entries.Load(key); ok {
-		return value.Value, nil
+	if entry, ok := m.entries.Load(key); ok {
+		return entry, nil
 	}
 
 	entry, err := m.IndexedMap.Get(ctx, key, opts...)
 	if err != nil {
 		return nil, err
 	}
-	m.entries.Store(entry.Key, entry, entry.Version)
-	m.indexes.Store(entry.Index, entry, entry.Version)
+	m.update(entry)
 	return entry, nil
 }
 
 func (m *cachedIndexedMap) GetIndex(ctx context.Context, index Index, opts ...GetOption) (*Entry[string, []byte], error) {
-	if value, ok := m.indexes.Load(index); ok {
-		return value.Value, nil
+	if entry, ok := m.indexes.Load(index); ok {
+		return entry, nil
 	}
 
 	entry, err := m.IndexedMap.GetIndex(ctx, index, opts...)
 	if err != nil {
 		return nil, err
 	}
-	m.entries.Store(entry.Key, entry, entry.Version)
-	m.indexes.Store(entry.Index, entry, entry.Version)
+	m.update(entry)
 	return entry, nil
 }
 
 type mirroredIndexedMap struct {
 	*cachingIndexedMap
-	entries *util.KeyValueMirror[string, *Entry[string, []byte]]
-	indexes *util.KeyValueMirror[Index, *Entry[string, []byte]]
+	entries *cache.UnsafeKeyValueMirror[string, *Entry[string, []byte]]
+	indexes *cache.UnsafeKeyValueMirror[Index, *Entry[string, []byte]]
 }
 
 func (m *mirroredIndexedMap) open(ctx context.Context) error {
@@ -104,31 +103,32 @@ func (m *mirroredIndexedMap) open(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		m.entries.Store(entry.Key, entry, entry.Version)
-		m.indexes.Store(entry.Index, entry, entry.Version)
+		m.update(entry)
 	}
 	return m.cachingIndexedMap.open()
 }
 
 func (m *mirroredIndexedMap) Get(ctx context.Context, key string, opts ...GetOption) (*Entry[string, []byte], error) {
-	if value, ok := m.entries.Load(key); ok {
-		return value.Value, nil
+	if entry, ok := m.entries.Load(key); ok {
+		return entry, nil
 	}
 	return nil, errors.NewNotFound("key %s not found", key)
 }
 
 func (m *mirroredIndexedMap) GetIndex(ctx context.Context, index Index, opts ...GetOption) (*Entry[string, []byte], error) {
-	if value, ok := m.indexes.Load(index); ok {
-		return value.Value, nil
+	if entry, ok := m.indexes.Load(index); ok {
+		return entry, nil
 	}
 	return nil, errors.NewNotFound("index %d not found", index)
 }
 
 func (m *mirroredIndexedMap) Entries(ctx context.Context) (EntryStream[string, []byte], error) {
+	m.mu.RLock()
 	mirror := m.entries.Copy()
+	m.mu.RUnlock()
 	entries := make([]*Entry[string, []byte], 0, len(mirror))
-	for _, value := range mirror {
-		entries = append(entries, value.Value)
+	for _, entry := range mirror {
+		entries = append(entries, entry)
 	}
 	sort.Slice(len(entries), func(i, j int) bool {
 		return entries[i].Index < entries[j].Index
@@ -138,8 +138,9 @@ func (m *mirroredIndexedMap) Entries(ctx context.Context) (EntryStream[string, [
 
 type cachingIndexedMap struct {
 	IndexedMap[string, []byte]
-	entries util.KeyValueCache[string, *Entry[string, []byte]]
-	indexes util.KeyValueCache[Index, *Entry[string, []byte]]
+	entries cache.KeyValueCache[string, *Entry[string, []byte]]
+	indexes cache.KeyValueCache[Index, *Entry[string, []byte]]
+	mu      sync.RWMutex
 	closeCh chan struct{}
 }
 
@@ -168,14 +169,11 @@ func (m *cachingIndexedMap) open() error {
 			} else {
 				switch e := event.(type) {
 				case *Inserted[string, []byte]:
-					m.entries.Store(e.Entry.Key, e.Entry, e.Entry.Version)
-					m.indexes.Store(e.Entry.Index, e.Entry, e.Entry.Version)
+					m.update(e.Entry)
 				case *Updated[string, []byte]:
-					m.entries.Store(e.Entry.Key, e.Entry, e.Entry.Version)
-					m.indexes.Store(e.Entry.Index, e.Entry, e.Entry.Version)
+					m.update(e.Entry)
 				case *Removed[string, []byte]:
-					m.entries.Delete(e.Entry.Key, e.Entry.Version)
-					m.indexes.Delete(e.Entry.Index, e.Entry.Version)
+					m.remove(e.Entry)
 				}
 			}
 		}
@@ -183,56 +181,93 @@ func (m *cachingIndexedMap) open() error {
 	return nil
 }
 
+func (m *cachingIndexedMap) update(entry *Entry[string, []byte]) {
+	m.mu.RLock()
+	stored, ok := m.indexes.Load(entry.Index)
+	m.mu.RUnlock()
+	if ok && entry.Version != 0 && stored.Version >= entry.Version {
+		return
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.entries.Store(entry.Key, entry, func(stored *Entry[string, []byte]) bool {
+		return entry.Version == 0 || entry.Version > stored.Version
+	})
+	m.indexes.Store(entry.Index, entry, func(stored *Entry[string, []byte]) bool {
+		return entry.Version == 0 || entry.Version > stored.Version
+	})
+}
+
+func (m *cachingIndexedMap) remove(entry *Entry[string, []byte]) {
+	m.mu.RLock()
+	stored, ok := m.indexes.Load(entry.Index)
+	m.mu.RUnlock()
+	if !ok || (entry.Version != 0 && stored.Version >= entry.Version) {
+		return
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.entries.Delete(entry.Key, func(stored *Entry[string, []byte]) bool {
+		return entry.Version == 0 || entry.Version >= stored.Version
+	})
+	m.indexes.Delete(entry.Index, func(stored *Entry[string, []byte]) bool {
+		return entry.Version == 0 || entry.Version >= stored.Version
+	})
+}
+
 func (m *cachingIndexedMap) Append(ctx context.Context, key string, value []byte, opts ...AppendOption) (*Entry[string, []byte], error) {
 	entry, err := m.IndexedMap.Append(ctx, key, value, opts...)
 	if err != nil {
-		if !errors.IsAlreadyExists(err) && !errors.IsConflict(err) {
-			m.entries.Invalidate(key)
-		}
 		return nil, err
 	}
-	m.entries.Store(key, entry, entry.Version)
-	m.indexes.Store(entry.Index, entry, entry.Version)
+	m.update(entry)
 	return entry, nil
 }
 
 func (m *cachingIndexedMap) Update(ctx context.Context, key string, value []byte, opts ...UpdateOption) (*Entry[string, []byte], error) {
 	entry, err := m.IndexedMap.Update(ctx, key, value, opts...)
 	if err != nil {
-		if !errors.IsConflict(err) {
-			m.entries.Invalidate(key)
-		}
 		return nil, err
 	}
-	m.entries.Store(key, entry, entry.Version)
-	m.indexes.Store(entry.Index, entry, entry.Version)
+	m.update(entry)
 	return entry, nil
 }
 
 func (m *cachingIndexedMap) Remove(ctx context.Context, key string, opts ...RemoveOption) (*Entry[string, []byte], error) {
 	entry, err := m.IndexedMap.Remove(ctx, key, opts...)
 	if err != nil {
-		if !errors.IsConflict(err) {
-			m.entries.Invalidate(key)
-		}
 		return nil, err
 	}
-	m.entries.Delete(key, entry.Version)
-	m.indexes.Delete(entry.Index, entry.Version)
+	m.remove(entry)
 	return entry, nil
 }
 
 func (m *cachingIndexedMap) RemoveIndex(ctx context.Context, index Index, opts ...RemoveOption) (*Entry[string, []byte], error) {
 	entry, err := m.IndexedMap.RemoveIndex(ctx, index, opts...)
 	if err != nil {
-		if !errors.IsConflict(err) {
-			m.indexes.Invalidate(index)
-		}
 		return nil, err
 	}
-	m.entries.Delete(entry.Key, entry.Version)
-	m.indexes.Delete(entry.Index, entry.Version)
+	m.remove(entry)
 	return entry, nil
+}
+
+func (m *cachingIndexedMap) Events(ctx context.Context, opts ...EventsOption) (EventStream[string, []byte], error) {
+	events, err := m.IndexedMap.Events(ctx, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return stream.NewInterceptingStream[Event[string, []byte]](events, func(event Event[string, []byte]) {
+		switch e := event.(type) {
+		case *Inserted[string, []byte]:
+			m.update(e.Entry)
+		case *Updated[string, []byte]:
+			m.update(e.Entry)
+		case *Removed[string, []byte]:
+			m.remove(e.Entry)
+		}
+	}), nil
 }
 
 func (m *cachingIndexedMap) Clear(ctx context.Context) error {

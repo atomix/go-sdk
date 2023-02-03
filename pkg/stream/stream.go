@@ -55,6 +55,26 @@ func (s *transcodingStream[I, O]) Next() (O, error) {
 	return s.transcoder(in)
 }
 
+func NewInterceptingStream[T any](stream Stream[T], interceptor func(T)) Stream[T] {
+	return &interceptingStream[T]{
+		stream:      stream,
+		interceptor: interceptor,
+	}
+}
+
+type interceptingStream[T any] struct {
+	stream      Stream[T]
+	interceptor func(T)
+}
+
+func (s *interceptingStream[T]) Next() (T, error) {
+	t, err := s.stream.Next()
+	if err == nil {
+		s.interceptor(t)
+	}
+	return t, err
+}
+
 func NewSliceStream[T any](elems []T) Stream[T] {
 	return &sliceStream[T]{
 		elems: elems,

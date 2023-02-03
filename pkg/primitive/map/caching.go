@@ -8,13 +8,13 @@ import (
 	"context"
 	"github.com/atomix/atomix/api/errors"
 	"github.com/atomix/go-sdk/pkg/stream"
-	"github.com/atomix/go-sdk/pkg/util"
+	"github.com/atomix/go-sdk/pkg/util/cache"
 	"io"
 )
 
 func newCachingMap(ctx context.Context, m Map[string, []byte], size int) (Map[string, []byte], error) {
 	if size == 0 {
-		mirror := util.NewKeyValueMirror[string, []byte]()
+		mirror := cache.NewKeyValueMirror[string, *Entry[string, []byte]]()
 		mm := &mirroredMap{
 			cachingMap: &cachingMap{
 				Map:   m,
@@ -28,7 +28,7 @@ func newCachingMap(ctx context.Context, m Map[string, []byte], size int) (Map[st
 		return mm, nil
 	}
 
-	cache, err := util.NewKeyValueLRU[string, []byte](size)
+	cache, err := cache.NewKeyValueLRU[string, *Entry[string, []byte]](size)
 	if err != nil {
 		return nil, err
 	}
@@ -49,24 +49,23 @@ type cachedMap struct {
 }
 
 func (m *cachedMap) Get(ctx context.Context, key string, opts ...GetOption) (*Entry[string, []byte], error) {
-	if value, ok := m.cache.Load(key); ok {
-		return &Entry[string, []byte]{
-			Key:       key,
-			Versioned: *value,
-		}, nil
+	if entry, ok := m.cache.Load(key); ok {
+		return entry, nil
 	}
 
 	entry, err := m.Map.Get(ctx, key, opts...)
 	if err != nil {
 		return nil, err
 	}
-	m.cache.Store(entry.Key, entry.Value, entry.Version)
+	m.cache.Store(entry.Key, entry, func(stored *Entry[string, []byte]) bool {
+		return entry.Version == 0 || entry.Version > stored.Version
+	})
 	return entry, nil
 }
 
 type mirroredMap struct {
 	*cachingMap
-	mirror *util.KeyValueMirror[string, []byte]
+	mirror *cache.KeyValueMirror[string, *Entry[string, []byte]]
 }
 
 func (m *mirroredMap) open(ctx context.Context) error {
@@ -82,17 +81,16 @@ func (m *mirroredMap) open(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		m.cache.Store(entry.Key, entry.Value, entry.Version)
+		m.cache.Store(entry.Key, entry, func(stored *Entry[string, []byte]) bool {
+			return entry.Version == 0 || entry.Version > stored.Version
+		})
 	}
 	return m.cachingMap.open()
 }
 
 func (m *mirroredMap) Get(ctx context.Context, key string, opts ...GetOption) (*Entry[string, []byte], error) {
-	if value, ok := m.cache.Load(key); ok {
-		return &Entry[string, []byte]{
-			Key:       key,
-			Versioned: *value,
-		}, nil
+	if entry, ok := m.cache.Load(key); ok {
+		return entry, nil
 	}
 	return nil, errors.NewNotFound("key %s not found", key)
 }
@@ -100,18 +98,15 @@ func (m *mirroredMap) Get(ctx context.Context, key string, opts ...GetOption) (*
 func (m *mirroredMap) Entries(ctx context.Context) (EntryStream[string, []byte], error) {
 	mirror := m.mirror.Copy()
 	entries := make([]*Entry[string, []byte], 0, len(mirror))
-	for key, value := range mirror {
-		entries = append(entries, &Entry[string, []byte]{
-			Key:       key,
-			Versioned: value,
-		})
+	for _, entry := range mirror {
+		entries = append(entries, entry)
 	}
 	return stream.NewSliceStream[*Entry[string, []byte]](entries), nil
 }
 
 type cachingMap struct {
 	Map[string, []byte]
-	cache   util.KeyValueCache[string, []byte]
+	cache   cache.KeyValueCache[string, *Entry[string, []byte]]
 	closeCh chan struct{}
 }
 
@@ -140,11 +135,17 @@ func (m *cachingMap) open() error {
 			} else {
 				switch e := event.(type) {
 				case *Inserted[string, []byte]:
-					m.cache.Store(e.Entry.Key, e.Entry.Value, e.Entry.Version)
+					m.cache.Store(e.Entry.Key, e.Entry, func(stored *Entry[string, []byte]) bool {
+						return e.Entry.Version == 0 || e.Entry.Version > stored.Version
+					})
 				case *Updated[string, []byte]:
-					m.cache.Store(e.Entry.Key, e.Entry.Value, e.Entry.Version)
+					m.cache.Store(e.Entry.Key, e.Entry, func(stored *Entry[string, []byte]) bool {
+						return e.Entry.Version == 0 || e.Entry.Version > stored.Version
+					})
 				case *Removed[string, []byte]:
-					m.cache.Delete(e.Entry.Key, e.Entry.Version)
+					m.cache.Delete(e.Entry.Key, func(stored *Entry[string, []byte]) bool {
+						return e.Entry.Version == 0 || e.Entry.Version >= stored.Version
+					})
 				}
 			}
 		}
@@ -155,49 +156,68 @@ func (m *cachingMap) open() error {
 func (m *cachingMap) Put(ctx context.Context, key string, value []byte, opts ...PutOption) (*Entry[string, []byte], error) {
 	entry, err := m.Map.Put(ctx, key, value, opts...)
 	if err != nil {
-		if !errors.IsAlreadyExists(err) && !errors.IsConflict(err) {
-			m.cache.Invalidate(key)
-		}
 		return nil, err
 	}
-	m.cache.Store(key, entry.Value, entry.Version)
+	m.cache.Store(key, entry, func(stored *Entry[string, []byte]) bool {
+		return entry.Version == 0 || entry.Version > stored.Version
+	})
 	return entry, nil
 }
 
 func (m *cachingMap) Insert(ctx context.Context, key string, value []byte, opts ...InsertOption) (*Entry[string, []byte], error) {
 	entry, err := m.Map.Insert(ctx, key, value, opts...)
 	if err != nil {
-		if !errors.IsAlreadyExists(err) && !errors.IsConflict(err) {
-			m.cache.Invalidate(key)
-		}
 		return nil, err
 	}
-	m.cache.Store(key, entry.Value, entry.Version)
+	m.cache.Store(key, entry, func(stored *Entry[string, []byte]) bool {
+		return entry.Version == 0 || entry.Version > stored.Version
+	})
 	return entry, nil
 }
 
 func (m *cachingMap) Update(ctx context.Context, key string, value []byte, opts ...UpdateOption) (*Entry[string, []byte], error) {
 	entry, err := m.Map.Update(ctx, key, value, opts...)
 	if err != nil {
-		if !errors.IsConflict(err) {
-			m.cache.Invalidate(key)
-		}
 		return nil, err
 	}
-	m.cache.Store(key, entry.Value, entry.Version)
+	m.cache.Store(key, entry, func(stored *Entry[string, []byte]) bool {
+		return entry.Version == 0 || entry.Version > stored.Version
+	})
 	return entry, nil
 }
 
 func (m *cachingMap) Remove(ctx context.Context, key string, opts ...RemoveOption) (*Entry[string, []byte], error) {
 	entry, err := m.Map.Remove(ctx, key, opts...)
 	if err != nil {
-		if !errors.IsConflict(err) {
-			m.cache.Invalidate(key)
-		}
 		return nil, err
 	}
-	m.cache.Delete(key, entry.Version)
+	m.cache.Delete(key, func(stored *Entry[string, []byte]) bool {
+		return entry.Version == 0 || entry.Version >= stored.Version
+	})
 	return entry, nil
+}
+
+func (m *cachingMap) Events(ctx context.Context, opts ...EventsOption) (EventStream[string, []byte], error) {
+	events, err := m.Map.Events(ctx, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return stream.NewInterceptingStream[Event[string, []byte]](events, func(event Event[string, []byte]) {
+		switch e := event.(type) {
+		case *Inserted[string, []byte]:
+			m.cache.Store(e.Entry.Key, e.Entry, func(stored *Entry[string, []byte]) bool {
+				return e.Entry.Version == 0 || e.Entry.Version > stored.Version
+			})
+		case *Updated[string, []byte]:
+			m.cache.Store(e.Entry.Key, e.Entry, func(stored *Entry[string, []byte]) bool {
+				return e.Entry.Version == 0 || e.Entry.Version > stored.Version
+			})
+		case *Removed[string, []byte]:
+			m.cache.Delete(e.Entry.Key, func(stored *Entry[string, []byte]) bool {
+				return e.Entry.Version == 0 || e.Entry.Version >= stored.Version
+			})
+		}
+	}), nil
 }
 
 func (m *cachingMap) Clear(ctx context.Context) error {
