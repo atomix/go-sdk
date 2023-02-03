@@ -10,6 +10,7 @@ import (
 	lockv1 "github.com/atomix/atomix/api/runtime/lock/v1"
 	runtimev1 "github.com/atomix/atomix/api/runtime/v1"
 	"github.com/atomix/go-sdk/pkg/primitive"
+	"time"
 )
 
 func newLocksClient(name string, client lockv1.LocksClient) primitive.Primitive {
@@ -58,6 +59,10 @@ func (l *lockClient) Lock(ctx context.Context, opts ...LockOption) (Version, err
 		ID: runtimev1.PrimitiveID{
 			Name: l.Name(),
 		},
+	}
+	if deadline, ok := ctx.Deadline(); ok {
+		timeout := time.Until(deadline)
+		request.Timeout = &timeout
 	}
 	for i := range opts {
 		opts[i].beforeLock(request)
