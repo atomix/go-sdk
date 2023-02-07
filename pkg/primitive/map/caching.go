@@ -232,3 +232,88 @@ func (m *cachingMap) Close(ctx context.Context) error {
 	defer close(m.closeCh)
 	return m.Map.Close(ctx)
 }
+
+func (m *cachingMap) Transaction(ctx context.Context) Transaction[string, []byte] {
+	return &cachingTransaction{
+		cachingMap:  m,
+		Transaction: m.Map.Transaction(ctx),
+	}
+}
+
+type cachingOpType int
+
+const (
+	cachingPut cachingOpType = iota
+	cachingInsert
+	cachingUpdate
+	cachingRemove
+)
+
+type cachingOp struct {
+	key string
+	op  cachingOpType
+}
+
+type cachingTransaction struct {
+	*cachingMap
+	Transaction[string, []byte]
+	operations []cachingOp
+}
+
+func (t *cachingTransaction) Put(key string, value []byte, opts ...PutOption) Transaction[string, []byte] {
+	t.operations = append(t.operations, cachingOp{
+		key: key,
+		op:  cachingPut,
+	})
+	return t.Transaction.Put(key, value, opts...)
+}
+
+func (t *cachingTransaction) Insert(key string, value []byte, opts ...InsertOption) Transaction[string, []byte] {
+	t.operations = append(t.operations, cachingOp{
+		key: key,
+		op:  cachingInsert,
+	})
+	return t.Transaction.Insert(key, value, opts...)
+}
+
+func (t *cachingTransaction) Update(key string, value []byte, opts ...UpdateOption) Transaction[string, []byte] {
+	t.operations = append(t.operations, cachingOp{
+		key: key,
+		op:  cachingUpdate,
+	})
+	return t.Transaction.Update(key, value, opts...)
+}
+
+func (t *cachingTransaction) Remove(key string, opts ...RemoveOption) Transaction[string, []byte] {
+	t.operations = append(t.operations, cachingOp{
+		key: key,
+		op:  cachingRemove,
+	})
+	return t.Transaction.Remove(key, opts...)
+}
+
+func (t *cachingTransaction) Commit() ([]*Entry[string, []byte], error) {
+	entries, err := t.Transaction.Commit()
+	if err != nil {
+		return nil, err
+	}
+	for i, operation := range t.operations {
+		entry := entries[i]
+		switch operation.op {
+		case cachingPut, cachingInsert, cachingUpdate:
+			t.cache.Store(entry.Key, entry, func(stored *Entry[string, []byte]) bool {
+				return entry.Version == 0 || entry.Version > stored.Version
+			})
+		case cachingRemove:
+			t.cache.Delete(entry.Key, func(stored *Entry[string, []byte]) bool {
+				return entry.Version == 0 || entry.Version >= stored.Version
+			})
+		}
+	}
+	for _, entry := range entries {
+		t.cache.Store(entry.Key, entry, func(stored *Entry[string, []byte]) bool {
+			return entry.Version == 0 || entry.Version > stored.Version
+		})
+	}
+	return entries, nil
+}
