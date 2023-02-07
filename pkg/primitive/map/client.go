@@ -463,6 +463,10 @@ func (t *transactionClient) Remove(key string, opts ...RemoveOption) Transaction
 }
 
 func (t *transactionClient) Commit() ([]*Entry[string, []byte], error) {
+	if len(t.operations) == 0 {
+		return nil, nil
+	}
+
 	request := &mapv1.CommitRequest{
 		ID: runtimev1.PrimitiveID{
 			Name: t.Name(),
