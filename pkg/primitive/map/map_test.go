@@ -54,6 +54,98 @@ func TestMapEntries(t *testing.T) {
 	}
 }
 
+func TestMapTransactions(t *testing.T) {
+	testMapTransactions(t, runtimev1.RoutingRule{Names: []string{"*"}})
+}
+
+func TestCachingMapTransactions(t *testing.T) {
+	config := mapv1.Config{
+		Cache: mapv1.CacheConfig{
+			Enabled: true,
+			Size_:   3,
+		},
+	}
+	bytes, err := json.Marshal(config)
+	assert.NoError(t, err)
+	testMapTransactions(t, runtimev1.RoutingRule{
+		Names: []string{"*"},
+		Config: &gogotypes.Any{
+			Value: bytes,
+		},
+	})
+}
+
+func TestMirroredMapTransactions(t *testing.T) {
+	config := mapv1.Config{
+		Cache: mapv1.CacheConfig{
+			Enabled: true,
+		},
+	}
+	bytes, err := json.Marshal(config)
+	assert.NoError(t, err)
+	testMapTransactions(t, runtimev1.RoutingRule{
+		Names: []string{"*"},
+		Config: &gogotypes.Any{
+			Value: bytes,
+		},
+	})
+}
+
+func testMapTransactions(t *testing.T, rule runtimev1.RoutingRule) {
+	logging.SetLevel(logging.DebugLevel)
+
+	client := test.NewClient(rule)
+	defer client.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	map1, err := NewBuilder[string, string](client, "test").
+		Codec(types.Scalar[string]()).
+		Get(ctx)
+	assert.NoError(t, err)
+
+	map2, err := NewBuilder[string, string](client, "test").
+		Codec(types.Scalar[string]()).
+		Get(ctx)
+	assert.NoError(t, err)
+
+	kv, err := map1.Get(context.Background(), "foo")
+	assert.Error(t, err)
+	assert.True(t, errors.IsNotFound(err))
+	assert.Nil(t, kv)
+
+	_, err = map1.Transaction(context.Background()).
+		Put("foo", "bar").
+		Insert("bar", "baz").
+		Update("baz", "bar").
+		Commit()
+	assert.Error(t, err)
+	assert.True(t, errors.IsNotFound(err))
+
+	entries, err := map1.Transaction(context.Background()).
+		Put("foo", "bar").
+		Insert("bar", "baz").
+		Insert("baz", "foo").
+		Commit()
+	assert.NoError(t, err)
+	assert.Len(t, entries, 3)
+	assert.Equal(t, "foo", entries[0].Key)
+	assert.Equal(t, "bar", entries[0].Value)
+	assert.Equal(t, "bar", entries[1].Key)
+	assert.Equal(t, "baz", entries[1].Value)
+	assert.Equal(t, "baz", entries[2].Key)
+	assert.Equal(t, "foo", entries[2].Value)
+
+	kv, err = map1.Get(context.Background(), "foo")
+	assert.NoError(t, err)
+	assert.Equal(t, "bar", kv.Value)
+
+	kv, err = map2.Get(context.Background(), "bar")
+	assert.NoError(t, err)
+	assert.Equal(t, "baz", kv.Value)
+}
+
 func TestMapOperations(t *testing.T) {
 	testMapOperations(t, runtimev1.RoutingRule{Names: []string{"*"}})
 }

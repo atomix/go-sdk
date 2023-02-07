@@ -205,6 +205,13 @@ func (m *transcodingMap[K, V]) Events(ctx context.Context, opts ...EventsOption)
 	}), nil
 }
 
+func (m *transcodingMap[K, V]) Transaction(ctx context.Context) Transaction[K, V] {
+	return &transcodingTransaction[K, V]{
+		transcodingMap: m,
+		Transaction:    m.Map.Transaction(ctx),
+	}
+}
+
 func (m *transcodingMap[K, V]) decode(entry *Entry[string, []byte]) (*Entry[K, V], error) {
 	key, err := m.keyDecoder(entry.Key)
 	if err != nil {
@@ -221,4 +228,75 @@ func (m *transcodingMap[K, V]) decode(entry *Entry[string, []byte]) (*Entry[K, V
 		},
 		Key: key,
 	}, nil
+}
+
+type transcodingTransaction[K scalar.Scalar, V any] struct {
+	*transcodingMap[K, V]
+	Transaction[string, []byte]
+	operations []func() error
+}
+
+func (t *transcodingTransaction[K, V]) Put(key K, value V, opts ...PutOption) Transaction[K, V] {
+	t.operations = append(t.operations, func() error {
+		valueBytes, err := t.valueCodec.Encode(value)
+		if err != nil {
+			return errors.NewInvalid("value encoding failed", err)
+		}
+		t.Transaction.Put(t.keyEncoder(key), valueBytes, opts...)
+		return nil
+	})
+	return t
+}
+
+func (t *transcodingTransaction[K, V]) Insert(key K, value V, opts ...InsertOption) Transaction[K, V] {
+	t.operations = append(t.operations, func() error {
+		valueBytes, err := t.valueCodec.Encode(value)
+		if err != nil {
+			return errors.NewInvalid("value encoding failed", err)
+		}
+		t.Transaction.Insert(t.keyEncoder(key), valueBytes, opts...)
+		return nil
+	})
+	return t
+}
+
+func (t *transcodingTransaction[K, V]) Update(key K, value V, opts ...UpdateOption) Transaction[K, V] {
+	t.operations = append(t.operations, func() error {
+		valueBytes, err := t.valueCodec.Encode(value)
+		if err != nil {
+			return errors.NewInvalid("value encoding failed", err)
+		}
+		t.Transaction.Update(t.keyEncoder(key), valueBytes, opts...)
+		return nil
+	})
+	return t
+}
+
+func (t *transcodingTransaction[K, V]) Remove(key K, opts ...RemoveOption) Transaction[K, V] {
+	t.operations = append(t.operations, func() error {
+		t.Transaction.Remove(t.keyEncoder(key), opts...)
+		return nil
+	})
+	return t
+}
+
+func (t *transcodingTransaction[K, V]) Commit() ([]*Entry[K, V], error) {
+	for _, operation := range t.operations {
+		if err := operation(); err != nil {
+			return nil, err
+		}
+	}
+	results, err := t.Transaction.Commit()
+	if err != nil {
+		return nil, err
+	}
+	entries := make([]*Entry[K, V], len(results))
+	for i, result := range results {
+		entry, err := t.decode(result)
+		if err != nil {
+			return nil, err
+		}
+		entries[i] = entry
+	}
+	return entries, nil
 }

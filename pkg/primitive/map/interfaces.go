@@ -61,6 +61,26 @@ type Map[K scalar.Scalar, V any] interface {
 	// This is a non-blocking method. If the method returns without error, map events will be pushed onto
 	// the given channel in the order in which they occur.
 	Events(ctx context.Context, opts ...EventsOption) (EventStream[K, V], error)
+
+	Transaction(ctx context.Context) Transaction[K, V]
+}
+
+// Transaction is a map transaction
+type Transaction[K scalar.Scalar, V any] interface {
+	// Put sets a key/value pair in the map
+	Put(key K, value V, opts ...PutOption) Transaction[K, V]
+
+	// Insert sets a key/value pair in the map
+	Insert(key K, value V, opts ...InsertOption) Transaction[K, V]
+
+	// Update sets a key/value pair in the map
+	Update(key K, value V, opts ...UpdateOption) Transaction[K, V]
+
+	// Remove removes a key from the map
+	Remove(key K, opts ...RemoveOption) Transaction[K, V]
+
+	// Commit commits the transaction and returns the results
+	Commit() ([]*Entry[K, V], error)
 }
 
 type EntryStream[K scalar.Scalar, V any] stream.Stream[*Entry[K, V]]

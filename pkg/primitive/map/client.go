@@ -368,3 +368,148 @@ func (m *mapClient) Events(ctx context.Context, opts ...EventsOption) (EventStre
 		return nil, ctx.Err()
 	}
 }
+
+func (m *mapClient) Transaction(ctx context.Context) Transaction[string, []byte] {
+	return &transactionClient{
+		mapClient: m,
+		ctx:       ctx,
+	}
+}
+
+type transactionClient struct {
+	*mapClient
+	ctx        context.Context
+	operations []mapv1.CommitRequest_Operation
+}
+
+func (t *transactionClient) Put(key string, value []byte, opts ...PutOption) Transaction[string, []byte] {
+	request := &mapv1.PutRequest{
+		Key:   key,
+		Value: value,
+	}
+	for _, opt := range opts {
+		opt.beforePut(request)
+	}
+	t.operations = append(t.operations, mapv1.CommitRequest_Operation{
+		Operation: &mapv1.CommitRequest_Operation_Put{
+			Put: &mapv1.CommitRequest_Put{
+				Key:         request.Key,
+				Value:       request.Value,
+				TTL:         request.TTL,
+				PrevVersion: request.PrevVersion,
+			},
+		},
+	})
+	return t
+}
+
+func (t *transactionClient) Insert(key string, value []byte, opts ...InsertOption) Transaction[string, []byte] {
+	request := &mapv1.InsertRequest{
+		Key:   key,
+		Value: value,
+	}
+	for _, opt := range opts {
+		opt.beforeInsert(request)
+	}
+	t.operations = append(t.operations, mapv1.CommitRequest_Operation{
+		Operation: &mapv1.CommitRequest_Operation_Insert{
+			Insert: &mapv1.CommitRequest_Insert{
+				Key:   request.Key,
+				Value: request.Value,
+				TTL:   request.TTL,
+			},
+		},
+	})
+	return t
+}
+
+func (t *transactionClient) Update(key string, value []byte, opts ...UpdateOption) Transaction[string, []byte] {
+	request := &mapv1.UpdateRequest{
+		Key:   key,
+		Value: value,
+	}
+	for _, opt := range opts {
+		opt.beforeUpdate(request)
+	}
+	t.operations = append(t.operations, mapv1.CommitRequest_Operation{
+		Operation: &mapv1.CommitRequest_Operation_Update{
+			Update: &mapv1.CommitRequest_Update{
+				Key:         request.Key,
+				Value:       request.Value,
+				TTL:         request.TTL,
+				PrevVersion: request.PrevVersion,
+			},
+		},
+	})
+	return t
+}
+
+func (t *transactionClient) Remove(key string, opts ...RemoveOption) Transaction[string, []byte] {
+	request := &mapv1.RemoveRequest{
+		Key: key,
+	}
+	for _, opt := range opts {
+		opt.beforeRemove(request)
+	}
+	t.operations = append(t.operations, mapv1.CommitRequest_Operation{
+		Operation: &mapv1.CommitRequest_Operation_Remove{
+			Remove: &mapv1.CommitRequest_Remove{
+				Key:         request.Key,
+				PrevVersion: request.PrevVersion,
+			},
+		},
+	})
+	return t
+}
+
+func (t *transactionClient) Commit() ([]*Entry[string, []byte], error) {
+	request := &mapv1.CommitRequest{
+		ID: runtimev1.PrimitiveID{
+			Name: t.Name(),
+		},
+		Operations: t.operations,
+	}
+	response, err := t.client.Commit(t.ctx, request)
+	if err != nil {
+		return nil, err
+	}
+	entries := make([]*Entry[string, []byte], len(t.operations))
+	for i, operation := range t.operations {
+		result := response.Results[i]
+		switch o := operation.Operation.(type) {
+		case *mapv1.CommitRequest_Operation_Put:
+			entries[i] = &Entry[string, []byte]{
+				Key: o.Put.Key,
+				Versioned: primitive.Versioned[[]byte]{
+					Value:   o.Put.Value,
+					Version: primitive.Version(result.GetPut().Version),
+				},
+			}
+		case *mapv1.CommitRequest_Operation_Insert:
+			entries[i] = &Entry[string, []byte]{
+				Key: o.Insert.Key,
+				Versioned: primitive.Versioned[[]byte]{
+					Value:   o.Insert.Value,
+					Version: primitive.Version(result.GetInsert().Version),
+				},
+			}
+		case *mapv1.CommitRequest_Operation_Update:
+			entries[i] = &Entry[string, []byte]{
+				Key: o.Update.Key,
+				Versioned: primitive.Versioned[[]byte]{
+					Value:   o.Update.Value,
+					Version: primitive.Version(result.GetUpdate().Version),
+				},
+			}
+		case *mapv1.CommitRequest_Operation_Remove:
+			entries[i] = &Entry[string, []byte]{
+				Key: o.Remove.Key,
+				Versioned: primitive.Versioned[[]byte]{
+					Value:   result.GetRemove().Value.Value,
+					Version: primitive.Version(result.GetRemove().Value.Version),
+				},
+			}
+		}
+	}
+	return entries, nil
+}
