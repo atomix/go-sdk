@@ -27,6 +27,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"os"
+	"sync"
 	"sync/atomic"
 )
 
@@ -55,9 +56,12 @@ type Client struct {
 	types    []runtimeapiv1.PrimitiveType
 	rules    []runtimeapiv1.RoutingRule
 	runtimes []*sidecar.Service
+	mu       sync.Mutex
 }
 
 func (c *Client) start() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if c.node != nil {
 		return nil
 	}
@@ -100,7 +104,9 @@ func (c *Client) Connect(ctx context.Context) (*grpc.ClientConn, error) {
 	if err := service.Start(); err != nil {
 		return nil, err
 	}
+	c.mu.Lock()
 	c.runtimes = append(c.runtimes, service)
+	c.mu.Unlock()
 
 	config := rsmapiv1.ProtocolConfig{
 		Partitions: []rsmapiv1.PartitionConfig{
@@ -150,6 +156,8 @@ func (c *Client) connect(ctx context.Context, target string) (*grpc.ClientConn, 
 }
 
 func (c *Client) Close() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	for _, proxy := range c.runtimes {
 		_ = proxy.Stop()
 	}
